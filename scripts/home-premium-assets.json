@@ -1,0 +1,21 @@
+{
+  "generator": "Built-in image_gen",
+  "mode": "Edición y composición guiada por imágenes de los frascos conceptuales existentes",
+  "assets": [
+    {
+      "name": "editorial-essential-v3",
+      "source": "C:/Users/USUARIO/.codex/generated_images/01a097a9-5d43-72c3-9e56-29e1fb6b1905/exec-836451cb-37eb-4061-92dd-46189c8c9d2b.png",
+      "references": ["public/images/cedre-960.webp"],
+      "prompt": "Use case: compositing. Asset type: premium niche perfume storefront editorial photograph, wide landscape 16:9, highest photographic quality. Use the referenced image as the exact bottle identity: tall clear rectangular perfume flacon with thick glass base, pale straw liquid, narrow tall matte black rectangular cap and a blank ivory rectangular front label. Preserve these proportions and label with no text. Re-stage this same bottle for a quiet luxury photography campaign. One single bottle upright on a broad smooth ivory limestone slab, right third of the image, whole bottle and cap visible. Large luminous off-white plaster backdrop with clean empty negative space across the left half for HTML headline overlay. Very refined natural side light, controlled translucent glass highlights, long soft architectural shadow across stone, a single slim piece of weathered pale wood lying low beside the base on the far right. Editorial still life, high-end medium format photography, subtle real material grain, no excessive golden tint. Composition should work as a landscape 16:9 image, bottle occupies about 60 percent of height and centered around 73 percent of image width. Background left must remain light, smooth, nearly white and uncluttered so black typography will read clearly. No typography in the image, no logos, no watermark, no added products, no flowers, no leaves, no decorative graphics."
+    },
+    {
+      "name": "featured-duo-v3",
+      "source": "C:/Users/USUARIO/.codex/generated_images/01a097a9-5d43-72c3-9e56-29e1fb6b1905/exec-ae4772a4-581b-403e-ad3e-4b8c96accf25.png",
+      "references": [
+        "public/images/sillage-960.webp",
+        "public/images/cedre-960.webp"
+      ],
+      "prompt": "Use case: compositing. Asset type: editorial still life for a curated perfume selection, landscape 4:3 photograph, highest quality. The two references identify exactly the two existing mock perfume bottles: 1 olive-green rectangular glass bottle with rounded shoulders, black dome-topped cylindrical cap, blank ivory rectangular label; 2 tall clear rectangular glass bottle with pale straw liquid, matte black tall rectangular cap, blank ivory label. Preserve both identities, silhouettes and labels without text. Place both bottles together on a matte pale warm-gray stone surface against a clean very light warm gray studio background. Thoughtful sculptural composition: olive green bottle upright in the central-left foreground, clear bottle upright behind and slightly right on one low rectangular ivory stone plinth, clearly visible and smaller in perspective. Both complete with breathing room above caps and below bases. Strong natural side light, refined cast shadow and glass caustics, subtle real photographic imperfections, tactile stone. High-end contemporary fragrance magazine product photography, clean, elegant, sculptural, confident, neutral restrained palette. Objects centered within the middle 65 percent of the frame so a portrait 4:5 center crop still includes both complete bottles. No words, no logos, no decorative graphics, no additional bottles, no foliage or flowers, no strong golden color grading."
+    }
+  ]
+}

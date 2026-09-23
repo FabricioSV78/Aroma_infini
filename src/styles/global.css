@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './base.css';
+@import './entrance.css';
+@import './dialog.css';
+@import './navigation.css';
+@import './home.css';
+@import './home-motion.css';
+@import './store-motion.css';
+@import './product-card.css';
+@import './footer.css';
+@import './catalog.css';
+@import './product-detail.css';
+@import './commerce.css';
+@import './checkout.css';
+@import './account.css';
+@import './institutional.css';
+@import './admin.css';
+@import './typography.css';
+@import './store-shell.css';
+@import './previews.css';
+@import './admin-product-preview.css';
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-display);
+  --color-ink: var(--color-ink);
+}

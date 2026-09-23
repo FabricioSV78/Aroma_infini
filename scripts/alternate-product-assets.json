@@ -1,0 +1,9 @@
+{
+  "prompt": "Edit target: the supplied perfume product photograph. Create an alternate studio photograph of EXACTLY THE SAME bottle for an ecommerce image-hover transition. Preserve the glass geometry, liquid color, blank label proportions, original cap shape and materials. Change the presentation: bottle viewed from a clear three-quarter angle, its cap removed and placed upright beside it on the same surface, revealing a realistic spray atomizer. Bottle and cap both fully visible, grouped centrally with generous margins. Same near-white seamless studio backdrop, soft natural product shadows, premium realistic glass reflections. Portrait 4:5 composition. No text, logos, extra bottles, plants, props, packaging, borders or watermark. This is a conceptual demonstration product, not a real branded item.",
+  "assets": {
+    "cedre": "C:\\Users\\USUARIO\\.codex\\generated_images\\01a097a9-5d43-72c3-9e56-29e1fb6b1905\\exec-b042ede1-366f-4ebe-a52b-069aa012ff9b.png",
+    "petale": "C:\\Users\\USUARIO\\.codex\\generated_images\\01a097a9-5d43-72c3-9e56-29e1fb6b1905\\exec-d29a817d-80dc-4be9-b727-185260e37bb0.png",
+    "sillage": "C:\\Users\\USUARIO\\.codex\\generated_images\\01a097a9-5d43-72c3-9e56-29e1fb6b1905\\exec-87cc73d1-7c85-4305-8bde-019429d66bd6.png",
+    "ambre": "C:\\Users\\USUARIO\\.codex\\generated_images\\01a097a9-5d43-72c3-9e56-29e1fb6b1905\\exec-54f5caec-242d-4b8c-ad86-3eb36a3a3b3d.png"
+  }
+}

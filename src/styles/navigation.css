@@ -1,0 +1,190 @@
+/* Navegación pública completa: disclosure en escritorio y grupos táctiles. */
+.navigation-panel[hidden],
+.mobile-group-panel[hidden] {
+  display: none;
+}
+.navigation-panel {
+  display: none;
+}
+.navigation-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.navigation-columns h3 {
+  color: var(--color-muted);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  margin-bottom: 12px;
+}
+.navigation-columns ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.navigation-columns a {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding-block: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  text-underline-offset: 5px;
+}
+.navigation-columns a > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+.navigation-columns a:is(:hover, :focus-visible, [aria-current]) {
+  text-decoration: underline;
+}
+.navigation-columns a:is(:hover, :focus-visible, [aria-current]) > svg {
+  opacity: 1;
+  transform: translateX(2px);
+}
+.menu-dialog {
+  width: min(480px, 100%);
+  overscroll-behavior: contain;
+}
+.mobile-navigation > .mobile-home-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  min-height: 44px;
+  border: 0;
+  margin-bottom: 8px;
+}
+.mobile-nav-group {
+  border-bottom: 1px solid var(--color-line);
+}
+.mobile-nav-group > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-ink);
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  text-align: left;
+}
+.mobile-nav-group > button > svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(90deg);
+  transition: transform 180ms ease;
+}
+.mobile-nav-group > button[aria-expanded='true'] > svg {
+  transform: rotate(-90deg);
+}
+.mobile-group-panel {
+  padding-block: 16px 24px;
+}
+.mobile-group-panel .navigation-columns {
+  gap: 20px;
+}
+.mobile-group-panel .navigation-columns a {
+  font-size: 13px;
+}
+.mobile-group-panel .navigation-columns a > svg {
+  display: none;
+}
+.menu-dialog .mobile-secondary {
+  gap: 8px 24px;
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: 20px;
+}
+
+@media (min-width: 1200px) {
+  .desktop-nav {
+    align-items: center;
+    height: 100%;
+    gap: clamp(12px, 1.5vw, 26px);
+  }
+  .desktop-menu-item {
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+  .nav-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    border: 0;
+    padding: 8px 0;
+    background: transparent;
+    color: var(--color-ink);
+    font-size: 13px;
+    text-underline-offset: 7px;
+  }
+  .nav-trigger > svg {
+    width: 12px;
+    height: 12px;
+    transform: rotate(90deg);
+    transition: transform 180ms ease;
+  }
+  .nav-trigger[aria-expanded='true'],
+  .nav-trigger:hover {
+    text-decoration: underline;
+  }
+  .nav-trigger[aria-expanded='true'] > svg {
+    transform: rotate(-90deg);
+  }
+  .navigation-panel {
+    display: block;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: calc(100dvh - var(--header-height) - 26px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--color-canvas);
+    border-bottom: 1px solid var(--color-line);
+    animation: navigation-reveal 180ms ease;
+  }
+  .navigation-panel-inner {
+    position: relative;
+    width: min(calc(100% - var(--entrance-gutter) * 2), 1120px);
+    margin-inline: auto;
+    padding-block: 36px;
+    display: grid;
+    grid-template-columns: 0.9fr 2.1fr;
+    gap: 64px;
+  }
+  .navigation-intro h2 {
+    margin-top: 0;
+    font-size: clamp(28px, 2.3vw, 34px);
+    line-height: 1.12;
+    letter-spacing: -0.045em;
+    max-width: 300px;
+  }
+  .navigation-columns {
+    gap: 32px;
+  }
+  .navigation-close {
+    position: absolute;
+    right: -12px;
+    top: 0;
+  }
+}
+@keyframes navigation-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

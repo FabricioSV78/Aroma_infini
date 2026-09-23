@@ -1,0 +1,325 @@
+.institutional-page {
+  padding-bottom: clamp(76px, 9vw, 128px);
+}
+
+.institutional-intro {
+  display: grid;
+  gap: 16px;
+  max-width: 900px;
+  padding-block: clamp(36px, 7vw, 96px);
+}
+
+.institutional-intro .eyebrow {
+  color: var(--color-muted);
+}
+
+.institutional-intro h1 {
+  max-width: 15ch;
+  font-family: var(--font-display);
+  font-size: var(--type-title-page);
+  line-height: 0.98;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+
+.institutional-intro > p:last-child {
+  max-width: 680px;
+  color: var(--color-muted);
+  font-size: var(--type-body);
+  line-height: 1.7;
+}
+
+.institutional-about-visual {
+  position: relative;
+  margin: 0;
+  background: var(--color-surface);
+}
+
+.institutional-about-visual img {
+  width: 100%;
+  max-height: min(76vh, 880px);
+  object-fit: cover;
+}
+
+.institutional-about-visual figcaption {
+  position: absolute;
+  right: var(--gutter);
+  bottom: 12px;
+  padding: 7px 9px;
+  background: rgb(255 255 255 / 0.88);
+  font-size: 10px;
+}
+
+.institutional-story-grid {
+  display: grid;
+  padding-block: clamp(64px, 9vw, 128px);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.institutional-story-grid section,
+.institutional-facts section,
+.institutional-process section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-block: 26px;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-story-grid section > span,
+.institutional-facts section > span,
+.institutional-process section > span,
+.institutional-legal-sections section > span {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.institutional-story-grid h2,
+.institutional-contact-grid h2,
+.institutional-complaints-state h2 {
+  font-family: var(--font-display);
+  font-size: var(--type-title-sm);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.institutional-story-grid section > p:last-child,
+.institutional-contact-grid section > p,
+.institutional-process p,
+.institutional-facts p {
+  max-width: 48ch;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.institutional-closing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-top: 40px;
+}
+
+.institutional-closing p {
+  max-width: 540px;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  line-height: 1.2;
+}
+
+.institutional-contact-grid {
+  display: grid;
+  gap: clamp(48px, 8vw, 120px);
+  padding-top: 28px;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-contact-grid section {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.institutional-contact-grid .text-link {
+  justify-self: start;
+  margin-top: 10px;
+}
+
+.institutional-contact-note {
+  align-self: start;
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  background: var(--color-surface);
+}
+
+.institutional-contact-note > p:last-child {
+  max-width: 38ch;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.institutional-status-list {
+  margin: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-status-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 18px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 12px;
+}
+
+.institutional-status-list dd {
+  margin: 0;
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.institutional-facts,
+.institutional-process {
+  display: grid;
+}
+
+.institutional-facts h2,
+.institutional-process h2,
+.institutional-legal-sections h2 {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.institutional-pending-note {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin-top: clamp(48px, 7vw, 88px);
+  padding: 24px;
+  background: var(--color-surface);
+}
+
+.institutional-pending-note > p:last-child,
+.institutional-legal-warning,
+.institutional-complaints-state > p:last-child {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.institutional-legal-warning {
+  max-width: 800px;
+  padding: 16px 0;
+  border-block: 1px solid var(--color-line);
+}
+
+.institutional-faq {
+  max-width: 960px;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-faq details {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.institutional-faq summary {
+  min-height: 68px;
+  padding: 20px 44px 20px 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+  line-height: 1.2;
+}
+
+.institutional-faq details p {
+  max-width: 680px;
+  padding: 0 0 24px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.institutional-legal .institutional-intro {
+  padding-bottom: 44px;
+}
+
+.institutional-legal-sections {
+  display: grid;
+  max-width: 960px;
+  margin-top: 48px;
+}
+
+.institutional-legal-sections section {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px 20px;
+  padding-block: 24px;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-legal-sections section > p {
+  grid-column: 2;
+  max-width: 660px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.institutional-complaints-state {
+  display: grid;
+  gap: 14px;
+  max-width: 820px;
+  padding: clamp(28px, 5vw, 56px);
+  background: var(--color-surface);
+}
+
+@media (min-width: 768px) {
+  .institutional-story-grid,
+  .institutional-facts,
+  .institutional-process {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .institutional-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .institutional-story-grid section,
+  .institutional-facts section,
+  .institutional-process section {
+    padding-inline: 24px;
+    border-right: 1px solid var(--color-line);
+  }
+
+  .institutional-story-grid section:first-child,
+  .institutional-facts section:nth-child(odd),
+  .institutional-process section:first-child {
+    padding-left: 0;
+  }
+
+  .institutional-story-grid section:last-child,
+  .institutional-facts section:nth-child(even),
+  .institutional-process section:last-child {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .institutional-contact-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .institutional-facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .institutional-facts section:nth-child(odd) {
+    padding-left: 24px;
+  }
+
+  .institutional-facts section:nth-child(even) {
+    padding-right: 24px;
+    border-right: 1px solid var(--color-line);
+  }
+
+  .institutional-facts section:first-child {
+    padding-left: 0;
+  }
+
+  .institutional-facts section:last-child {
+    padding-right: 0;
+    border-right: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .institutional-closing .button {
+    width: 100%;
+  }
+}

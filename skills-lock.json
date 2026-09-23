@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "frontend-accessibility-best-practices": {
+      "source": "sergiodxa/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-accessibility-best-practices/SKILL.md",
+      "computedHash": "b093e74b6b7b48770dfe9ec08651252692b9775da4b7db209e110a6449430dd1"
+    },
+    "frontend-design": {
+      "source": "vadimcomanescu/codex-skills",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/design/frontend-design/SKILL.md",
+      "computedHash": "5c8f978fdc851be107880df9d06400088646fba9f0901734888dc2540154697b"
+    },
+    "frontend-react-best-practices": {
+      "source": "sergiodxa/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-react-best-practices/SKILL.md",
+      "computedHash": "d79af29866e2c8cac7285743a3b049a92124bb0e466a43f71a136a614b78085f"
+    },
+    "typescript-react-patterns": {
+      "source": "asyrafhussin/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-react-patterns/SKILL.md",
+      "computedHash": "8f76be25c1c42cf5669d04ec14b4cc3d6b0d15b935a0d75a52237ec68caea9f1"
+    }
+  }
+}

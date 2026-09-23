@@ -1,0 +1,219 @@
+import { test, expect } from '@playwright/test'
+import {
+  queryCatalog,
+  readCatalogQuery,
+  catalogService,
+} from '../src/services/catalog-service'
+import { products } from '../src/mocks/home'
+import {
+  brandCatalogRedirectLoader,
+  catalogLoader,
+  brandsLoader,
+} from '../src/features/catalog/catalog-loaders'
+
+test('Consulta: facetas, acentos, stock, precios y paginación', () => {
+  const run = (query: string) =>
+    queryCatalog(readCatalogQuery(new URLSearchParams(query)))
+  expect(run('q=petale').items[0].name).toBe('Pétale Nu')
+  expect(
+    run('marca=atelier-01&marca=forme&genero=mujer').items.map((p) => p.id),
+  ).toEqual(['petale'])
+  expect(run('min=600&max=630').items.map((p) => p.id)).toEqual(['petale'])
+  expect(run('orden=precio-asc').items.map((p) => p.id)).toEqual([
+    'cedre',
+    'petale',
+    'ambre',
+    'sillage',
+  ])
+  expect(run('marca=invalid&pagina=-8&min=bad&orden=bad').total).toBe(4)
+  const fixture = {
+    ...products[0],
+    variants: [
+      { id: 'sold', ml: 50, priceCents: 10000, stock: 0 },
+      { id: 'available', ml: 100, priceCents: 50000, stock: 1 },
+    ],
+  }
+  expect(
+    queryCatalog(readCatalogQuery(new URLSearchParams('max=200')), [fixture])
+      .total,
+  ).toBe(0)
+  const many = Array.from({ length: 13 }, (_, i) => ({
+    ...products[0],
+    id: 'test-' + i,
+  }))
+  expect(
+    queryCatalog(readCatalogQuery(new URLSearchParams()), many).items,
+  ).toHaveLength(12)
+  expect(
+    queryCatalog(readCatalogQuery(new URLSearchParams('pagina=999')), many)
+      .items,
+  ).toHaveLength(1)
+  expect(
+    queryCatalog(readCatalogQuery(new URLSearchParams()), [
+      { ...fixture, variants: [] },
+    ]).items,
+  ).toHaveLength(1)
+})
+
+test('Loaders: marca inexistente y fallos recuperables', async () => {
+  const args = {
+    request: new Request('http://localhost/marcas/inexistente'),
+    params: { slug: 'inexistente' },
+    url: new URL('http://localhost/marcas/inexistente'),
+    pattern: '/marcas/:slug',
+    context: {},
+  }
+  expect((await catalogLoader(args)).kind).toBe('missing')
+  const original = catalogService.getBrands
+  try {
+    catalogService.getBrands = async () => {
+      throw new Error('test')
+    }
+    expect((await catalogLoader(args)).kind).toBe('error')
+    expect((await brandsLoader()).kind).toBe('error')
+  } finally {
+    catalogService.getBrands = original
+  }
+})
+
+test('Las rutas anteriores de marca redirigen al filtro del catálogo', async () => {
+  const response = await brandCatalogRedirectLoader({
+    request: new Request('http://localhost/marcas/forme'),
+    params: { slug: 'forme' },
+    context: {},
+    url: new URL('http://localhost/marcas/forme'),
+    pattern: '/marcas/:slug',
+  })
+  expect(response).toBeInstanceOf(Response)
+  expect((response as Response).headers.get('Location')).toBe(
+    '/catalogo?marca=forme',
+  )
+})
+
+test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
+  page,
+}) => {
+  await page.goto('/catalogo')
+  await expect(page.locator('.product-card')).toHaveCount(4)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const dialog = page.getByRole('complementary', {
+    name: 'Filtros del catálogo',
+  })
+  await expect(dialog).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Filtros/ })).toBeHidden()
+  await dialog.getByLabel('FORME', { exact: true }).check()
+  await dialog.getByLabel('Para ella', { exact: true }).check()
+  await dialog.getByLabel('Mínimo').fill('400')
+  await dialog.getByLabel('Máximo').fill('630')
+  await dialog.getByRole('button', { name: 'Aplicar filtros' }).click()
+  await expect(page).toHaveURL(/marca=forme/)
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  await page.reload()
+  await expect(page.locator('.product-card')).toContainText('Pétale Nu')
+  await page
+    .getByRole('button', { name: 'Limpiar filtros', exact: true })
+    .click()
+  await expect(page.locator('.product-card')).toHaveCount(4)
+  await page.getByLabel('Ordenar', { exact: true }).selectOption('precio-asc')
+  await expect(page.locator('.product-card').first()).toContainText(
+    'Bois Clair',
+  )
+  await page.goBack()
+  await expect(page.getByLabel('Ordenar', { exact: true })).toHaveValue(
+    'novedades',
+  )
+})
+
+test('Móvil: cancelar borrador, Escape, retorno de foco y aplicación', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/catalogo')
+  const trigger = page.getByRole('button', { name: /^Filtros/ })
+  await trigger.click()
+  await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
+  await page.keyboard.press('Escape')
+  await expect(trigger).toBeFocused()
+  await expect(page).toHaveURL(/\/catalogo$/)
+  await trigger.click()
+  await expect(
+    page.getByRole('dialog').getByLabel('Unisex', { exact: true }),
+  ).not.toBeChecked()
+  await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
+  await page.getByRole('button', { name: 'Aplicar filtros' }).click()
+  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(trigger).toBeFocused()
+})
+
+test('El panel móvil cierra al pasar a la columna desktop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/catalogo')
+  await page.getByRole('button', { name: /^Filtros/ }).click()
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Filtrar por' })).toBeFocused()
+  const sidebar = await page.locator('.catalog-sidebar').boundingBox()
+  const listing = await page.locator('.catalog-listing').boundingBox()
+  expect(sidebar!.x + sidebar!.width).toBeLessThan(listing!.x)
+  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
+    'hidden',
+  )
+})
+
+test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) => {
+  await page.goto('/marcas')
+  await page
+    .locator('.brands-directory')
+    .getByRole('link', { name: /FORME/ })
+    .click()
+  await expect(page).toHaveURL('/catalogo?marca=forme')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Elige tu próxima fragancia.',
+  )
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Buscar perfumes' }).click()
+  await page.getByRole('dialog').getByLabel('Perfume o marca').fill('petale')
+  await expect(page.locator('.search-suggestions')).toContainText('Pétale Nu')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Buscar', exact: true })
+    .click()
+  await expect(page).toHaveURL(/buscar\?q=petale/)
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  await page.goto('/buscar?q=inexistente')
+  await expect(
+    page.getByRole('heading', { name: 'No encontramos coincidencias.' }),
+  ).toBeVisible()
+  await page.goto('/buscar')
+  await expect(
+    page.getByRole('heading', { name: '¿Qué perfume tienes en mente?' }),
+  ).toBeVisible()
+  await page.goto('/marcas/inexistente')
+  await expect(page.locator('.product-card')).toHaveCount(0)
+})
+
+for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
+  test(`Catálogo ${width}px: imágenes, consola y ancho`, async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    page.on('console', (message) => {
+      if (message.type() === 'error' || message.type() === 'warning')
+        errors.push(message.text())
+    })
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/catalogo')
+    await expect(page.locator('.product-card')).toHaveCount(4)
+    await page.locator('footer').scrollIntoViewIfNeeded()
+    await page.waitForFunction(() =>
+      [...document.images].every((img) => img.complete && img.naturalWidth > 0),
+    )
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true)
+    expect(errors).toEqual([])
+  })
+}

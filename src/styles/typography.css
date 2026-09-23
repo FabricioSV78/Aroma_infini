@@ -1,0 +1,205 @@
+/* Una sola familia tipográfica; la jerarquía nace de escala, peso y ritmo. */
+:where(
+  .hero-title,
+  .section-heading h2,
+  .brand-intro h2,
+  .category h3,
+  .editorial-copy h2,
+  .featured-intro h2,
+  .product-meta h3,
+  .catalog-heading h1,
+  .catalog-empty h1,
+  .catalog-empty h2,
+  .brands-directory h2,
+  .product-purchase h1,
+  .product-recommendations h2,
+  .product-state h1,
+  .pending-page h1,
+  .navigation-intro h2,
+  .olfactory-profile-heading h2
+) {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 400;
+  letter-spacing: -0.032em;
+  text-rendering: optimizeLegibility;
+}
+
+.hero-title {
+  max-width: 11ch;
+  font-size: var(--type-title-lg);
+  line-height: 0.96;
+  letter-spacing: -0.035em;
+}
+
+.section-heading h2 {
+  max-width: 18ch;
+  font-size: var(--type-title-sm);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.brand-intro h2 {
+  max-width: 16ch;
+  font-size: var(--type-title-md);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.category h3 {
+  font-size: clamp(1.5rem, 6vw, 1.875rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.editorial-copy h2 {
+  max-width: 11ch;
+  font-size: var(--type-title-campaign);
+  line-height: 0.96;
+  letter-spacing: -0.038em;
+}
+
+.featured-intro h2 {
+  max-width: 13ch;
+  font-size: var(--type-title-sm);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.product-meta h3 {
+  font-size: clamp(1.25rem, 5vw, 1.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+}
+
+.catalog-heading h1 {
+  max-width: 14ch;
+  font-size: var(--type-title-page);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.catalog-empty h1,
+.catalog-empty h2,
+.pending-page h1,
+.product-state h1 {
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.brands-directory h2 {
+  font-size: clamp(2rem, 7vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+
+.product-purchase h1 {
+  max-width: 12ch;
+  font-size: clamp(3rem, 12vw, 4rem);
+  line-height: 0.96;
+  letter-spacing: -0.038em;
+}
+
+.product-recommendations h2 {
+  max-width: 20ch;
+  font-size: clamp(2.5rem, 10vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.028em;
+}
+
+.navigation-intro h2 {
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.olfactory-profile-heading h2 {
+  font-size: clamp(1.625rem, 5.5vw, 2.125rem);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+
+:where(
+  .announcement,
+  .eyebrow,
+  .section-heading .eyebrow,
+  .brand-intro .eyebrow,
+  .editorial-copy > .eyebrow,
+  .featured-intro .eyebrow,
+  .product-meta > .eyebrow,
+  .product-profile-heading .eyebrow,
+  .product-recommendations .eyebrow
+) {
+  font-size: var(--type-label);
+  line-height: 1.45;
+  letter-spacing: 0.105em;
+}
+
+:where(
+  .hero-description,
+  .editorial-copy > p:not(.eyebrow),
+  .catalog-heading > p,
+  .product-lead
+) {
+  font-size: var(--type-body);
+  line-height: 1.6;
+}
+
+:where(
+  .product-volume,
+  .price-prefix,
+  .product-kind,
+  .brand-scent
+) {
+  font-size: var(--type-small);
+  line-height: 1.5;
+}
+
+.product-description-copy {
+  max-width: 44ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 1.8vw, 1.5rem);
+  font-optical-sizing: auto;
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+}
+
+@media (min-width: 768px) {
+  .category h3 {
+    font-size: 2rem;
+  }
+
+  .product-meta h3 {
+    font-size: clamp(1.375rem, 2vw, 1.625rem);
+  }
+
+  .product-purchase h1 {
+    font-size: clamp(3.5rem, 4.8vw, 4.5rem);
+  }
+
+  .product-recommendations h2 {
+    font-size: clamp(3rem, 4vw, 3.75rem);
+  }
+
+  .catalog-empty h1,
+  .catalog-empty h2,
+  .pending-page h1,
+  .product-state h1 {
+    font-size: clamp(3rem, 4.2vw, 4rem);
+  }
+
+  .brands-directory h2 {
+    font-size: clamp(2.5rem, 3.5vw, 3.25rem);
+  }
+}
+
+@media (min-width: 1200px) {
+  .product-meta h3 {
+    font-size: 1.625rem;
+  }
+
+  .product-purchase h1 {
+    font-size: clamp(3.75rem, 4.5vw, 4.5rem);
+  }
+}

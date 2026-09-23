@@ -1,0 +1,66 @@
+// COPY TEMPORAL y dirección visual sujetos a revisión del cliente.
+export const heroSlides = [
+  {
+    eyebrow: 'El arte de encontrar tu aroma',
+    title: ['Una fragancia.', 'Muchas formas', 'de ser tú.'],
+    description: 'Perfumes con carácter. Encuentra el que se siente como tú.',
+    cta: 'Explorar perfumes',
+    to: '/catalogo',
+    image: 'hero-v2-lumiere',
+    alt: 'Campaña conceptual: un frasco de cristal sin marca sobre piedra blanca, bañado por luz natural',
+  },
+  {
+    eyebrow: 'Una pausa para descubrir',
+    title: ['Lo sutil también', 'deja huella.'],
+    description: 'Texturas verdes. Maderas suaves. Una nueva forma de sentir.',
+    cta: 'Descubrir la selección',
+    to: '/#destacados',
+    image: 'hero-v2-silence',
+    alt: 'Campaña conceptual: un frasco verde sin marca sobre un bloque de vidrio entre reflejos de luz',
+  },
+  {
+    eyebrow: 'Una expresión propia',
+    title: ['Tu esencia.', 'A tu manera.'],
+    description: 'Una expresión sutil. Una presencia propia.',
+    cta: 'Descubrir FORME',
+    to: '/catalogo?marca=forme',
+    image: 'hero-v3-petale',
+    alt: 'Campaña conceptual: el frasco rosado de FORME sobre piedra clara y seda blanca',
+  },
+]
+
+export const categories = [
+  {
+    id: 'hombre',
+    title: 'Para él',
+    description: 'Carácter en cada nota.',
+    to: '/catalogo?genero=hombre',
+    image: 'discovery-bois',
+    layout: 'portrait',
+    reveal: 'from-left',
+    width: 1024,
+    height: 1536,
+  },
+  {
+    id: 'mujer',
+    title: 'Para ella',
+    description: 'Tu forma de expresarte.',
+    to: '/catalogo?genero=mujer',
+    image: 'discovery-petale',
+    layout: 'landscape',
+    reveal: 'from-right',
+    width: 1536,
+    height: 1024,
+  },
+  {
+    id: 'unisex',
+    title: 'Unisex',
+    description: 'Sin etiquetas. A tu manera.',
+    to: '/catalogo?genero=unisex',
+    image: 'discovery-libre',
+    layout: 'panorama',
+    reveal: 'from-right',
+    width: 1536,
+    height: 1024,
+  },
+]

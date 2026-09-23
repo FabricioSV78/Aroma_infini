@@ -1,0 +1,78 @@
+/* Entrada coherente para todas las vistas públicas interiores. */
+.store-layout nav[aria-label='Ruta de navegación'] {
+  display: flex;
+  min-height: 44px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+  color: var(--color-muted);
+  font-size: var(--type-small);
+  line-height: 1;
+}
+
+.store-layout nav[aria-label='Ruta de navegación'] > :is(a, span) {
+  display: inline-flex;
+  min-height: 44px;
+  align-self: stretch;
+  align-items: center;
+}
+
+.store-layout nav[aria-label='Ruta de navegación'] > span[aria-hidden='true'] {
+  width: 1px;
+  min-width: 1px;
+  min-height: 12px;
+  height: 12px;
+  align-self: center;
+  background: currentColor;
+  font-size: 0;
+  opacity: 0.55;
+  transform: rotate(18deg);
+}
+
+.store-layout nav[aria-label='Ruta de navegación'] > [aria-current='page'] {
+  color: var(--color-ink);
+}
+
+.store-layout
+  nav[aria-label='Ruta de navegación']
+  > a:is(:hover, :focus-visible) {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* La galería puede ser más ancha; la ruta conserva el eje del resto del sitio. */
+.store-layout .product-breadcrumb {
+  width: min(calc(100% - var(--gutter) * 2), var(--container));
+  max-width: var(--container);
+}
+
+.store-layout .catalog-heading,
+.store-layout .checkout-heading {
+  padding-top: clamp(24px, 3vw, 36px);
+}
+
+.store-layout .institutional-intro {
+  padding-block: clamp(24px, 3vw, 36px) clamp(52px, 5vw, 72px);
+}
+
+.store-layout .account-access-layout {
+  padding-block: clamp(24px, 3vw, 40px) clamp(56px, 6vw, 80px);
+}
+
+.store-layout .tracking-heading,
+.store-layout .checkout-confirmation-heading {
+  padding-top: clamp(24px, 3vw, 36px);
+}
+
+.store-layout .account-demo-note {
+  margin-top: 20px;
+}
+
+.store-layout .account-layout {
+  padding-top: 28px;
+}
+
+.store-layout :where(.account-page, .account-access, .institutional-page) {
+  padding-bottom: clamp(64px, 7vw, 96px);
+}

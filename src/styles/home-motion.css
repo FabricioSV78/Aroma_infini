@@ -1,0 +1,94 @@
+/* Entrance is enhancement only: no content is hidden before observation. */
+@media (prefers-reduced-motion: no-preference) {
+  .store-layout[data-scroll-ready] .home [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  .store-layout[data-scroll-ready]
+    .home
+    [data-reveal='from-left']:not([data-revealed]) {
+    transform: translate3d(-16px, 0, 0);
+  }
+  .store-layout[data-scroll-ready]
+    .home
+    [data-reveal='from-right']:not([data-revealed]) {
+    transform: translate3d(16px, 0, 0);
+  }
+  .home [data-revealed] {
+    animation: home-enter var(--duration-reveal) var(--ease-editorial) both;
+  }
+  .home [data-reveal='from-left'][data-revealed] {
+    animation-name: home-enter-left;
+  }
+  .home [data-reveal='from-right'][data-revealed] {
+    animation-name: home-enter-right;
+  }
+  .home [data-reveal='image'][data-revealed] {
+    animation-duration: var(--duration-image-reveal);
+  }
+  .home [data-reveal='image'][data-revealed] img:not(.product-image-alternate) {
+    animation: home-image-settle 1100ms var(--ease-editorial);
+  }
+  .home .editorial-image[data-revealed] {
+    animation-name: home-image-fade;
+  }
+  .home .text-link svg {
+    transition: transform var(--duration-header) var(--ease-editorial);
+  }
+  .home .text-link:is(:hover, :focus-visible) svg {
+    transform: translateX(4px);
+  }
+  @keyframes home-enter {
+    from {
+      opacity: 0.4;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes home-enter-left {
+    from {
+      opacity: 0.4;
+      transform: translate3d(-16px, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes home-enter-right {
+    from {
+      opacity: 0.4;
+      transform: translate3d(16px, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes home-image-settle {
+    from {
+      transform: scale(1.018);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  @keyframes home-image-fade {
+    from {
+      opacity: 0.45;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+@media print {
+  .home [data-reveal] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

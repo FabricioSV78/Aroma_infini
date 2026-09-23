@@ -1,0 +1,24 @@
+{
+  "generator": "Built-in image_gen",
+  "mode": "Edición/composición con referencias",
+  "assets": [
+    {
+      "name": "hero-v3-petale-desktop",
+      "source": "C:/Users/USUARIO/.codex/generated_images/01a097a9-5d43-72c3-9e56-29e1fb6b1905/exec-e0182e83-79a4-4c31-92ca-2b05161cb22f.png",
+      "references": [
+        "public/images/petale-960.webp",
+        "public/images/hero-v2-lumiere-desktop-1536.webp"
+      ],
+      "prompt": "Use case: compositing. Premium fragrance website campaign photograph, photorealistic. The first reference identifies the exact existing concept perfume bottle to preserve: low wide cylindrical transparent glass flacon, very pale blush pink liquid, thick clear base, blank ivory front label, wide brushed silver cylindrical cap. Preserve its proportions and cap; do not create a different bottle. The second reference is composition and lighting guidance only, do not include its bottle. New scene: the pink bottle upright on a clean ivory stone shelf, one sculptural fold of white silk flowing under its base at the right edge, luminous off-white plaster background, refined soft side daylight, realistic glass refraction, calm architectural shadows. Restrained neutral palette with only the perfume's pale pink. No text, logos, watermarks, flowers or added bottles. This is a concept storefront, not a real product. Output landscape 16:9 ideally 2048x1152. Bottle in right third around x=76%, full bottle about 57% of frame height, base y=80%. Left 54% remains bright nearly white clean negative space for black HTML headline and button. Upper 15% clean for navbar. Match reference's high-end lighting quality; silk only low and far right."
+    },
+    {
+      "name": "hero-v3-petale-mobile",
+      "source": "C:/Users/USUARIO/.codex/generated_images/01a097a9-5d43-72c3-9e56-29e1fb6b1905/exec-18a28d7b-e650-4fba-a9ee-6d8cf0353ac6.png",
+      "references": [
+        "public/images/petale-960.webp",
+        "public/images/hero-v2-lumiere-mobile-780.webp"
+      ],
+      "prompt": "Use case: compositing. Premium fragrance website campaign photograph, photorealistic. The first reference identifies the exact existing concept perfume bottle to preserve: low wide cylindrical transparent glass flacon, very pale blush pink liquid, thick clear base, blank ivory front label, wide brushed silver cylindrical cap. Preserve its proportions and cap; do not create a different bottle. The second reference is composition and lighting guidance only, do not include its bottle. New scene: the pink bottle upright on a clean ivory stone shelf, one sculptural fold of white silk flowing under its base at the right edge, luminous off-white plaster background, refined soft side daylight, realistic glass refraction, calm architectural shadows. Restrained neutral palette with only the perfume's pale pink. No text, logos, watermarks, flowers or added bottles. This is a concept storefront, not a real product. Output portrait 2:3 ideally 1024x1536. Bottle center around x=66%, y=37%, occupies about 32% of frame height, whole bottle and cap clearly visible. Low ivory stone ledge base around y=58%. Upper 13% light clean negative space for navbar; lower 42% of photograph should be smooth near-white empty foreground for black HTML headline and button, without large props or strong shadows. Camera placement and lighting should match the referenced portrait's calm balance."
+    }
+  ]
+}
