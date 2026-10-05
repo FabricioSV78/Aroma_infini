@@ -1,18 +1,14 @@
+import { formatBrandName } from '../../utils/brand-name'
+import './admin-operations.css'
 import { useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import {
-  getPeruDistrictOptions,
-  getPeruProvinceOptions,
-  peruDepartments,
-  peruUbigeoSummary,
-} from '../../content/peru'
-import {
   adminService,
   type AdminBrand,
   type AdminOrderStatus,
+  type AdminOrder,
   type AdminPromotion,
-  type AdminShippingSettings,
 } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
 import { AdminPagination } from './AdminPagination'
@@ -29,6 +25,18 @@ import {
 } from './admin-utils'
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
+import { useUnsavedChanges } from './useUnsavedChanges'
+
+function hasDeliveryDetails(order: AdminOrder, phone?: string) {
+  return Boolean(
+    order.customerEmail &&
+    order.customerEmail !== '—' &&
+    phone &&
+    phone !== '—' &&
+    order.address.street &&
+    order.address.street !== 'Dirección registrada',
+  )
+}
 
 export function AdminBrandsPage() {
   const state = useAdminStore()
@@ -58,32 +66,35 @@ export function AdminBrandsPage() {
   }
 
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-brands-page">
       <AdminPageHeader
         eyebrow="Organización del surtido"
         title="Marcas"
-        description="Crea, edita y controla las marcas disponibles en el catálogo."
+        description="Crea, edita y controla las marcas disponibles en la tienda."
       />
-      <div className="admin-list-toolbar">
-        <p>
-          {state.brands.length} {state.brands.length === 1 ? 'marca' : 'marcas'}
-        </p>
-        <button
-          className="button button--primary"
-          type="button"
-          onClick={() => {
-            setMessage('')
-            setForm({
-              id: `brand-${crypto.randomUUID().slice(0, 8)}`,
-              name: '',
-              slug: '',
-              active: true,
-            })
-          }}
-        >
-          Nueva marca
-        </button>
-      </div>
+      {!form ? (
+        <div className="admin-list-toolbar">
+          <p>
+            {state.brands.length}{' '}
+            {state.brands.length === 1 ? 'marca' : 'marcas'}
+          </p>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => {
+              setMessage('')
+              setForm({
+                id: `brand-${crypto.randomUUID().slice(0, 8)}`,
+                name: '',
+                slug: '',
+                active: true,
+              })
+            }}
+          >
+            Nueva marca
+          </button>
+        </div>
+      ) : null}
       {form ? (
         <form className="admin-compact-form" onSubmit={save}>
           <header>
@@ -138,7 +149,7 @@ export function AdminBrandsPage() {
       <AdminNotice>{message}</AdminNotice>
       <div className="admin-table-wrap">
         <table className="admin-table">
-          <caption className="sr-only">Marcas del catálogo</caption>
+          <caption className="sr-only">Marcas de la tienda</caption>
           <thead>
             <tr>
               <th scope="col">Marca</th>
@@ -327,7 +338,7 @@ export function AdminOrdersPage() {
       </form>
       <div className="admin-table-wrap">
         <table className="admin-table admin-table--orders">
-          <caption className="sr-only">Pedidos de demostración</caption>
+          <caption className="sr-only">Pedidos</caption>
           <thead>
             <tr>
               <th scope="col">Código</th>
@@ -346,6 +357,10 @@ export function AdminOrdersPage() {
               const currentIndex = orderStatusOrder.indexOf(order.status)
               const nextStatus = orderStatusOrder[currentIndex + 1]
               const canAdvance = order.paymentStatus === 'approved'
+              const customer = state.customers.find(
+                (item) => item.id === order.customerId,
+              )
+              const deliveryReady = hasDeliveryDetails(order, customer?.phone)
               return (
                 <tr key={order.reference}>
                   <th scope="row">
@@ -356,7 +371,14 @@ export function AdminOrdersPage() {
                   </th>
                   <td>
                     <span className="admin-cell-label">Cliente</span>
-                    {order.customerName}
+                    <span>
+                      {order.customerName}
+                      {!deliveryReady ? (
+                        <small className="admin-data-gap">
+                          Datos de entrega pendientes
+                        </small>
+                      ) : null}
+                    </span>
                   </td>
                   <td>
                     <span className="admin-cell-label">Fecha</span>
@@ -391,7 +413,9 @@ export function AdminOrdersPage() {
                       >
                         Ver <span className="sr-only">{order.reference}</span>
                       </Link>
-                      {nextStatus && canAdvance ? (
+                      {nextStatus &&
+                      canAdvance &&
+                      (nextStatus !== 'shipped' || deliveryReady) ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -457,6 +481,29 @@ export function AdminOrderDetailPage() {
     order?.status ?? 'received',
   )
   const [saved, setSaved] = useState(false)
+  const [editingDelivery, setEditingDelivery] = useState(false)
+  const [deliveryMessage, setDeliveryMessage] = useState('')
+  const [deliveryDraft, setDeliveryDraft] = useState(() => {
+    const customer = state.customers.find(
+      (item) => item.id === order?.customerId,
+    )
+    return {
+      customerName: /^Cliente \d+$/.test(order?.customerName ?? '')
+        ? ''
+        : (order?.customerName ?? ''),
+      customerEmail:
+        order?.customerEmail === '—' ? '' : (order?.customerEmail ?? ''),
+      phone: customer?.phone === '—' ? '' : (customer?.phone ?? ''),
+      street:
+        order?.address.street === 'Dirección registrada'
+          ? ''
+          : (order?.address.street ?? ''),
+    }
+  })
+  const [savedDeliveryDraft, setSavedDeliveryDraft] = useState(deliveryDraft)
+  const dirtyDelivery =
+    JSON.stringify(deliveryDraft) !== JSON.stringify(savedDeliveryDraft)
+  useUnsavedChanges(dirtyDelivery)
   if (!order)
     return (
       <div className="admin-page admin-empty">
@@ -465,13 +512,16 @@ export function AdminOrderDetailPage() {
       </div>
     )
   const customer = state.customers.find((item) => item.id === order.customerId)
+  const deliveryReady = hasDeliveryDetails(order, customer?.phone)
   const orderStatus = adminOrderStatusMeta[order.status]
   const paymentStatus = adminPaymentStatusMeta[order.paymentStatus]
   const orderReference = order.reference
   const persistedStatus = order.status
   const currentStatusIndex = orderStatusOrder.indexOf(order.status)
   const selectedStatusIndex = orderStatusOrder.indexOf(status)
-  const canChangeStatus = order.paymentStatus === 'approved'
+  const canChangeStatus =
+    order.paymentStatus === 'approved' &&
+    (status !== 'shipped' || deliveryReady)
   const deliveryMethod =
     order.deliveryMethod === 'motorizado' ? 'Motorizado' : 'Courier'
 
@@ -487,8 +537,20 @@ export function AdminOrderDetailPage() {
     setSaved(true)
   }
 
+  function saveDelivery(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const result = adminService.saveOrderDelivery(orderReference, deliveryDraft)
+    setDeliveryMessage(
+      result.kind === 'saved' ? 'Datos de entrega guardados.' : result.message,
+    )
+    if (result.kind === 'saved') {
+      setSavedDeliveryDraft(deliveryDraft)
+      setEditingDelivery(false)
+    }
+  }
+
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-page--order-detail">
       <Link className="admin-back" to={returnTo}>
         ← {returnTo === '/admin' ? 'Resumen' : 'Pedidos'}
       </Link>
@@ -503,75 +565,14 @@ export function AdminOrderDetailPage() {
       >
         <AdminBadge tone={orderStatus.tone}>{orderStatus.label}</AdminBadge>
       </div>
+      {!deliveryReady ? (
+        <p className="admin-inline-warning" role="status">
+          Faltan datos de contacto o una dirección verificable. Verifica la
+          información antes de coordinar el envío.
+        </p>
+      ) : null}
       <div className="admin-order-layout">
-        <section aria-labelledby="admin-order-products">
-          <h2 id="admin-order-products">Productos</h2>
-          <ul>
-            {order.lines.map((line) => (
-              <li key={line.variantId}>
-                <span>
-                  <small>{line.brand}</small>
-                  <strong>{line.name}</strong>
-                  <small>
-                    {line.ml} ml · Cant. {line.quantity}
-                  </small>
-                </span>
-                <span>{formatPEN(line.unitPriceCents * line.quantity)}</span>
-              </li>
-            ))}
-          </ul>
-          <dl>
-            <div>
-              <dt>Subtotal</dt>
-              <dd>{formatPEN(order.subtotalCents)}</dd>
-            </div>
-            {order.discountCents > 0 ? (
-              <div>
-                <dt>
-                  Descuento
-                  {order.promotionCode ? ` · ${order.promotionCode}` : ''}
-                </dt>
-                <dd>−{formatPEN(order.discountCents)}</dd>
-              </div>
-            ) : null}
-            <div>
-              <dt>Envío</dt>
-              <dd>{formatPEN(order.shippingCents)}</dd>
-            </div>
-            <div>
-              <dt>Total</dt>
-              <dd>{formatPEN(order.totalCents)}</dd>
-            </div>
-          </dl>
-        </section>
         <aside>
-          <section aria-labelledby="admin-order-customer">
-            <h2 id="admin-order-customer">Cliente</h2>
-            <p>{order.customerName}</p>
-            <p>{order.customerEmail}</p>
-            {customer?.phone ? <p>{customer.phone}</p> : null}
-          </section>
-          <section aria-labelledby="admin-order-delivery">
-            <h2 id="admin-order-delivery">Entrega</h2>
-            <p>{deliveryMethod}</p>
-            <p>{order.address.street}</p>
-            <p>
-              {order.address.district}, {order.address.province},{' '}
-              {order.address.department}
-            </p>
-          </section>
-          <section aria-labelledby="admin-order-payment">
-            <h2 id="admin-order-payment">Pago</h2>
-            <p>
-              <AdminBadge tone={paymentStatus.tone}>
-                {paymentStatus.label}
-              </AdminBadge>
-            </p>
-            <p>Mercado Pago · entorno de demostración</p>
-            <p>
-              El estado del pago es informativo y no se modifica desde aquí.
-            </p>
-          </section>
           <form onSubmit={saveStatus}>
             <label>
               Preparación del pedido
@@ -605,14 +606,184 @@ export function AdminOrderDetailPage() {
             </button>
             {!canChangeStatus ? (
               <p className="admin-data-note">
-                El pedido debe tener el pago aprobado antes de avanzar.
+                {order.paymentStatus !== 'approved'
+                  ? 'El pedido debe tener el pago aprobado antes de avanzar.'
+                  : 'Faltan datos de contacto y entrega para marcar el pedido como enviado.'}
               </p>
             ) : null}
             <AdminNotice>
               {saved ? 'Estado actualizado en esta sesión.' : ''}
             </AdminNotice>
           </form>
+          <section aria-labelledby="admin-order-customer">
+            <h2 id="admin-order-customer">Cliente</h2>
+            <p>{order.customerName}</p>
+            <p>
+              {order.customerEmail === '—'
+                ? 'Correo no disponible'
+                : order.customerEmail}
+            </p>
+            <p>
+              {!customer?.phone || customer.phone === '—'
+                ? 'Teléfono no disponible'
+                : customer.phone}
+            </p>
+          </section>
+          <section aria-labelledby="admin-order-payment">
+            <h2 id="admin-order-payment">Pago</h2>
+            <p>
+              <AdminBadge tone={paymentStatus.tone}>
+                {paymentStatus.label}
+              </AdminBadge>
+            </p>
+            <p>Método indicado: Mercado Pago</p>
+            <p>
+              El estado del pago es informativo y no se modifica desde aquí.
+            </p>
+          </section>
         </aside>
+        <div className="admin-order-primary">
+          <section aria-labelledby="admin-order-products">
+            <h2 id="admin-order-products">Productos</h2>
+            <ul>
+              {order.lines.map((line) => (
+                <li key={line.variantId}>
+                  <span>
+                    <small>{formatBrandName(line.brand)}</small>
+                    <strong>{line.name}</strong>
+                    <small>
+                      {line.ml} ml · Cant. {line.quantity}
+                    </small>
+                  </span>
+                  <span>{formatPEN(line.unitPriceCents * line.quantity)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl>
+              <div>
+                <dt>Subtotal</dt>
+                <dd>{formatPEN(order.subtotalCents)}</dd>
+              </div>
+              {order.discountCents > 0 ? (
+                <div>
+                  <dt>
+                    Descuento
+                    {order.promotionCode ? ` · ${order.promotionCode}` : ''}
+                  </dt>
+                  <dd>−{formatPEN(order.discountCents)}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>Envío</dt>
+                <dd>{formatPEN(order.shippingCents)}</dd>
+              </div>
+              <div>
+                <dt>Total</dt>
+                <dd>{formatPEN(order.totalCents)}</dd>
+              </div>
+            </dl>
+          </section>
+          <section aria-labelledby="admin-order-delivery">
+            <h2 id="admin-order-delivery">Entrega</h2>
+            <p>{deliveryMethod}</p>
+            <p>
+              {order.address.street === 'Dirección registrada'
+                ? 'Dirección exacta no disponible'
+                : order.address.street}
+            </p>
+            <p>
+              {order.address.district}, {order.address.province},{' '}
+              {order.address.department}
+            </p>
+            <button
+              className="admin-delivery-edit-button"
+              type="button"
+              onClick={() => {
+                if (editingDelivery && dirtyDelivery) {
+                  if (
+                    !window.confirm(
+                      '¿Cerrar sin guardar los cambios de entrega?',
+                    )
+                  )
+                    return
+                  setDeliveryDraft(savedDeliveryDraft)
+                }
+                setEditingDelivery((open) => !open)
+                setDeliveryMessage('')
+              }}
+            >
+              {editingDelivery
+                ? 'Cerrar edición'
+                : deliveryReady
+                  ? 'Editar datos de entrega'
+                  : 'Completar datos de entrega'}
+            </button>
+            {editingDelivery ? (
+              <form className="admin-delivery-editor" onSubmit={saveDelivery}>
+                <label>
+                  Nombre del cliente
+                  <input
+                    required
+                    minLength={2}
+                    value={deliveryDraft.customerName}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        customerName: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Correo electrónico
+                  <input
+                    required
+                    type="email"
+                    value={deliveryDraft.customerEmail}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        customerEmail: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Teléfono
+                  <input
+                    required
+                    type="tel"
+                    value={deliveryDraft.phone}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        phone: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Dirección exacta
+                  <input
+                    required
+                    minLength={5}
+                    value={deliveryDraft.street}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        street: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <button className="button button--secondary" type="submit">
+                  Guardar datos de entrega
+                </button>
+              </form>
+            ) : null}
+            <AdminNotice>{deliveryMessage}</AdminNotice>
+          </section>
+        </div>
       </div>
     </div>
   )
@@ -632,15 +803,15 @@ export function AdminCustomersPage() {
   )
   const pagination = useAdminPagination(customers, 25)
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-customers-page">
       <AdminPageHeader
-        eyebrow="Clientes"
+        eyebrow="Operación"
         title="Clientes"
-        description="Consulta de ejemplo sin campañas, segmentación ni envío de mensajes."
+        description="Consulta los clientes y su historial de pedidos."
       />
       <div className="admin-table-wrap">
         <table className="admin-table">
-          <caption className="sr-only">Clientes ficticios</caption>
+          <caption className="sr-only">Clientes</caption>
           <thead>
             <tr>
               <th scope="col">Cliente</th>
@@ -682,9 +853,6 @@ export function AdminCustomersPage() {
         to={pagination.to}
         onPageChange={pagination.setPage}
       />
-      <p className="admin-data-note">
-        Todas las identidades usan datos de muestra y dominios no válidos.
-      </p>
     </div>
   )
 }
@@ -728,30 +896,32 @@ export function AdminPromotionsPage() {
       setMessage(result.message)
       return
     }
-    setMessage('Promoción guardada en memoria.')
+    setMessage('Promoción guardada.')
     setForm(null)
   }
 
   return (
     <div className="admin-page">
       <AdminPageHeader
-        eyebrow="Reglas de ejemplo"
+        eyebrow="Códigos y descuentos"
         title="Promociones"
         description="Administra códigos, vigencia y límites de uso desde una lista compacta."
       />
-      <div className="admin-list-toolbar">
-        <p>
-          {state.promotions.length}{' '}
-          {state.promotions.length === 1 ? 'promoción' : 'promociones'}
-        </p>
-        <button
-          className="button button--primary"
-          type="button"
-          onClick={() => openEditor(createPromotionDraft())}
-        >
-          Nueva promoción
-        </button>
-      </div>
+      {!form ? (
+        <div className="admin-list-toolbar">
+          <p>
+            {state.promotions.length}{' '}
+            {state.promotions.length === 1 ? 'promoción' : 'promociones'}
+          </p>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => openEditor(createPromotionDraft())}
+          >
+            Nueva promoción
+          </button>
+        </div>
+      ) : null}
       {form ? (
         <form className="admin-editor admin-promotion-form" onSubmit={submit}>
           <section aria-labelledby="promotion-editor-title">
@@ -979,481 +1149,6 @@ export function AdminPromotionsPage() {
         to={pagination.to}
         onPageChange={pagination.setPage}
       />
-    </div>
-  )
-}
-
-export function AdminShippingPage() {
-  const state = useAdminStore()
-  const [form, setForm] = useState<AdminShippingSettings>(() => ({
-    freeThresholdCents: state.shipping.freeThresholdCents,
-    zones: state.shipping.zones.map((zone) => ({ ...zone })),
-  }))
-  const [message, setMessage] = useState('')
-
-  function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const result = adminService.saveShipping(form)
-    setMessage(
-      result.kind === 'saved'
-        ? 'Configuración aplicada a la tienda durante esta sesión.'
-        : result.message,
-    )
-  }
-
-  const availableDepartments = peruDepartments.filter(
-    (department) =>
-      !form.zones.some((zone) => zone.department === department.value),
-  )
-
-  function addZone() {
-    const department = availableDepartments[0] ?? peruDepartments[0]
-    if (!department) return
-    setForm((current) => ({
-      ...current,
-      zones: [
-        ...current.zones,
-        {
-          id: `zone-${crypto.randomUUID().slice(0, 8)}`,
-          name: department.label,
-          department: department.value,
-          province: null,
-          district: null,
-          courierFeeCents: 0,
-          motorizadoFeeCents: null,
-          estimate: 'Hasta 5 días',
-          active: false,
-        },
-      ],
-    }))
-    setMessage(
-      'Completa la tarifa y activa la zona cuando la cobertura esté confirmada.',
-    )
-  }
-
-  return (
-    <div className="admin-page">
-      <AdminPageHeader
-        eyebrow="Configuración logística"
-        title="Envíos"
-        description={`Configura cobertura y tarifas sobre ${peruUbigeoSummary.departments} departamentos, ${peruUbigeoSummary.provinces} provincias y ${peruUbigeoSummary.districts} distritos.`}
-      />
-      <form className="admin-editor" onSubmit={save}>
-        <section aria-labelledby="shipping-global-title">
-          <header>
-            <span>01</span>
-            <div>
-              <h2 id="shipping-global-title">Condición global</h2>
-              <p>Modificarla afecta carrito y checkout de prueba.</p>
-            </div>
-          </header>
-          <div className="admin-fields">
-            <label>
-              Envío gratis desde (S/)
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.freeThresholdCents / 100}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    freeThresholdCents: Math.round(
-                      Number(event.target.value) * 100,
-                    ),
-                  }))
-                }
-              />
-            </label>
-          </div>
-        </section>
-        <section aria-labelledby="shipping-zones-title">
-          <header>
-            <span>02</span>
-            <div>
-              <h2 id="shipping-zones-title">Zonas de entrega</h2>
-              <p>
-                Solo las zonas activas aparecen en el checkout. Las tarifas
-                deben coincidir con el courier contratado.
-              </p>
-            </div>
-          </header>
-          <div className="admin-zone-toolbar">
-            <p>
-              {form.zones.length}{' '}
-              {form.zones.length === 1
-                ? 'zona configurada'
-                : 'zonas configuradas'}
-            </p>
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={addZone}
-            >
-              Agregar zona
-            </button>
-          </div>
-          <div className="admin-zone-list">
-            {form.zones.map((zone) => (
-              <fieldset key={zone.id}>
-                <legend>{zone.name}</legend>
-                <label>
-                  Nombre visible
-                  <input
-                    required
-                    maxLength={60}
-                    value={zone.name}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? { ...item, name: event.target.value }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Departamento
-                  <select
-                    value={zone.department}
-                    onChange={(event) => {
-                      const department = peruDepartments.find(
-                        (item) => item.value === event.target.value,
-                      )
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? {
-                                ...item,
-                                department: event.target.value,
-                                province: null,
-                                district: null,
-                                name:
-                                  item.name.trim() === '' ||
-                                  peruDepartments.some(
-                                    (candidate) =>
-                                      candidate.label === item.name,
-                                  )
-                                    ? (department?.label ?? item.name)
-                                    : item.name,
-                              }
-                            : item,
-                        ),
-                      }))
-                    }}
-                  >
-                    {peruDepartments.map((department) => (
-                      <option key={department.value} value={department.value}>
-                        {department.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Provincia
-                  <select
-                    value={zone.province ?? ''}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? {
-                                ...item,
-                                province: event.target.value || null,
-                                district: null,
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  >
-                    <option value="">Todas</option>
-                    {getPeruProvinceOptions(zone.department).map((province) => (
-                      <option key={province.value} value={province.value}>
-                        {province.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Distrito
-                  <select
-                    value={zone.district ?? ''}
-                    disabled={!zone.province}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? {
-                                ...item,
-                                district: event.target.value || null,
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  >
-                    <option value="">Todos</option>
-                    {getPeruDistrictOptions(zone.province ?? '').map(
-                      (district) => (
-                        <option key={district.value} value={district.value}>
-                          {district.label}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </label>
-                <label>
-                  Courier (S/)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={zone.courierFeeCents / 100}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? {
-                                ...item,
-                                courierFeeCents: Math.round(
-                                  Number(event.target.value) * 100,
-                                ),
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Motorizado (S/)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={
-                      zone.motorizadoFeeCents === null
-                        ? ''
-                        : zone.motorizadoFeeCents / 100
-                    }
-                    placeholder="No disponible"
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? {
-                                ...item,
-                                motorizadoFeeCents: event.target.value
-                                  ? Math.round(Number(event.target.value) * 100)
-                                  : null,
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Plazo
-                  <input
-                    value={zone.estimate}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? { ...item, estimate: event.target.value }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-                <label className="admin-check">
-                  <input
-                    type="checkbox"
-                    checked={zone.active}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        zones: current.zones.map((item) =>
-                          item.id === zone.id
-                            ? { ...item, active: event.target.checked }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                  Zona activa
-                </label>
-                <button
-                  className="admin-remove"
-                  type="button"
-                  onClick={() => {
-                    setForm((current) => ({
-                      ...current,
-                      zones: current.zones.filter(
-                        (item) => item.id !== zone.id,
-                      ),
-                    }))
-                    setMessage(
-                      'La zona se eliminará de la tienda cuando guardes la configuración.',
-                    )
-                  }}
-                >
-                  Quitar zona
-                </button>
-              </fieldset>
-            ))}
-          </div>
-        </section>
-        <AdminNotice>{message}</AdminNotice>
-        <button className="button button--primary" type="submit">
-          Guardar configuración
-        </button>
-      </form>
-    </div>
-  )
-}
-
-export function AdminHomePage() {
-  const state = useAdminStore()
-  const [draft, setDraft] = useState(() => [...state.featuredOrder])
-  const [message, setMessage] = useState('')
-  const products = state.products
-    .filter((record) => record.active)
-    .sort((first, second) => {
-      const firstPosition = draft.indexOf(first.product.id)
-      const secondPosition = draft.indexOf(second.product.id)
-      if (firstPosition >= 0 && secondPosition >= 0)
-        return firstPosition - secondPosition
-      if (firstPosition >= 0) return -1
-      if (secondPosition >= 0) return 1
-      return first.popularity - second.popularity
-    })
-
-  function move(id: string, direction: -1 | 1) {
-    setMessage('')
-    setDraft((current) => {
-      const index = current.indexOf(id)
-      const target = index + direction
-      if (index < 0 || target < 0 || target >= current.length) return current
-      const next = [...current]
-      ;[next[index], next[target]] = [next[target], next[index]]
-      return next
-    })
-  }
-
-  return (
-    <div className="admin-page">
-      <AdminPageHeader
-        eyebrow="Selección editorial"
-        title="Home"
-        description="El orden de destacados es independiente del ranking ilustrativo de Más vendidos."
-      />
-      <div className="admin-home-preview-link">
-        <Link className="text-link" to="/">
-          Vista previa de la tienda <Icon name="arrow" />
-        </Link>
-      </div>
-      <p className="admin-selection-note">
-        {draft.length} de 2 destacados seleccionados
-        {draft.length >= 2 ? ' · Desmarca uno para reemplazarlo.' : '.'}
-      </p>
-      <ol className="admin-featured-list">
-        {products.map((record) => {
-          const selected = draft.includes(record.product.id)
-          const position = draft.indexOf(record.product.id)
-          return (
-            <li
-              key={record.product.id}
-              className={selected ? 'is-selected' : ''}
-            >
-              <span>
-                {selected ? String(position + 1).padStart(2, '0') : '—'}
-              </span>
-              <img
-                src={`/images/${record.product.image}-480.webp`}
-                width={64}
-                height={80}
-                alt=""
-              />
-              <div>
-                <strong>{record.product.name}</strong>
-                <small>
-                  {
-                    state.brands.find(
-                      (brand) => brand.id === record.product.brandId,
-                    )?.name
-                  }
-                </small>
-              </div>
-              <label className="admin-check">
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  disabled={!selected && draft.length >= 2}
-                  onChange={(event) => {
-                    setMessage('')
-                    setDraft((current) =>
-                      event.target.checked
-                        ? [...current, record.product.id]
-                        : current.filter((id) => id !== record.product.id),
-                    )
-                  }}
-                />
-                Destacado
-              </label>
-              <div className="admin-order-controls">
-                <button
-                  type="button"
-                  onClick={() => move(record.product.id, -1)}
-                  disabled={!selected || position === 0}
-                  aria-label={`Subir ${record.product.name}`}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(record.product.id, 1)}
-                  disabled={!selected || position === draft.length - 1}
-                  aria-label={`Bajar ${record.product.name}`}
-                >
-                  ↓
-                </button>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-      <div className="admin-editor-actions">
-        <button
-          className="button button--primary"
-          type="button"
-          onClick={() => {
-            if (draft.length !== 2) {
-              setMessage(
-                'Selecciona exactamente dos productos para conservar la composición del Home.',
-              )
-              return
-            }
-            adminService.setFeaturedOrder(draft)
-            setMessage('Selección aplicada al Home durante esta sesión.')
-          }}
-        >
-          Guardar destacados
-        </button>
-        <AdminNotice>{message}</AdminNotice>
-      </div>
     </div>
   )
 }

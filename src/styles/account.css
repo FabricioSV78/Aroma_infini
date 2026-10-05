@@ -13,7 +13,6 @@
   max-width: 720px;
 }
 
-.account-access-layout > header .eyebrow,
 .account-access-layout > section .eyebrow {
   margin-bottom: 14px;
   color: var(--color-muted);
@@ -142,11 +141,6 @@
   transform: rotate(-90deg);
 }
 
-.account-sidebar .eyebrow {
-  margin-bottom: 12px;
-  color: var(--color-muted);
-}
-
 .account-sidebar ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -209,6 +203,11 @@
   min-width: 0;
 }
 
+.account-content .commerce-empty {
+  min-height: 280px;
+  padding-block: 24px 48px;
+}
+
 .account-heading {
   max-width: 720px;
   padding-bottom: 36px;
@@ -259,7 +258,7 @@
 .account-overview-grid h2 {
   margin-top: 30px;
   font-family: var(--font-display);
-  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
   line-height: 1.05;
 }
 
@@ -684,6 +683,10 @@
 }
 
 @media (min-width: 900px) {
+  .account-content .favorites-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .account-access-layout {
     grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
     gap: clamp(72px, 10vw, 160px);
@@ -723,6 +726,12 @@
   .account-order-detail-grid {
     grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.6fr);
     gap: clamp(52px, 7vw, 100px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .account-content .favorites-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

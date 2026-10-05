@@ -19,7 +19,7 @@ const adminGroups = [
     ],
   },
   {
-    label: 'Catálogo',
+    label: 'Tienda',
     sections: [
       { to: '/admin/productos', label: 'Productos', icon: 'package' },
       { to: '/admin/marcas', label: 'Marcas', icon: 'tag' },
@@ -52,6 +52,7 @@ export function AdminLayout() {
   const previousKey = useRef(location.key)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const menuCloseButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
   const [navigationOpen, setNavigationOpen] = useState(false)
   const currentSection = adminGroups
     .reduce<Array<{ to: string; label: string; end?: boolean }>>(
@@ -80,16 +81,30 @@ export function AdminLayout() {
     if (!navigationOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    window.requestAnimationFrame(() => menuCloseButtonRef.current?.focus())
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setNavigationOpen(false)
-      window.requestAnimationFrame(() => menuButtonRef.current?.focus())
+    window.requestAnimationFrame(() => menuCloseButtonRef.current?.focus({ preventScroll: true }))
+    const handleDrawerKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setNavigationOpen(false)
+        window.requestAnimationFrame(() => menuButtonRef.current?.focus())
+        return
+      }
+      if (event.key !== 'Tab' || !sidebarRef.current) return
+      const items = [...sidebarRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')]
+      const first = items[0]
+      const last = items.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
-    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('keydown', handleDrawerKeys)
     return () => {
       document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('keydown', handleDrawerKeys)
     }
   }, [navigationOpen])
 
@@ -105,7 +120,7 @@ export function AdminLayout() {
   function resetDemo() {
     if (
       window.confirm(
-        '¿Restablecer productos, pedidos y configuración de demostración?',
+        '¿Restablecer productos, pedidos y configuración guardados en este navegador?',
       )
     ) {
       adminService.reset()
@@ -119,13 +134,13 @@ export function AdminLayout() {
       <a className="skip-link" href="#admin-content">
         Saltar al contenido
       </a>
-      <header className="admin-header">
+      <header className="admin-header" inert={navigationOpen}>
         <Link
           className="admin-brand"
           to="/admin"
           aria-label="Panel Aroma Infini"
         >
-          aroma infini<span>.</span>
+          Aroma Infini<span>.</span>
           <small>administración</small>
         </Link>
         <div className="admin-header-context" aria-label="Ubicación actual">
@@ -154,7 +169,11 @@ export function AdminLayout() {
         </div>
       </header>
       <aside
+        ref={sidebarRef}
         id="admin-navigation"
+        role={navigationOpen ? 'dialog' : undefined}
+        aria-modal={navigationOpen ? true : undefined}
+        aria-label={navigationOpen ? 'Menú administrativo' : undefined}
         className={`admin-sidebar${navigationOpen ? ' is-open' : ''}`}
       >
         <div className="admin-sidebar-heading">
@@ -168,7 +187,7 @@ export function AdminLayout() {
               <Icon name="store" />
             </span>
             <span>
-              aroma infini<strong>.</strong>
+              Aroma Infini<strong>.</strong>
               <small>Administración</small>
             </span>
           </Link>
@@ -208,10 +227,10 @@ export function AdminLayout() {
         </nav>
         <div className="admin-sidebar-footer">
           <button className="admin-reset" type="button" onClick={resetDemo}>
-            Restablecer demostración
+            Restablecer datos
           </button>
           <span className="admin-side-status">
-            <span aria-hidden="true" /> Demo local
+            <span aria-hidden="true" /> Sesión local
           </span>
         </div>
       </aside>
@@ -219,15 +238,15 @@ export function AdminLayout() {
         className={`admin-sidebar-backdrop${navigationOpen ? ' is-visible' : ''}`}
         type="button"
         aria-label="Cerrar menú administrativo"
-        tabIndex={navigationOpen ? 0 : -1}
+        tabIndex={-1}
         onClick={() => {
           setNavigationOpen(false)
           window.requestAnimationFrame(() => menuButtonRef.current?.focus())
         }}
       />
-      <main id="admin-content" className="admin-main" tabIndex={-1}>
+      <main id="admin-content" className="admin-main" tabIndex={-1} inert={navigationOpen}>
         <div className="admin-demo-banner">
-          Demo · Cambios temporales · Datos ficticios
+          Los cambios de este panel se guardan en este navegador.
         </div>
         <Outlet />
       </main>

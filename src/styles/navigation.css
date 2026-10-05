@@ -159,7 +159,7 @@
     position: relative;
     width: min(calc(100% - var(--entrance-gutter) * 2), 1120px);
     margin-inline: auto;
-    padding-block: 36px;
+    padding-block: 28px 32px;
     display: grid;
     grid-template-columns: 0.9fr 2.1fr;
     gap: 64px;
@@ -174,10 +174,10 @@
   .navigation-columns {
     gap: 32px;
   }
-  .navigation-close {
+  .site-header .navigation-panel .navigation-close {
     position: absolute;
     right: -12px;
-    top: 0;
+    top: 4px;
   }
 }
 @keyframes navigation-reveal {

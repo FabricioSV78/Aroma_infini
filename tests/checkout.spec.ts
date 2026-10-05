@@ -66,19 +66,21 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
     feeCents: 0,
     free: true,
   })
-  expect(quoteShipping('Cusco', 'courier', 39000).kind).toBe('pending')
+  expect(quoteShipping('Cusco', 'courier', 39000)).toMatchObject({
+    kind: 'quoted',
+    feeCents: 3500,
+    estimate: 'Hasta 5 días',
+  })
   expect(quoteShipping('Cusco', 'motorizado', 39000).kind).toBe('unavailable')
+  expect(quoteShipping('departamento inexistente', 'courier', 39000).kind).toBe('pending')
+  for (const department of peruDepartments) {
+    expect(quoteShipping(department.value, 'courier', 39000).kind).toBe('quoted')
+  }
 
   expect(evaluatePromotion('', 39000).kind).toBe('empty')
-  expect(evaluatePromotion('demo10', 39000).kind).toBe('applied')
-  expect(evaluatePromotion('MINIMO500', 39000).kind).toBe('minimum-not-met')
-  expect(evaluatePromotion('MINIMO500', 59000).kind).toBe('applied')
+  expect(evaluatePromotion('DESCONOCIDO', 39000).kind).toBe('not-found')
   for (const [code, kind] of [
     ['DESCONOCIDO', 'not-found'],
-    ['INACTIVO', 'inactive'],
-    ['PROXIMO', 'not-started'],
-    ['VENCIDO', 'expired'],
-    ['LIMITE', 'limit-reached'],
     ['ERROR', 'error'],
   ] as const)
     expect(evaluatePromotion(code, 39000).kind).toBe(kind)
@@ -89,14 +91,13 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
   draft.address.province = '1501'
   draft.address.district = '150122'
   draft.deliveryMethod = 'motorizado'
-  draft.appliedPromotion = 'DEMO10'
   expect(calculateCheckout(cart, draft)).toMatchObject({
     subtotalCents: 39000,
-    discountCents: 3900,
-    totalCents: 36600,
+    discountCents: 0,
+    totalCents: 40500,
   })
   expect(createMockOrder(cart, draft)).toMatchObject({
-    reference: expect.stringMatching(/^AI-DEMO-[A-F0-9]{16}$/),
+    reference: expect.stringMatching(/^AI-[A-F0-9]{16}$/),
     paymentProvider: 'mercado-pago',
   })
   expect(
@@ -105,6 +106,30 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
       draft,
     ),
   ).toBeNull()
+})
+
+test('El checkout cotiza courier para un departamento sin excepción', async ({ page }) => {
+  const province = getPeruProvinceOptions('cusco')[0]
+  const district = getPeruDistrictOptions(province.value)[0]
+  await page.addInitScript(() => {
+    localStorage.setItem('aroma-infini:cart:v1', JSON.stringify({
+      version: 1,
+      items: [{ variantId: 'cedre-50', quantity: 1 }],
+    }))
+  })
+  await page.goto('/checkout')
+  await page.getByRole('button', { name: 'Continuar a entrega' }).click()
+  await page.getByLabel('Nombre', { exact: true }).fill('María')
+  await page.getByLabel('Apellido').fill('Rojas')
+  await page.getByLabel('Correo electrónico').fill('maria@ejemplo.invalid')
+  await page.getByLabel('Celular').fill('912345678')
+  await page.getByRole('button', { name: 'Continuar a entrega' }).click()
+  await page.getByLabel('Departamento').selectOption('cusco')
+  await page.getByLabel('Provincia').selectOption(province.value)
+  await page.getByLabel('Distrito').selectOption(district.value)
+  await expect(page.locator('.checkout-delivery-quote')).toContainText(/S\/\s*35/)
+  await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Revisar selección' })).toBeEnabled()
 })
 
 test('El checkout vacío o con variantes no disponibles pide corregir el carrito', async ({
@@ -136,13 +161,11 @@ test('El seguimiento descarta registros locales dañados', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('aroma-infini:order-tracking:v1', '{roto')
   })
-  await page.goto('/seguir-pedido?codigo=AI-DEMO-0000000000000000')
-  await expect(
-    page.getByText(/No encontramos ese pedido de prueba/),
-  ).toBeVisible()
+  await page.goto('/seguir-pedido?codigo=AI-0000000000000000')
+  await expect(page.getByText(/No encontramos ese pedido/)).toBeVisible()
   await page.goto('/cuenta/pedidos')
   await expect(
-    page.getByRole('heading', { name: 'Explora la experiencia de cuenta.' }),
+    page.getByRole('heading', { name: 'Todo en un mismo lugar.' }),
   ).toBeVisible()
 })
 
@@ -159,7 +182,10 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
     )
   })
   await page.goto('/checkout')
-  await page.getByRole('radio', { name: /Cuenta de demostración/ }).check()
+  await page.getByRole('radio', { name: /Con mi cuenta/ }).check()
+  await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+  await page.getByLabel('Apellido').fill('Torres')
+  await page.getByLabel('Correo electrónico').fill('ana@example.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
   await page.getByLabel('Departamento').selectOption('lima')
@@ -171,29 +197,27 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
   await page.getByRole('button', { name: 'Revisar selección' }).click()
 
   await expect(
-    page.getByRole('heading', { name: 'Pago con Mercado Pago' }),
+    page.getByRole('heading', { name: 'Resumen de tu selección' }),
   ).toBeVisible()
-  await expect(page.getByLabel('Resultado de prueba')).toHaveCount(0)
+  await expect(page.getByLabel('Estado de validación')).toHaveCount(0)
   await expect(
     page.getByRole('radio', { name: /Tarjeta|Transferencia/ }),
   ).toHaveCount(0)
   await expect(page.getByLabel('Código de descuento')).toBeHidden()
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(page).toHaveURL('/checkout/confirmacion')
   await expect(
-    page.getByRole('heading', { name: 'Compra de prueba completada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
   ).toBeVisible()
   await page.getByRole('link', { name: 'Ver en Mis pedidos' }).click()
   await expect(page).toHaveURL('/cuenta/pedidos')
-  await page
-    .getByRole('button', { name: 'Explorar cuenta de demostración' })
-    .click()
+  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await expect(page.locator('.account-order-list > li')).toHaveCount(2)
   await page.getByRole('link', { name: 'Ver pedido' }).first().click()
   await expect(page.getByRole('heading', { name: 'Recibido.' })).toBeVisible()
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'Explora la experiencia de cuenta.' }),
+    page.getByRole('heading', { name: 'Recibido.' }),
   ).toBeVisible()
 })
 
@@ -207,9 +231,9 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await expect(page).toHaveURL('/checkout')
   await page.goto('/checkout?demo=1')
   await expect(page.getByRole('radio', { name: /Como invitado/ })).toBeChecked()
-  await expect(page.locator('.help-button')).toHaveCount(0)
+  await expect(page.locator('.help-button')).toBeVisible()
   const helpButton = page.getByRole('button', {
-    name: 'Información de atención',
+    name: 'Abrir ayuda y contacto',
   })
   await helpButton.click()
   await expect(page.getByRole('dialog')).toBeVisible()
@@ -247,43 +271,47 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
     0,
   )
   await expect(
-    page.getByRole('heading', { name: 'Pago con Mercado Pago' }),
+    page.getByRole('heading', { name: 'Resumen de tu selección' }),
   ).toBeVisible()
   await page.getByText('¿Tienes un código de descuento?').click()
-  await page.getByLabel('Código de descuento').fill('DEMO10')
+  await page.getByLabel('Código de descuento').fill('AROMA10')
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page.locator('.checkout-promotion-message')).toContainText(
-    '10 %',
+    'No encontramos ese código',
   )
-  await expect(page.locator('.checkout-summary')).toContainText('S/ 366')
+  await expect(page.locator('.checkout-summary')).toContainText('S/ 405')
 
-  await page.getByLabel('Resultado de prueba').selectOption('rejected')
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
-  await expect(page.getByRole('alert')).toContainText('rechazado')
+  await page.getByLabel('Estado de validación').selectOption('rejected')
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
+  await expect(page.locator('.checkout-payment-message')).toContainText(
+    'No se pudo registrar',
+  )
   await expect(
     page.getByRole('button', { name: 'Carrito, 1 producto' }),
   ).toBeVisible()
 
-  await page.getByLabel('Resultado de prueba').selectOption('error')
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
-  await expect(page.getByRole('alert')).toContainText('completar la prueba')
+  await page.getByLabel('Estado de validación').selectOption('error')
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
+  await expect(page.locator('.checkout-payment-message')).toContainText(
+    'Ocurrió un error',
+  )
 
-  await page.getByLabel('Resultado de prueba').selectOption('approved')
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
+  await page.getByLabel('Estado de validación').selectOption('approved')
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(page).toHaveURL('/checkout/confirmacion')
   await expect(
-    page.getByRole('heading', { name: 'Compra de prueba completada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
   ).toBeVisible()
   await expect(
     page.locator('.checkout-confirmation-tracking strong'),
-  ).toHaveText(/^AI-DEMO-[A-F0-9]{16}$/)
+  ).toHaveText(/^AI-[A-F0-9]{16}$/)
   await expect(
     page.getByRole('button', { name: 'Carrito', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('.checkout-confirmation')).toContainText('S/ 366')
+  await expect(page.locator('.checkout-confirmation')).toContainText('S/ 405')
   const trackingLink = page.getByRole('link', { name: 'Ver estado del pedido' })
   const trackingHref = await trackingLink.getAttribute('href')
-  expect(trackingHref).toMatch(/^\/seguir-pedido\?codigo=AI-DEMO-[A-F0-9]{16}$/)
+  expect(trackingHref).toMatch(/^\/seguir-pedido\?codigo=AI-[A-F0-9]{16}$/)
   const saved = await page.evaluate(() =>
     localStorage.getItem('aroma-infini:order-tracking:v1'),
   )
@@ -291,22 +319,18 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   expect(saved).not.toContain('Avenida de ejemplo')
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'No hay una simulación activa.' }),
+    page.getByRole('heading', { name: 'No hay una selección reciente.' }),
   ).toBeVisible()
   await page.goto(trackingHref!)
   await expect(
-    page.getByRole('heading', { name: 'Pedido de prueba: recibido.' }),
+    page.getByRole('heading', { name: 'Estado: recibido.' }),
   ).toBeVisible()
   await expect(page.getByText('María Prueba')).toHaveCount(0)
-  await page.getByLabel('Código de pedido').fill('AI-DEMO-0000000000000000')
+  await page.getByLabel('Código de pedido').fill('AI-0000000000000000')
   await page.getByRole('button', { name: 'Consultar' }).click()
-  await expect(
-    page.getByText(/No encontramos ese pedido de prueba/),
-  ).toBeVisible()
+  await expect(page.getByText(/No encontramos ese pedido/)).toBeVisible()
   await page.goto('/cuenta/pedidos')
-  await page
-    .getByRole('button', { name: 'Explorar cuenta de demostración' })
-    .click()
+  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await expect(page.locator('.account-order-list > li')).toHaveCount(1)
   await expect(page.getByText(trackingHref!.split('codigo=')[1])).toHaveCount(0)
 })
@@ -336,12 +360,12 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
     .getByLabel('Dirección', { exact: true })
     .fill('Avenida de prueba 123')
   await page.getByRole('button', { name: 'Revisar selección' }).click()
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
 
   const reference = await page
     .locator('.checkout-confirmation-tracking strong')
     .textContent()
-  expect(reference).toMatch(/^AI-DEMO-[A-F0-9]{16}$/)
+  expect(reference).toMatch(/^AI-[A-F0-9]{16}$/)
   const trackingHref = `/seguir-pedido?codigo=${reference}`
 
   await page.evaluate((path) => {
@@ -372,7 +396,7 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, trackingHref)
   await expect(
-    page.getByRole('heading', { name: 'Pedido de prueba: en preparación.' }),
+    page.getByRole('heading', { name: 'Estado: en preparación.' }),
   ).toBeVisible()
   await expect(
     page.locator('.tracking-steps li[aria-current="step"]'),
@@ -404,9 +428,9 @@ test('Un pago rechazado no crea pedido ni cliente en administración', async ({
     .getByLabel('Dirección', { exact: true })
     .fill('Avenida de prueba 456')
   await page.getByRole('button', { name: 'Revisar selección' }).click()
-  await page.getByLabel('Resultado de prueba').selectOption('rejected')
-  await page.getByRole('button', { name: 'Ver confirmación de prueba' }).click()
-  await expect(page.getByRole('alert')).toContainText('rechazado')
+  await page.getByLabel('Estado de validación').selectOption('rejected')
+  await page.getByRole('button', { name: 'Guardar selección' }).click()
+  await expect(page.getByRole('alert')).toContainText('No se pudo registrar')
 
   await page.evaluate(() => {
     window.history.pushState(null, '', '/admin/pedidos')
@@ -424,13 +448,12 @@ test('La cuenta de ejemplo no autentica y el borrador se conserva al editar el c
   await page.goto('/producto/bois-clair')
   await page.getByRole('button', { name: 'Añadir al carrito' }).click()
   await page.goto('/checkout')
-  await page.getByRole('radio', { name: /Cuenta de demostración/ }).check()
-  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue(
-    'Cliente',
-  )
-  await expect(page.getByLabel('Correo electrónico')).toHaveValue(
-    'cliente@ejemplo.invalid',
-  )
+  await page.getByRole('radio', { name: /Con mi cuenta/ }).check()
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Correo electrónico')).toHaveValue('')
+  await page.getByLabel('Nombre', { exact: true }).fill('Camila')
+  await page.getByLabel('Apellido').fill('Torres')
+  await page.getByLabel('Correo electrónico').fill('camila@example.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
   await expect(page.getByLabel('Departamento')).toHaveValue('')

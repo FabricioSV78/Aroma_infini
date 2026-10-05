@@ -40,7 +40,7 @@ export function CartPage() {
           <p>
             Explora la selección y añade la presentación que quieras comparar.
           </p>
-          <Link className="button button--primary" to="/catalogo">
+          <Link className="button button--primary" to="/tienda">
             Explorar perfumes <Icon name="arrow" />
           </Link>
         </div>

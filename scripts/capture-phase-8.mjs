@@ -35,11 +35,6 @@ try {
         messages.push(message.text())
     })
     await capture(page, '/nosotros', `nosotros-${width}`)
-    await capture(
-      page,
-      '/preguntas-frecuentes',
-      `preguntas-frecuentes-${width}`,
-    )
     await capture(page, '/privacidad', `privacidad-${width}`)
     measurements.push({
       width,

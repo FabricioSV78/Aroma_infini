@@ -1,16 +1,8 @@
 import { Link } from 'react-router'
-import {
-  getFreeShippingThresholdCents,
-  type ResolvedCart,
-} from '../../services/commerce-service'
+import type { ResolvedCart } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
 
 export function CartSummary({ cart }: { cart: ResolvedCart }) {
-  const remaining = Math.max(
-    0,
-    getFreeShippingThresholdCents() - cart.subtotalCents,
-  )
-  const qualifies = remaining === 0
   return (
     <aside className="cart-summary" aria-labelledby="cart-summary-title">
       <p className="eyebrow">Resumen</p>
@@ -22,20 +14,18 @@ export function CartSummary({ cart }: { cart: ResolvedCart }) {
         </div>
         <div>
           <dt>Envío</dt>
-          <dd>{qualifies ? 'Gratis' : 'Por definir según destino'}</dd>
+          <dd>Según destino</dd>
         </div>
         <div className="cart-summary-total">
           <dt>Total estimado</dt>
           <dd>
             {formatPEN(cart.subtotalCents)}
-            {!qualifies ? ' + envío' : ''}
+            {' + envío'}
           </dd>
         </div>
       </dl>
       <p className="cart-shipping-note">
-        {qualifies
-          ? 'Tu selección alcanza el envío gratis.'
-          : `Te faltan ${formatPEN(remaining)} para el envío gratis.`}
+        Las opciones de entrega se muestran al elegir tu ubicación.
       </p>
       {cart.needsAttention ? (
         <p className="cart-attention" role="alert">
@@ -56,7 +46,7 @@ export function CartSummary({ cart }: { cart: ResolvedCart }) {
         </Link>
       )}
       <p className="cart-summary-caption">
-        Recorrido de demostración; sin cobros ni pedidos reales.
+        Puedes revisar los datos de entrega antes de guardar tu selección.
       </p>
     </aside>
   )

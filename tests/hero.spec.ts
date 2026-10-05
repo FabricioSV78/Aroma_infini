@@ -190,9 +190,9 @@ test('El fundido se reduce con la preferencia de movimiento reducido', async ({
   await page.keyboard.press('Enter')
   await expect(page.locator('.hero-slide.is-active')).toHaveCSS('opacity', '1')
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  const regularDuration = await slide.evaluate((element) =>
+  const regularDuration = await page.locator('.hero-slide.is-active').evaluate((element) =>
     parseFloat(getComputedStyle(element).transitionDuration),
   )
-  expect(regularDuration).toBeGreaterThanOrEqual(0.65)
-  expect(regularDuration).toBeLessThanOrEqual(0.8)
+  expect(regularDuration).toBeGreaterThanOrEqual(1.3)
+  expect(regularDuration).toBeLessThanOrEqual(1.5)
 })

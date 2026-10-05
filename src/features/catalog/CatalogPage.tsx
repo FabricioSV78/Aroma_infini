@@ -107,8 +107,8 @@ export function CatalogPage() {
             Reintentar
           </button>
         )}
-        <Link className="text-link" to="/catalogo">
-          Explorar catálogo
+        <Link className="text-link" to="/tienda">
+          Explorar tienda
         </Link>
       </section>
     )
@@ -222,14 +222,12 @@ export function CatalogPage() {
             <span aria-current="page">{brand.name}</span>
           </>
         ) : (
-          <span aria-current="page">
-            {searchMode ? 'Búsqueda' : 'Perfumes'}
-          </span>
+          <span aria-current="page">{searchMode ? 'Búsqueda' : 'Tienda'}</span>
         )}
       </nav>
       <header className="catalog-heading" data-scroll-reveal="copy">
         <div>
-          <p className="eyebrow">
+          <p className={brand ? 'eyebrow' : 'eyebrow brand-label'}>
             {brand ? 'Universo de marca' : 'La selección de Aroma Infini'}
           </p>
           <h1>{title}</h1>
@@ -272,15 +270,33 @@ export function CatalogPage() {
         <section className="catalog-empty" data-scroll-reveal="copy">
           <h2>¿Qué perfume tienes en mente?</h2>
           <p>Escribe un nombre de perfume o una marca para empezar.</p>
-          <Link className="text-link" to="/catalogo">
+          <Link className="text-link" to="/tienda">
             Explorar todos los perfumes
           </Link>
+        </section>
+      ) : searchMode && query.search && data.total === 0 ? (
+        <section
+          className="catalog-empty catalog-empty--search"
+          data-scroll-reveal="copy"
+          role="status"
+        >
+          <h2>No encontramos coincidencias.</h2>
+          <p>Prueba con otro nombre de perfume o marca.</p>
+          {count > 0 ? (
+            <button className="button button--secondary" onClick={clearFilters}>
+              Limpiar filtros
+            </button>
+          ) : (
+            <Link className="text-link" to="/tienda">
+              Explorar la tienda
+            </Link>
+          )}
         </section>
       ) : (
         <div className="catalog-layout">
           <aside
             className="catalog-sidebar"
-            aria-label="Filtros del catálogo"
+            aria-label="Filtros de la tienda"
             data-scroll-reveal="copy"
           >
             <h2 ref={sidebarTitle} tabIndex={-1}>
@@ -380,7 +396,6 @@ export function CatalogPage() {
                       brand={data.brands.find(
                         (item) => item.id === product.brandId,
                       )}
-                      hoverImage={product.image + '-alternate'}
                     />
                   ))}
                 </div>
@@ -402,7 +417,7 @@ export function CatalogPage() {
             {data.pages > 1 && (
               <nav
                 className="catalog-pagination"
-                aria-label="Páginas del catálogo"
+                aria-label="Páginas de la tienda"
                 data-scroll-reveal="copy"
               >
                 {Array.from(

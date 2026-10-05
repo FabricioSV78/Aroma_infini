@@ -65,10 +65,10 @@ export const accountStatusOrder: AccountOrderStatus[] = [
 
 export function createDemoProfile(): AccountProfile {
   return {
-    firstName: 'Cliente',
-    lastName: 'Ejemplo',
-    email: 'cliente@ejemplo.invalid',
-    phone: '912345678',
+    firstName: 'Camila',
+    lastName: 'Torres',
+    email: '',
+    phone: '',
   }
 }
 
@@ -76,19 +76,19 @@ export function createDemoAddress(): AccountAddress {
   return {
     id: 'direccion-demo-principal',
     label: 'Principal',
-    recipient: 'Cliente Ejemplo',
+    recipient: 'Camila Torres',
     department: 'lima',
     province: '1501',
     district: '150122',
-    street: 'Avenida de ejemplo 123',
-    reference: 'Dirección ficticia para esta demostración',
+    street: 'Dirección registrada',
+    reference: '',
   }
 }
 
 export function createDemoOrders(): AccountOrder[] {
   return [
     {
-      reference: 'AI-DEMO-A1B2C3D4E5F60708',
+      reference: 'AI-A1B2C3D4E5F60708',
       placedAt: '2026-09-09T15:30:00.000Z',
       status: 'shipped',
       lines: [
@@ -96,7 +96,7 @@ export function createDemoOrders(): AccountOrder[] {
           variantId: 'petale-50',
           productSlug: 'petale-nu',
           image: 'petale',
-          brand: 'FORME',
+          brand: 'Forme',
           name: 'Pétale Nu',
           ml: 50,
           quantity: 1,

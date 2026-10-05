@@ -2,6 +2,8 @@
   box-sizing: border-box;
 }
 html {
+  /* Keep the layout width when a dialog temporarily hides the scrollbar. */
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-height) + 24px);
 }
@@ -155,28 +157,6 @@ section[tabindex]:focus {
   letter-spacing: -0.055em;
   white-space: nowrap;
 }
-.help-button {
-  width: min(calc(100% - var(--gutter) * 2), var(--container));
-  min-height: 56px;
-  margin: 28px auto;
-  padding: 10px 14px;
-  background: white;
-  border: 1px solid var(--color-control);
-  color: var(--color-ink);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.help-button-label {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-}
-.help-button-arrow {
-  width: 18px;
-  height: 18px;
-}
 .pending-page {
   min-height: 55vh;
   padding-bottom: 96px;
@@ -203,24 +183,6 @@ section[tabindex]:focus {
 @media (min-width: 768px) {
   .wordmark {
     font-size: 35px;
-  }
-}
-@media (min-width: 1024px) {
-  .help-button {
-    position: fixed;
-    right: 16px;
-    bottom: 20px;
-    z-index: 10;
-    width: 48px;
-    height: 48px;
-    min-height: 48px;
-    margin: 0;
-    padding: 0;
-    justify-content: center;
-  }
-  .help-button-label,
-  .help-button-arrow {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

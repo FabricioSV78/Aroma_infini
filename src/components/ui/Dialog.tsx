@@ -1,4 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { IconButton } from './IconButton'
 
 interface DialogProps {
@@ -35,13 +40,17 @@ export function Dialog({
       first?.focus()
     }
   }
-  useEffect(
+  useLayoutEffect(
     function synchronizeDialog() {
       const dialog = ref.current
       if (!dialog || !open) return
-      dialog.showModal()
       const previousOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
+      const scrollX = window.scrollX
+      const scrollY = window.scrollY
+      dialog.showModal()
+      if (window.scrollX !== scrollX || window.scrollY !== scrollY)
+        window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' })
       return () => {
         dialog.close()
         document.body.style.overflow = previousOverflow

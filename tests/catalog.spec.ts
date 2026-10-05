@@ -11,6 +11,42 @@ import {
   brandsLoader,
 } from '../src/features/catalog/catalog-loaders'
 
+test('Los enlaces anteriores conservan filtros al abrir la tienda', async ({
+  page,
+}) => {
+  await page.goto('/catalogo?marca=forme&orden=precio-asc')
+  await expect(page).toHaveURL('/tienda?marca=forme&orden=precio-asc')
+  await expect(page.locator('.product-card')).toHaveCount(2)
+})
+
+test('Los cuatro perfumes añadidos tienen ficha y se pueden añadir al carrito', async ({
+  page,
+}) => {
+  for (const [slug, name] of [
+    ['neroli-matin', 'Néroli Matin'],
+    ['iris-velours', 'Iris Velours'],
+    ['figue-douce', 'Figue Douce'],
+    ['santal-nuit', 'Santal Nuit'],
+  ]) {
+    await page.goto(`/producto/${slug}`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+    await expect(page.locator('.product-review-list > li')).toHaveCount(3)
+    await page.getByRole('button', { name: 'Añadir al carrito' }).click()
+    await expect(page.locator('.cart-notice')).toContainText(
+      `${name} se añadió al carrito.`,
+    )
+  }
+  await page.goto('/carrito')
+  for (const name of [
+    'Néroli Matin',
+    'Iris Velours',
+    'Figue Douce',
+    'Santal Nuit',
+  ]) {
+    await expect(page.locator('main')).toContainText(name)
+  }
+})
+
 test('Consulta: facetas, acentos, stock, precios y paginación', () => {
   const run = (query: string) =>
     queryCatalog(readCatalogQuery(new URLSearchParams(query)))
@@ -21,11 +57,15 @@ test('Consulta: facetas, acentos, stock, precios y paginación', () => {
   expect(run('min=600&max=630').items.map((p) => p.id)).toEqual(['petale'])
   expect(run('orden=precio-asc').items.map((p) => p.id)).toEqual([
     'cedre',
+    'neroli',
     'petale',
     'ambre',
+    'iris',
     'sillage',
+    'figue',
+    'santal',
   ])
-  expect(run('marca=invalid&pagina=-8&min=bad&orden=bad').total).toBe(4)
+  expect(run('marca=invalid&pagina=-8&min=bad&orden=bad').total).toBe(8)
   const fixture = {
     ...products[0],
     variants: [
@@ -76,7 +116,7 @@ test('Loaders: marca inexistente y fallos recuperables', async () => {
   }
 })
 
-test('Las rutas anteriores de marca redirigen al filtro del catálogo', async () => {
+test('Las rutas anteriores de marca redirigen al filtro de la tienda', async () => {
   const response = await brandCatalogRedirectLoader({
     request: new Request('http://localhost/marcas/forme'),
     params: { slug: 'forme' },
@@ -86,22 +126,22 @@ test('Las rutas anteriores de marca redirigen al filtro del catálogo', async ()
   })
   expect(response).toBeInstanceOf(Response)
   expect((response as Response).headers.get('Location')).toBe(
-    '/catalogo?marca=forme',
+    '/tienda?marca=forme',
   )
 })
 
 test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
   page,
 }) => {
-  await page.goto('/catalogo')
-  await expect(page.locator('.product-card')).toHaveCount(4)
+  await page.goto('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(8)
   await page.setViewportSize({ width: 1440, height: 900 })
   const dialog = page.getByRole('complementary', {
-    name: 'Filtros del catálogo',
+    name: 'Filtros de la tienda',
   })
   await expect(dialog).toBeVisible()
   await expect(page.getByRole('button', { name: /^Filtros/ })).toBeHidden()
-  await dialog.getByLabel('FORME', { exact: true }).check()
+  await dialog.getByLabel('Forme', { exact: true }).check()
   await dialog.getByLabel('Para ella', { exact: true }).check()
   await dialog.getByLabel('Mínimo').fill('400')
   await dialog.getByLabel('Máximo').fill('630')
@@ -113,7 +153,7 @@ test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
   await page
     .getByRole('button', { name: 'Limpiar filtros', exact: true })
     .click()
-  await expect(page.locator('.product-card')).toHaveCount(4)
+  await expect(page.locator('.product-card')).toHaveCount(8)
   await page.getByLabel('Ordenar', { exact: true }).selectOption('precio-asc')
   await expect(page.locator('.product-card').first()).toContainText(
     'Bois Clair',
@@ -128,20 +168,20 @@ test('Móvil: cancelar borrador, Escape, retorno de foco y aplicación', async (
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/catalogo')
+  await page.goto('/tienda')
   const trigger = page.getByRole('button', { name: /^Filtros/ })
   await trigger.click()
   await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
-  await expect(page).toHaveURL(/\/catalogo$/)
+  await expect(page).toHaveURL(/\/tienda$/)
   await trigger.click()
   await expect(
     page.getByRole('dialog').getByLabel('Unisex', { exact: true }),
   ).not.toBeChecked()
   await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
   await page.getByRole('button', { name: 'Aplicar filtros' }).click()
-  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(page.locator('.product-card')).toHaveCount(6)
   await expect(trigger).toBeFocused()
 })
 
@@ -149,7 +189,7 @@ test('El panel móvil cierra al pasar a la columna desktop', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/catalogo')
+  await page.goto('/tienda')
   await page.getByRole('button', { name: /^Filtros/ }).click()
   await page.setViewportSize({ width: 1024, height: 900 })
   await expect(page.getByRole('dialog')).toBeHidden()
@@ -166,13 +206,13 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   await page.goto('/marcas')
   await page
     .locator('.brands-directory')
-    .getByRole('link', { name: /FORME/ })
+    .getByRole('link', { name: /Forme/ })
     .click()
-  await expect(page).toHaveURL('/catalogo?marca=forme')
+  await expect(page).toHaveURL('/tienda?marca=forme')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Elige tu próxima fragancia.',
   )
-  await expect(page.locator('.product-card')).toHaveCount(1)
+  await expect(page.locator('.product-card')).toHaveCount(2)
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
   await page.getByRole('dialog').getByLabel('Perfume o marca').fill('petale')
   await expect(page.locator('.search-suggestions')).toContainText('Pétale Nu')
@@ -195,7 +235,7 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
 })
 
 for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
-  test(`Catálogo ${width}px: imágenes, consola y ancho`, async ({ page }) => {
+  test(`Tienda ${width}px: imágenes, consola y ancho`, async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('console', (message) => {
@@ -203,8 +243,8 @@ for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
         errors.push(message.text())
     })
     await page.setViewportSize({ width, height: 900 })
-    await page.goto('/catalogo')
-    await expect(page.locator('.product-card')).toHaveCount(4)
+    await page.goto('/tienda')
+    await expect(page.locator('.product-card')).toHaveCount(8)
     await page.locator('footer').scrollIntoViewIfNeeded()
     await page.waitForFunction(() =>
       [...document.images].every((img) => img.complete && img.naturalWidth > 0),

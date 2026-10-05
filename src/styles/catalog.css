@@ -130,6 +130,8 @@
 .catalog-empty p {
   color: var(--color-muted);
 }
+
+.catalog-empty--search { padding-block: 24px 48px; gap: 14px; }
 .catalog-search {
   padding-bottom: 32px;
   max-width: 680px;
@@ -175,13 +177,15 @@
 }
 .catalog-price-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 240px);
+  gap: 12px;
 }
 .catalog-price-fields label {
   font-size: 13px;
 }
 .catalog-price-fields input {
+  min-width: 0;
   display: block;
   width: 100%;
   min-height: 44px;
@@ -278,6 +282,13 @@
     max-height: 100dvh;
     margin: 0;
   }
+  .catalog-filter-dialog .catalog-filter-actions {
+    position: static;
+    padding-bottom: 24px;
+  }
+  .catalog-filter-dialog .catalog-filter-form fieldset { padding-bottom: 12px; }
+  .catalog-filter-dialog .catalog-filter-form legend { margin-bottom: 6px; }
+  .catalog-filter-dialog .catalog-filter-form fieldset > label { min-height: 40px; }
 }
 .catalog-sidebar {
   display: none;
@@ -288,8 +299,8 @@
 @media (min-width: 1024px) {
   .catalog-layout {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
-    gap: 48px;
+    grid-template-columns: clamp(240px, 19vw, 272px) minmax(0, 1fr);
+    gap: clamp(24px, 3vw, 48px);
     align-items: start;
   }
   .catalog-sidebar {

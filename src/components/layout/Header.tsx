@@ -8,6 +8,7 @@ import { SearchPanel } from '../../features/catalog/SearchPanel'
 import { CartDrawer } from '../../features/cart/CartDrawer'
 import { useCart } from '../../features/cart/cart-context'
 import { useFavorites } from '../../features/favorites/favorites-context'
+import { useAccount } from '../../features/account/account-context'
 import { Dialog } from '../ui/Dialog'
 import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -56,6 +57,8 @@ function NavigationColumns({ group, onNavigate }: NavigationColumnsProps) {
 export function Header() {
   const { itemCount, drawerOpen, openCart } = useCart()
   const { favoriteCount } = useFavorites()
+  const { active: accountActive } = useAccount()
+  const favoritesPath = accountActive ? '/cuenta/favoritos' : '/favoritos'
   const [overlay, setOverlay] = useState<'menu' | 'search' | null>(null)
   const [expanded, setExpanded] = useState<{ id: string; key: string } | null>(
     null,
@@ -69,6 +72,7 @@ export function Header() {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(() => window.scrollY > 26)
   const isTransparent = pathname === '/' && !scrolled && !openGroup
+  const freeShippingThresholdCents = getFreeShippingThresholdCents()
 
   function cancelHover() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
@@ -132,10 +136,19 @@ export function Header() {
       <a className="skip-link" href="#contenido">
         Saltar al contenido
       </a>
-      <div className="announcement">
-        Envíos en zonas habilitadas <span aria-hidden="true">·</span> Gratis
-        desde {formatPEN(getFreeShippingThresholdCents())}
-      </div>
+      {pathname === '/' ? (
+        <div className="announcement">
+          <span>Envíos a todo el Perú</span>
+          {freeShippingThresholdCents > 0 ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                Gratis desde {formatPEN(freeShippingThresholdCents)}
+              </span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       <div className="header-sentinel" ref={sentinelRef} aria-hidden="true" />
       <header
         ref={headerRef}
@@ -168,7 +181,7 @@ export function Header() {
             aria-label="Aroma Infini, inicio"
             onClick={closeNavigation}
           >
-            aroma infini<span className="wordmark-dot">.</span>
+            Aroma Infini<span className="wordmark-dot">.</span>
           </Link>
           <nav
             className="desktop-nav"
@@ -259,7 +272,7 @@ export function Header() {
             />
             <Link
               className="icon-button desktop-access header-commerce-action"
-              to="/favoritos"
+              to={favoritesPath}
               onClick={closeNavigation}
               aria-label={
                 favoriteCount
@@ -344,7 +357,7 @@ export function Header() {
           ))}
         </nav>
         <div className="mobile-secondary">
-          <Link to="/favoritos" onClick={() => setOverlay(null)}>
+          <Link to={favoritesPath} onClick={() => setOverlay(null)}>
             <Icon name="heart" />
             Favoritos
           </Link>

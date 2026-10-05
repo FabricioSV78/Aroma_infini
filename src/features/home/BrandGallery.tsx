@@ -2,6 +2,16 @@ import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import type { HomeData } from '../../services/home-service'
+import type { Product } from '../../types/catalog'
+import { getAdminProduct } from '../../services/admin-service'
+import { imageSource, imageSourceSet } from '../../services/image-source'
+
+function alternateImage(product: Product) {
+  return (
+    getAdminProduct(product.id)?.detail.gallery[1]?.image ??
+    `${product.image}-alternate`
+  )
+}
 
 const galleryMedia = '(min-width: 768px)'
 function subscribeGalleryLayout(onChange: () => void) {
@@ -48,7 +58,7 @@ export function BrandGallery({
         <div className="brand-list" data-reveal="copy">
           {selection.map(({ brand, product }, index) => (
             <Link
-              to={`/catalogo?marca=${brand.slug}`}
+              to={`/tienda?marca=${brand.slug}`}
               key={brand.id}
               className={
                 activeId === brand.id
@@ -63,8 +73,8 @@ export function BrandGallery({
               {product && !desktop && (
                 <img
                   className="brand-thumbnail"
-                  src={'/images/' + product.image + '-alternate-480.webp'}
-                  srcSet={`/images/${product.image}-alternate-480.webp 480w, /images/${product.image}-alternate-960.webp 960w`}
+                  src={imageSource(alternateImage(product))}
+                  srcSet={imageSourceSet(alternateImage(product), [480, 960])}
                   sizes="(max-width: 767px) calc((100vw - 48px) / 2), 1px"
                   width={960}
                   height={1200}
@@ -100,14 +110,11 @@ export function BrandGallery({
                     key={brand.id}
                   >
                     <img
-                      src={'/images/' + product.image + '-alternate-960.webp'}
-                      srcSet={
-                        '/images/' +
-                        product.image +
-                        '-alternate-480.webp 480w, /images/' +
-                        product.image +
-                        '-alternate-960.webp 960w'
-                      }
+                      src={imageSource(alternateImage(product), 960)}
+                      srcSet={imageSourceSet(
+                        alternateImage(product),
+                        [480, 960],
+                      )}
                       sizes="(min-width: 1440px) 432px, (min-width: 768px) 34vw, 1px"
                       width={960}
                       height={1200}

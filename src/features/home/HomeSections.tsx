@@ -3,10 +3,10 @@ import { SectionHeading } from '../../components/ui/SectionHeading'
 import { Icon } from '../../components/ui/Icon'
 import { categories } from '../../content/home'
 import type { HomeData } from '../../services/home-service'
-import { formatPEN } from '../../services/currency'
+import { imageSource, imageSourceSet } from '../../services/image-source'
 import { ProductCard } from './ProductCard'
 
-export function Categories() {
+export function Categories({ media }: Pick<HomeData, 'media'>) {
   return (
     <section
       className="section container discovery-section"
@@ -29,8 +29,14 @@ export function Categories() {
           >
             <div className="category-image">
               <img
-                src={`/images/${category.image}-480.webp`}
-                srcSet={`/images/${category.image}-480.webp 480w, /images/${category.image}-960.webp 960w, /images/${category.image}-1536.webp 1536w`}
+                src={imageSource(
+                  media[category.id as keyof typeof media] ?? category.image,
+                  480,
+                )}
+                srcSet={imageSourceSet(
+                  media[category.id as keyof typeof media] ?? category.image,
+                  [480, 960, 1536],
+                )}
                 sizes="(min-width: 1440px) 760px, (min-width: 768px) 55vw, (max-width: 767px) 100vw"
                 width={category.width}
                 height={category.height}
@@ -71,7 +77,7 @@ export function Bestsellers({
         eyebrow="Selección Aroma Infini"
         title="Más vendidos"
         action={
-          <Link className="text-link" to="/catalogo?orden=mas-vendidos">
+          <Link className="text-link" to="/tienda?orden=mas-vendidos">
             Ver selección
             <Icon name="arrow" />
           </Link>
@@ -82,7 +88,6 @@ export function Bestsellers({
           <ProductCard
             key={product.id}
             product={product}
-            hoverImage={`${product.image}-alternate`}
             brand={brands.find((brand) => brand.id === product.brandId)}
           />
         ))}
@@ -91,53 +96,11 @@ export function Bestsellers({
   )
 }
 
-export function BrandEditorial() {
-  return (
-    <section
-      id="marca-destacada"
-      tabIndex={-1}
-      className="editorial"
-      aria-labelledby="editorial-title"
-    >
-      <div className="editorial-copy" data-reveal="copy">
-        <p className="eyebrow">En foco · ATELIER 01</p>
-        <h2 id="editorial-title">
-          <span>El carácter</span>
-          <span>de lo esencial.</span>
-        </h2>
-        <p>Bois Clair · madera clara, aire fresco.</p>
-        <Link className="text-link" to="/catalogo?marca=atelier-01">
-          Descubrir ATELIER 01
-          <Icon name="arrow" />
-        </Link>
-      </div>
-      <picture className="editorial-image" data-reveal="image">
-        <source
-          media="(max-width: 767px)"
-          srcSet="/images/editorial-essential-v3-mobile-480.webp 480w, /images/editorial-essential-v3-mobile-780.webp 780w"
-          sizes="100vw"
-          width={780}
-          height={858}
-        />
-        <img
-          src="/images/editorial-essential-v3-1536.webp"
-          srcSet="/images/editorial-essential-v3-480.webp 480w, /images/editorial-essential-v3-960.webp 960w, /images/editorial-essential-v3-1536.webp 1536w"
-          sizes="100vw"
-          width={1672}
-          height={941}
-          loading="lazy"
-          decoding="async"
-          alt="El frasco conceptual de Bois Clair sobre piedra clara, junto a una pieza de madera"
-        />
-      </picture>
-    </section>
-  )
-}
-
 export function FeaturedPerfumes({
   brands,
   featured,
-}: Pick<HomeData, 'brands' | 'featured'>) {
+  media,
+}: Pick<HomeData, 'brands' | 'featured' | 'media'>) {
   const title =
     featured.length === 2
       ? 'Dos aromas. Dos formas de dejar huella.'
@@ -159,7 +122,7 @@ export function FeaturedPerfumes({
           </div>
           <Link
             className="text-link featured-action"
-            to="/catalogo?seleccion=destacados"
+            to="/tienda?seleccion=destacados"
           >
             Explorar destacados <Icon name="arrow" />
           </Link>
@@ -167,18 +130,21 @@ export function FeaturedPerfumes({
         <Link
           className="featured-visual"
           data-reveal="image"
-          to="/catalogo?seleccion=destacados"
+          to="/tienda?seleccion=destacados"
           aria-label="Descubrir la selección editorial de perfumes destacados"
         >
           <img
-            src="/images/featured-duo-v3-960.webp"
-            srcSet="/images/featured-duo-v3-480.webp 480w, /images/featured-duo-v3-960.webp 960w, /images/featured-duo-v3-1536.webp 1448w"
+            src={imageSource(media.featured ?? 'featured-duo-v3', 960)}
+            srcSet={imageSourceSet(
+              media.featured ?? 'featured-duo-v3',
+              [480, 960, 1536],
+            )}
             sizes="(min-width: 1440px) 800px, (min-width: 1024px) 56vw, (min-width: 768px) calc(100vw - 48px), calc(100vw - 32px)"
             width={1448}
             height={1086}
             loading="lazy"
             decoding="async"
-            alt="Dos frascos conceptuales de perfumes destacados en una composición de luz y piedra"
+            alt=""
           />
         </Link>
         <div className="featured-products" data-reveal="copy">
@@ -196,8 +162,7 @@ export function FeaturedPerfumes({
   )
 }
 
-export function TrustInformation({ shipping }: Pick<HomeData, 'shipping'>) {
-  const activeZones = shipping.zones.filter((zone) => zone.active)
+export function TrustInformation() {
   return (
     <section
       className="trust-section container"
@@ -208,24 +173,18 @@ export function TrustInformation({ shipping }: Pick<HomeData, 'shipping'>) {
     >
       <div>
         <Icon name="truck" />
-        <h2>Envíos en Perú</h2>
-        <p>Gratis desde {formatPEN(shipping.freeThresholdCents)}.</p>
+        <h2>Opciones de entrega</h2>
+        <p>Consulta las opciones disponibles para tu ubicación.</p>
       </div>
       <div>
         <Icon name="clock" />
-        <h2>Tiempos de entrega</h2>
-        <p>
-          {activeZones.length
-            ? activeZones
-                .map((zone) => `${zone.name}: ${zone.estimate.toLowerCase()}`)
-                .join(' · ')
-            : 'Consulta la cobertura disponible.'}
-        </p>
+        <h2>Tu pedido</h2>
+        <p>Encuentra el estado de tu selección con su código.</p>
       </div>
       <div>
         <Icon name="chat" />
         <h2>Conversemos</h2>
-        <p>Canal de atención en preparación.</p>
+        <p>Escríbenos si necesitas orientación.</p>
         <Link className="text-link" to="/contacto">
           Ver contacto
           <Icon name="arrow" />

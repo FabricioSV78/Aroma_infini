@@ -43,15 +43,7 @@ export function CheckoutContactForm({ onNext }: ContactFormProps) {
     setDraft((current) => ({
       ...current,
       mode,
-      contact:
-        mode === 'demo-account'
-          ? {
-              ...current.contact,
-              firstName: current.contact.firstName || 'Cliente',
-              lastName: current.contact.lastName || 'Ejemplo',
-              email: current.contact.email || 'cliente@ejemplo.invalid',
-            }
-          : current.contact,
+      contact: current.contact,
     }))
   }
 
@@ -110,8 +102,8 @@ export function CheckoutContactForm({ onNext }: ContactFormProps) {
             onChange={() => chooseMode('demo-account')}
           />
           <span>
-            <strong>Cuenta de demostración</strong>
-            <small>Datos ficticios, sin iniciar sesión</small>
+            <strong>Con mi cuenta</strong>
+            <small>Guarda la selección en Mis pedidos</small>
           </span>
         </label>
       </fieldset>
@@ -396,7 +388,7 @@ export function CheckoutDeliveryForm({
           />
           <span>
             <strong>Courier</strong>
-            <small>Tarifa según la zona de ejemplo</small>
+            <small>Tarifa según la ubicación</small>
           </span>
         </label>
         <label className="checkout-option">
@@ -413,14 +405,14 @@ export function CheckoutDeliveryForm({
             <small>
               {inProvince
                 ? 'No disponible para la ubicación elegida'
-                : 'Escenario Lima y Callao'}
+                : 'Disponible según ubicación'}
             </small>
           </span>
         </label>
       </fieldset>
 
       <div className="checkout-delivery-quote" role="status">
-        <span>Cotización de demostración</span>
+        <span>Entrega estimada</span>
         {quote.kind === 'quoted' ? (
           <strong>
             {quote.free ? 'Envío gratis' : formatPEN(quote.feeCents)}
@@ -428,14 +420,14 @@ export function CheckoutDeliveryForm({
         ) : (
           <strong>
             {draft.address.department.trim()
-              ? 'Sin cotización de ejemplo'
+              ? 'Sin tarifa disponible'
               : 'Completa el departamento'}
           </strong>
         )}
         {quote.kind === 'quoted' ? <small>{quote.estimate}</small> : null}
       </div>
       <p className="checkout-footnote">
-        Solo se muestran las zonas activas configuradas en esta demostración.
+        Se muestran las opciones disponibles para la ubicación seleccionada.
       </p>
 
       <div className="checkout-actions">

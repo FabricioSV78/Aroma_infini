@@ -18,8 +18,22 @@
 @import './admin.css';
 @import './typography.css';
 @import './store-shell.css';
+@import './contact-help.css';
+@import './institutional-editorial.css';
 @import './previews.css';
 @import './admin-product-preview.css';
+@import './admin-home-editor.css';
+@import './admin-shipping.css';
+@import './editorial-refinements.css';
+
+/* Preserve the editorial spelling of business and perfume brand names. */
+.brand-label,
+.bestsellers-section .section-heading .eyebrow,
+.footer-top h2.brand-label,
+.contact-help-panel-heading p.brand-label {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
 
 @theme inline {
   --font-sans: var(--font-sans);

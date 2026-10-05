@@ -2,18 +2,17 @@ import { expect, test, type Page } from '@playwright/test'
 
 const mobileRoutes = [
   '/',
-  '/catalogo',
+  '/tienda',
   '/marcas',
   '/producto/petale-nu',
   '/carrito',
   '/checkout',
   '/cuenta',
   '/nosotros',
-  '/preguntas-frecuentes',
   '/seguir-pedido',
 ]
 
-const desktopRoutes = ['/', '/catalogo', '/producto/petale-nu', '/nosotros']
+const desktopRoutes = ['/', '/tienda', '/producto/petale-nu', '/nosotros']
 
 async function revealEverySection(page: Page) {
   const elements = page.locator('[data-scroll-reveal], [data-reveal]')

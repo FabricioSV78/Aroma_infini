@@ -9,6 +9,7 @@ const sections = [
   { to: '/cuenta/direcciones', label: 'Direcciones' },
   { to: '/cuenta/pedidos', label: 'Mis pedidos' },
   { to: '/cuenta/pagos', label: 'Pagos' },
+  { to: '/cuenta/favoritos', label: 'Favoritos' },
 ] as const
 
 function AccountAccessPage() {
@@ -26,34 +27,20 @@ function AccountAccessPage() {
       </nav>
       <div className="account-access-layout" data-scroll-reveal="stagger">
         <header>
-          <p className="eyebrow">Mi cuenta</p>
           <h1>Tu universo, siempre cerca.</h1>
           <p>Reúne tus pedidos, direcciones y favoritos en un solo lugar.</p>
         </header>
         <section aria-labelledby="demo-access-title">
-          <p className="eyebrow">Recorrido de demostración</p>
-          <h2 id="demo-access-title">Explora la experiencia de cuenta.</h2>
-          <p>
-            Usa una identidad ficticia. No se solicitarán ni guardarán
-            credenciales.
-          </p>
+          <p className="eyebrow">Acceso a tu espacio</p>
+          <h2 id="demo-access-title">Todo en un mismo lugar.</h2>
+          <p>Consulta tu selección, tus pedidos y tus datos de entrega.</p>
           <button
             className="button button--primary"
             type="button"
             onClick={activateDemo}
           >
-            Explorar cuenta de demostración <Icon name="arrow" />
+            Ver mi cuenta <Icon name="arrow" />
           </button>
-          <div className="account-future-access" aria-label="Accesos futuros">
-            <div>
-              <strong>Continuar con Google</strong>
-              <span>Disponible al conectar autenticación</span>
-            </div>
-            <div>
-              <strong>Correo y contraseña</strong>
-              <span>Disponible al conectar autenticación</span>
-            </div>
-          </div>
         </section>
       </div>
     </article>
@@ -89,7 +76,7 @@ export function AccountLayout() {
         role="status"
         data-scroll-reveal="copy"
       >
-        Cuenta de demostración · Los cambios viven solo durante esta sesión.
+        Los cambios en tu cuenta se conservan durante esta sesión.
       </div>
       <div className="account-layout" data-scroll-reveal="stagger">
         <button
@@ -108,7 +95,6 @@ export function AccountLayout() {
           className={`account-sidebar${navigationOpen ? ' is-open' : ''}`}
         >
           <nav aria-label="Secciones de mi cuenta">
-            <p className="eyebrow">Mi cuenta</p>
             <ul>
               {sections.map((section) => (
                 <li key={section.to}>
@@ -121,15 +107,10 @@ export function AccountLayout() {
                   </NavLink>
                 </li>
               ))}
-              <li>
-                <Link to="/favoritos" onClick={() => setNavigationOpen(false)}>
-                  Favoritos <Icon name="arrow" />
-                </Link>
-              </li>
             </ul>
           </nav>
           <button className="account-leave" type="button" onClick={leaveDemo}>
-            Salir de la demostración
+            Salir de mi cuenta
           </button>
         </aside>
         <div className="account-content">

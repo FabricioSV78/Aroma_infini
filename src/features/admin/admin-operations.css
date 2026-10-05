@@ -1,0 +1,195 @@
+/* Operation screens keep the same panel surfaces while using the space available. */
+.admin-page--order-detail .admin-inline-warning {
+  margin-top: 8px;
+}
+
+.admin-order-primary {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.admin-order-primary > section + section,
+.admin-order-layout aside > section + section,
+.admin-order-layout aside > form {
+  margin-top: 0;
+}
+
+.admin-order-layout aside {
+  gap: 20px;
+}
+
+.admin-order-layout aside > form {
+  margin-bottom: 0;
+}
+
+.admin-order-layout :is(dd, li, p) {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .admin-order-layout > .admin-order-primary {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .admin-order-layout > aside {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-order-primary .admin-delivery-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-primary .admin-delivery-editor .button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-order-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-order-primary,
+  .admin-order-layout aside {
+    display: contents;
+  }
+
+  .admin-order-layout aside > form {
+    order: -1;
+  }
+
+  .admin-order-primary > section:first-child {
+    order: 0;
+  }
+
+  .admin-order-layout aside > section:first-of-type {
+    order: 1;
+  }
+
+  .admin-order-primary > section:last-child {
+    order: 2;
+  }
+
+  .admin-order-layout aside > section:last-of-type {
+    order: 3;
+  }
+
+  .admin-brands-page .admin-table tr,
+  .admin-customers-page .admin-table tr {
+    margin-bottom: 10px;
+    padding: 12px 14px;
+  }
+
+  .admin-brands-page .admin-table th,
+  .admin-brands-page .admin-table td,
+  .admin-customers-page .admin-table th,
+  .admin-customers-page .admin-table td {
+    min-width: 0;
+    padding-block: 7px;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .admin-orders-page .admin-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .admin-orders-page .admin-table,
+  .admin-orders-page .admin-table tbody,
+  .admin-orders-page .admin-table tr,
+  .admin-orders-page .admin-table th,
+  .admin-orders-page .admin-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-orders-page .admin-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .admin-orders-page .admin-table tbody {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .admin-orders-page .admin-table tr {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius);
+    background: var(--admin-surface);
+    box-shadow: var(--admin-shadow);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 0 12px;
+  }
+
+  .admin-orders-page .admin-table th,
+  .admin-orders-page .admin-table td {
+    min-width: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .admin-orders-page .admin-table th:first-child,
+  .admin-orders-page .admin-table td:nth-child(2),
+  .admin-orders-page .admin-table td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .admin-orders-page .admin-table td:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-orders-page .admin-table td:nth-child(2) .admin-cell-label,
+  .admin-orders-page .admin-table td:nth-child(2) > span:last-child {
+    display: block;
+  }
+
+  .admin-orders-page .admin-table td:nth-child(2) .admin-cell-label {
+    margin-bottom: 4px;
+  }
+
+  .admin-orders-page .admin-table td:nth-child(n + 3):nth-child(-n + 6) {
+    display: grid;
+    align-content: start;
+    gap: 5px;
+  }
+
+  .admin-orders-page .admin-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .admin-orders-page .admin-table .admin-cell-label {
+    color: var(--admin-muted);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: inline;
+  }
+
+  .admin-orders-page .admin-table th:first-child > .admin-cell-label {
+    display: none;
+  }
+
+  .admin-orders-page .admin-table td:last-child .admin-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

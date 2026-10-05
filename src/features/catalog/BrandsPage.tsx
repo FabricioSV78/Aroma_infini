@@ -18,7 +18,7 @@ export function BrandsPage() {
       </nav>
       <header className="catalog-heading" data-scroll-reveal="copy">
         <div>
-          <p className="eyebrow">La selección de Aroma Infini</p>
+          <p className="eyebrow brand-label">La selección de Aroma Infini</p>
           <h1>
             Un universo.
             <br />
@@ -40,7 +40,7 @@ export function BrandsPage() {
           </div>
         ) : (
           data.brands.map((brand) => (
-            <Link key={brand.id} to={`/catalogo?marca=${brand.slug}`}>
+            <Link key={brand.id} to={`/tienda?marca=${brand.slug}`}>
               <h2>{brand.name}</h2>
               <span>
                 Explorar perfumes <Icon name="arrow" />

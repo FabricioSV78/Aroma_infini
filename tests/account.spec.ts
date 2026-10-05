@@ -1,16 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const demoOrderReference = 'AI-DEMO-A1B2C3D4E5F60708'
+const demoOrderReference = 'AI-A1B2C3D4E5F60708'
 
 async function activateDemoAccount(page: Page, path = '/cuenta') {
   await page.goto(path)
   const accessButton = page.getByRole('button', {
-    name: 'Explorar cuenta de demostración',
+    name: 'Ver mi cuenta',
   })
   await expect(accessButton).toBeVisible()
   await accessButton.focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByText(/Cuenta de demostración/).first()).toBeVisible()
+  await expect(page.getByText(/Los cambios en tu cuenta/).first()).toBeVisible()
 }
 
 test('La cuenta diferencia el acceso futuro de la demostración sin pedir credenciales', async ({
@@ -21,34 +21,75 @@ test('La cuenta diferencia el acceso futuro de la demostración sin pedir creden
   await expect(
     page.getByRole('heading', { name: 'Tu universo, siempre cerca.' }),
   ).toBeVisible()
-  await expect(page.getByText('Continuar con Google')).toBeVisible()
-  await expect(page.getByText('Correo y contraseña')).toBeVisible()
   await expect(page.locator('input')).toHaveCount(0)
 
-  await page
-    .getByRole('button', { name: 'Explorar cuenta de demostración' })
-    .click()
+  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Hola, Cliente.' }),
+    page.getByRole('heading', { name: 'Hola, Camila.' }),
   ).toBeVisible()
   await expect(page.getByRole('link', { name: 'Resumen' })).toHaveAttribute(
     'aria-current',
     'page',
   )
 
-  await page.getByRole('button', { name: 'Salir de la demostración' }).click()
+  await page.getByRole('button', { name: 'Salir de mi cuenta' }).click()
   await expect(
     page.getByRole('heading', { name: 'Tu universo, siempre cerca.' }),
   ).toBeVisible()
 })
 
-test('Los datos y la dirección cambian solo durante la sesión de la cuenta', async ({
+test('Favoritos conserva el formato de cuenta activa y la vista independiente queda para invitados', async ({
+  page,
+}) => {
+  await page.goto('/favoritos')
+  await expect(
+    page.getByRole('heading', { name: 'Tus favoritos.' }),
+  ).toBeVisible()
+  await expect(page.locator('.account-page')).toHaveCount(0)
+
+  await activateDemoAccount(page)
+  await page
+    .locator('.account-sidebar')
+    .getByRole('link', { name: 'Favoritos' })
+    .click()
+  await expect(page).toHaveURL('/cuenta/favoritos')
+  await expect(page.locator('.account-page')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Favoritos.' })).toBeVisible()
+  await expect(
+    page.locator('.account-sidebar').getByRole('link', { name: 'Favoritos' }),
+  ).toHaveAttribute('aria-current', 'page')
+
+  await page.getByRole('link', { name: 'Explorar perfumes' }).click()
+  await page.getByRole('link', { name: 'Ver Bois Clair' }).first().click()
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await page.getByRole('link', { name: 'Favoritos, 1 guardado' }).click()
+  await expect(page).toHaveURL('/cuenta/favoritos')
+  await expect(page.locator('.account-content .product-card')).toHaveCount(1)
+
+  await page
+    .locator('.account-sidebar')
+    .getByRole('link', { name: 'Resumen' })
+    .click()
+  await page.getByRole('link', { name: 'Ver favoritos' }).click()
+  await expect(page).toHaveURL('/cuenta/favoritos')
+
+  await page.getByRole('button', { name: 'Salir de mi cuenta' }).click()
+  await page.getByRole('link', { name: 'Favoritos, 1 guardado' }).click()
+  await expect(page).toHaveURL('/favoritos')
+  await expect(
+    page.getByRole('heading', { name: 'Tus favoritos.' }),
+  ).toBeVisible()
+})
+
+test('Los datos y la dirección se conservan al recargar durante la sesión de la cuenta', async ({
   page,
 }) => {
   await activateDemoAccount(page)
 
   await page.getByRole('link', { name: 'Mis datos' }).click()
   await page.getByLabel('Nombre').fill('Ariana')
+  await page.getByLabel('Correo electrónico').fill('ariana@example.invalid')
+  await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Guardar cambios' }).click()
   await expect(page.getByRole('status').last()).toContainText(
     'Cambios guardados durante esta sesión.',
@@ -59,23 +100,27 @@ test('Los datos y la dirección cambian solo durante la sesión de la cuenta', a
   ).toBeVisible()
 
   await page.getByRole('link', { name: 'Direcciones' }).click()
-  await page
-    .getByRole('button', { name: 'Eliminar dirección de prueba' })
-    .click()
+  await page.getByRole('button', { name: 'Eliminar dirección' }).click()
   await expect(
     page.getByRole('heading', { name: 'No hay una dirección guardada.' }),
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Restaurar ejemplo' }).click()
+  await page.reload()
+  await expect(
+    page.getByRole('heading', { name: 'No hay una dirección guardada.' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Añadir dirección' }).click()
   await expect(page.getByLabel('Distrito')).toHaveValue('150122')
 
   const stored = await page.evaluate(() => JSON.stringify(localStorage))
   expect(stored).not.toContain('Ariana')
-  expect(stored).not.toContain('Avenida de ejemplo 123')
+  expect(stored).not.toContain('Dirección registrada')
 
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'Tu universo, siempre cerca.' }),
-  ).toBeVisible()
+    page.getByRole('textbox', { name: 'Dirección', exact: true }),
+  ).toHaveValue('Dirección registrada')
+  await page.getByRole('link', { name: 'Resumen' }).click()
+  await expect(page.getByRole('heading', { name: 'Hola, Ariana.' })).toBeVisible()
 })
 
 test('El historial conecta pedido, estado, entrega y pago simulado', async ({
@@ -104,7 +149,7 @@ test('El historial conecta pedido, estado, entrega y pago simulado', async ({
   await expect(page.getByRole('heading', { name: 'Pagos.' })).toBeVisible()
   await expect(page.getByText('Mercado Pago', { exact: true })).toBeVisible()
   await expect(page.locator('input')).toHaveCount(0)
-  await expect(page.getByText(/CVV/)).toBeVisible()
+  await expect(page.getByText(/Los datos de tarjeta/)).toBeVisible()
   await expect(page.getByText(/transferencia/i)).toHaveCount(0)
 })
 
@@ -113,17 +158,14 @@ test('La cuenta contempla historial vacío y pedido inexistente', async ({
 }) => {
   await activateDemoAccount(page, '/cuenta/pedidos?demo=empty')
   await expect(
-    page.getByRole('heading', { name: 'Aún no hay pedidos de prueba.' }),
+    page.getByRole('heading', { name: 'Aún no hay pedidos.' }),
   ).toBeVisible()
 
   await page.getByRole('link', { name: 'Resumen' }).click()
   await page.goto('/cuenta/pedidos/AI-DEMO-NO-EXISTE')
-  await page
-    .getByRole('button', { name: 'Explorar cuenta de demostración' })
-    .click()
   await expect(
     page.getByRole('heading', {
-      name: 'No encontramos ese pedido de prueba.',
+      name: 'No encontramos ese pedido.',
     }),
   ).toBeVisible()
 })
@@ -140,7 +182,7 @@ test('La navegación móvil de cuenta se abre bajo demanda y se repliega al eleg
   await expect(menu).toHaveAttribute('aria-expanded', 'false')
   await expect(navigation).toBeHidden()
   await expect(
-    page.getByRole('heading', { name: 'Hola, Cliente.' }),
+    page.getByRole('heading', { name: 'Hola, Camila.' }),
   ).toBeInViewport()
 
   await menu.click()
@@ -154,6 +196,13 @@ test('La navegación móvil de cuenta se abre bajo demanda y se repliega al eleg
   await expect(
     page.getByRole('heading', { name: 'Mis pedidos.' }),
   ).toBeVisible()
+
+  await menu.click()
+  await navigation.getByRole('link', { name: 'Favoritos' }).click()
+  await expect(page).toHaveURL('/cuenta/favoritos')
+  await expect(navigation).toBeHidden()
+  await expect(menu).toContainText('Favoritos')
+  await expect(page.getByRole('heading', { name: 'Favoritos.' })).toBeVisible()
 })
 
 for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {

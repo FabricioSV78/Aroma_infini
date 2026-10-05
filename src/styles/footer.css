@@ -1,5 +1,5 @@
 .site-footer {
-  padding-block: 40px 0;
+  padding-block: 40px calc(24px + env(safe-area-inset-bottom));
   background: var(--color-ink);
   color: var(--color-canvas);
 }
@@ -16,7 +16,7 @@
   display: inline-flex;
   min-height: 48px;
   align-items: center;
-  font-size: clamp(46px, 13vw, 62px);
+  font-size: clamp(32px, 8vw, 44px);
   font-weight: 300;
 }
 .footer-brand > p {
@@ -67,6 +67,7 @@
   outline-color: var(--color-canvas);
 }
 .footer-bottom {
+  padding-right: 64px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 24px;
@@ -91,16 +92,11 @@
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-.prototype-note {
-  max-width: 640px;
-  padding-block: 10px 28px;
-  color: #92928d;
-  font-size: 10px;
-}
 
 @media (min-width: 1024px) {
   .site-footer {
     padding-top: 54px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
   .footer-top {
     grid-template-columns:

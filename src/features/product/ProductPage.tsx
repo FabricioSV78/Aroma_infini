@@ -11,6 +11,7 @@ import { useCart } from '../cart/cart-context'
 import { formatPEN } from '../../services/currency'
 import { ProductReviewsPreview } from './ProductReviewsPreview'
 import { ProductPopularityPreview } from './ProductPopularityPreview'
+import { getBestsellingProducts } from '../../services/home-service'
 
 interface ProductReadyProps {
   product: Product
@@ -47,7 +48,7 @@ function ProductReady({
   const isAvailable = Boolean(selectedVariant && selectedVariant.stock > 0)
   const selectedPrice = selectedVariant
     ? formatPEN(selectedVariant.priceCents)
-    : 'Precio por confirmar'
+    : 'Precio no disponible'
 
   function handleInfoTabKeyDown(
     event: KeyboardEvent<HTMLButtonElement>,
@@ -79,7 +80,7 @@ function ProductReady({
       >
         <Link to="/">Inicio</Link>
         <span aria-hidden="true">/</span>
-        <Link to="/catalogo">Perfumes</Link>
+        <Link to="/tienda">Perfumes</Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">{product.name}</span>
       </nav>
@@ -92,7 +93,7 @@ function ProductReady({
               {brand ? (
                 <Link
                   className="product-brand"
-                  to={`/catalogo?marca=${brand.slug}`}
+                  to={`/tienda?marca=${brand.slug}`}
                 >
                   {brand.name}
                 </Link>
@@ -159,11 +160,13 @@ function ProductReady({
                 addItem(selectedVariant.id, selectedVariant.stock, product.name)
             }}
           >
-            {isAvailable ? 'Añadir al carrito' : 'Presentación agotada'}
+            <span className="product-cart-button__label">
+              {isAvailable ? 'Añadir al carrito' : 'Presentación agotada'}
+            </span>
           </button>
           <p id="product-purchase-note" className="sr-only">
             {isAvailable
-              ? 'La presentación se añadirá a tu carrito de demostración.'
+              ? 'La presentación se añadirá a tu carrito.'
               : 'Puedes explorar otras presentaciones o perfumes relacionados.'}
           </p>
 
@@ -242,12 +245,14 @@ function ProductReady({
         </div>
       </section>
 
-      <ProductReviewsPreview />
-
+      <ProductReviewsPreview productId={product.id} sizes={[...new Set(product.variants.map((variant) => variant.ml))]} />
       <ProductPopularityPreview
         productImage={product.image}
         productName={product.name}
-        productSlug={product.slug}
+        description={detail.shortDescription}
+        bestseller={getBestsellingProducts().some(
+          (item) => item.id === product.id,
+        )}
       />
 
       <section
@@ -259,8 +264,8 @@ function ProductReady({
             <p className="eyebrow">Seguir descubriendo</p>
             <h2 id="recommendations-title">También te puede gustar.</h2>
           </div>
-          <Link className="text-link" to="/catalogo">
-            Ver catálogo <Icon name="arrow" />
+          <Link className="text-link" to="/tienda">
+            Ver tienda <Icon name="arrow" />
           </Link>
         </header>
         <div className="product-grid" data-scroll-reveal="stagger">
@@ -269,7 +274,6 @@ function ProductReady({
               key={item.id}
               product={item}
               brand={brands.find((candidate) => candidate.id === item.brandId)}
-              hoverImage={`${item.image}-alternate`}
             />
           ))}
         </div>
@@ -305,8 +309,8 @@ export function ProductPage() {
             Reintentar
           </button>
         ) : null}
-        <Link className="text-link" to="/catalogo">
-          Explorar catálogo <Icon name="arrow" />
+        <Link className="text-link" to="/tienda">
+          Explorar tienda <Icon name="arrow" />
         </Link>
       </section>
     )

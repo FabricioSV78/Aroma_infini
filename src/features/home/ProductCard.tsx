@@ -4,17 +4,17 @@ import { Icon } from '../../components/ui/Icon'
 import { useFavorites } from '../favorites/favorites-context'
 import { getProductPresentation } from '../../services/product-presentation'
 import { formatPEN } from '../../services/currency'
+import { getAdminProduct } from '../../services/admin-service'
+import { imageSource, imageSourceSet } from '../../services/image-source'
 
 interface ProductCardProps {
   product: Product
   brand: Brand | undefined
-  hoverImage?: string
   variant?: 'standard' | 'editorial'
 }
 export function ProductCard({
   product,
   brand,
-  hoverImage,
   variant = 'standard',
 }: ProductCardProps) {
   const { favoriteIds, toggleFavorite } = useFavorites()
@@ -26,12 +26,15 @@ export function ProductCard({
     variant === 'standard'
       ? '(min-width: 1440px) 296px, (min-width: 768px) 23vw, 46vw'
       : '(min-width: 1024px) 120px, 76px'
+  const gallery = getAdminProduct(product.id)?.detail.gallery
+  const alternateImage = gallery?.[1]?.image
+  const productImageAlt = gallery?.[0]?.alt ?? `Frasco de ${product.name}`
   return (
     <article className={`product-card product-card--${variant}`}>
       <div className="product-photo">
         <Link
           className={
-            hoverImage
+            alternateImage
               ? 'product-image-link product-image-link--swap'
               : 'product-image-link'
           }
@@ -39,20 +42,20 @@ export function ProductCard({
           aria-label={`Ver ${product.name}`}
         >
           <img
-            src={`/images/${product.image}-480.webp`}
-            srcSet={`/images/${product.image}-480.webp 480w, /images/${product.image}-960.webp 960w`}
+            src={imageSource(product.image)}
+            srcSet={imageSourceSet(product.image, [480, 960])}
             sizes={imageSizes}
             width={1024}
             height={1280}
             loading="lazy"
             decoding="async"
-            alt={`Frasco conceptual de ${product.name}; imagen temporal`}
+            alt={productImageAlt}
           />
-          {hoverImage && (
+          {alternateImage && (
             <img
               className="product-image-alternate"
-              src={`/images/${hoverImage}-480.webp`}
-              srcSet={`/images/${hoverImage}-480.webp 480w, /images/${hoverImage}-960.webp 960w`}
+              src={imageSource(alternateImage)}
+              srcSet={imageSourceSet(alternateImage, [480, 960])}
               sizes={imageSizes}
               width={1024}
               height={1280}
@@ -76,7 +79,7 @@ export function ProductCard({
         {!inStock && <span className="stock-label">Agotado</span>}
       </div>
       <div className="product-meta">
-        <p className="eyebrow">{brand?.name}</p>
+        <p className="eyebrow brand-label">{brand?.name}</p>
         <h3>
           <Link to={`/producto/${product.slug}`}>
             {product.name}

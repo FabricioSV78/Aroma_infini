@@ -3,12 +3,15 @@ import {
   products as fixtureProducts,
 } from '../mocks/home'
 import { getProductDetail } from '../mocks/product-details'
+import { readAdminState, writeAdminState } from './admin-persistence'
+import { formatBrandName } from '../utils/brand-name'
 import {
   getPeruDepartmentLabel,
   getPeruDistrictLabel,
   getPeruProvinceOptions,
   getPeruProvinceLabel,
   isValidPeruLocation,
+  peruDepartments,
 } from '../content/peru'
 import type {
   Brand,
@@ -18,6 +21,8 @@ import type {
 } from '../types/catalog'
 
 export type AdminGender = 'hombre' | 'mujer' | 'unisex'
+export type HomeMediaKey = AdminGender | 'featured'
+export type HomeMedia = Record<HomeMediaKey, string | null>
 export type AdminOrderStatus =
   'received' | 'preparing' | 'shipped' | 'delivered'
 export type AdminOrderPaymentStatus =
@@ -131,6 +136,8 @@ export interface AdminShippingZone {
 
 export interface AdminShippingSettings {
   freeThresholdCents: number
+  nationalCourierFeeCents: number
+  nationalEstimate: string
   zones: AdminShippingZone[]
 }
 
@@ -142,6 +149,7 @@ export interface AdminState {
   promotions: AdminPromotion[]
   shipping: AdminShippingSettings
   featuredOrder: string[]
+  homeMedia: HomeMedia
   revision: number
 }
 
@@ -152,6 +160,10 @@ const metadata: Record<
   string,
   Pick<AdminProduct, 'gender' | 'featured' | 'popularity' | 'newest'>
 > = {
+  neroli: { gender: 'unisex', featured: false, popularity: 5, newest: 8 },
+  iris: { gender: 'unisex', featured: false, popularity: 6, newest: 7 },
+  figue: { gender: 'unisex', featured: false, popularity: 7, newest: 6 },
+  santal: { gender: 'unisex', featured: false, popularity: 8, newest: 5 },
   cedre: {
     gender: 'hombre',
     featured: true,
@@ -201,7 +213,7 @@ function cloneDetail(detail: ProductDetail): ProductDetail {
 
 export function createAdminProductDetail(
   product: Product,
-  description = 'Descripción temporal pendiente de contenido comercial aprobado.',
+  description = 'Descubre el carácter de esta fragancia y sus notas principales.',
 ): ProductDetail {
   return {
     type: 'Eau de Parfum',
@@ -215,14 +227,18 @@ export function createAdminProductDetail(
     gallery: [
       {
         image: product.image,
-        alt: `Vista conceptual de ${product.name}; imagen temporal`,
+        alt: `Frasco de ${product.name}`,
         framing: 'full',
       },
-      {
-        image: `${product.image}-alternate`,
-        alt: `Vista alternativa conceptual de ${product.name}; imagen temporal`,
-        framing: 'full',
-      },
+      ...(product.image
+        ? [
+            {
+              image: `${product.image}-alternate`,
+              alt: `Vista alternativa de ${product.name}`,
+              framing: 'full' as const,
+            },
+          ]
+        : []),
     ],
     recommendationIds: [],
   }
@@ -249,17 +265,17 @@ function createInitialState(): AdminState {
     brands: fixtureBrands.map((brand) => ({ ...brand, active: true })),
     orders: [
       {
-        reference: 'AI-DEMO-NUEVO-210926',
+        reference: 'AI-210926-01',
         customerId: 'customer-demo-2',
-        customerName: 'Camila Torres',
-        customerEmail: 'camila@ejemplo.invalid',
+        customerName: 'Cliente 02',
+        customerEmail: '—',
         placedAt: '2026-09-21T15:15:00.000Z',
         status: 'received',
         paymentStatus: 'approved',
         lines: [
           {
             variantId: 'cedre-50',
-            brand: 'ATELIER 01',
+            brand: 'Atelier 01',
             name: 'Bois Clair',
             ml: 50,
             quantity: 1,
@@ -277,21 +293,21 @@ function createInitialState(): AdminState {
           department: 'Lima',
           province: 'Lima',
           district: 'San Isidro',
-          street: 'Calle de demostración 210',
+          street: 'Dirección registrada',
         },
       },
       {
-        reference: 'AI-DEMO-PREPARANDO-200926',
+        reference: 'AI-200926-01',
         customerId: 'customer-demo-4',
-        customerName: 'Luisa Mendoza',
-        customerEmail: 'luisa@ejemplo.invalid',
+        customerName: 'Cliente 03',
+        customerEmail: '—',
         placedAt: '2026-09-20T21:15:00.000Z',
         status: 'preparing',
         paymentStatus: 'approved',
         lines: [
           {
             variantId: 'petale-100',
-            brand: 'FORME',
+            brand: 'Forme',
             name: 'Pétale Nu',
             ml: 100,
             quantity: 1,
@@ -309,21 +325,21 @@ function createInitialState(): AdminState {
           department: 'Lima',
           province: 'Lima',
           district: 'Miraflores',
-          street: 'Avenida de demostración 560',
+          street: 'Dirección registrada',
         },
       },
       {
-        reference: 'AI-DEMO-A1B2C3D4E5F60708',
+        reference: 'AI-A1B2C3D4E5F60708',
         customerId: 'customer-demo-1',
-        customerName: 'Cliente Ejemplo',
-        customerEmail: 'cliente@ejemplo.invalid',
+        customerName: 'Cliente 01',
+        customerEmail: '—',
         placedAt: '2026-09-09T15:30:00.000Z',
         status: 'shipped',
         paymentStatus: 'approved',
         lines: [
           {
             variantId: 'petale-50',
-            brand: 'FORME',
+            brand: 'Forme',
             name: 'Pétale Nu',
             ml: 50,
             quantity: 1,
@@ -341,21 +357,21 @@ function createInitialState(): AdminState {
           department: 'Lima',
           province: 'Lima',
           district: 'Miraflores',
-          street: 'Avenida de ejemplo 123',
+          street: 'Dirección registrada',
         },
       },
       {
-        reference: 'AI-DEMO-ENTREGADO-150926',
+        reference: 'AI-150926-01',
         customerId: 'customer-demo-2',
-        customerName: 'Camila Torres',
-        customerEmail: 'camila@ejemplo.invalid',
+        customerName: 'Cliente 02',
+        customerEmail: '—',
         placedAt: '2026-09-15T17:00:00.000Z',
         status: 'delivered',
         paymentStatus: 'approved',
         lines: [
           {
             variantId: 'sillage-75',
-            brand: 'STUDIO SILLAGE',
+            brand: 'Studio sillage',
             name: 'Vert Silence',
             ml: 75,
             quantity: 1,
@@ -373,106 +389,35 @@ function createInitialState(): AdminState {
           department: 'Arequipa',
           province: 'Arequipa',
           district: 'Cayma',
-          street: 'Calle de demostración 45',
+          street: 'Dirección registrada',
         },
       },
     ],
     customers: [
       {
         id: 'customer-demo-1',
-        name: 'Cliente Ejemplo',
-        email: 'cliente@ejemplo.invalid',
-        phone: '912345678',
+        name: 'Cliente 01',
+        email: '—',
+        phone: '—',
       },
       {
         id: 'customer-demo-2',
-        name: 'Camila Torres',
-        email: 'camila@ejemplo.invalid',
-        phone: '923456781',
+        name: 'Cliente 02',
+        email: '—',
+        phone: '—',
       },
       {
         id: 'customer-demo-4',
-        name: 'Luisa Mendoza',
-        email: 'luisa@ejemplo.invalid',
-        phone: '945678123',
+        name: 'Cliente 03',
+        email: '—',
+        phone: '—',
       },
     ],
-    promotions: [
-      {
-        id: 'promo-demo10',
-        code: 'DEMO10',
-        active: true,
-        type: 'percent',
-        value: 10,
-        minimumCents: 0,
-        startsAt: '',
-        endsAt: '',
-        usageLimit: null,
-        used: 0,
-      },
-      {
-        id: 'promo-minimo500',
-        code: 'MINIMO500',
-        active: true,
-        type: 'percent',
-        value: 10,
-        minimumCents: 50000,
-        startsAt: '',
-        endsAt: '',
-        usageLimit: null,
-        used: 0,
-      },
-      {
-        id: 'promo-inactivo',
-        code: 'INACTIVO',
-        active: false,
-        type: 'percent',
-        value: 10,
-        minimumCents: 0,
-        startsAt: '',
-        endsAt: '',
-        usageLimit: null,
-        used: 0,
-      },
-      {
-        id: 'promo-proximo',
-        code: 'PROXIMO',
-        active: true,
-        type: 'percent',
-        value: 10,
-        minimumCents: 0,
-        startsAt: '2099-01-01T00:00',
-        endsAt: '',
-        usageLimit: null,
-        used: 0,
-      },
-      {
-        id: 'promo-vencido',
-        code: 'VENCIDO',
-        active: true,
-        type: 'percent',
-        value: 10,
-        minimumCents: 0,
-        startsAt: '',
-        endsAt: '2020-01-01T00:00',
-        usageLimit: null,
-        used: 0,
-      },
-      {
-        id: 'promo-limite',
-        code: 'LIMITE',
-        active: true,
-        type: 'percent',
-        value: 10,
-        minimumCents: 0,
-        startsAt: '',
-        endsAt: '',
-        usageLimit: 1,
-        used: 1,
-      },
-    ],
+    promotions: [],
     shipping: {
       freeThresholdCents: 45000,
+      nationalCourierFeeCents: 3500,
+      nationalEstimate: 'Hasta 5 días',
       zones: [
         {
           id: 'zone-lima',
@@ -498,7 +443,7 @@ function createInitialState(): AdminState {
         },
         {
           id: 'zone-arequipa',
-          name: 'Arequipa · ejemplo',
+          name: 'Arequipa',
           department: 'arequipa',
           province: null,
           district: null,
@@ -510,15 +455,112 @@ function createInitialState(): AdminState {
       ],
     },
     featuredOrder: ['sillage', 'cedre'],
+    homeMedia: { hombre: null, mujer: null, unisex: null, featured: null },
     revision: 0,
   }
 }
 
 let state = createInitialState()
 const listeners = new Set<() => void>()
+let persistenceQueue: Promise<void> = Promise.resolve()
+let hydrationPromise: Promise<void> | undefined
+
+export function hydrateAdminStore() {
+  hydrationPromise ??= (async () => {
+    try {
+      const saved = await readAdminState()
+      if (
+        !saved ||
+        !Array.isArray(saved.products) ||
+        !Array.isArray(saved.featuredOrder)
+      )
+        return
+      const initial = createInitialState()
+      state = {
+        ...initial,
+        ...saved,
+        products: saved.products.map((record) => {
+          const legacyImages: Record<string, string> = {
+            neroli: 'cedre',
+            iris: 'petale',
+            figue: 'sillage',
+            santal: 'ambre',
+          }
+          const legacy = legacyImages[record.product.id]
+          const product =
+            legacy && record.product.image === legacy
+              ? { ...record.product, image: record.product.id }
+              : record.product
+          const defaultRecord = initial.products.find(
+            (item) => item.product.id === product.id,
+          )
+          const fixtureKeys = [product.id, legacy]
+            .filter(Boolean)
+            .flatMap((key) => [
+              key,
+              `${key}-alternate`,
+              `${key}-detail`,
+              `${key}-back`,
+            ])
+          const hasOnlyFixturePhotos =
+            product.image === product.id &&
+            record.detail.gallery.every((view) =>
+              fixtureKeys.includes(view.image),
+            )
+          const gallery =
+            hasOnlyFixturePhotos && defaultRecord
+              ? cloneDetail(defaultRecord.detail).gallery
+              : record.detail.gallery
+                  .filter(
+                    (view, index, views) =>
+                      views.findIndex((item) => item.image === view.image) ===
+                      index,
+                  )
+                  .filter(
+                    (view) => !(legacy && view.image === `${legacy}-alternate`),
+                  )
+                  .map((view) =>
+                    legacy && view.image === legacy
+                      ? { ...view, image: product.image }
+                      : view,
+                  )
+          return { ...record, product, detail: { ...record.detail, gallery } }
+        }),
+        brands: (saved.brands ?? initial.brands).map((brand) => ({
+          ...brand,
+          name: formatBrandName(brand.name),
+        })),
+        shipping: {
+          ...initial.shipping,
+          ...saved.shipping,
+          zones: Array.isArray(saved.shipping?.zones)
+            ? saved.shipping.zones
+            : initial.shipping.zones,
+        },
+        homeMedia: {
+          hombre: saved.homeMedia?.hombre ?? null,
+          mujer: saved.homeMedia?.mujer ?? null,
+          unisex: saved.homeMedia?.unisex ?? null,
+          featured: saved.homeMedia?.featured ?? null,
+        },
+      }
+      listeners.forEach((listener) => listener())
+    } catch {
+      // The storefront remains available when browser storage is unavailable.
+    }
+  })()
+  return hydrationPromise
+}
+
+function persist(snapshot: AdminState) {
+  persistenceQueue = persistenceQueue
+    .catch(() => undefined)
+    .then(() => writeAdminState(snapshot))
+}
 
 function commit(update: (current: AdminState) => AdminState) {
   state = { ...update(state), revision: state.revision + 1 }
+  persist(state)
   listeners.forEach((listener) => listener())
 }
 
@@ -547,13 +589,13 @@ function normalizeKey(value: string) {
 }
 
 function resolveShippingZone(
-  zones: AdminShippingZone[],
+  shipping: AdminShippingSettings,
   department: string,
   province = '',
   district = '',
 ) {
   const normalizedDepartment = normalizeKey(department)
-  return zones
+  const override = shipping.zones
     .filter(
       (zone) =>
         zone.active &&
@@ -566,6 +608,20 @@ function resolveShippingZone(
         Number(Boolean(right.district)) - Number(Boolean(left.district)) ||
         Number(Boolean(right.province)) - Number(Boolean(left.province)),
     )[0]
+  if (override) return override
+  if (!peruDepartments.some((item) => item.value === normalizedDepartment))
+    return undefined
+  return {
+    id: 'national',
+    name: 'Todo el Perú',
+    department: normalizedDepartment,
+    province: null,
+    district: null,
+    courierFeeCents: shipping.nationalCourierFeeCents,
+    motorizadoFeeCents: null,
+    estimate: shipping.nationalEstimate,
+    active: true,
+  } satisfies AdminShippingZone
 }
 
 function promotionDiscount(promotion: AdminPromotion, subtotalCents: number) {
@@ -584,10 +640,24 @@ export const adminService = {
   },
   reset() {
     state = createInitialState()
+    persist(state)
     listeners.forEach((listener) => listener())
+  },
+  flush() {
+    return persistenceQueue
   },
   saveProduct(record: AdminProduct): AdminSaveResult {
     const product = record.product
+    if (!product.image || !record.detail.gallery[0]?.image)
+      return {
+        kind: 'validation',
+        message: 'Selecciona o sube una fotografía principal.',
+      }
+    if (record.detail.gallery.some((view) => !view.alt.trim()))
+      return {
+        kind: 'validation',
+        message: 'Describe cada fotografía de la galería.',
+      }
     if (!product.name.trim() || !validSlug(product.slug))
       return {
         kind: 'validation',
@@ -724,10 +794,41 @@ export const adminService = {
       })),
     }))
   },
+  saveHome(featuredOrder: string[], homeMedia: HomeMedia): AdminSaveResult {
+    const unique = [...new Set(featuredOrder)]
+    if (
+      unique.length !== 2 ||
+      !unique.every((id) =>
+        state.products.some(
+          (item) =>
+            item.product.id === id &&
+            item.active &&
+            state.brands.some(
+              (brand) => brand.id === item.product.brandId && brand.active,
+            ),
+        ),
+      )
+    ) {
+      return {
+        kind: 'validation',
+        message: 'Selecciona dos productos activos diferentes para destacados.',
+      }
+    }
+    commit((current) => ({
+      ...current,
+      featuredOrder: unique,
+      homeMedia: { ...homeMedia },
+      products: current.products.map((item) => ({
+        ...item,
+        featured: unique.includes(item.product.id),
+      })),
+    }))
+    return { kind: 'saved' }
+  },
   saveBrand(brand: AdminBrand): AdminSaveResult {
     const normalized = {
       ...brand,
-      name: brand.name.trim(),
+      name: formatBrandName(brand.name),
       slug: brand.slug.trim(),
     }
     if (!normalized.name || !validSlug(normalized.slug))
@@ -780,7 +881,7 @@ export const adminService = {
       `${order.contact.firstName.trim()} ${order.contact.lastName.trim()}`.trim()
     if (
       !order.reference.trim() ||
-      !/^AI-DEMO-[A-F0-9]{16}$/.test(order.reference) ||
+      !/^AI-[A-F0-9]{16}$/.test(order.reference) ||
       !customerName ||
       !customerEmail ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) ||
@@ -850,17 +951,21 @@ export const adminService = {
       0,
     )
     const deliveryZone = resolveShippingZone(
-      state.shipping.zones,
+      state.shipping,
       order.address.department,
       order.address.province,
       order.address.district,
     )
     const expectedShippingCents = deliveryZone
-      ? order.subtotalCents >= state.shipping.freeThresholdCents
-        ? 0
-        : order.deliveryMethod === 'motorizado'
-          ? deliveryZone.motorizadoFeeCents
-          : deliveryZone.courierFeeCents
+      ? order.deliveryMethod === 'motorizado' &&
+        deliveryZone.motorizadoFeeCents === null
+        ? null
+        : state.shipping.freeThresholdCents > 0 &&
+            order.subtotalCents >= state.shipping.freeThresholdCents
+          ? 0
+          : order.deliveryMethod === 'motorizado'
+            ? deliveryZone.motorizadoFeeCents
+            : deliveryZone.courierFeeCents
       : null
     if (
       expectedSubtotal !== order.subtotalCents ||
@@ -983,6 +1088,24 @@ export const adminService = {
         kind: 'validation',
         message: 'El pago debe estar aprobado antes de preparar el pedido.',
       }
+    if (status === 'shipped') {
+      const customer = state.customers.find(
+        (item) => item.id === order.customerId,
+      )
+      if (
+        !order.customerEmail ||
+        order.customerEmail === '—' ||
+        !customer?.phone ||
+        customer.phone === '—' ||
+        !order.address.street ||
+        order.address.street === 'Dirección registrada'
+      )
+        return {
+          kind: 'validation',
+          message:
+            'Completa el contacto y la dirección antes de marcar el pedido como enviado.',
+        }
+    }
     const statuses: AdminOrderStatus[] = [
       'received',
       'preparing',
@@ -1001,6 +1124,54 @@ export const adminService = {
       orders: current.orders.map((order) =>
         order.reference === reference ? { ...order, status } : order,
       ),
+    }))
+    return { kind: 'saved' }
+  },
+  saveOrderDelivery(
+    reference: string,
+    details: {
+      customerName: string
+      customerEmail: string
+      phone: string
+      street: string
+    },
+  ): AdminSaveResult {
+    const order = state.orders.find((item) => item.reference === reference)
+    if (!order)
+      return { kind: 'validation', message: 'El pedido ya no existe.' }
+    const name = details.customerName.trim()
+    const email = normalizeEmail(details.customerEmail)
+    const phone = details.phone.trim()
+    const street = details.street.trim()
+    if (
+      name.length < 2 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !/^[+\d\s()-]{9,20}$/.test(phone) ||
+      street.length < 5
+    )
+      return {
+        kind: 'validation',
+        message: 'Revisa el nombre, correo, teléfono y dirección de entrega.',
+      }
+    commit((current) => ({
+      ...current,
+      orders: current.orders.map((item) =>
+        item.reference === reference
+          ? {
+              ...item,
+              customerName: name,
+              customerEmail: email,
+              address: { ...item.address, street },
+            }
+          : item,
+      ),
+      customers: current.customers.some((item) => item.id === order.customerId)
+        ? current.customers.map((item) =>
+            item.id === order.customerId
+              ? { ...item, name, email, phone }
+              : item,
+          )
+        : [{ id: order.customerId, name, email, phone }, ...current.customers],
     }))
     return { kind: 'saved' }
   },
@@ -1081,6 +1252,8 @@ export const adminService = {
     const zoneIds = shipping.zones.map((zone) => zone.id.trim())
     if (
       !isNonNegativeInteger(shipping.freeThresholdCents) ||
+      !isNonNegativeInteger(shipping.nationalCourierFeeCents) ||
+      !shipping.nationalEstimate?.trim() ||
       new Set(zoneIds).size !== zoneIds.length ||
       new Set(coverageKeys).size !== coverageKeys.length ||
       shipping.zones.some(
@@ -1088,6 +1261,9 @@ export const adminService = {
           !zone.id.trim() ||
           !zone.name.trim() ||
           !zone.department.trim() ||
+          !peruDepartments.some(
+            (department) => department.value === normalizeKey(zone.department),
+          ) ||
           (zone.province !== null &&
             !getPeruProvinceOptions(zone.department).some(
               (province) => province.value === zone.province,
@@ -1114,6 +1290,8 @@ export const adminService = {
       ...current,
       shipping: {
         freeThresholdCents: shipping.freeThresholdCents,
+        nationalCourierFeeCents: shipping.nationalCourierFeeCents,
+        nationalEstimate: shipping.nationalEstimate.trim(),
         zones: shipping.zones.map((zone) => ({
           ...zone,
           id: zone.id.trim(),
@@ -1177,10 +1355,5 @@ export function getShippingZoneForAddress(
   province = '',
   district = '',
 ) {
-  return resolveShippingZone(
-    state.shipping.zones,
-    department,
-    province,
-    district,
-  )
+  return resolveShippingZone(state.shipping, department, province, district)
 }

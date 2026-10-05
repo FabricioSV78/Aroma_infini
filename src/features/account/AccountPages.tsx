@@ -1,3 +1,4 @@
+import { formatBrandName } from '../../utils/brand-name'
 import { useState, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
@@ -17,7 +18,9 @@ import {
   type AccountProfile,
 } from '../../services/account-service'
 import { formatPEN } from '../../services/currency'
+import { imageSource, imageSourceSet } from '../../services/image-source'
 import { useFavorites } from '../favorites/favorites-context'
+import { FavoritesCollection } from '../favorites/FavoritesCollection'
 import { AccountOrderTimeline } from './AccountOrderTimeline'
 import { useAccount } from './account-context'
 
@@ -49,7 +52,7 @@ export function AccountOverviewPage() {
       <div className="account-overview-grid" data-scroll-reveal="stagger">
         <section aria-labelledby="overview-orders-title">
           <span>{String(orders.length).padStart(2, '0')}</span>
-          <h2 id="overview-orders-title">Pedidos de prueba</h2>
+          <h2 id="overview-orders-title">Mis pedidos</h2>
           <p>
             {latestOrder
               ? `Último estado: ${accountStatusLabels[latestOrder.status]}.`
@@ -75,11 +78,27 @@ export function AccountOverviewPage() {
           <span>{String(favoriteCount).padStart(2, '0')}</span>
           <h2 id="overview-favorites-title">Favoritos</h2>
           <p>Aromas guardados en este navegador.</p>
-          <Link className="text-link" to="/favoritos">
+          <Link className="text-link" to="/cuenta/favoritos">
             Ver favoritos <Icon name="arrow" />
           </Link>
         </section>
       </div>
+    </section>
+  )
+}
+
+export function AccountFavoritesPage() {
+  return (
+    <section
+      className="account-section"
+      aria-labelledby="account-favorites-title"
+    >
+      <header className="account-heading" data-scroll-reveal="copy">
+        <p className="eyebrow">Tu selección personal</p>
+        <h1 id="account-favorites-title">Favoritos.</h1>
+        <p>Aromas guardados en este navegador.</p>
+      </header>
+      <FavoritesCollection />
     </section>
   )
 }
@@ -108,12 +127,9 @@ export function AccountDataPage() {
   return (
     <section className="account-section" aria-labelledby="account-data-title">
       <header className="account-heading" data-scroll-reveal="copy">
-        <p className="eyebrow">Perfil de demostración</p>
+        <p className="eyebrow">Perfil</p>
         <h1 id="account-data-title">Mis datos.</h1>
-        <p>
-          Estos datos ficticios no salen del navegador ni se conservan al
-          recargar.
-        </p>
+        <p>Revisa y actualiza tu información de contacto.</p>
       </header>
       <form
         className="account-form"
@@ -217,13 +233,13 @@ export function AccountAddressesPage() {
   }
   function remove() {
     removeAddress()
-    setMessage('Dirección de demostración eliminada.')
+    setMessage('Dirección eliminada.')
   }
   function restore() {
     const restored = createDemoAddress()
     setForm(restored)
     saveAddress(restored)
-    setMessage('Dirección de ejemplo restaurada.')
+    setMessage('Dirección restaurada.')
   }
 
   return (
@@ -234,22 +250,18 @@ export function AccountAddressesPage() {
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Entrega</p>
         <h1 id="account-address-title">Direcciones.</h1>
-        <p>
-          Administra una dirección ficticia para revisar el recorrido de cuenta.
-        </p>
+        <p>Revisa y actualiza tus datos de entrega.</p>
       </header>
       {!address ? (
         <div className="account-empty" data-scroll-reveal="copy">
           <h2>No hay una dirección guardada.</h2>
-          <p>
-            Puedes restaurar la dirección de ejemplo para continuar la prueba.
-          </p>
+          <p>Puedes volver a añadir una dirección cuando la necesites.</p>
           <button
             className="button button--secondary"
             type="button"
             onClick={restore}
           >
-            Restaurar ejemplo
+            Añadir dirección
           </button>
         </div>
       ) : (
@@ -357,7 +369,7 @@ export function AccountAddressesPage() {
               Guardar dirección
             </button>
             <button className="account-remove" type="button" onClick={remove}>
-              Eliminar dirección de prueba
+              Eliminar dirección
             </button>
           </div>
         </form>
@@ -376,9 +388,9 @@ export function AccountOrdersPage() {
   return (
     <section className="account-section" aria-labelledby="account-orders-title">
       <header className="account-heading" data-scroll-reveal="copy">
-        <p className="eyebrow">Historial de demostración</p>
+        <p className="eyebrow">Historial</p>
         <h1 id="account-orders-title">Mis pedidos.</h1>
-        <p>Consulta el detalle y el estado de cada pedido de prueba.</p>
+        <p>Consulta el detalle y el estado de cada pedido.</p>
       </header>
       {visibleOrders.length ? (
         <ul className="account-order-list" data-scroll-reveal="stagger">
@@ -396,7 +408,7 @@ export function AccountOrdersPage() {
                 <strong>{formatPEN(order.totalCents)}</strong>
               </div>
               <span className="account-order-status">
-                {accountStatusLabels[order.status]} · prueba
+                {accountStatusLabels[order.status]}
               </span>
               <Link
                 className="text-link"
@@ -409,9 +421,9 @@ export function AccountOrdersPage() {
         </ul>
       ) : (
         <div className="account-empty" data-scroll-reveal="copy">
-          <h2>Aún no hay pedidos de prueba.</h2>
+          <h2>Aún no hay pedidos.</h2>
           <p>Cuando completes el checkout con esta cuenta aparecerán aquí.</p>
-          <Link className="text-link" to="/catalogo">
+          <Link className="text-link" to="/tienda">
             Explorar perfumes <Icon name="arrow" />
           </Link>
         </div>
@@ -431,7 +443,7 @@ export function AccountOrderDetailPage() {
         aria-labelledby="missing-order-title"
       >
         <p className="eyebrow">Pedido no encontrado</p>
-        <h1 id="missing-order-title">No encontramos ese pedido de prueba.</h1>
+        <h1 id="missing-order-title">No encontramos ese pedido.</h1>
         <Link className="text-link" to="/cuenta/pedidos">
           Volver a mis pedidos <Icon name="arrow" />
         </Link>
@@ -471,8 +483,8 @@ export function AccountOrderDetailPage() {
                     aria-label={`Ver ${line.name}`}
                   >
                     <img
-                      src={`/images/${line.image}-480.webp`}
-                      srcSet={`/images/${line.image}-480.webp 480w, /images/${line.image}-960.webp 960w`}
+                      src={imageSource(line.image)}
+                      srcSet={imageSourceSet(line.image, [480, 960])}
                       sizes="88px"
                       width={480}
                       height={600}
@@ -482,7 +494,7 @@ export function AccountOrderDetailPage() {
                     />
                   </Link>
                   <div>
-                    <span>{line.brand}</span>
+                    <span>{formatBrandName(line.brand)}</span>
                     <strong>
                       <Link to={`/producto/${line.productSlug}`}>
                         {line.name}
@@ -556,24 +568,21 @@ export function AccountPaymentsPage() {
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Información de pagos</p>
         <h1 id="account-payments-title">Pagos.</h1>
-        <p>
-          En la integración real, los medios de pago se gestionarán en Mercado
-          Pago.
-        </p>
+        <p>Consulta el historial de importes asociados a tus pedidos.</p>
       </header>
       <div className="account-payment-provider" data-scroll-reveal="copy">
         <div>
-          <span>Proveedor previsto</span>
+          <span>Método indicado</span>
           <strong>Mercado Pago</strong>
         </div>
-        <p>No guardamos números de tarjeta, CVV ni credenciales bancarias.</p>
+        <p>Los datos de tarjeta no se muestran en esta sección.</p>
       </div>
       <section
         className="account-transactions"
         aria-labelledby="transactions-title"
         data-scroll-reveal="copy"
       >
-        <h2 id="transactions-title">Transacciones de prueba</h2>
+        <h2 id="transactions-title">Resumen de pagos</h2>
         {orders.length ? (
           <ul>
             {orders.map((order) => (
@@ -582,13 +591,13 @@ export function AccountPaymentsPage() {
                   <strong>{order.reference}</strong>
                   <span>{dateFormatter.format(new Date(order.placedAt))}</span>
                 </div>
-                <span>Confirmación simulada</span>
+                <span>Registrado</span>
                 <strong>{formatPEN(order.totalCents)}</strong>
               </li>
             ))}
           </ul>
         ) : (
-          <p>No hay transacciones de prueba.</p>
+          <p>No hay pagos registrados.</p>
         )}
       </section>
     </section>

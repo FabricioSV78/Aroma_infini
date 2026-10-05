@@ -1,0 +1,251 @@
+.store-layout .institutional-about,
+.store-layout .institutional-contact {
+  padding-bottom: clamp(64px, 7vw, 96px);
+}
+
+.institutional-about-hero {
+  display: grid;
+  align-items: center;
+  gap: clamp(28px, 5vw, 72px);
+  padding-block: 0 clamp(40px, 5vw, 64px);
+}
+
+.institutional-about-opening,
+.institutional-contact-opening {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 16px;
+}
+
+.institutional-about-approach .eyebrow,
+.institutional-contact-options .eyebrow {
+  color: var(--color-muted);
+}
+
+.institutional-about-opening h1,
+.institutional-contact-opening h1 {
+  max-width: 18ch;
+  font-family: var(--font-display);
+  font-size: var(--type-title-page);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.institutional-about-opening > p:last-child,
+.institutional-contact-opening-copy > p {
+  max-width: 42ch;
+  color: var(--color-muted);
+  font-size: var(--type-body);
+  line-height: 1.65;
+}
+
+.institutional-about-visual {
+  min-width: 0;
+  margin: 0;
+}
+
+.institutional-about-visual picture {
+  display: block;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.institutional-about-visual img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.institutional-about-visual figcaption {
+  padding-top: 8px;
+  color: var(--color-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: right;
+}
+
+.institutional-about-approach {
+  display: grid;
+  gap: clamp(28px, 5vw, 72px);
+  padding-top: clamp(36px, 5vw, 64px);
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-about-approach-copy {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 14px;
+}
+
+.institutional-about-approach h2,
+.institutional-contact-options h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.institutional-about-approach-copy > p:not(.eyebrow) {
+  max-width: 45ch;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.institutional-about-approach-copy .text-link {
+  margin-top: 4px;
+}
+
+.institutional-about-principles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-about-principles li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  padding-block: 15px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.institutional-about-principles li > span {
+  padding-top: 3px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.institutional-about-principles h3 {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.institutional-about-principles p {
+  margin-top: 3px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.institutional-contact-opening {
+  padding-block: 0 clamp(24px, 3vw, 40px);
+}
+
+.institutional-contact-opening-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.institutional-contact-options {
+  display: grid;
+  gap: clamp(32px, 5vw, 80px);
+  padding-top: clamp(24px, 3vw, 36px);
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-contact-direct,
+.institutional-contact-guide {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.institutional-contact-direct > p:not(.eyebrow),
+.institutional-contact-hours {
+  max-width: 36ch;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.institutional-contact-direct .button {
+  margin-top: 8px;
+}
+
+.institutional-contact-direct .text-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.institutional-contact-guide ul {
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-line);
+}
+
+.institutional-contact-guide li {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.institutional-contact-guide a {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 4px;
+  font-size: 14px;
+  transition: background-color 160ms ease;
+}
+
+.institutional-contact-guide a:is(:hover, :focus-visible) {
+  background: var(--color-surface);
+}
+
+.institutional-contact-guide svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+@media (min-width: 768px) {
+  .institutional-about-hero {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  }
+
+  .institutional-about-visual img {
+    aspect-ratio: 16 / 9;
+  }
+
+  .institutional-about-approach {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  }
+
+  .institutional-contact-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .institutional-contact-opening-copy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: clamp(32px, 5vw, 80px);
+  }
+}
+
+@media (max-width: 767px) {
+  .institutional-contact-direct {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--color-line);
+  }
+}
+
+@media (max-width: 359px) {
+  .institutional-contact-direct .button {
+    width: 100%;
+    padding-inline: 10px;
+  }
+}

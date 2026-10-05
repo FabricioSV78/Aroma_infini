@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router'
 import { Icon } from '../components/ui/Icon'
 
 const titles: Record<string, string> = {
-  catalogo: 'Catálogo',
+  tienda: 'Tienda',
   marcas: 'Universos de marca',
   producto: 'Detalle del perfume',
   favoritos: 'Tus favoritos',
@@ -13,7 +13,6 @@ const titles: Record<string, string> = {
   contacto: 'Contacto',
   envios: 'Envíos y entregas',
   devoluciones: 'Cambios y devoluciones',
-  'preguntas-frecuentes': 'Preguntas frecuentes',
   privacidad: 'Privacidad',
   terminos: 'Términos y condiciones',
   'libro-de-reclamaciones': 'Libro de reclamaciones',
@@ -21,7 +20,9 @@ const titles: Record<string, string> = {
 export function PendingPage() {
   const { pathname, search } = useLocation()
   const segment = pathname.split('/')[1]
-  const title = titles[segment] ?? 'No encontramos esta página'
+  const title = titles[segment]
+    ? 'No encontramos esta página'
+    : 'Página no encontrada'
   const query =
     segment === 'buscar' ? new URLSearchParams(search).get('q') : null
   return (
@@ -29,11 +30,7 @@ export function PendingPage() {
       className="store-page pending-page container"
       data-scroll-reveal="fade"
     >
-      <p className="eyebrow">
-        {titles[segment]
-          ? 'Propuesta visual · próximamente'
-          : 'Página no encontrada'}
-      </p>
+      <p className="eyebrow">Página no encontrada</p>
       <h1>{title}</h1>
       {query && (
         <p className="search-query">
@@ -41,9 +38,8 @@ export function PendingPage() {
         </p>
       )}
       <p>
-        {titles[segment]
-          ? 'Este espacio estará disponible en una próxima etapa. Mientras tanto, te invitamos a explorar la propuesta de nuestra página de inicio.'
-          : 'El enlace no corresponde a una página de esta propuesta.'}
+        El enlace no corresponde a una página disponible. Puedes volver al
+        inicio o explorar los perfumes.
       </p>
       <Link className="button button--primary" to="/">
         Volver al inicio

@@ -8,6 +8,7 @@
   color: var(--color-muted);
   font-size: var(--type-small);
   line-height: 1;
+  margin-bottom: clamp(8px, 1vw, 12px);
 }
 
 .store-layout nav[aria-label='Ruta de navegación'] > :is(a, span) {
@@ -49,20 +50,28 @@
 
 .store-layout .catalog-heading,
 .store-layout .checkout-heading {
-  padding-top: clamp(24px, 3vw, 36px);
+  padding-top: 0;
 }
 
 .store-layout .institutional-intro {
-  padding-block: clamp(24px, 3vw, 36px) clamp(52px, 5vw, 72px);
+  padding-block: 0 clamp(52px, 5vw, 72px);
+}
+
+.store-layout .institutional-shipping .institutional-intro {
+  padding-block: 0 clamp(24px, 3vw, 40px);
+}
+
+.store-layout .institutional-shipping {
+  padding-bottom: clamp(48px, 6vw, 80px);
 }
 
 .store-layout .account-access-layout {
-  padding-block: clamp(24px, 3vw, 40px) clamp(56px, 6vw, 80px);
+  padding-block: 0 clamp(56px, 6vw, 80px);
 }
 
 .store-layout .tracking-heading,
 .store-layout .checkout-confirmation-heading {
-  padding-top: clamp(24px, 3vw, 36px);
+  padding-top: 0;
 }
 
 .store-layout .account-demo-note {

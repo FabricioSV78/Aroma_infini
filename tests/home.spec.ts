@@ -1,21 +1,13 @@
 import { expect, test } from '@playwright/test'
 
-test('El aviso comercial de ejemplo se puede recorrer y cerrar por sesión', async ({
+test('La portada presenta la selección sin avisos de popularidad no verificada', async ({
   page,
 }) => {
   await page.goto('/')
-  const preview = page.getByRole('complementary', {
-    name: 'Vista previa de avisos comerciales',
-  })
-  await expect(preview).toBeVisible({ timeout: 4000 })
-  await expect(preview).toContainText('Más explorado · ejemplo')
-  await preview.getByRole('button', { name: 'Siguiente ejemplo' }).click()
-  await expect(preview).toContainText('Novedad · ejemplo')
-  await preview.getByRole('button', { name: 'Cerrar vista previa' }).click()
-  await expect(preview).toHaveCount(0)
-  await page.reload()
-  await page.waitForTimeout(2100)
-  await expect(preview).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'Más vendidos' }),
+  ).toBeVisible()
+  await expect(page.locator('.commercial-preview-notice')).toHaveCount(0)
 })
 
 const widths = [360, 375, 390, 430, 768, 1024, 1280, 1440]
@@ -104,7 +96,7 @@ test('Menú móvil: teclado, foco contenido y retorno con Escape', async ({
   await expect(trigger).toBeFocused()
   await trigger.click()
   await dialog.getByRole('link', { name: 'Para ella' }).click()
-  await expect(page).toHaveURL(/catalogo\?genero=mujer/)
+  await expect(page).toHaveURL(/tienda\?genero=mujer/)
   await expect(page.locator('main')).toBeFocused()
 })
 
@@ -113,7 +105,7 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
 }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
-  await page.getByLabel('Perfume o marca').fill('Bois Clair & FORME')
+  await page.getByLabel('Perfume o marca').fill('Bois Clair & Forme')
   await page.getByRole('button', { name: 'Buscar', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: 'No encontramos coincidencias.' }),
@@ -142,9 +134,7 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
   await expect(page.getByRole('heading', { name: 'Tu carrito' })).toBeVisible()
 })
 
-test('Movimiento reducido y contacto sin número inventado', async ({
-  page,
-}) => {
+test('Movimiento reducido y ayuda accesible', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
   expect(
@@ -163,37 +153,36 @@ test('Movimiento reducido y contacto sin número inventado', async ({
     .evaluate((element) => getComputedStyle(element).transitionDuration)
   expect(parseFloat(duration)).toBeLessThan(0.01)
   const trigger = page.getByRole('button', {
-    name: /Información de atención/,
+    name: /Abrir ayuda y contacto/,
   })
   await trigger.click()
-  const dialog = page.getByRole('dialog')
+  const dialog = page.getByRole('dialog', {
+    name: '¿En qué podemos ayudarte?',
+  })
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('a[href^="tel:"]')).toHaveCount(0)
+  await expect(dialog.getByLabel('Tu consulta')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
 })
 
-test('La ayuda móvil permanece en el flujo y no cubre contenido de la tienda', async ({
+test('La ayuda móvil permanece flotante y dentro de la pantalla', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/catalogo')
+  await page.goto('/tienda')
 
-  const main = page.locator('main')
   const help = page.locator('.help-button')
   await expect(help).toBeVisible()
-  await expect(help).toHaveAccessibleName(/Información de atención/)
+  await expect(help).toHaveAccessibleName(/Abrir ayuda y contacto/)
   expect(
     await help.evaluate((element) => getComputedStyle(element).position),
-  ).toBe('static')
-  expect(
-    await main.evaluate(
-      (element, button) =>
-        Boolean(
-          element.compareDocumentPosition(button as Node) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-        ),
-      await help.elementHandle(),
-    ),
-  ).toBe(true)
+  ).toBe('fixed')
+  const box = await help.boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) return
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(390)
+  expect(box.y + box.height).toBeLessThanOrEqual(844)
 })

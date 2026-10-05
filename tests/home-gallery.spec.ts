@@ -50,9 +50,9 @@ test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', asyn
   )
   const preview = gallery.locator('.brand-preview')
   const active = preview.locator('.brand-preview-frame.is-active')
-  await expect(active).toContainText('ATELIER 01')
+  await expect(active).toContainText('Atelier 01')
   const before = await preview.boundingBox()
-  const forme = gallery.getByRole('link', { name: /^FORME/ })
+  const forme = gallery.getByRole('link', { name: /^Forme/ })
   await expect
     .poll(async () => {
       await forme.hover()
@@ -65,7 +65,7 @@ test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', asyn
       text: expect.stringContaining('Pétale Nu'),
       src: expect.stringMatching(/petale-alternate/),
     })
-  const sillage = gallery.getByRole('link', { name: /^STUDIO SILLAGE/ })
+  const sillage = gallery.getByRole('link', { name: /^Studio sillage/ })
   await sillage.focus()
   await expect(sillage).toBeFocused()
   await expect(active).toContainText('Vert Silence')
@@ -73,7 +73,7 @@ test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', asyn
   expect(after?.height).toBeCloseTo(before?.height ?? 0, 2)
   expect(after?.width).toBeCloseTo(before?.width ?? 0, 2)
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL('/catalogo?marca=studio-sillage')
+  await expect(page).toHaveURL('/tienda?marca=studio-sillage')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Elige tu próxima fragancia.',
   )
@@ -106,8 +106,8 @@ test('Marcas móvil: cada enlace tiene fotografía y el cambio de tamaño conser
   await expect(gallery.locator('.brand-preview')).toBeVisible()
   await expect(gallery.locator('.brand-thumbnail')).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
-  await gallery.getByRole('link', { name: /^MATIÈRE 04/ }).click()
-  await expect(page).toHaveURL('/catalogo?marca=matiere-04')
+  await gallery.getByRole('link', { name: /^Matière 04/ }).click()
+  await expect(page).toHaveURL('/tienda?marca=matiere-04')
 })
 
 test('Más vendidos blanco y galería respetuosa con movimiento reducido', async ({
@@ -144,7 +144,7 @@ test('Más vendidos blanco y galería respetuosa con movimiento reducido', async
   expect(parseFloat(duration)).toBeLessThan(0.01)
   await page
     .locator('#marcas')
-    .getByRole('link', { name: /^FORME/ })
+    .getByRole('link', { name: /^Forme/ })
     .focus()
   await expect(page.locator('.brand-preview-frame.is-active')).toContainText(
     'Pétale Nu',

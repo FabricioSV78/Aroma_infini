@@ -16,6 +16,7 @@ import {
   type AdminProduct,
 } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
+import { imageSource, isUploadedImage } from '../../services/image-source'
 import type { ProductVariant } from '../../types/catalog'
 import { AdminPagination } from './AdminPagination'
 import {
@@ -31,6 +32,7 @@ import {
 } from './admin-utils'
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
+import { prepareImageFile, productImagePreset } from './prepareImageFile'
 
 function productPrice(record: AdminProduct) {
   const active = record.product.variants.filter(
@@ -43,6 +45,13 @@ function productPrice(record: AdminProduct) {
 
 export function AdminProductsPage() {
   const state = useAdminStore()
+  const [pageSize, setPageSize] = useState(() => window.matchMedia('(max-width: 767px)').matches ? 4 : 12)
+  useEffect(() => {
+    const mobile = window.matchMedia('(max-width: 767px)')
+    const updatePageSize = () => setPageSize(mobile.matches ? 4 : 12)
+    mobile.addEventListener('change', updatePageSize)
+    return () => mobile.removeEventListener('change', updatePageSize)
+  }, [])
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const [actionMessage, setActionMessage] = useState('')
@@ -104,19 +113,19 @@ export function AdminProductsPage() {
         )
       )
     })
-  const pagination = useAdminPagination(products, 20)
+  const pagination = useAdminPagination(products, pageSize)
   const hasFilters =
     Boolean(search) || stockFilter !== 'all' || visibilityFilter !== 'all'
 
   return (
     <div className="admin-page admin-products-page">
       <AdminPageHeader
-        eyebrow="Catálogo"
+        eyebrow="Tienda"
         title="Productos"
-        description="Controla catálogo, presentaciones e inventario desde un solo lugar."
+        description="Controla la tienda, las presentaciones y el inventario desde un solo lugar."
         action={{ label: 'Nuevo producto', to: '/admin/productos/nuevo' }}
       />
-      {saved ? <AdminNotice>Producto guardado en memoria.</AdminNotice> : null}
+      {saved ? <AdminNotice>Producto guardado.</AdminNotice> : null}
       {actionMessage ? <AdminNotice>{actionMessage}</AdminNotice> : null}
 
       <section
@@ -212,7 +221,7 @@ export function AdminProductsPage() {
       </form>
       <div className="admin-table-wrap admin-table-wrap--products">
         <table className="admin-table admin-table--products">
-          <caption className="sr-only">Productos de demostración</caption>
+          <caption className="sr-only">Productos</caption>
           <thead>
             <tr>
               <th scope="col">Producto</th>
@@ -231,7 +240,7 @@ export function AdminProductsPage() {
                     <span className="admin-cell-label">Producto</span>
                     <div className="admin-product-identity">
                       <img
-                        src={`/images/${record.product.image}-480.webp`}
+                        src={imageSource(record.product.image)}
                         width={54}
                         height={68}
                         loading="lazy"
@@ -403,7 +412,7 @@ function createProductDraft(brandId: string): AdminProduct {
     slug: '',
     name: '',
     brandId,
-    image: 'cedre',
+    image: '',
     family: '',
     variants: [
       {
@@ -451,11 +460,17 @@ export function AdminProductFormPage() {
   const [noteDraft, setNoteDraft] = useState<NoteDraft>(() =>
     createNoteDraft(form.detail.notes),
   )
-  const [initialSnapshot] = useState(() => JSON.stringify({ form, noteDraft }))
+  const [initialForm] = useState(form)
+  const [initialNoteDraft] = useState(noteDraft)
   const [message, setMessage] = useState('')
+  const [mediaMessage, setMediaMessage] = useState('')
+  const [uploadingImage, setUploadingImage] = useState<number | null>(null)
+  const [previewImageIndex, setPreviewImageIndex] = useState(0)
+  const [showPreview, setShowPreview] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+  const [saving, setSaving] = useState(false)
   const editing = Boolean(id)
   const hasUnsavedChanges =
-    JSON.stringify({ form, noteDraft }) !== initialSnapshot
+    form !== initialForm || noteDraft !== initialNoteDraft
   const allowNavigation = useRef(false)
   const blocker = useBlocker(
     () => hasUnsavedChanges && !allowNavigation.current,
@@ -494,7 +509,7 @@ export function AdminProductFormPage() {
     return (
       <div className="admin-page admin-empty">
         <p className="eyebrow">Producto no encontrado</p>
-        <h1>No existe este registro de demostración.</h1>
+        <h1>No encontramos este producto.</h1>
         <Link className="text-link" to="/admin/productos">
           Volver a productos <Icon name="arrow" />
         </Link>
@@ -515,17 +530,83 @@ export function AdminProductFormPage() {
         detail: shouldUpdateGallery
           ? {
               ...current.detail,
-              gallery: current.detail.gallery.map((view, index) => ({
-                ...view,
-                image:
-                  index === 0 ? product.image : `${product.image}-alternate`,
-                alt:
+              gallery: current.detail.gallery.map((view, index) => {
+                const previousDefault =
                   index === 0
-                    ? `Vista conceptual de ${product.name}; imagen temporal`
-                    : `Vista alternativa conceptual de ${product.name}; imagen temporal`,
-              })),
+                    ? `Frasco de ${current.product.name}`
+                    : `Vista alternativa de ${current.product.name}`
+                const nextDefault =
+                  index === 0
+                    ? `Frasco de ${product.name}`
+                    : `Vista alternativa de ${product.name}`
+                return {
+                  ...view,
+                  image:
+                    field === 'image'
+                      ? index === 0
+                        ? product.image
+                        : `${product.image}-alternate`
+                      : view.image,
+                  alt:
+                    field === 'name' &&
+                    view.alt.trim() &&
+                    view.alt !== previousDefault
+                      ? view.alt
+                      : nextDefault,
+                }
+              }),
             }
           : current.detail,
+      }
+    })
+  }
+
+  async function uploadGalleryImage(file: File, index: number) {
+    setUploadingImage(index)
+    setMediaMessage('')
+    try {
+      const image = await prepareImageFile(file, productImagePreset)
+      setForm((current) => ({
+        ...current,
+        product: index === 0 ? { ...current.product, image } : current.product,
+        detail: {
+          ...current.detail,
+          gallery: current.detail.gallery.map((view, viewIndex) =>
+            viewIndex === index ? { ...view, image } : view,
+          ),
+        },
+      }))
+      setPreviewImageIndex(index)
+      setMediaMessage(
+        `${file.name} preparado. Revisa la vista previa y guarda el producto.`,
+      )
+    } catch (error) {
+      setMediaMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo preparar la imagen.',
+      )
+    } finally {
+      setUploadingImage(null)
+    }
+  }
+
+  function addGalleryView() {
+    setForm((current) => {
+      if (current.detail.gallery.length >= 4) return current
+      return {
+        ...current,
+        detail: {
+          ...current.detail,
+          gallery: [
+            ...current.detail.gallery,
+            {
+              image: current.detail.gallery[1]?.image ?? current.product.image,
+              alt: `Vista alternativa de ${current.product.name}`,
+              framing: 'full',
+            },
+          ],
+        },
       }
     })
   }
@@ -579,8 +660,9 @@ export function AdminProductFormPage() {
     }))
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (uploadingImage !== null || saving) return
     const productToSave = {
       ...form,
       detail: {
@@ -592,6 +674,16 @@ export function AdminProductFormPage() {
     const result = adminService.saveProduct(productToSave)
     if (result.kind === 'validation') {
       setMessage(result.message)
+      return
+    }
+    setSaving(true)
+    try {
+      await adminService.flush()
+    } catch {
+      setMessage(
+        'El producto se ve en esta sesión, pero no se pudo guardar en el navegador. Inténtalo de nuevo.',
+      )
+      setSaving(false)
       return
     }
     allowNavigation.current = true
@@ -610,6 +702,13 @@ export function AdminProductFormPage() {
         title={editing ? form.product.name : 'Crear producto'}
         description="Actualiza información, inventario y visibilidad."
       />
+      <nav className="admin-editor-section-nav" aria-label="Secciones del producto">
+        <a href="#product-general-title">General</a>
+        <a href="#product-preview-title">Vista previa</a>
+        <a href="#product-content-title">Aroma</a>
+        <a href="#product-variants-title">Presentaciones</a>
+        <a href="#product-visibility-title">Visibilidad</a>
+      </nav>
       <form className="admin-editor" onSubmit={submit}>
         <section aria-labelledby="product-general-title">
           <header>
@@ -677,11 +776,21 @@ export function AdminProductFormPage() {
               </select>
             </label>
             <label>
-              Fotografía del catálogo
+              Fotografía de la tienda
               <select
-                value={form.product.image}
+                value={
+                  isUploadedImage(form.product.image)
+                    ? '__uploaded__'
+                    : form.product.image
+                }
                 onChange={(event) => updateProduct('image', event.target.value)}
               >
+                <option value="">Selecciona una imagen disponible</option>
+                {isUploadedImage(form.product.image) ? (
+                  <option value="__uploaded__" disabled>
+                    Imagen subida
+                  </option>
+                ) : null}
                 {imageOptions.map((image) => (
                   <option key={image.value} value={image.value}>
                     {image.label}
@@ -689,6 +798,102 @@ export function AdminProductFormPage() {
                 ))}
               </select>
             </label>
+          </div>
+          <div className="admin-product-upload-area">
+            <h3>Fotografías del producto</h3>
+            <p>
+              {productImagePreset.label}. JPG, PNG, WebP o AVIF. La imagen se
+              recorta al centro y puedes revisar el resultado antes de guardar.
+            </p>
+            {mediaMessage ? (
+              <p className="admin-product-upload-feedback" role="status">
+                {mediaMessage}
+              </p>
+            ) : null}
+            <div className="admin-product-upload-grid">
+              {form.detail.gallery.map((view, index) => (
+                <div className="admin-product-upload-item" key={index}>
+                  {view.image ? (
+                    <img src={imageSource(view.image)} alt="" />
+                  ) : (
+                    <div className="admin-product-upload-placeholder">
+                      Sin imagen
+                    </div>
+                  )}
+                  <div>
+                    <strong>
+                      {index === 0 ? 'Foto principal' : `Vista ${index + 1}`}
+                    </strong>
+                    <label className="admin-home-file-button">
+                      {uploadingImage === index
+                        ? 'Preparando…'
+                        : 'Subir archivo'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        aria-label={`Subir ${index === 0 ? 'foto principal' : `vista ${index + 1}`} del producto`}
+                        disabled={uploadingImage !== null}
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          if (file) void uploadGalleryImage(file, index)
+                        }}
+                      />
+                    </label>
+                    {index > 0 ? (
+                      <button
+                        type="button"
+                        className="admin-remove"
+                        onClick={() => {
+                          setForm((current) => ({
+                            ...current,
+                            detail: {
+                              ...current.detail,
+                              gallery: current.detail.gallery.filter(
+                                (_, galleryIndex) => galleryIndex !== index,
+                              ),
+                            },
+                          }))
+                          setPreviewImageIndex(0)
+                        }}
+                      >
+                        Quitar vista
+                      </button>
+                    ) : null}
+                  </div>
+                  <label className="admin-product-alt-label">
+                    Descripción de la imagen
+                    <input
+                      value={view.alt}
+                      maxLength={120}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          detail: {
+                            ...current.detail,
+                            gallery: current.detail.gallery.map(
+                              (item, galleryIndex) =>
+                                galleryIndex === index
+                                  ? { ...item, alt: event.target.value }
+                                  : item,
+                            ),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+            {form.detail.gallery.length < 4 ? (
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={addGalleryView}
+              >
+                Añadir vista
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -698,24 +903,51 @@ export function AdminProductFormPage() {
               <h2 id="product-preview-title">Así se verá tu producto</h2>
               <p>Vista previa del borrador, antes de guardar.</p>
             </div>
+            <button type="button" className="admin-preview-toggle" aria-expanded={showPreview} aria-controls="admin-product-preview-content" onClick={() => setShowPreview((open) => !open)}>
+              {showPreview ? 'Ocultar vista previa' : 'Mostrar vista previa'}
+            </button>
           </header>
-          <div className="admin-product-live-preview">
+          {showPreview ? <div id="admin-product-preview-content" className="admin-product-live-preview">
             <div className="admin-product-preview-photos">
-              <img
-                src={'/images/' + form.product.image + '-480.webp'}
-                alt="Fotografía principal seleccionada"
-                width={480}
-                height={600}
-              />
-              <img
-                src={'/images/' + form.product.image + '-alternate-480.webp'}
-                alt="Fotografía alternativa seleccionada"
-                width={480}
-                height={600}
-              />
+              <div className="admin-product-preview-main">
+                {form.detail.gallery[previewImageIndex]?.image ? (
+                  <img
+                    src={imageSource(
+                      form.detail.gallery[previewImageIndex].image,
+                    )}
+                    alt={`Vista previa ${previewImageIndex + 1} de ${form.product.name || 'este producto'}`}
+                    width={480}
+                    height={600}
+                  />
+                ) : (
+                  <p>Sube una fotografía para ver cómo quedará el producto.</p>
+                )}
+              </div>
+              <div
+                className="admin-product-preview-thumbnails"
+                aria-label="Elegir imagen de la vista previa"
+              >
+                {form.detail.gallery.map((view, index) => (
+                  <button
+                    type="button"
+                    key={index}
+                    aria-label={`Ver vista ${index + 1} del borrador`}
+                    aria-pressed={previewImageIndex === index}
+                    onClick={() => setPreviewImageIndex(index)}
+                  >
+                    {view.image ? (
+                      <img src={imageSource(view.image)} alt="" />
+                    ) : (
+                      <span aria-hidden="true">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
-              <p className="eyebrow">
+              <p className="eyebrow brand-label">
                 {
                   state.brands.find(
                     (brand) => brand.id === form.product.brandId,
@@ -744,7 +976,7 @@ export function AdminProductFormPage() {
                   : 'Borrador oculto en la tienda.'}
               </p>
             </div>
-          </div>
+          </div> : null}
         </section>
 
         <section aria-labelledby="product-content-title">
@@ -1099,8 +1331,12 @@ export function AdminProductFormPage() {
           </p>
         ) : null}
         <div className="admin-editor-actions">
-          <button className="button button--primary" type="submit">
-            Guardar producto
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={uploadingImage !== null || saving}
+          >
+            {saving ? 'Guardando…' : 'Guardar producto'}
           </button>
           <Link className="button button--secondary" to={returnTo}>
             Cancelar

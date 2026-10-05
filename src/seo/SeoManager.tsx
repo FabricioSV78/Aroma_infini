@@ -4,7 +4,7 @@ import { resolveSeoPage, type SeoPageConfig } from './seo-config'
 
 const SITE_NAME = 'Aroma Infini'
 const DEFAULT_DESCRIPTION =
-  'Aroma Infini. Propuesta visual de una perfumería en Perú. Contenido e imágenes temporales.'
+  'Aroma Infini. Explora perfumes, familias olfativas y propuestas para encontrar tu próxima fragancia.'
 const PRODUCTION_ROBOTS =
   'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
 

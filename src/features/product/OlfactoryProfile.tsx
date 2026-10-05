@@ -21,10 +21,7 @@ export function OlfactoryProfile({
 }: OlfactoryProfileProps) {
   return (
     <div className="olfactory-profile-card">
-      <header className="olfactory-profile-heading">
-        <h2>Perfil olfativo</h2>
-        <p>{editor?.family ?? family}</p>
-      </header>
+      <div className="olfactory-profile-family">{editor?.family ?? family}</div>
       <div className="olfactory-profile-intensity">
         <p>Intensidad</p>
         <div

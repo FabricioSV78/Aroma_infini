@@ -15,8 +15,7 @@
   .product-recommendations h2,
   .product-state h1,
   .pending-page h1,
-  .navigation-intro h2,
-  .olfactory-profile-heading h2
+  .navigation-intro h2
 ) {
   font-family: var(--font-display);
   font-optical-sizing: auto;
@@ -28,7 +27,7 @@
 .hero-title {
   max-width: 11ch;
   font-size: var(--type-title-lg);
-  line-height: 0.96;
+  line-height: 1.08;
   letter-spacing: -0.035em;
 }
 
@@ -42,7 +41,7 @@
 .brand-intro h2 {
   max-width: 16ch;
   font-size: var(--type-title-md);
-  line-height: 0.98;
+  line-height: 1.1;
   letter-spacing: -0.035em;
 }
 
@@ -55,7 +54,7 @@
 .editorial-copy h2 {
   max-width: 11ch;
   font-size: var(--type-title-campaign);
-  line-height: 0.96;
+  line-height: 1.08;
   letter-spacing: -0.038em;
 }
 
@@ -67,7 +66,7 @@
 }
 
 .product-meta h3 {
-  font-size: clamp(1.25rem, 5vw, 1.5rem);
+  font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
 }
@@ -75,7 +74,7 @@
 .catalog-heading h1 {
   max-width: 14ch;
   font-size: var(--type-title-page);
-  line-height: 0.98;
+  line-height: 1.1;
   letter-spacing: -0.035em;
 }
 
@@ -83,41 +82,35 @@
 .catalog-empty h2,
 .pending-page h1,
 .product-state h1 {
-  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  font-size: var(--type-title-page);
   line-height: 1;
   letter-spacing: -0.03em;
 }
 
 .brands-directory h2 {
-  font-size: clamp(2rem, 7vw, 2.75rem);
+  font-size: var(--type-title-sm);
   line-height: 1.02;
   letter-spacing: -0.02em;
 }
 
 .product-purchase h1 {
   max-width: 12ch;
-  font-size: clamp(3rem, 12vw, 4rem);
-  line-height: 0.96;
+  font-size: var(--type-title-page);
+  line-height: 1.08;
   letter-spacing: -0.038em;
 }
 
 .product-recommendations h2 {
   max-width: 20ch;
-  font-size: clamp(2.5rem, 10vw, 3rem);
+  font-size: var(--type-title-sm);
   line-height: 1;
   letter-spacing: -0.028em;
 }
 
 .navigation-intro h2 {
-  font-size: clamp(2rem, 3vw, 2.5rem);
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
   line-height: 1.04;
   letter-spacing: -0.02em;
-}
-
-.olfactory-profile-heading h2 {
-  font-size: clamp(1.625rem, 5.5vw, 2.125rem);
-  line-height: 0.95;
-  letter-spacing: 0.01em;
 }
 
 :where(
@@ -167,39 +160,39 @@
 
 @media (min-width: 768px) {
   .category h3 {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .product-meta h3 {
-    font-size: clamp(1.375rem, 2vw, 1.625rem);
+    font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
   }
 
   .product-purchase h1 {
-    font-size: clamp(3.5rem, 4.8vw, 4.5rem);
+    font-size: var(--type-title-page);
   }
 
   .product-recommendations h2 {
-    font-size: clamp(3rem, 4vw, 3.75rem);
+    font-size: var(--type-title-sm);
   }
 
   .catalog-empty h1,
   .catalog-empty h2,
   .pending-page h1,
   .product-state h1 {
-    font-size: clamp(3rem, 4.2vw, 4rem);
+    font-size: var(--type-title-page);
   }
 
   .brands-directory h2 {
-    font-size: clamp(2.5rem, 3.5vw, 3.25rem);
+    font-size: var(--type-title-sm);
   }
 }
 
 @media (min-width: 1200px) {
   .product-meta h3 {
-    font-size: 1.625rem;
+    font-size: 1.375rem;
   }
 
   .product-purchase h1 {
-    font-size: clamp(3.75rem, 4.5vw, 4.5rem);
+    font-size: var(--type-title-page);
   }
 }

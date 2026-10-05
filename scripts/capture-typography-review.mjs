@@ -9,7 +9,7 @@ const review = []
 
 const routes = {
   home: '/',
-  catalog: '/catalogo',
+  catalog: '/tienda',
   brands: '/marcas',
   product: '/producto/bois-clair',
 }

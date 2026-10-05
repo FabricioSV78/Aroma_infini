@@ -23,7 +23,7 @@ async function capture(page, route, name) {
 }
 
 try {
-  for (const width of [390, 768, 1440]) {
+  for (const width of [320, 390, 768, 1024, 1440]) {
     const page = await browser.newPage({
       viewport: { width, height: 900 },
       reducedMotion: 'reduce',
@@ -52,6 +52,11 @@ try {
         ),
       messages,
     })
+    if (width < 1024) {
+      await page.goto('http://127.0.0.1:5173/admin')
+      await page.getByRole('button', { name: 'Abrir menú administrativo' }).click()
+      await page.screenshot({ path: `${output}/menu-${width}.png` })
+    }
     await page.close()
   }
 } finally {

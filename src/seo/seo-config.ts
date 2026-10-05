@@ -42,6 +42,11 @@ export function resolveSeoPage(
 ): SeoPageConfig {
   const path = normalizePath(pathname)
   const hasQuery = Boolean(search)
+  if (path === '/fuente')
+    return privatePage(
+      'Tipografía | Aroma Infini',
+      'Compara las fuentes de Aroma Infini.',
+    )
 
   if (path === '/')
     return {
@@ -54,7 +59,7 @@ export function resolveSeoPage(
       imageAlt: 'Universo editorial de Aroma Infini',
     }
 
-  if (path === '/catalogo') {
+  if (path === '/tienda') {
     const params = new URLSearchParams(search)
     const selectedBrands = params.getAll('marca')
     const brand =
@@ -66,7 +71,7 @@ export function resolveSeoPage(
       return {
         title: `${brand.name}: perfumes | Aroma Infini`,
         description: `Descubre los perfumes de ${brand.name} seleccionados por Aroma Infini.`,
-        canonicalPath: `/catalogo?marca=${encodeURIComponent(brand.slug)}`,
+        canonicalPath: `/tienda?marca=${encodeURIComponent(brand.slug)}`,
         indexable: true,
         follow: true,
         breadcrumbs: [
@@ -74,7 +79,7 @@ export function resolveSeoPage(
           { name: 'Marcas', path: '/marcas' },
           {
             name: brand.name,
-            path: `/catalogo?marca=${encodeURIComponent(brand.slug)}`,
+            path: `/tienda?marca=${encodeURIComponent(brand.slug)}`,
           },
         ],
       }
@@ -82,14 +87,14 @@ export function resolveSeoPage(
       title: 'Perfumes de autor | Aroma Infini',
       description:
         'Explora la selección de perfumes de Aroma Infini por marca, familia y presentación.',
-      canonicalPath: '/catalogo',
+      canonicalPath: '/tienda',
       indexable: !hasQuery,
       follow: true,
       imagePath: '/images/featured-duo-v3-1536.webp',
       imageAlt: 'Selección de perfumes de Aroma Infini',
       breadcrumbs: [
         { name: 'Inicio', path: '/' },
-        { name: 'Perfumes', path: '/catalogo' },
+        { name: 'Perfumes', path: '/tienda' },
       ],
     }
   }
@@ -150,7 +155,7 @@ export function resolveSeoPage(
         imageAlt: `${product.name}${brand ? ` de ${brand.name}` : ''}`,
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
-          { name: 'Perfumes', path: '/catalogo' },
+          { name: 'Perfumes', path: '/tienda' },
           { name: product.name, path: `/producto/${product.slug}` },
         ],
       }
@@ -176,13 +181,13 @@ export function resolveSeoPage(
     )
   if (path === '/checkout')
     return privatePage(
-      'Checkout de demostración | Aroma Infini',
-      'Proceso de compra de demostración de Aroma Infini.',
+      'Tu selección | Aroma Infini',
+      'Revisa tu selección de perfumes y los datos de entrega.',
     )
   if (path === '/checkout/confirmacion')
     return privatePage(
-      'Confirmación de demostración | Aroma Infini',
-      'Confirmación local de una compra de demostración.',
+      'Confirmación | Aroma Infini',
+      'Consulta el resumen de tu selección de perfumes.',
     )
   if (path === '/seguir-pedido')
     return privatePage(
@@ -204,6 +209,11 @@ export function resolveSeoPage(
       'Mis direcciones | Aroma Infini',
       'Administra las direcciones privadas de tu cuenta.',
     )
+  if (path === '/cuenta/favoritos')
+    return privatePage(
+      'Mis favoritos | Aroma Infini',
+      'Revisa los perfumes guardados dentro de tu cuenta.',
+    )
   if (path === '/cuenta/pedidos')
     return privatePage(
       'Mis pedidos | Aroma Infini',
@@ -217,11 +227,11 @@ export function resolveSeoPage(
   const institutionalPages: Record<string, [string, string]> = {
     '/nosotros': [
       'Nosotros | Aroma Infini',
-      'Conoce la propuesta editorial y el criterio de selección de Aroma Infini.',
+      'Descubre la propuesta de Aroma Infini para explorar, comparar y elegir perfumes a tu ritmo.',
     ],
     '/contacto': [
       'Contacto | Aroma Infini',
-      'Consulta el estado de los canales de atención de Aroma Infini.',
+      'Encuentra orientación sobre perfumes, pedidos y entregas en Aroma Infini.',
     ],
     '/envios': [
       'Envíos y entregas | Aroma Infini',
@@ -229,23 +239,19 @@ export function resolveSeoPage(
     ],
     '/devoluciones': [
       'Cambios y devoluciones | Aroma Infini',
-      'Consulta el estado de la política de cambios y devoluciones de Aroma Infini.',
-    ],
-    '/preguntas-frecuentes': [
-      'Preguntas frecuentes | Aroma Infini',
-      'Encuentra respuestas breves sobre la propuesta de Aroma Infini.',
+      'Encuentra orientación para consultas sobre cambios y devoluciones.',
     ],
     '/privacidad': [
       'Privacidad | Aroma Infini',
-      'Consulta el estado de la política de privacidad de Aroma Infini.',
+      'Contacta con Aroma Infini si tienes consultas sobre privacidad.',
     ],
     '/terminos': [
       'Términos y condiciones | Aroma Infini',
-      'Consulta el estado de los términos y condiciones de Aroma Infini.',
+      'Contacta con Aroma Infini para consultas sobre productos, pedidos y el uso del sitio.',
     ],
     '/libro-de-reclamaciones': [
       'Libro de reclamaciones | Aroma Infini',
-      'Consulta el estado de implementación del Libro de reclamaciones de Aroma Infini.',
+      'Encuentra el canal de contacto de Aroma Infini para comunicar una incidencia.',
     ],
   }
   const institutional = institutionalPages[path]
@@ -257,8 +263,8 @@ export function resolveSeoPage(
 
   if (path === '/admin' || path.startsWith('/admin/'))
     return privatePage(
-      'Panel de demostración | Aroma Infini',
-      'Panel administrativo frontend de demostración de Aroma Infini.',
+      'Administración | Aroma Infini',
+      'Gestiona la tienda, los pedidos y la configuración de Aroma Infini.',
     )
 
   if (path === '/cuenta/pagos')
@@ -268,7 +274,7 @@ export function resolveSeoPage(
     )
 
   return privatePage(
-    'Página no disponible | Aroma Infini',
-    'Esta página todavía no está disponible en Aroma Infini.',
+    'Página no encontrada | Aroma Infini',
+    'Vuelve al inicio o explora la selección de Aroma Infini.',
   )
 }

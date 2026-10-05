@@ -143,7 +143,9 @@ export function quoteShipping(
   if (method === 'motorizado' && zone.motorizadoFeeCents === null)
     return { kind: 'unavailable' }
 
-  const free = subtotalCents >= shipping.freeThresholdCents
+  const free =
+    shipping.freeThresholdCents > 0 &&
+    subtotalCents >= shipping.freeThresholdCents
   const feeCents = free
     ? 0
     : method === 'motorizado'
@@ -163,12 +165,7 @@ export function getDeliveryZoneOptions(): DeliveryZoneOption[] {
 }
 
 export function getDeliveryZoneLabel(department: string): string {
-  const normalized = normalizeDepartment(department)
-  return (
-    getShippingSettings().zones.find(
-      (zone) => zone.active && zone.department === normalized,
-    )?.name ?? getPeruDepartmentLabel(department)
-  )
+  return getPeruDepartmentLabel(department)
 }
 
 export function evaluatePromotion(
@@ -177,37 +174,37 @@ export function evaluatePromotion(
 ): PromotionResult {
   const code = rawCode.trim().toUpperCase()
   if (!code)
-    return { kind: 'empty', message: 'Escribe un código para probarlo.' }
+    return { kind: 'empty', message: 'Escribe un código de descuento.' }
   if (code === 'ERROR')
     return {
       kind: 'error',
-      message: 'El simulador no pudo validar el código. Inténtalo de nuevo.',
+      message: 'No se pudo validar el código. Inténtalo de nuevo.',
     }
   const promotion = getPromotionByCode(code)
   if (!promotion)
     return {
       kind: 'not-found',
-      message: 'No encontramos ese código de prueba.',
+      message: 'No encontramos ese código.',
     }
   if (!promotion.active)
-    return { kind: 'inactive', message: 'Este código de prueba está inactivo.' }
+    return { kind: 'inactive', message: 'Este código no está activo.' }
   const now = Date.now()
   if (promotion.startsAt && new Date(promotion.startsAt).getTime() > now)
     return {
       kind: 'not-started',
-      message: 'Este código de prueba todavía no ha comenzado.',
+      message: 'Este código aún no está disponible.',
     }
   if (promotion.endsAt && new Date(promotion.endsAt).getTime() < now)
-    return { kind: 'expired', message: 'Este código de prueba venció.' }
+    return { kind: 'expired', message: 'Este código venció.' }
   if (promotion.usageLimit !== null && promotion.used >= promotion.usageLimit)
     return {
       kind: 'limit-reached',
-      message: 'Este código de prueba alcanzó su límite de usos.',
+      message: 'Este código alcanzó su límite de usos.',
     }
   if (subtotalCents < promotion.minimumCents)
     return {
       kind: 'minimum-not-met',
-      message: `Este código de prueba requiere un subtotal de S/ ${promotion.minimumCents / 100}.`,
+      message: `Este código requiere un subtotal de S/ ${promotion.minimumCents / 100}.`,
     }
   const discountCents =
     promotion.type === 'percent'
@@ -219,8 +216,8 @@ export function evaluatePromotion(
     discountCents,
     message:
       promotion.type === 'percent'
-        ? `Descuento de demostración aplicado: ${promotion.value} %.`
-        : `Descuento de demostración aplicado: S/ ${promotion.value}.`,
+        ? `Descuento aplicado: ${promotion.value} %.`
+        : `Descuento aplicado: S/ ${promotion.value}.`,
   }
 }
 
@@ -230,7 +227,7 @@ export function calculateCheckout(cart: ResolvedCart, draft: CheckoutDraft) {
     : null
   const discountCents =
     promotion?.kind === 'applied' ? promotion.discountCents : 0
-  // En esta demo, el umbral de envío gratis se calcula antes del descuento.
+  // El umbral de envío gratis se calcula antes del descuento.
   const shipping = quoteShipping(
     draft.address.department,
     draft.deliveryMethod,
@@ -258,7 +255,7 @@ export function createMockOrder(
   if (amount.shipping.kind !== 'quoted' || amount.totalCents === null)
     return null
   return {
-    reference: `AI-DEMO-${crypto.randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`,
+    reference: `AI-${crypto.randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`,
     mode: draft.mode,
     placedAt: new Date().toISOString(),
     lines: cart.lines.flatMap((line) =>

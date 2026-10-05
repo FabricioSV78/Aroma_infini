@@ -116,7 +116,7 @@ test('Carrito añade variantes, actualiza cantidades, persiste y abre desde el h
   await page.goto('/producto/bois-clair')
   const add = page.getByRole('button', { name: 'Añadir al carrito' })
   await add.click()
-  await expect(page.getByRole('status')).toContainText(
+  await expect(page.locator('.cart-notice')).toContainText(
     'Bois Clair se añadió al carrito.',
   )
   await add.click()
@@ -137,7 +137,7 @@ test('Carrito añade variantes, actualiza cantidades, persiste y abre desde el h
     page.getByRole('heading', { level: 1, name: 'Tu carrito.' }),
   ).toBeVisible()
   await expect(page.locator('.cart-summary')).toContainText('S/ 1,370')
-  await expect(page.locator('.cart-summary')).toContainText('Gratis')
+  await expect(page.locator('.cart-summary')).toContainText('Según destino')
   await page
     .getByRole('button', { name: 'Aumentar cantidad de Bois Clair, 50 ml' })
     .click()

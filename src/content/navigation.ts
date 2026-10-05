@@ -1,10 +1,10 @@
 export const navigation = [
-  { label: 'Catálogo', to: '/catalogo' },
+  { label: 'Tienda', to: '/tienda' },
   { label: 'Marcas', to: '/marcas' },
   { label: 'Más vendidos', to: '/#mas-vendidos' },
-  { label: 'Para él', to: '/catalogo?genero=hombre' },
-  { label: 'Para ella', to: '/catalogo?genero=mujer' },
-  { label: 'Unisex', to: '/catalogo?genero=unisex' },
+  { label: 'Para él', to: '/tienda?genero=hombre' },
+  { label: 'Para ella', to: '/tienda?genero=mujer' },
+  { label: 'Unisex', to: '/tienda?genero=unisex' },
 ]
 
 export interface NavigationLink {
@@ -21,7 +21,6 @@ export const supportLinks: NavigationLink[] = [
   { label: 'Seguir pedido', to: '/seguir-pedido' },
   { label: 'Envíos y entregas', to: '/envios' },
   { label: 'Cambios y devoluciones', to: '/devoluciones' },
-  { label: 'Preguntas frecuentes', to: '/preguntas-frecuentes' },
 ]
 // Tres puertas de entrada breves: producto, marcas y relación con la tienda.
 export const navigationGroups: NavigationGroup[] = [
@@ -45,16 +44,16 @@ export const navigationGroups: NavigationGroup[] = [
       {
         title: 'Nuestra selección',
         links: [
-          { label: 'ATELIER 01', to: '/catalogo?marca=atelier-01' },
-          { label: 'FORME', to: '/catalogo?marca=forme' },
-          { label: 'STUDIO SILLAGE', to: '/catalogo?marca=studio-sillage' },
-          { label: 'MATIÈRE 04', to: '/catalogo?marca=matiere-04' },
+          { label: 'Atelier 01', to: '/tienda?marca=atelier-01' },
+          { label: 'Forme', to: '/tienda?marca=forme' },
+          { label: 'Studio sillage', to: '/tienda?marca=studio-sillage' },
+          { label: 'Matière 04', to: '/tienda?marca=matiere-04' },
         ],
       },
       {
         title: 'Descubrir las casas',
         links: [
-          { label: 'Marca destacada', to: '/#marca-destacada' },
+          { label: 'Marca destacada', to: '/tienda?marca=atelier-01' },
           { label: 'Todas las marcas', to: '/marcas' },
         ],
       },

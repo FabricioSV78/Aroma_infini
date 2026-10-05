@@ -1,3 +1,4 @@
+import { formatBrandName } from '../../utils/brand-name'
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
@@ -21,12 +22,10 @@ export function CheckoutConfirmationPage() {
         className="store-page checkout-page checkout-unavailable container"
         data-scroll-reveal="fade"
       >
-        <p className="eyebrow">Confirmación de demostración</p>
-        <h1>No hay una simulación activa.</h1>
-        <p>
-          La confirmación de prueba solo permanece en esta sesión del navegador.
-        </p>
-        <Link className="button button--primary" to="/catalogo">
+        <p className="eyebrow">Confirmación</p>
+        <h1>No hay una selección reciente.</h1>
+        <p>Puedes volver a la tienda para explorar los perfumes.</p>
+        <Link className="button button--primary" to="/tienda">
           Explorar perfumes <Icon name="arrow" />
         </Link>
       </section>
@@ -47,9 +46,12 @@ export function CheckoutConfirmationPage() {
         className="checkout-confirmation-heading"
         data-scroll-reveal="copy"
       >
-        <p className="eyebrow">Vista de prueba · {order.reference}</p>
-        <h1>Compra de prueba completada.</h1>
-        <p>No se realizó ningún cobro ni pedido real.</p>
+        <p className="eyebrow">Selección · {order.reference}</p>
+        <h1>Tu selección quedó guardada.</h1>
+        <p>
+          La información está disponible durante esta sesión. No se realizó
+          ningún cobro.
+        </p>
         <div className="checkout-confirmation-tracking">
           <span>Código de pedido</span>
           <strong>{order.reference}</strong>
@@ -67,7 +69,7 @@ export function CheckoutConfirmationPage() {
             <Icon name="arrow" />
           </Link>
         </div>
-        <Link className="text-link" to="/catalogo">
+        <Link className="text-link" to="/tienda">
           Seguir descubriendo <Icon name="arrow" />
         </Link>
       </header>
@@ -82,7 +84,7 @@ export function CheckoutConfirmationPage() {
             {order.lines.map((line) => (
               <li key={line.variantId}>
                 <div>
-                  <small>{line.brand}</small>
+                  <small>{formatBrandName(line.brand)}</small>
                   <strong>{line.name}</strong>
                   <span>
                     {line.ml} ml · Cant. {line.quantity}
@@ -99,7 +101,7 @@ export function CheckoutConfirmationPage() {
             </div>
             {order.discountCents > 0 ? (
               <div>
-                <dt>Descuento de prueba</dt>
+                <dt>Descuento</dt>
                 <dd>−{formatPEN(order.discountCents)}</dd>
               </div>
             ) : null}

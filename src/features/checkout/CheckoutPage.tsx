@@ -148,7 +148,7 @@ export function CheckoutPage() {
         className="store-page checkout-page checkout-unavailable container"
         data-scroll-reveal="fade"
       >
-        <p className="eyebrow">Checkout de demostración</p>
+        <p className="eyebrow">Tu selección</p>
         <h1>
           {cart.lines.length
             ? 'Revisa tu carrito.'
@@ -157,11 +157,11 @@ export function CheckoutPage() {
         <p>
           {cart.lines.length
             ? 'Corrige las presentaciones señaladas antes de continuar.'
-            : 'Elige un perfume para comenzar esta simulación.'}
+            : 'Elige un perfume para continuar.'}
         </p>
         <Link
           className="button button--primary"
-          to={cart.lines.length ? '/carrito' : '/catalogo'}
+          to={cart.lines.length ? '/carrito' : '/tienda'}
         >
           {cart.lines.length ? 'Revisar carrito' : 'Explorar perfumes'}{' '}
           <Icon name="arrow" />
@@ -183,9 +183,8 @@ export function CheckoutPage() {
         <span aria-current="page">Checkout</span>
       </nav>
       <header className="checkout-heading" data-scroll-reveal="copy">
-        <p className="eyebrow">Checkout</p>
         <h1>Finaliza tu selección.</h1>
-        <p>Vista de prueba · Sin cobros ni conexión a Mercado Pago.</p>
+        <p>Revisa tus datos y la entrega antes de continuar.</p>
       </header>
 
       <ol
@@ -339,7 +338,7 @@ export function CheckoutPage() {
                     }
                   >
                     {promotionState.kind === 'validating'
-                      ? 'Validando código de prueba…'
+                      ? 'Validando código…'
                       : promotionState.message}
                   </p>
                 ) : null}
@@ -349,13 +348,18 @@ export function CheckoutPage() {
                 className="checkout-gateway"
                 aria-labelledby="checkout-gateway-title"
               >
-                <h3 id="checkout-gateway-title">Pago con Mercado Pago</h3>
-                <p>Elegirás cómo pagar en Mercado Pago.</p>
+                <h3 id="checkout-gateway-title">Resumen de tu selección</h3>
+                <p>
+                  Al continuar, la selección se guardará en este navegador. No
+                  se realizará ningún cobro.
+                </p>
               </section>
 
               {showTestControls ? (
                 <div className="checkout-simulation-settings">
-                  <label htmlFor="checkout-scenario">Resultado de prueba</label>
+                  <label htmlFor="checkout-scenario">
+                    Estado de validación
+                  </label>
                   <select
                     id="checkout-scenario"
                     value={paymentScenario}
@@ -368,25 +372,25 @@ export function CheckoutPage() {
                   >
                     <option value="approved">Aprobado</option>
                     <option value="rejected">Rechazado</option>
-                    <option value="error">Error del simulador</option>
+                    <option value="error">Error</option>
                   </select>
-                  <small>Control de pruebas; no representa un pago real.</small>
+                  <small>Control de validación local.</small>
                 </div>
               ) : null}
 
               {paymentStatus === 'processing' ? (
                 <p className="checkout-payment-message" role="status">
-                  Preparando la demostración…
+                  Guardando tu selección…
                 </p>
               ) : null}
               {paymentStatus === 'rejected' ? (
                 <p className="checkout-payment-message" role="alert">
-                  Resultado de prueba rechazado. Puedes volver a intentarlo.
+                  No se pudo registrar la selección. Puedes volver a intentarlo.
                 </p>
               ) : null}
               {paymentStatus === 'error' ? (
                 <p className="checkout-payment-message" role="alert">
-                  No se pudo completar la prueba. Vuelve a intentarlo.
+                  Ocurrió un error. Vuelve a intentarlo.
                 </p>
               ) : null}
               <div className="checkout-payment-action">
@@ -409,8 +413,8 @@ export function CheckoutPage() {
                   {paymentStatus === 'processing'
                     ? 'Procesando…'
                     : paymentStatus === 'ready'
-                      ? 'Ver confirmación de prueba'
-                      : 'Reintentar prueba'}
+                      ? 'Guardar selección'
+                      : 'Reintentar'}
                   {paymentStatus !== 'processing' ? (
                     <Icon name="arrow" />
                   ) : null}

@@ -1,18 +1,13 @@
 .product-page {
+  position: relative;
   overflow: clip;
   background: var(--color-canvas);
 }
 
-.product-intro,
-.product-recommendations {
-  width: min(calc(100% - clamp(32px, 4vw, 56px)), 1480px);
-  max-width: 1480px;
-}
-
 .product-intro {
   display: grid;
-  gap: 26px;
-  padding-bottom: 60px;
+  gap: 16px;
+  padding-bottom: 48px;
 }
 .product-gallery {
   min-width: 0;
@@ -115,7 +110,7 @@
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   text-underline-offset: 5px;
 }
 .product-brand:is(:hover, :focus-visible) {
@@ -153,7 +148,6 @@
 .product-purchase h1 {
   max-width: 680px;
   margin-top: 10px;
-  font-size: clamp(48px, 13vw, 72px);
   font-weight: 300;
   line-height: 0.96;
   letter-spacing: -0.06em;
@@ -275,12 +269,66 @@
 .product-cart-button {
   width: 100%;
   margin-top: 12px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+.product-cart-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--color-ink);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 550ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  pointer-events: none;
+}
+.product-cart-button__label {
+  position: relative;
+  z-index: 1;
+}
+@supports (mix-blend-mode: difference) {
+  .product-cart-button__label {
+    color: white;
+    mix-blend-mode: difference;
+  }
+}
+.product-cart-button:not(:disabled):focus-visible {
+  background: var(--color-canvas);
+}
+.product-cart-button:not(:disabled):focus-visible::before {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+@media (hover: hover) and (pointer: fine) {
+  .product-cart-button:not(:disabled):hover {
+    background: var(--color-canvas);
+  }
+  .product-cart-button:not(:disabled):hover::before {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-cart-button::before {
+    transition: none;
+  }
 }
 .product-cart-button:disabled {
   border-color: #565656;
   background: #565656;
   color: white;
   opacity: 1;
+}
+.product-cart-button:disabled::before {
+  content: none;
+}
+.product-cart-button:disabled .product-cart-button__label {
+  color: white;
+  mix-blend-mode: normal;
 }
 .product-info-nav {
   display: grid;
@@ -369,34 +417,15 @@
   --profile-tint: #f8eef1;
   --profile-botanical: #496b55;
   --profile-botanical-tint: #edf4ee;
-  position: relative;
   width: min(100%, 880px);
-  margin: 24px auto 0;
-  padding: 68px clamp(16px, 5vw, 62px) 38px;
-  border: 1px solid #d9ced0;
+  margin-inline: auto;
   text-align: center;
 }
-.olfactory-profile-heading {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: min(calc(100% - 72px), 430px);
-  padding-inline: 16px;
-  background: var(--color-canvas);
-  transform: translate(-50%, -50%);
-}
-.olfactory-profile-heading h2 {
-  font-size: clamp(24px, 5.8vw, 34px);
-  font-weight: 300;
-  line-height: 1;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-}
-.olfactory-profile-heading p {
-  margin-top: 7px;
+.olfactory-profile-family {
+  margin-bottom: 28px;
   color: var(--profile-accent);
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  font-size: 14px;
+  font-weight: 500;
 }
 .olfactory-profile-intensity > p {
   font-size: clamp(17px, 2vw, 21px);
@@ -458,7 +487,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin: 40px 0 0;
+  margin: 32px 0 0;
 }
 .olfactory-profile-traits > div {
   min-width: 0;
@@ -551,7 +580,6 @@
 }
 .product-recommendations h2 {
   max-width: 760px;
-  font-size: clamp(42px, 10vw, 64px);
   font-weight: 300;
   line-height: 1.02;
   letter-spacing: -0.055em;
@@ -575,6 +603,7 @@
 }
 .product-recommendations .product-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px 14px;
 }
 
 .product-state {
@@ -600,15 +629,13 @@
     aspect-ratio: 16 / 9;
   }
   .product-intro {
-    gap: 26px;
-    padding-bottom: 76px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 24px;
+    padding-bottom: 64px;
   }
   .product-purchase {
-    width: min(100%, 660px);
-    justify-self: center;
-  }
-  .product-purchase h1 {
-    font-size: clamp(64px, 9vw, 86px);
+    width: 100%;
   }
   .product-info-tabs,
   .product-info-tabs button {
@@ -618,15 +645,11 @@
     font-size: 14px;
   }
   .product-info-panel {
-    padding-block: 80px 88px;
-  }
-  .olfactory-profile-card {
-    margin-top: 18px;
-    padding: 76px 70px 52px;
+    padding-block: 72px 76px;
   }
   .olfactory-profile-traits {
     gap: 36px;
-    margin-top: 52px;
+    margin-top: 40px;
   }
   .olfactory-profile-glyph {
     min-height: 48px;
@@ -649,24 +672,66 @@
   .product-recommendations > header {
     margin-bottom: 38px;
   }
-  .product-recommendations h2 {
-    font-size: clamp(50px, 5vw, 70px);
-  }
   .product-recommendations .product-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+  }
+  .product-recommendations .product-card {
+    width: 100%;
+    max-width: 280px;
   }
 }
 
 @media (max-width: 767px) {
+  .product-intro {
+    gap: 12px;
+    padding-bottom: 44px;
+  }
+  .product-gallery-frame {
+    height: clamp(170px, 27svh, 228px);
+    max-height: none;
+    aspect-ratio: auto;
+  }
+  .product-brand {
+    min-height: 32px;
+  }
+  .product-save {
+    min-height: 40px;
+  }
+  .product-purchase h1 {
+    margin-top: 4px;
+  }
   .product-selected-price {
     padding-right: 62px;
+    margin-top: 8px;
+  }
+  .product-lead {
+    display: -webkit-box;
+    overflow: hidden;
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .product-variants {
+    margin-top: 10px;
+  }
+  .product-variants label > span {
+    min-height: 52px;
+    padding: 6px 10px;
+  }
+  .product-cart-button {
+    margin-top: 8px;
+  }
+  .product-info-nav {
+    margin-top: 8px;
   }
 }
 
-@media (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   .product-intro {
-    gap: 18px;
-    padding-bottom: 60px;
+    gap: 24px;
   }
 
   .product-gallery-frame {
@@ -678,9 +743,9 @@
 
 @media (min-width: 1024px) {
   .product-intro {
-    grid-template-columns: minmax(0, 1.22fr) minmax(430px, 0.78fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(400px, 1fr);
     align-items: stretch;
-    gap: 0;
+    gap: clamp(24px, 3vw, 44px);
     padding-bottom: 82px;
   }
   .product-gallery-layout {
@@ -731,7 +796,7 @@
     position: relative;
     display: block;
     overflow: hidden;
-    width: min(100%, 520px);
+    width: min(100%, 520px, 56svh);
     height: auto;
     justify-self: center;
     aspect-ratio: 4 / 5;
@@ -761,24 +826,21 @@
     top: calc(var(--header-height) + 12px);
     width: 100%;
     align-self: start;
-    padding: clamp(40px, 6vh, 58px) clamp(28px, 3.2vw, 46px) 30px;
+    padding: clamp(16px, 3svh, 38px) clamp(14px, 2.2vw, 32px) 24px;
     background: var(--color-canvas);
-  }
-  .product-purchase h1 {
-    font-size: clamp(56px, 5vw, 78px);
   }
   .product-lead {
     font-size: 14px;
     line-height: 1.5;
   }
   .product-info-panel {
-    padding-block: 96px 88px;
+    padding-block: 72px 76px;
   }
 }
 
 @media (min-width: 1280px) {
   .product-intro {
-    grid-template-columns: minmax(0, 1.24fr) minmax(470px, 0.76fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(430px, 1fr);
   }
   .product-gallery-layout {
     grid-template-columns: 82px minmax(0, 1fr);
@@ -787,8 +849,18 @@
   .product-thumbnail {
     width: 82px;
   }
-  .product-purchase h1 {
-    font-size: clamp(68px, 5vw, 78px);
+}
+
+@media (max-width: 767px) and (max-height: 700px) {
+  .product-gallery-frame {
+    height: clamp(120px, 20svh, 145px);
+  }
+  .product-cart-button {
+    width: calc(100% - 80px);
+  }
+  .product-lead,
+  .product-info-nav {
+    display: none;
   }
 }
 
@@ -820,3 +892,6 @@
     transform: scale(1);
   }
 }
+.product-gallery--single .product-gallery-layout { grid-template-columns: minmax(0, 1fr); }
+.product-gallery--single .product-thumbnails,
+.product-gallery--single .product-gallery-mobile-controls { display: none; }

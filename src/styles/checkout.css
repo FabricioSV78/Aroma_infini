@@ -7,7 +7,6 @@
 .checkout-heading {
   padding-block: 34px 40px;
 }
-.checkout-heading .eyebrow,
 .checkout-confirmation-heading .eyebrow {
   margin-bottom: 12px;
   color: var(--color-muted);
@@ -536,10 +535,6 @@
   max-width: 720px;
   padding-block: clamp(36px, 5vw, 68px) 34px;
 }
-.tracking-heading .eyebrow {
-  margin-bottom: 12px;
-  color: var(--color-muted);
-}
 .tracking-heading h1 {
   font-family: var(--font-display);
   font-size: var(--type-title-page);
@@ -725,36 +720,5 @@
   }
   .checkout-summary-lines img {
     width: 52px;
-  }
-}
-.checkout-help {
-  border-top: 1px solid var(--color-line);
-}
-
-.checkout-help-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding-block: 28px;
-}
-
-.checkout-help-inner p {
-  margin: 0;
-}
-
-.checkout-help-inner button {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 44px;
-}
-
-@media (max-width: 600px) {
-  .checkout-help-inner {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-    padding-block: 24px;
   }
 }

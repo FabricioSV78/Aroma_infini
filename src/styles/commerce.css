@@ -337,7 +337,7 @@
   position: fixed;
   z-index: 40;
   right: 16px;
-  bottom: 82px;
+  bottom: 98px;
   left: 16px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -430,10 +430,10 @@
     text-align: left;
   }
   .cart-notice {
-    right: 80px;
+    right: 96px;
     bottom: 24px;
     left: auto;
-    width: min(470px, calc(100% - 104px));
+    width: min(470px, calc(100% - 112px));
   }
 }
 

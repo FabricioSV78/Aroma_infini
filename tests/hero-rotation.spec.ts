@@ -15,7 +15,7 @@ async function prepare(page: Page) {
   })
 }
 
-test('Tres campañas: imagen, texto y enlace cambian cada tres segundos sin variar la altura', async ({
+test('Tres campañas: imagen, texto y enlace cambian cada cinco segundos sin variar la altura', async ({
   page,
 }) => {
   await prepare(page)
@@ -34,31 +34,31 @@ test('Tres campañas: imagen, texto y enlace cambian cada tres segundos sin vari
   await expect(
     page.getByRole('button', { name: 'Diapositiva siguiente' }),
   ).toHaveCount(0)
-  await page.clock.runFor(3100)
+  await page.clock.runFor(5100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
   await expect(hero.getByRole('link')).toHaveAttribute('href', '/#destacados')
   await expect(page.locator('.hero-position')).toContainText('02 / 03')
   await expect(hero.locator('.is-active img')).toHaveAttribute('src', /silence/)
-  await page.clock.runFor(800)
+  await page.clock.runFor(1500)
   await expect(hero.locator('.is-active')).toHaveCSS('opacity', '1')
   expect((await hero.boundingBox())!.height).toBe(height)
-  await page.clock.runFor(2200)
+  await page.clock.runFor(3500)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Tu esencia.',
   )
   await expect(hero.getByRole('link')).toHaveAttribute(
     'href',
-    '/catalogo?marca=forme',
+    '/tienda?marca=forme',
   )
   await expect(hero.locator('.is-active img')).toHaveAttribute('src', /petale/)
   expect((await hero.boundingBox())!.height).toBe(height)
-  await page.clock.runFor(3000)
+  await page.clock.runFor(5000)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Una fragancia.',
   )
-  await expect(hero.getByRole('link')).toHaveAttribute('href', '/catalogo')
+  await expect(hero.getByRole('link')).toHaveAttribute('href', '/tienda')
 })
 
 test('Los controles se descubren por teclado y permiten detener o reanudar las campañas', async ({
@@ -76,7 +76,7 @@ test('Los controles se descubren por teclado y permiten detener o reanudar las c
   )
   await page.getByRole('button', { name: 'Reanudar cambio automático' }).focus()
   await page.keyboard.press('Enter')
-  await page.clock.runFor(3100)
+  await page.clock.runFor(5100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
@@ -111,7 +111,7 @@ test('Hover y salida del viewport suspenden la rotación', async ({ page }) => {
   )
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
   await expect(status).toHaveAttribute('aria-live', 'off')
-  await page.clock.runFor(3100)
+  await page.clock.runFor(5100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
@@ -159,11 +159,11 @@ test('Una tercera fotografía fallida no interrumpe las campañas disponibles', 
     'aria-live',
     'off',
   )
-  await page.clock.runFor(3100)
+  await page.clock.runFor(5100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
-  await page.clock.runFor(3000)
+  await page.clock.runFor(5000)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Una fragancia.',
   )

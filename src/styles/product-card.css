@@ -20,10 +20,29 @@
   transform: scale(1.035);
 }
 .product-card--standard .product-image-link img {
+  object-fit: contain;
   aspect-ratio: 4 / 5;
   transform: none;
   mix-blend-mode: normal;
   transition: opacity 450ms ease;
+}
+/* One neutral surface and the same framing for both catalog photographs. */
+.catalog-page .product-photo,
+.catalog-page .product-image-link {
+  background: #faf9f6;
+}
+.catalog-page .product-card--standard .product-image-link img {
+  object-fit: contain;
+  object-position: center;
+  mix-blend-mode: multiply;
+}
+.catalog-page .product-image-link--swap:focus-visible > img:first-child {
+  opacity: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .catalog-page .product-image-link--swap:hover > img:first-child {
+    opacity: 0;
+  }
 }
 .product-image-link--swap {
   position: relative;

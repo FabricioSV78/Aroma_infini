@@ -5,6 +5,7 @@ import {
   type CheckoutDraft,
 } from '../../services/checkout-service'
 import { formatPEN } from '../../services/currency'
+import { imageSource } from '../../services/image-source'
 
 interface CheckoutSummaryProps {
   cart: ResolvedCart
@@ -29,7 +30,7 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
           line.kind === 'ready' ? (
             <li key={line.item.variantId}>
               <img
-                src={`/images/${line.product.image}-480.webp`}
+                src={imageSource(line.product.image)}
                 width={72}
                 height={90}
                 loading="lazy"
@@ -80,7 +81,7 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
       </dl>
       {amount.discountCents > 0 ? (
         <p className="checkout-summary-note">
-          Envío gratis calculado antes del descuento.
+          El importe de entrega se calcula sobre el subtotal.
         </p>
       ) : null}
     </aside>

@@ -1,5 +1,6 @@
 import { useRef, useState, type UIEvent } from 'react'
 import type { ProductGalleryView } from '../../types/catalog'
+import { imageSource, imageSourceSet } from '../../services/image-source'
 
 interface ProductGalleryProps {
   name: string
@@ -31,7 +32,7 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
 
   return (
     <section
-      className="product-gallery"
+      className={`product-gallery${views.length === 1 ? ' product-gallery--single' : ''}`}
       aria-label={`Galería de ${name}`}
       aria-roledescription="carrusel"
     >
@@ -39,7 +40,7 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
         <div className="product-thumbnails" aria-label="Vistas del producto">
           {views.map((view, index) => (
             <button
-              key={`${view.image}-${view.framing}`}
+              key={index}
               type="button"
               className="product-thumbnail"
               aria-label={`Ver imagen ${index + 1} de ${views.length}`}
@@ -47,14 +48,16 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
               onClick={() => setActiveIndex(index)}
             >
               <img
-                src={`/images/${view.image}-480.webp`}
+                src={imageSource(view.image)}
                 width={480}
                 height={600}
                 alt=""
                 loading="lazy"
                 decoding="async"
               />
-              <span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+              <span aria-hidden="true">
+                {String(index + 1).padStart(2, '0')}
+              </span>
             </button>
           ))}
         </div>
@@ -65,15 +68,15 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
         >
           {views.map((view, index) => (
             <figure
-              key={`${view.image}-${view.framing}`}
+              key={index}
               className={`product-gallery-frame product-gallery-frame--${view.framing}${
                 activeIndex === index ? ' is-active' : ''
               }`}
               aria-hidden={activeIndex !== index ? 'true' : undefined}
             >
               <img
-                src={`/images/${view.image}-480.webp`}
-                srcSet={`/images/${view.image}-480.webp 480w, /images/${view.image}-960.webp 960w`}
+                src={imageSource(view.image)}
+                srcSet={imageSourceSet(view.image, [480, 960])}
                 sizes="(min-width: 1024px) 52vw, 100vw"
                 width={960}
                 height={1200}

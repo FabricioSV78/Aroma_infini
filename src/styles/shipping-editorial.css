@@ -1,0 +1,195 @@
+.institutional-shipping .institutional-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 760px;
+  margin-inline: auto;
+  text-align: center;
+}
+.institutional-shipping .institutional-intro h1,
+.institutional-shipping .institutional-intro > p:last-child {
+  max-width: none;
+}
+.shipping-editorial-layout {
+  display: grid;
+  gap: clamp(28px, 3vw, 44px);
+}
+.shipping-rate-card {
+  background: var(--color-cream);
+  padding: clamp(24px, 3vw, 40px);
+  border-top: 2px solid #b3a18a;
+}
+.shipping-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-muted);
+}
+.shipping-rate-card h2,
+.shipping-journey h2 {
+  font-size: clamp(22px, 2vw, 28px);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  margin-top: 0;
+  color: var(--color-ink);
+}
+.institutional-shipping .shipping-rate-card .institutional-shipping-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  margin: 28px 0 0;
+  border: 0;
+}
+.shipping-rate-card dl > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-left: 1px solid #d8d0c4;
+  text-align: center;
+}
+.shipping-rate-card dl > div:first-child {
+  border-left: 0;
+}
+.shipping-rate-card dt {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.shipping-rate-card dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.shipping-rate-note {
+  margin-top: 28px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-muted);
+  text-align: center;
+}
+.shipping-journey {
+  padding: 0 4px;
+  text-align: center;
+}
+.shipping-journey ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--color-line);
+}
+.shipping-journey li {
+  padding: 22px 24px 0;
+  border-left: 1px solid var(--color-line);
+  text-align: center;
+}
+.shipping-journey li:first-child {
+  border-left: 0;
+}
+.shipping-journey li > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--color-muted);
+  margin: 0 auto 12px;
+}
+.shipping-journey h3 {
+  font-size: 16px;
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+.shipping-journey li p {
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 44ch;
+  margin-inline: auto;
+  color: var(--color-muted);
+}
+.shipping-journey .text-link {
+  margin-top: 8px;
+}
+.shipping-help {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 6vw, 88px);
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+}
+.shipping-help > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.shipping-help p {
+  font-size: 14px;
+}
+.shipping-help svg {
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .shipping-rate-card dl > div {
+    padding-inline: 16px;
+  }
+  .shipping-journey li {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .institutional-shipping .shipping-rate-card .institutional-shipping-summary,
+  .shipping-journey ol {
+    display: block;
+  }
+  .shipping-rate-card dl > div {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 16px 0;
+    border-left: 0;
+    border-bottom: 1px solid #d8d0c4;
+    text-align: left;
+  }
+  .shipping-rate-card dl > div:first-child {
+    padding-top: 0;
+  }
+  .shipping-journey ol {
+    border-top: 0;
+  }
+  .shipping-journey li,
+  .shipping-journey li:first-child {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 16px;
+    padding: 18px 0;
+    border-left: 0;
+    border-top: 1px solid var(--color-line);
+    text-align: left;
+  }
+  .shipping-journey li > span {
+    margin: 0;
+  }
+  .shipping-journey li p {
+    margin-inline: 0;
+  }
+  .shipping-help {
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .shipping-rate-card dd {
+    font-size: 20px;
+  }
+}

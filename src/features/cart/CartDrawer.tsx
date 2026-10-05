@@ -53,7 +53,7 @@ export function CartDrawer() {
           >
             Ver carrito <Icon name="arrow" />
           </Link>
-          <Link className="text-link" to="/catalogo" onClick={closeCart}>
+          <Link className="text-link" to="/tienda" onClick={closeCart}>
             Explorar perfumes <Icon name="arrow" />
           </Link>
         </div>

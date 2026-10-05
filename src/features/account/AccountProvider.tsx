@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -34,8 +35,40 @@ function createAccountState(): AccountState {
   }
 }
 
+const accountStorageKey = 'aroma-infini-account-session-v1'
+
+function restoreAccountState(): AccountState {
+  const initial = createAccountState()
+  try {
+    const stored = sessionStorage.getItem(accountStorageKey)
+    if (!stored) return initial
+    const parsed: unknown = JSON.parse(stored)
+    if (!parsed || typeof parsed !== 'object') return initial
+    const value = parsed as Partial<AccountState>
+    if (value.active !== true || !value.profile || !Array.isArray(value.orders))
+      return initial
+    return {
+      active: true,
+      profile: value.profile,
+      address: value.address ?? null,
+      orders: value.orders,
+    }
+  } catch {
+    return initial
+  }
+}
+
 export function AccountProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AccountState>(createAccountState)
+  const [state, setState] = useState<AccountState>(restoreAccountState)
+  useEffect(() => {
+    try {
+      if (state.active)
+        sessionStorage.setItem(accountStorageKey, JSON.stringify(state))
+      else sessionStorage.removeItem(accountStorageKey)
+    } catch {
+      // La cuenta sigue disponible durante esta visita si el almacenamiento falla.
+    }
+  }, [state])
   const adminState = useSyncExternalStore(
     adminService.subscribe,
     adminService.getSnapshot,

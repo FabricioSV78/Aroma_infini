@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { catalogService } from '../../services/catalog-service'
 import { getProductPresentation } from '../../services/product-presentation'
 import { formatPEN } from '../../services/currency'
+import { imageSource } from '../../services/image-source'
 
 type Suggestions = Awaited<ReturnType<typeof catalogService.suggest>>
 type SearchState =
@@ -99,7 +100,7 @@ export function SearchPanel({ onClose }: { onClose: () => void }) {
                     <li key={product.id}>
                       <Link to={'/producto/' + product.slug} onClick={onClose}>
                         <img
-                          src={'/images/' + product.image + '-480.webp'}
+                          src={imageSource(product.image)}
                           alt=""
                           width={48}
                           height={60}

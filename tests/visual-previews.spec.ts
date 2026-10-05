@@ -1,39 +1,33 @@
 import { expect, test } from '@playwright/test'
 
-test('Capturas de revisión de ubicación, avisos y reseñas', async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    sessionStorage.removeItem('aroma-infini:commercial-preview-seen:v1')
-    sessionStorage.removeItem(
-      'aroma-infini:product-interest-notice:petale-nu:v2',
-    )
-  })
+test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) => {
+  test.setTimeout(90_000)
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 })
 
     await page.goto('/')
-    const notice = page.getByRole('complementary', {
-      name: 'Vista previa de avisos comerciales',
-    })
-    await expect(notice).toBeVisible({ timeout: 4000 })
+    await expect(
+      page.getByRole('heading', { name: 'Más vendidos' }),
+    ).toBeVisible()
     await page.waitForTimeout(550)
     await page.screenshot({
-      path: `artifacts/review-home-notice-${width}.png`,
+      path: `artifacts/review-home-${width}.png`,
     })
 
     await page.goto('/producto/petale-nu')
-    const popularity = page.getByRole('complementary', {
-      name: 'Interés en Pétale Nu',
+    const productNotice = page.locator('.product-popularity-preview')
+    await expect(productNotice).toBeVisible()
+    await productNotice.getByRole('button', { name: /Cerrar aviso/ }).click()
+    const information = page.locator('#informacion-producto')
+    await information.evaluate((element) => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      window.scrollTo({ top: Math.max(0, top - 104), behavior: 'instant' })
     })
-    await expect(popularity).toBeVisible({ timeout: 4000 })
-    await page.waitForTimeout(550)
+    await expect(information).toBeInViewport()
+    await page.waitForTimeout(950)
     await page.screenshot({
-      path: `artifacts/review-product-popup-${width}.png`,
+      path: `artifacts/review-product-family-${width}.png`,
     })
-    await popularity
-      .getByRole('button', { name: 'Cerrar aviso sobre Pétale Nu' })
-      .click()
 
     const reviews = page.locator('.product-reviews-preview')
     await reviews.evaluate((element) => {
@@ -41,15 +35,27 @@ test('Capturas de revisión de ubicación, avisos y reseñas', async ({
       window.scrollTo({ top: Math.max(0, top - 104), behavior: 'instant' })
     })
     await expect(reviews).toBeInViewport()
+    await page.waitForTimeout(950)
     await page.screenshot({
       path: `artifacts/review-product-reviews-${width}.png`,
     })
 
-    await page.goto('/cuenta/pedidos/AI-DEMO-A1B2C3D4E5F60708')
-    await page
-      .getByRole('button', { name: 'Explorar cuenta de demostración' })
-      .click()
+    const recommendations = page.locator('.product-recommendations')
+    await recommendations.evaluate((element) => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      window.scrollTo({ top: Math.max(0, top - 104), behavior: 'instant' })
+    })
+    await expect(recommendations).toBeInViewport()
+    await page.waitForTimeout(950)
+    await page.screenshot({
+      path: `artifacts/review-product-recommendations-${width}.png`,
+    })
+
+    await page.goto('/cuenta/pedidos/AI-A1B2C3D4E5F60708')
+    const enterAccount = page.getByRole('button', { name: 'Ver mi cuenta' })
     const orderProducts = page.locator('.account-order-lines')
+    await expect(enterAccount.or(orderProducts).first()).toBeVisible()
+    if (await enterAccount.isVisible()) await enterAccount.click()
     await orderProducts.scrollIntoViewIfNeeded()
     await expect(orderProducts).toBeVisible()
     await page.screenshot({
@@ -57,11 +63,16 @@ test('Capturas de revisión de ubicación, avisos y reseñas', async ({
     })
 
     await page.goto('/admin/envios')
-    const firstZone = page.locator('.admin-zone-list fieldset').first()
-    await firstZone.scrollIntoViewIfNeeded()
-    await expect(firstZone).toBeVisible()
-    await firstZone.screenshot({
-      path: `artifacts/review-admin-location-${width}.png`,
+    await expect(page.getByRole('heading', { name: 'Todo el Perú' })).toBeVisible()
+    await page.screenshot({
+      path: `artifacts/review-admin-shipping-${width}.png`,
+      fullPage: true,
+    })
+    await page.locator('.admin-shipping-row').first().click()
+    await expect(page.locator('.admin-shipping-editor')).toBeVisible()
+    await page.screenshot({
+      path: `artifacts/review-admin-shipping-editor-${width}.png`,
+      fullPage: true,
     })
 
     expect(

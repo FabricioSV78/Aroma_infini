@@ -52,9 +52,9 @@ test('El navbar da acceso a las páginas públicas y las anclas existentes', asy
     .evaluateAll((links) => links.map((link) => link.getAttribute('href')!)))
     destinations.add(href)
   const expected = [
-    '/catalogo',
+    '/tienda',
     '/marcas',
-    '/#marca-destacada',
+    '/tienda?marca=atelier-01',
     '/#destacados',
     '/nosotros',
     '/contacto',
@@ -64,7 +64,6 @@ test('El navbar da acceso a las páginas públicas y las anclas existentes', asy
   for (const href of expected) expect(destinations.has(href), href).toBe(true)
   for (const footerOnly of [
     '/devoluciones',
-    '/preguntas-frecuentes',
     '/privacidad',
     '/terminos',
     '/libro-de-reclamaciones',
@@ -111,6 +110,39 @@ test('El menú desktop cierra fuera, al navegar y al cambiar de breakpoint', asy
     page.getByRole('dialog', { name: 'Explorar', exact: true }),
   ).not.toBeVisible()
   await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+})
+
+test('El desplegable termina cerca de sus enlaces y mantiene el cierre arriba', async ({
+  page,
+}) => {
+  for (const width of [1200, 1440, 1900]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/tienda')
+
+    for (const group of navigationGroups) {
+      await page.locator(`#nav-trigger-${group.id}`).focus()
+      await page.keyboard.press('Enter')
+      const panel = page.locator(`#nav-panel-${group.id}`)
+      await expect(panel).toBeVisible()
+      await expect(panel.locator('.navigation-close')).toHaveCSS(
+        'position',
+        'absolute',
+      )
+
+      const panelBox = await panel.boundingBox()
+      const linksBox = await panel.locator('.navigation-columns').boundingBox()
+      const closeBox = await panel.locator('.navigation-close').boundingBox()
+      expect(panelBox).not.toBeNull()
+      expect(linksBox).not.toBeNull()
+      expect(closeBox).not.toBeNull()
+      if (!panelBox || !linksBox || !closeBox) continue
+
+      const bottomGap =
+        panelBox.y + panelBox.height - (linksBox.y + linksBox.height)
+      expect(bottomGap, `${width}px ${group.label}`).toBeLessThanOrEqual(40)
+      expect(closeBox.y, `${width}px ${group.label}`).toBeLessThan(linksBox.y)
+    }
+  }
 })
 
 test('Móvil: todos los grupos, foco y anclas desde otra página', async ({
@@ -163,12 +195,10 @@ test('Móvil: todos los grupos, foco y anclas desde otra página', async ({
   await dialog
     .getByRole('link', { name: 'Marca destacada', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/#marca-destacada$/)
+  await expect(page).toHaveURL('/tienda?marca=atelier-01')
   await expect(dialog).not.toBeVisible()
-  await expect(page.locator('#marca-destacada')).toBeFocused()
-  await expect
-    .poll(async () => (await page.locator('#marca-destacada').boundingBox())!.y)
-    .toBeGreaterThanOrEqual(72)
+  await expect(page.locator('main')).toBeFocused()
+  await expect(page.locator('.product-card')).toHaveCount(2)
   await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
 })
 
@@ -180,7 +210,7 @@ test('Hover desktop permite recorrer el panel y cierra al abandonarlo', async ({
   await page.locator('#nav-trigger-marcas').hover()
   const panel = page.locator('#nav-panel-marcas')
   await expect(panel).toBeVisible()
-  await panel.getByRole('link', { name: 'FORME', exact: true }).hover()
+  await panel.getByRole('link', { name: 'Forme', exact: true }).hover()
   await expect(panel).toBeVisible()
   const aroma = page.locator('#nav-trigger-aroma-infini')
   await aroma.hover()
@@ -195,7 +225,7 @@ test('Los accesos del header responden sin mostrar cajas de fondo', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/catalogo')
+  await page.goto('/tienda')
   const actions = page.locator('.header-actions .icon-button')
   await expect(actions).toHaveCount(4)
   for (const action of await actions.all()) {

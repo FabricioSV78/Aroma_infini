@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, redirect } from 'react-router'
 import { StoreLayout } from '../components/layout/StoreLayout'
 import { HomePage } from '../features/home/HomePage'
 import { PendingPage } from '../pages/PendingPage'
@@ -30,6 +30,13 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
+        path: 'fuente',
+        lazy: async () => {
+          const module = await import('../pages/FontPreviewPage')
+          return { Component: module.FontPreviewPage }
+        },
+      },
+      {
         index: true,
         loader: () => homeService.getHome(),
         Component: HomePage,
@@ -37,7 +44,14 @@ export const router = createBrowserRouter([
           <p className="container">Preparando la selección…</p>
         ),
       },
-      { path: 'catalogo', loader: catalogLoader, Component: CatalogPage },
+      { path: 'tienda', loader: catalogLoader, Component: CatalogPage },
+      {
+        path: 'catalogo',
+        loader: ({ request }) => {
+          const url = new URL(request.url)
+          return redirect(`/tienda${url.search}${url.hash}`)
+        },
+      },
       { path: 'buscar', loader: catalogLoader, Component: CatalogPage },
       { path: 'marcas', loader: brandsLoader, Component: BrandsPage },
       { path: 'marcas/:slug', loader: brandCatalogRedirectLoader },
@@ -54,16 +68,14 @@ export const router = createBrowserRouter([
       {
         path: 'nosotros',
         lazy: async () => {
-          const module =
-            await import('../features/institutional/InstitutionalPages')
+          const module = await import('../features/institutional/AboutPage')
           return { Component: module.AboutPage }
         },
       },
       {
         path: 'contacto',
         lazy: async () => {
-          const module =
-            await import('../features/institutional/InstitutionalPages')
+          const module = await import('../features/institutional/ContactPage')
           return { Component: module.ContactPage }
         },
       },
@@ -81,14 +93,6 @@ export const router = createBrowserRouter([
           const module =
             await import('../features/institutional/InstitutionalPages')
           return { Component: module.ReturnsPage }
-        },
-      },
-      {
-        path: 'preguntas-frecuentes',
-        lazy: async () => {
-          const module =
-            await import('../features/institutional/InstitutionalPages')
-          return { Component: module.FaqPage }
         },
       },
       {
@@ -164,6 +168,13 @@ export const router = createBrowserRouter([
               return { Component: module.AccountPaymentsPage }
             },
           },
+          {
+            path: 'favoritos',
+            lazy: async () => {
+              const module = await import('../features/account/AccountPages')
+              return { Component: module.AccountFavoritesPage }
+            },
+          },
         ],
       },
       { path: '*', Component: PendingPage },
@@ -174,7 +185,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: (
       <p className="admin-demo-banner" role="status">
-        Preparando el panel de demostración…
+        Cargando el panel…
       </p>
     ),
     lazy: async () => {
@@ -248,14 +259,14 @@ export const router = createBrowserRouter([
       {
         path: 'envios',
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await import('../features/admin/AdminShippingPage')
           return { Component: module.AdminShippingPage }
         },
       },
       {
         path: 'home',
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await import('../features/admin/AdminHomePage')
           return { Component: module.AdminHomePage }
         },
       },

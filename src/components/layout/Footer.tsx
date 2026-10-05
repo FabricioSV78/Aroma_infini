@@ -8,7 +8,7 @@ export function Footer() {
         <div className="footer-top" data-scroll-reveal="stagger">
           <div className="footer-brand">
             <Link to="/" className="wordmark">
-              aroma infini.
+              Aroma Infini.
             </Link>
             <p>Perfumes. Identidad. Descubrimiento.</p>
             <span className="eyebrow">PERÚ</span>
@@ -18,7 +18,7 @@ export function Footer() {
               key={group.title}
               className={`footer-group footer-group--${group.layout ?? 'standard'}`}
             >
-              <h2>{group.title}</h2>
+              <h2 className={group.title === 'Aroma Infini' ? 'brand-label' : undefined}>{group.title}</h2>
               <ul>
                 {group.links.map((link) => (
                   <li key={link.to}>
@@ -37,10 +37,6 @@ export function Footer() {
             <Link to="/libro-de-reclamaciones">Libro de reclamaciones</Link>
           </div>
         </div>
-        <p className="prototype-note" data-scroll-reveal="copy">
-          Propuesta de frontend · Imágenes, marcas, productos y precios
-          ilustrativos. Compras no habilitadas.
-        </p>
       </div>
     </footer>
   )

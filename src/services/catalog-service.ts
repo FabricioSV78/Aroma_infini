@@ -25,7 +25,7 @@ export const orders = [
   { value: 'novedades', label: 'Novedades' },
   { value: 'precio-asc', label: 'Precio: menor a mayor' },
   { value: 'precio-desc', label: 'Precio: mayor a menor' },
-  { value: 'mas-vendidos', label: 'Más vendidos · selección ilustrativa' },
+  { value: 'mas-vendidos', label: 'Más vendidos' },
 ] as const
 export type CatalogOrder = (typeof orders)[number]['value']
 // Clasificación y orden exclusivamente de muestra. No equivalen a ventas reales.

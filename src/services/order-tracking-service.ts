@@ -2,7 +2,7 @@ import type { CheckoutMode, MockOrder } from './checkout-service'
 import { getAdminOrder, type AdminOrderStatus } from './admin-service'
 
 const STORAGE_KEY = 'aroma-infini:order-tracking:v1'
-const REFERENCE_PATTERN = /^AI-DEMO-[A-F0-9]{16}$/
+const REFERENCE_PATTERN = /^AI-(?:DEMO-)?[A-F0-9]{16}$/
 const MAX_RECORDS = 30
 
 export interface TrackingRecord {

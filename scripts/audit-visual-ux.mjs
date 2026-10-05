@@ -9,7 +9,7 @@ const output = `artifacts/visual-ux-audit/${phase}`
 
 const storeRoutes = [
   ['home', '/'],
-  ['catalogo', '/catalogo'],
+  ['tienda', '/tienda'],
   ['busqueda', '/buscar?q=petale'],
   ['marcas', '/marcas'],
   ['marca', '/marcas/forme'],
@@ -30,7 +30,6 @@ const storeRoutes = [
   ['contacto', '/contacto'],
   ['envios', '/envios'],
   ['devoluciones', '/devoluciones'],
-  ['preguntas', '/preguntas-frecuentes'],
   ['privacidad', '/privacidad'],
   ['terminos', '/terminos'],
   ['reclamaciones', '/libro-de-reclamaciones'],

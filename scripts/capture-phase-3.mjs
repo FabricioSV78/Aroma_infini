@@ -10,11 +10,11 @@ try {
       reducedMotion: 'reduce',
     })
     for (const [name, route] of Object.entries({
-      catalogo: '/catalogo',
+      tienda: '/tienda',
       marcas: '/marcas',
       marca: '/marcas/atelier-01',
       busqueda: '/buscar?q=petale',
-      vacio: '/catalogo?max=10',
+      vacio: '/tienda?max=10',
     })) {
       await page.goto('http://127.0.0.1:5173' + route)
       await page.evaluate(() => document.fonts.ready)
@@ -32,7 +32,7 @@ try {
         fullPage: true,
       })
     }
-    await page.goto('http://127.0.0.1:5173/catalogo')
+    await page.goto('http://127.0.0.1:5173/tienda')
     if (width < 1024)
       await page.getByRole('button', { name: /^Filtros/ }).click()
     await page.screenshot({ path: `artifacts/phase-3/filtros-${width}.png` })

@@ -2,10 +2,10 @@ import type { Brand, Product } from '../types/catalog'
 
 // Datos de demostración: no representan marcas, precios ni inventario reales.
 export const brands: Brand[] = [
-  { id: 'atelier', slug: 'atelier-01', name: 'ATELIER 01' },
-  { id: 'forme', slug: 'forme', name: 'FORME' },
-  { id: 'sillage', slug: 'studio-sillage', name: 'STUDIO SILLAGE' },
-  { id: 'matiere', slug: 'matiere-04', name: 'MATIÈRE 04' },
+  { id: 'atelier', slug: 'atelier-01', name: 'Atelier 01' },
+  { id: 'forme', slug: 'forme', name: 'Forme' },
+  { id: 'sillage', slug: 'studio-sillage', name: 'Studio sillage' },
+  { id: 'matiere', slug: 'matiere-04', name: 'Matière 04' },
 ]
 
 export const products: Product[] = [
@@ -53,5 +53,41 @@ export const products: Product[] = [
       { id: 'ambre-50', ml: 50, priceCents: 45000, stock: 0 },
       { id: 'ambre-100', ml: 100, priceCents: 65000, stock: 0 },
     ],
+  },
+  {
+    id: 'neroli',
+    slug: 'neroli-matin',
+    name: 'Néroli Matin',
+    brandId: 'atelier',
+    image: 'neroli',
+    family: 'Cítrico · luminoso',
+    variants: [{ id: 'neroli-75', ml: 75, priceCents: 41000, stock: 6 }],
+  },
+  {
+    id: 'iris',
+    slug: 'iris-velours',
+    name: 'Iris Velours',
+    brandId: 'forme',
+    image: 'iris',
+    family: 'Floral · empolvado',
+    variants: [{ id: 'iris-75', ml: 75, priceCents: 46000, stock: 6 }],
+  },
+  {
+    id: 'figue',
+    slug: 'figue-douce',
+    name: 'Figue Douce',
+    brandId: 'sillage',
+    image: 'figue',
+    family: 'Verde · cremoso',
+    variants: [{ id: 'figue-75', ml: 75, priceCents: 49000, stock: 6 }],
+  },
+  {
+    id: 'santal',
+    slug: 'santal-nuit',
+    name: 'Santal Nuit',
+    brandId: 'matiere',
+    image: 'santal',
+    family: 'Amaderado · especiado',
+    variants: [{ id: 'santal-75', ml: 75, priceCents: 52000, stock: 6 }],
   },
 ]

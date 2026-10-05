@@ -1,189 +1,119 @@
 import { Link } from 'react-router'
+import { useSyncExternalStore } from 'react'
 import { Icon } from '../../components/ui/Icon'
-import { getShippingSettings } from '../../services/admin-service'
+import { adminService } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
-
-interface InstitutionalBreadcrumbProps {
-  current: string
-}
-
-function InstitutionalBreadcrumb({ current }: InstitutionalBreadcrumbProps) {
-  return (
-    <nav
-      className="institutional-breadcrumb"
-      aria-label="Ruta de navegación"
-      data-scroll-reveal="fade"
-    >
-      <Link to="/">Inicio</Link>
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">{current}</span>
-    </nav>
-  )
-}
+import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
 
 interface InstitutionalIntroProps {
-  eyebrow: string
   title: string
   description: string
 }
 
 function InstitutionalIntro({
-  eyebrow,
   title,
   description,
 }: InstitutionalIntroProps) {
   return (
     <header className="institutional-intro" data-scroll-reveal="copy">
-      <p className="eyebrow">{eyebrow}</p>
       <h1>{title}</h1>
       <p>{description}</p>
     </header>
   )
 }
 
-export function AboutPage() {
+function ContactAction({ label = 'Escríbenos' }: { label?: string }) {
   return (
-    <article className="store-page institutional-page institutional-about">
-      <div className="container">
-        <InstitutionalBreadcrumb current="Nosotros" />
-        <InstitutionalIntro
-          eyebrow="Aroma Infini"
-          title="Un espacio para descubrir lo que te representa."
-          description="Una propuesta multimarca para explorar perfumes con claridad, atención y criterio."
-        />
-      </div>
-      <figure className="institutional-about-visual" data-scroll-reveal="image">
-        <img
-          src="/images/editorial-essential-v3-1536.webp"
-          srcSet="/images/editorial-essential-v3-480.webp 480w, /images/editorial-essential-v3-960.webp 960w, /images/editorial-essential-v3-1536.webp 1536w"
-          sizes="100vw"
-          width={1672}
-          height={941}
-          alt="Composición editorial temporal de un perfume sobre piedra y madera"
-        />
-        <figcaption>Imagen conceptual temporal</figcaption>
-      </figure>
-      <div
-        className="container institutional-story-grid"
-        data-scroll-reveal="stagger"
-      >
-        <section aria-labelledby="about-origin">
-          <span>01</span>
-          <p className="eyebrow">Descubrimiento</p>
-          <h2 id="about-origin">Elegir desde lo que sientes.</h2>
-          <p>
-            Empieza por una familia olfativa, una firma o una forma de llevar el
-            perfume.
-          </p>
-        </section>
-        <section aria-labelledby="about-selection">
-          <span>02</span>
-          <p className="eyebrow">Criterio de selección</p>
-          <h2 id="about-selection">Elegir con intención.</h2>
-          <p>
-            La propuesta parte de una selección multimarca clara y de una forma
-            cercana de acompañar el descubrimiento de cada perfume.
-          </p>
-        </section>
-        <section aria-labelledby="about-attention">
-          <span>03</span>
-          <p className="eyebrow">Claridad</p>
-          <h2 id="about-attention">Entender antes de elegir.</h2>
-          <p>
-            Cada ficha prioriza presentación, precio, familia y disponibilidad
-            para facilitar la comparación.
-          </p>
-        </section>
-      </div>
-      <div
-        className="institutional-closing container"
-        data-scroll-reveal="copy"
-      >
-        <p>Una selección breve, pensada para descubrir sin prisa.</p>
-        <Link className="button button--primary" to="/catalogo">
-          Explorar perfumes <Icon name="arrow" />
-        </Link>
-      </div>
-    </article>
-  )
-}
-
-export function ContactPage() {
-  return (
-    <article className="store-page institutional-page container">
-      <InstitutionalBreadcrumb current="Contacto" />
-      <InstitutionalIntro
-        eyebrow="Conversemos"
-        title="Tu elección puede empezar con una conversación."
-        description="Publicaremos aquí el canal y el horario de atención cuando estén confirmados. Esta propuesta todavía no recibe mensajes."
-      />
-      <div className="institutional-contact-grid" data-scroll-reveal="stagger">
-        <section aria-labelledby="contact-guidance">
-          <p className="eyebrow">Mientras tanto</p>
-          <h2 id="contact-guidance">Encuentra una primera orientación.</h2>
-          <p>
-            Revisa la selección por marca, familia y presentación para comparar
-            cada propuesta con claridad.
-          </p>
-          <Link className="text-link" to="/catalogo">
-            Ir al catálogo <Icon name="arrow" />
-          </Link>
-        </section>
-        <aside className="institutional-contact-note" role="note">
-          <p className="eyebrow">Canales en preparación</p>
-          <p>El canal y el horario se mostrarán juntos cuando estén listos.</p>
-        </aside>
-      </div>
-    </article>
+    <Link className="button button--primary" to="/contacto">
+      {label} <Icon name="arrow" />
+    </Link>
   )
 }
 
 export function ShippingPage() {
-  const shipping = getShippingSettings()
-  const activeZones = shipping.zones.filter((zone) => zone.active)
+  const shipping = useSyncExternalStore(
+    adminService.subscribe,
+    adminService.getSnapshot,
+  ).shipping
   return (
-    <article className="store-page institutional-page container">
+    <article className="store-page institutional-page institutional-shipping container">
       <InstitutionalBreadcrumb current="Envíos y entregas" />
       <InstitutionalIntro
-        eyebrow="Entrega en Perú"
-        title="Lo esencial para recibir tu pedido."
-        description={`Envíos en las zonas habilitadas, gratis desde ${formatPEN(shipping.freeThresholdCents)}.`}
+        title="Tu pedido, de principio a fin."
+        description="Enviamos a todo el Perú."
       />
-      <div
-        className="institutional-facts"
-        aria-label="Datos confirmados de entrega"
-        data-scroll-reveal="stagger"
-      >
-        <section>
-          <span>01</span>
-          <h2>Cobertura</h2>
-          <p>
-            {activeZones.length
-              ? activeZones.map((zone) => zone.name).join(', ')
-              : 'Cobertura temporalmente no disponible.'}
+      <div className="shipping-editorial-layout">
+        <section
+          className="shipping-rate-card"
+          aria-labelledby="shipping-rates-title"
+          data-scroll-reveal="copy"
+        >
+          <div className="shipping-card-heading">
+            <Icon name="truck" />
+            <h2 id="shipping-rates-title">Tarifas y plazos</h2>
+          </div>
+          <dl className="institutional-shipping-summary">
+            <div>
+              <dt>Tarifa base</dt>
+              <dd>{formatPEN(shipping.nationalCourierFeeCents)}</dd>
+            </div>
+            {shipping.freeThresholdCents > 0 ? (
+              <div>
+                <dt>Envío gratis desde</dt>
+                <dd>{formatPEN(shipping.freeThresholdCents)}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Plazo estimado</dt>
+              <dd>{shipping.nationalEstimate}</dd>
+            </div>
+          </dl>
+          <p className="shipping-rate-note">
+            Confirma el costo y el plazo para tu dirección antes de pagar.
           </p>
         </section>
-        <section>
-          <span>02</span>
-          <h2>Envío gratis</h2>
-          <p>Disponible desde {formatPEN(shipping.freeThresholdCents)}.</p>
+        <section
+          className="shipping-journey"
+          aria-labelledby="shipping-journey-title"
+          data-scroll-reveal="copy"
+        >
+          <h2 id="shipping-journey-title">Así llega tu pedido</h2>
+          <ol>
+            <li>
+              <span aria-hidden="true">01</span>
+              <div>
+                <h3>Indica tu destino</h3>
+                <p>Elige dónde recibirlo.</p>
+              </div>
+            </li>
+            <li>
+              <span aria-hidden="true">02</span>
+              <div>
+                <h3>Revisa tu entrega</h3>
+                <p>Consulta el costo y el plazo.</p>
+              </div>
+            </li>
+            <li>
+              <span aria-hidden="true">03</span>
+              <div>
+                <h3>Sigue tu pedido</h3>
+                <p>Revisa su estado con tu código.</p>
+                <Link className="text-link" to="/seguir-pedido">
+                  Seguir mi pedido <Icon name="arrow" />
+                </Link>
+              </div>
+            </li>
+          </ol>
         </section>
-        {activeZones.map((zone, index) => (
-          <section key={zone.id}>
-            <span>{String(index + 3).padStart(2, '0')}</span>
-            <h2>{zone.name}</h2>
-            <p>{zone.estimate}.</p>
-          </section>
-        ))}
       </div>
-      <aside className="institutional-pending-note" data-scroll-reveal="copy">
-        <p className="eyebrow">Operación pendiente</p>
-        <p>
-          El courier, las tarifas por destino, los días hábiles o calendario y
-          las posibles restricciones se publicarán después de su validación.
-          Aroma Infini operará únicamente con delivery; no se ha confirmado
-          recojo.
-        </p>
+      <aside className="shipping-help" data-scroll-reveal="copy">
+        <div>
+          <Icon name="chat" />
+          <p>¿Dudas sobre tu entrega?</p>
+        </div>
+        <Link className="text-link" to="/contacto">
+          Consultar entrega <Icon name="arrow" />
+        </Link>
       </aside>
     </article>
   )
@@ -194,117 +124,66 @@ export function ReturnsPage() {
     <article className="store-page institutional-page container">
       <InstitutionalBreadcrumb current="Cambios y devoluciones" />
       <InstitutionalIntro
-        eyebrow="Política en revisión"
         title="Cambios y devoluciones."
-        description="La política comercial todavía está en revisión. Publicaremos plazos, condiciones y canales antes de habilitar las ventas."
+        description="Si necesitas ayuda con un producto o un pedido, cuéntanos qué ocurrió para revisar tu caso."
       />
-      <p
-        className="institutional-legal-warning"
-        role="note"
-        data-scroll-reveal="copy"
+      <div
+        className="institutional-legal-sections"
+        data-scroll-reveal="stagger"
       >
-        Aún no se reciben solicitudes desde esta propuesta. La versión comercial
-        mostrará la política aprobada y su canal de atención.
-      </p>
-    </article>
-  )
-}
-
-export function FaqPage() {
-  const shipping = getShippingSettings()
-  const activeZones = shipping.zones.filter((zone) => zone.active)
-  const faqItems = [
-    {
-      question: '¿Realizan envíos en Perú?',
-      answer: activeZones.length
-        ? `La demostración tiene cobertura configurada para ${activeZones.map((zone) => zone.name).join(', ')}.`
-        : 'La cobertura todavía no está configurada.',
-    },
-    {
-      question: '¿Cuándo aplica el envío gratis?',
-      answer: `La referencia configurada es desde ${formatPEN(shipping.freeThresholdCents)}. Sus condiciones finales se definirán antes de habilitar ventas.`,
-    },
-    {
-      question: '¿Cuánto demora una entrega?',
-      answer: activeZones.length
-        ? activeZones
-            .map((zone) => `${zone.name}: ${zone.estimate.toLowerCase()}`)
-            .join(' · ')
-        : 'Los tiempos todavía no están configurados.',
-    },
-    {
-      question: '¿Puedo comprar desde esta propuesta?',
-      answer:
-        'No. El catálogo, carrito, checkout y seguimiento actuales son una demostración frontend sin cobros ni pedidos reales.',
-    },
-  ]
-  return (
-    <article className="store-page institutional-page container">
-      <InstitutionalBreadcrumb current="Preguntas frecuentes" />
-      <InstitutionalIntro
-        eyebrow="Información esencial"
-        title="Respuestas breves para avanzar con claridad."
-        description="Consulta envíos, tiempos y alcance de esta propuesta."
-      />
-      <div className="institutional-faq" data-scroll-reveal="stagger">
-        {faqItems.map((item) => (
-          <details key={item.question}>
-            <summary>{item.question}</summary>
-            <p>{item.answer}</p>
-          </details>
-        ))}
+        <section>
+          <span>01</span>
+          <h2>Comparte tu consulta</h2>
+          <p>Indícanos el producto y, si lo tienes, el código de pedido.</p>
+        </section>
+        <section>
+          <span>02</span>
+          <h2>Conversemos</h2>
+          <p>
+            Revisaremos la información que nos proporciones y te orientaremos.
+          </p>
+        </section>
+      </div>
+      <div className="institutional-legal-warning" data-scroll-reveal="copy">
+        <ContactAction />
       </div>
     </article>
   )
 }
 
-interface LegalSection {
-  title: string
-  copy: string
-}
-
-interface LegalPageProps {
-  current: string
-  eyebrow: string
-  title: string
-  description: string
-  sections: LegalSection[]
-}
-
-function LegalPage({
+function InformationPage({
   current,
-  eyebrow,
   title,
   description,
   sections,
-}: LegalPageProps) {
+}: InstitutionalIntroProps & {
+  current: string
+  sections: { title: string; body: string }[]
+}) {
   return (
     <article className="store-page institutional-page institutional-legal container">
       <InstitutionalBreadcrumb current={current} />
       <InstitutionalIntro
-        eyebrow={eyebrow}
         title={title}
         description={description}
       />
-      <p
-        className="institutional-legal-warning"
-        role="note"
-        data-scroll-reveal="copy"
-      >
-        Borrador estructural · Requiere contenido y validación legal antes de su
-        publicación.
-      </p>
       <div
         className="institutional-legal-sections"
         data-scroll-reveal="stagger"
       >
         {sections.map((section, index) => (
-          <section key={section.title} aria-labelledby={`legal-${index}`}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <h2 id={`legal-${index}`}>{section.title}</h2>
-            <p>{section.copy}</p>
+          <section key={section.title}>
+            <span>0{index + 1}</span>
+            <h2>{section.title}</h2>
+            <p>{section.body}</p>
           </section>
         ))}
+        <section>
+          <span>0{sections.length + 1}</span>
+          <h2>Consultas</h2>
+          <p>Si necesitas ayuda con esta información, puedes escribirnos.</p>
+          <ContactAction />
+        </section>
       </div>
     </article>
   )
@@ -312,27 +191,18 @@ function LegalPage({
 
 export function PrivacyPage() {
   return (
-    <LegalPage
+    <InformationPage
       current="Privacidad"
-      eyebrow="Documento pendiente"
       title="Privacidad."
-      description="La política definitiva deberá identificar al responsable, los datos tratados, sus finalidades, bases aplicables, conservación y canales para ejercer derechos."
+      description="Conoce qué información compartes al usar la tienda."
       sections={[
         {
-          title: 'Responsable y contacto',
-          copy: 'Razón social, identificación y canal de privacidad pendientes.',
+          title: 'Datos que proporcionas',
+          body: 'Al realizar una compra, introduces tus datos de contacto y entrega. En la cuenta puedes editar tu perfil y dirección.',
         },
         {
-          title: 'Datos y finalidades',
-          copy: 'Alcance sujeto a la arquitectura final de cuenta, pedidos, pagos y atención.',
-        },
-        {
-          title: 'Proveedores y conservación',
-          copy: 'Plazos, encargados y transferencias pendientes de definición técnica y legal.',
-        },
-        {
-          title: 'Derechos',
-          copy: 'Procedimiento y canal de ejercicio pendientes de validación.',
+          title: 'Información en este navegador',
+          body: 'La cuenta y las preferencias de compra se conservan durante la sesión en este navegador para que puedas continuar donde quedaste.',
         },
       ]}
     />
@@ -341,27 +211,18 @@ export function PrivacyPage() {
 
 export function TermsPage() {
   return (
-    <LegalPage
+    <InformationPage
       current="Términos y condiciones"
-      eyebrow="Documento pendiente"
       title="Términos y condiciones."
-      description="La estructura está preparada para las condiciones comerciales reales. Ningún texto de esta vista constituye todavía una condición de venta."
+      description="Revisa la información disponible antes de confirmar tu pedido."
       sections={[
         {
-          title: 'Identificación del proveedor',
-          copy: 'Razón social, RUC, domicilio y canales pendientes.',
+          title: 'Productos y precios',
+          body: 'Cada ficha muestra las presentaciones disponibles, su precio y la descripción del perfume.',
         },
         {
-          title: 'Catálogo y precios',
-          copy: 'Disponibilidad, moneda, vigencia y corrección de información pendientes.',
-        },
-        {
-          title: 'Pago y confirmación',
-          copy: 'Condiciones sujetas a la integración final con Mercado Pago y el backend.',
-        },
-        {
-          title: 'Entrega y posventa',
-          copy: 'Cobertura, plazos, cambios, devoluciones y reclamos pendientes.',
+          title: 'Pedido y entrega',
+          body: 'En el proceso de compra puedes revisar los artículos, el destino, el costo de envío y el total antes de continuar.',
         },
       ]}
     />
@@ -370,26 +231,20 @@ export function TermsPage() {
 
 export function ComplaintsBookPage() {
   return (
-    <article className="store-page institutional-page container">
-      <InstitutionalBreadcrumb current="Libro de reclamaciones" />
-      <InstitutionalIntro
-        eyebrow="Implementación pendiente"
-        title="Libro de reclamaciones."
-        description="El formulario oficial no está habilitado en esta propuesta. Requiere la identificación legal del proveedor, numeración, tratamiento seguro y un canal real de recepción."
-      />
-      <div
-        className="institutional-complaints-state"
-        role="note"
-        data-scroll-reveal="copy"
-      >
-        <p className="eyebrow">Sin envío de datos</p>
-        <h2>Esta vista no registra reclamos.</h2>
-        <p>
-          La versión comercial deberá implementarse con respaldo de servidor,
-          constancia y contenido legal aprobado. No añadimos un formulario que
-          pueda hacer creer que una solicitud fue recibida.
-        </p>
-      </div>
-    </article>
+    <InformationPage
+      current="Libro de reclamaciones"
+      title="Libro de reclamaciones."
+      description="Comunícanos una incidencia o consulta relacionada con tu experiencia de compra."
+      sections={[
+        {
+          title: 'Cuéntanos qué ocurrió',
+          body: 'Describe tu consulta con claridad e indica el producto o servicio al que se refiere.',
+        },
+        {
+          title: 'Incluye tu pedido',
+          body: 'Si tu consulta está relacionada con una compra, agrega el código de pedido que aparece en la confirmación.',
+        },
+      ]}
+    />
   )
 }

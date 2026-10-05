@@ -3,7 +3,9 @@ import {
   catalogService,
   readCatalogQuery,
 } from '../../services/catalog-service'
+import { hydrateAdminStore } from '../../services/admin-service'
 export async function catalogLoader({ request, params }: LoaderFunctionArgs) {
+  await hydrateAdminStore()
   const query = readCatalogQuery(new URL(request.url).searchParams)
   try {
     const brands = await catalogService.getBrands()
@@ -19,6 +21,7 @@ export async function catalogLoader({ request, params }: LoaderFunctionArgs) {
   }
 }
 export async function brandsLoader() {
+  await hydrateAdminStore()
   try {
     return { kind: 'ready' as const, brands: await catalogService.getBrands() }
   } catch {
@@ -29,12 +32,13 @@ export async function brandsLoader() {
 export async function brandCatalogRedirectLoader({
   params,
 }: LoaderFunctionArgs) {
+  await hydrateAdminStore()
   try {
     const brand = (await catalogService.getBrands()).find(
       (item) => item.slug === params.slug,
     )
     if (!brand) return redirect('/marcas')
-    return redirect(`/catalogo?marca=${encodeURIComponent(brand.slug)}`)
+    return redirect(`/tienda?marca=${encodeURIComponent(brand.slug)}`)
   } catch {
     return redirect('/marcas')
   }

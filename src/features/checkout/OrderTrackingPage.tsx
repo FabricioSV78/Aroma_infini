@@ -28,13 +28,13 @@ function OrderStatus({ record }: { record: TrackingRecord }) {
         <div>
           <p className="eyebrow">{record.reference}</p>
           <h2 id="tracking-result-title">
-            Pedido de prueba: {accountStatusLabels[record.status].toLowerCase()}
+            Estado: {accountStatusLabels[record.status].toLowerCase()}
             .
           </h2>
         </div>
         <span>{dateFormatter.format(new Date(record.placedAt))}</span>
       </div>
-      <ol className="tracking-steps" aria-label="Estado del pedido de prueba">
+      <ol className="tracking-steps" aria-label="Estado del pedido">
         {accountStatusOrder.map((status, index) => (
           <li
             key={status}
@@ -46,8 +46,7 @@ function OrderStatus({ record }: { record: TrackingRecord }) {
         ))}
       </ol>
       <p className="tracking-note">
-        Este seguimiento pertenece a la demostración y refleja los cambios
-        realizados en el panel durante esta sesión.
+        El estado refleja la información guardada durante esta sesión.
       </p>
     </section>
   )
@@ -80,7 +79,6 @@ export function OrderTrackingPage() {
         <span aria-current="page">Seguir pedido</span>
       </nav>
       <header className="tracking-heading" data-scroll-reveal="copy">
-        <p className="eyebrow">Seguimiento de demostración</p>
         <h1>Tu pedido, a la vista.</h1>
         <p>Consulta el estado con el código que aparece en la confirmación.</p>
       </header>
@@ -99,7 +97,7 @@ export function OrderTrackingPage() {
             spellCheck={false}
             maxLength={32}
             defaultValue={code}
-            placeholder="AI-DEMO-…"
+            placeholder="AI-…"
             required
           />
           <button className="button button--primary" type="submit">
@@ -109,13 +107,13 @@ export function OrderTrackingPage() {
       </form>
       <p className="sr-only" role="status">
         {record
-          ? `Pedido de prueba encontrado. Estado: ${accountStatusLabels[record.status]}.`
+          ? `Pedido encontrado. Estado: ${accountStatusLabels[record.status]}.`
           : ''}
       </p>
       {record ? <OrderStatus record={record} /> : null}
       {code && !record ? (
         <p className="tracking-not-found" role="status">
-          No encontramos ese pedido de prueba en este navegador. Revisa el
+          No encontramos ese pedido en este navegador. Revisa el
           código de la confirmación.
         </p>
       ) : null}

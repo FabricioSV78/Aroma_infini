@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const breadcrumbRoutes = [
-  ['/catalogo', '.catalog-breadcrumb'],
+  ['/tienda', '.catalog-breadcrumb'],
   ['/marcas', '.catalog-breadcrumb'],
   ['/producto/petale-nu', '.product-breadcrumb'],
   ['/cuenta', '.account-breadcrumb'],
@@ -56,7 +56,7 @@ for (const width of [390, 768, 1440]) {
 test('La tienda y el panel usan una sola familia tipográfica', async ({
   page,
 }) => {
-  for (const route of ['/', '/catalogo', '/producto/petale-nu', '/admin']) {
+  for (const route of ['/', '/tienda', '/producto/petale-nu', '/admin']) {
     await page.goto(route)
     const families = await page.evaluate(() => {
       const visibleTextElements = [

@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import type { ResolvedCartLine } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
+import { imageSource } from '../../services/image-source'
 import { useCart } from './cart-context'
 
 interface CartLineProps {
@@ -47,7 +48,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
         aria-label={`Ver ${product.name}`}
       >
         <img
-          src={`/images/${product.image}-480.webp`}
+          src={imageSource(product.image)}
           width={480}
           height={600}
           loading="lazy"
@@ -56,7 +57,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
         />
       </Link>
       <div className="cart-line-main">
-        <p className="eyebrow">{brand?.name}</p>
+        <p className="eyebrow brand-label">{brand?.name}</p>
         <h3>
           <Link to={`/producto/${product.slug}`}>{product.name}</Link>
         </h3>
