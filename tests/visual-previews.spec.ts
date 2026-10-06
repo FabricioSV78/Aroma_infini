@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test'
 
 test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) => {
-  test.setTimeout(90_000)
-  for (const width of [390, 768, 1440]) {
-    await page.setViewportSize({ width, height: 900 })
+  test.setTimeout(120_000)
+  for (const { width, height } of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+    { width: 1904, height: 947 },
+  ]) {
+    await page.setViewportSize({ width, height })
 
     await page.goto('/')
     await expect(
@@ -18,6 +23,10 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
     const productNotice = page.locator('.product-popularity-preview')
     await expect(productNotice).toBeVisible()
     await productNotice.getByRole('button', { name: /Cerrar aviso/ }).click()
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+    await page.screenshot({
+      path: `artifacts/review-product-intro-${width}.png`,
+    })
     const information = page.locator('#informacion-producto')
     await information.evaluate((element) => {
       const top = element.getBoundingClientRect().top + window.scrollY

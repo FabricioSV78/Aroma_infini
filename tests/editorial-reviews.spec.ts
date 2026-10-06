@@ -41,6 +41,35 @@ test('El video usa un archivo panorámico en escritorio y uno vertical en móvil
     .toBe(1280)
 })
 
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 768, height: 900 },
+  { width: 1440, height: 900 },
+  { width: 1904, height: 947 },
+]) {
+  test(`El video conserva el encuadre completo a ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+
+    const section = page.locator('.editorial-film')
+    const media = page.locator('.editorial-film-media')
+    await section.scrollIntoViewIfNeeded()
+
+    await expect(media.locator('video')).toHaveCSS('object-fit', 'contain')
+    await expect(media.locator('img')).toHaveCSS('object-fit', 'contain')
+    const bounds = await section.boundingBox()
+    const layoutWidth = await page.evaluate(() => document.body.clientWidth)
+    expect(bounds?.width).toBeCloseTo(layoutWidth, 0)
+    expect(bounds?.height).toBeLessThanOrEqual(viewport.height)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(viewport.width)
+  })
+}
+
 test('Un visitante debe acceder a su cuenta antes de escribir', async ({
   page,
 }) => {
@@ -185,8 +214,9 @@ for (const width of [320, 390, 768, 1440]) {
       await section.scrollIntoViewIfNeeded()
       if (route === '/') {
         const bounds = await page.locator('.editorial-film-media').boundingBox()
+        const layoutWidth = await page.evaluate(() => document.body.clientWidth)
         expect(bounds?.x).toBe(0)
-        expect(bounds?.width).toBe(width)
+        expect(bounds?.width).toBe(layoutWidth)
       }
       expect(
         await page.evaluate(

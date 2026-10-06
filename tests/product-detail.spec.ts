@@ -324,6 +324,49 @@ test('Reseñas y recomendaciones comparten el ancho de la ficha sin agrandar las
   }
 })
 
+test('La ficha aprovecha monitores amplios y conserva proporciones de laptop', async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 1366, height: 768 },
+    { width: 1904, height: 947 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto('/producto/petale-nu')
+
+    const intro = await page.locator('.product-intro').boundingBox()
+    const breadcrumb = await page.locator('.product-breadcrumb').boundingBox()
+    const gallery = await page.locator('.product-gallery-track').boundingBox()
+    const purchase = await page.locator('.product-purchase').boundingBox()
+    const layoutWidth = await page.evaluate(() => document.body.clientWidth)
+
+    expect(intro).not.toBeNull()
+    expect(breadcrumb?.x).toBeCloseTo(intro?.x ?? 0, 0)
+    expect(breadcrumb?.width).toBeCloseTo(intro?.width ?? 0, 0)
+    expect(intro?.x).toBeCloseTo(
+      layoutWidth - ((intro?.x ?? 0) + (intro?.width ?? 0)),
+      0,
+    )
+    expect((gallery?.x ?? 0) + (gallery?.width ?? 0)).toBeLessThan(
+      purchase?.x ?? 0,
+    )
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(viewport.width)
+
+    if (viewport.width >= 1600) {
+      expect(intro?.width).toBeGreaterThanOrEqual(1600)
+      expect(intro?.width).toBeLessThanOrEqual(1680)
+      expect(gallery?.width).toBeGreaterThanOrEqual(520)
+      expect(gallery?.width).toBeLessThanOrEqual(560)
+      expect(purchase?.width).toBeLessThanOrEqual(640)
+    } else {
+      expect(intro?.width).toBeLessThanOrEqual(1280)
+      expect(gallery?.width).toBeLessThanOrEqual(520)
+    }
+  }
+})
+
 test('Las reseñas numerosas se muestran por tandas y conservan el foco', async ({
   page,
 }) => {

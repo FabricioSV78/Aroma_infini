@@ -32,7 +32,8 @@
   --space-16: 64px;
   --space-24: 96px;
   --space-32: 128px;
-  --container: 1280px;
+  /* Mantiene la escala de laptop y crece gradualmente en monitores amplios. */
+  --container: clamp(1280px, calc(100vw - 80px), 1680px);
   --gutter: 16px;
   --section-space: 64px;
   --header-height: 72px;

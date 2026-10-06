@@ -182,7 +182,7 @@
   text-underline-offset: 4px;
 }
 
-@media (max-width: 359px) {
+@media (max-width: 399px) {
   .contact-help-panel {
     right: 12px;
     left: 12px;

@@ -57,7 +57,7 @@ Con Vite activo, `node scripts/capture-hero-review.mjs` genera capturas de las t
 
 La Fase 3 está disponible en `/catalogo`, `/marcas`, `/marcas/:slug` y `/buscar?q=petale`. La Fase 4 está en `/producto/:slug`. La Fase 5 añade `/favoritos` y `/carrito`. La Fase 6 incorpora `/checkout`, `/checkout/confirmacion` y `/seguir-pedido` como simulación preparada para Mercado Pago. La Fase 7 completa `/cuenta` y sus vistas privadas de demostración. La Fase 8 incorpora `/nosotros`, contacto, entregas, devoluciones, preguntas frecuentes y estructuras legales pendientes. La Fase 9 añade `/admin` y sus módulos de productos, marcas, categorías, pedidos, clientes, promociones, envíos y Home. Las reseñas permanecen ocultas hasta disponer de testimonios reales.
 
-El resultado de Vite es estático y no depende de un servidor propio. No se han configurado Cloudflare, Workers, Pages Functions, R2 ni Supabase. Al autorizar el despliegue habrá que configurar y comprobar el fallback SPA del alojamiento para las rutas de React Router; no se ha publicado nada.
+El resultado de Vite es estático y no depende de un servidor propio. El entorno de validación está preparado como Worker de activos estáticos con fallback SPA, cabeceras de seguridad y configuración independiente de `staging`; consulta [CLOUDFLARE_STAGING.md](docs/CLOUDFLARE_STAGING.md). R2, Supabase, pagos y cualquier backend continúan deliberadamente fuera de este despliegue frontend.
 
 La entrega anterior está en [PHASE_1_2_DELIVERY.md](docs/PHASE_1_2_DELIVERY.md). El usuario autorizó continuar con la Fase 3 manteniendo la Home. Su entrega y límites están en [PHASE_3_DELIVERY.md](docs/PHASE_3_DELIVERY.md). Capturas: `node scripts/capture-phase-3.mjs` con Vite activo.
 

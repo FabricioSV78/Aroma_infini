@@ -18,18 +18,21 @@ export function FontPreviewPage() {
   async function selectFont(id: FontId) {
     const sequence = ++request.current
     const font = fontOptions.find((option) => option.id === id)!
+    const previousSelection = selected
+    setSelected(id)
     setStatus(`Cargando ${font.name}…`)
     try {
       await document.fonts.load(`400 16px "${font.name}"`)
       if (sequence !== request.current) return
       const saved = applyFontPreference(id)
-      setSelected(id)
       setStatus(
         `${font.name} aplicada.${saved ? ' Selección guardada en este navegador.' : ' No se pudo guardar; se mantendrá mientras navegues sin recargar.'}`,
       )
     } catch {
-      if (sequence === request.current)
+      if (sequence === request.current) {
+        setSelected(previousSelection)
         setStatus('No se pudo cargar la fuente. Inténtalo de nuevo.')
+      }
     }
   }
 

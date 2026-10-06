@@ -65,6 +65,7 @@ section[tabindex]:focus {
 }
 .container {
   width: min(calc(100% - var(--gutter) * 2), var(--container));
+  max-width: var(--container);
   margin-inline: auto;
 }
 .section {

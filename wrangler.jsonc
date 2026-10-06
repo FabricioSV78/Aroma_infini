@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aroma-infini-frontend",
+  "compatibility_date": "2026-10-05",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "none",
+    "not_found_handling": "single-page-application",
+  },
+  "env": {
+    "staging": {
+      "name": "aroma-infini-frontend-staging",
+      "workers_dev": true,
+      "preview_urls": true,
+    },
+  },
+}
