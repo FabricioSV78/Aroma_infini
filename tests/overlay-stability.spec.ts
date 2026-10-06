@@ -70,6 +70,8 @@ for (const width of [390, 768, 1440]) {
     ]
     for (const item of cases) {
       await page.goto(item.route)
+      if (item.trigger === 'Escribir una reseña')
+        await page.getByRole('tab', { name: 'Reseñas' }).click()
       await expect(page.locator(item.anchor)).toBeVisible()
       const trigger = page.getByRole('button', {
         name: item.trigger,

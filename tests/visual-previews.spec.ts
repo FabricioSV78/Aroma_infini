@@ -38,6 +38,7 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
       path: `artifacts/review-product-family-${width}.png`,
     })
 
+    await page.getByRole('tab', { name: 'Reseñas' }).click()
     const reviews = page.locator('.product-reviews-preview')
     await reviews.evaluate((element) => {
       const top = element.getBoundingClientRect().top + window.scrollY
@@ -72,7 +73,9 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
     })
 
     await page.goto('/admin/envios')
-    await expect(page.getByRole('heading', { name: 'Todo el Perú' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Todo el Perú' }),
+    ).toBeVisible()
     await page.screenshot({
       path: `artifacts/review-admin-shipping-${width}.png`,
       fullPage: true,

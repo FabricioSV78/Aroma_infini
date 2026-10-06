@@ -1,6 +1,13 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { getProductReviews } from '../src/mocks/product-reviews'
 import { products } from '../src/mocks/home'
+
+async function openReviews(page: Page) {
+  const tab = page.getByRole('tab', { name: 'Reseñas' })
+  await tab.click()
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('#product-info-panel-reviews')).toBeVisible()
+}
 
 test('Los ocho perfumes incluyen 50 opiniones coherentes con sus presentaciones', () => {
   for (const product of products) {
@@ -74,6 +81,7 @@ test('Un visitante debe acceder a su cuenta antes de escribir', async ({
   page,
 }) => {
   await page.goto('/producto/petale-nu')
+  await openReviews(page)
   const trigger = page.getByRole('button', { name: 'Escribir una reseña' })
   await trigger.click()
   const dialog = page.getByRole('dialog', { name: 'Inicia sesión para opinar' })
@@ -93,6 +101,7 @@ test('Con 50 reseñas la lista mantiene tres filas y permite saltar a la última
   page,
 }) => {
   await page.goto('/producto/petale-nu')
+  await openReviews(page)
   const section = page.locator('.product-reviews-preview')
   const rows = section.locator('.product-review-list > li')
   await expect(rows).toHaveCount(3)
@@ -161,6 +170,7 @@ test('Reseñas: filtrar, ordenar, añadir y conservar una opinión local', async
   await page.goto('/cuenta')
   await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await page.goto('/producto/petale-nu')
+  await openReviews(page)
   const section = page.locator('.product-reviews-preview')
   await section.scrollIntoViewIfNeeded()
   await section.getByRole('button', { name: /^4 estrellas:/ }).click()
@@ -190,6 +200,7 @@ test('Reseñas: filtrar, ordenar, añadir y conservar una opinión local', async
     section.getByRole('heading', { name: 'Un aroma suave' }),
   ).toBeVisible()
   await page.reload()
+  await openReviews(page)
   await expect(
     section.getByRole('heading', { name: 'Un aroma suave' }),
   ).toBeVisible()
@@ -208,6 +219,7 @@ for (const width of [320, 390, 768, 1440]) {
     await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
     for (const route of ['/', '/producto/petale-nu']) {
       await page.goto(route)
+      if (route !== '/') await openReviews(page)
       const section = page.locator(
         route === '/' ? '.editorial-film' : '.product-reviews-preview',
       )

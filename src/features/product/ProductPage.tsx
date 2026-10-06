@@ -21,7 +21,7 @@ interface ProductReadyProps {
   brands: Brand[]
 }
 
-const productInfoTabs = ['family', 'description'] as const
+const productInfoTabs = ['family', 'description', 'reviews'] as const
 type ProductInfoTab = (typeof productInfoTabs)[number]
 
 function ProductReady({
@@ -186,6 +186,12 @@ function ProductReady({
             >
               Descripción <span aria-hidden="true">↓</span>
             </a>
+            <a
+              href="#informacion-producto"
+              onClick={() => setActiveInfoTab('reviews')}
+            >
+              Reseñas <span aria-hidden="true">↓</span>
+            </a>
           </nav>
         </section>
       </div>
@@ -222,6 +228,18 @@ function ProductReady({
           >
             Descripción
           </button>
+          <button
+            id="product-info-tab-reviews"
+            type="button"
+            role="tab"
+            aria-selected={activeInfoTab === 'reviews'}
+            aria-controls="product-info-panel-reviews"
+            tabIndex={activeInfoTab === 'reviews' ? 0 : -1}
+            onClick={() => setActiveInfoTab('reviews')}
+            onKeyDown={(event) => handleInfoTabKeyDown(event, 'reviews')}
+          >
+            Reseñas
+          </button>
         </div>
 
         <div
@@ -243,9 +261,20 @@ function ProductReady({
         >
           <p className="product-description-copy">{detail.description}</p>
         </div>
-      </section>
 
-      <ProductReviewsPreview productId={product.id} sizes={[...new Set(product.variants.map((variant) => variant.ml))]} />
+        <div
+          id="product-info-panel-reviews"
+          className="product-info-panel product-info-panel--reviews"
+          role="tabpanel"
+          aria-labelledby="product-info-tab-reviews"
+          hidden={activeInfoTab !== 'reviews'}
+        >
+          <ProductReviewsPreview
+            productId={product.id}
+            sizes={[...new Set(product.variants.map((variant) => variant.ml))]}
+          />
+        </div>
+      </section>
       <ProductPopularityPreview
         productImage={product.image}
         productName={product.name}

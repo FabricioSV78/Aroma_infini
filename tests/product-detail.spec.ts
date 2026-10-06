@@ -135,6 +135,9 @@ test('Móvil usa controles táctiles de galería y mantiene la compra cerca', as
   )
   await expect(page.locator('#product-info-panel-description')).toBeVisible()
   await expect(page.locator('#product-info-panel-family')).toBeHidden()
+  await page.getByRole('tab', { name: 'Reseñas' }).click()
+  await expect(page.locator('#product-info-panel-reviews')).toBeVisible()
+  await expect(page.locator('#product-info-panel-description')).toBeHidden()
 })
 
 test('La primera vista muestra imagen, presentación y compra sin desplazarse', async ({
@@ -224,8 +227,10 @@ test('Los accesos internos abren un único detalle con contenido intercambiable'
   const information = page.locator('#informacion-producto')
   const familyTab = page.getByRole('tab', { name: 'Familia olfativa' })
   const descriptionTab = page.getByRole('tab', { name: 'Descripción' })
+  const reviewsTab = page.getByRole('tab', { name: 'Reseñas' })
   const familyPanel = page.locator('#product-info-panel-family')
   const descriptionPanel = page.locator('#product-info-panel-description')
+  const reviewsPanel = page.locator('#product-info-panel-reviews')
 
   await infoNav.getByRole('link', { name: /Familia olfativa/ }).click()
   await expect(page).toHaveURL(/#informacion-producto$/)
@@ -242,24 +247,37 @@ test('Los accesos internos abren un único detalle con contenido intercambiable'
   await expect(descriptionTab).toHaveAttribute('aria-selected', 'true')
   await expect(descriptionPanel).toBeVisible()
   await expect(familyPanel).toBeHidden()
+  await expect(reviewsPanel).toBeHidden()
   await expect(descriptionPanel.getByRole('heading')).toHaveCount(0)
   await expect(
     descriptionPanel.locator('.product-description-copy'),
   ).toContainText('Una interpretación floral')
 
-  await descriptionTab.focus()
-  await page.keyboard.press('ArrowLeft')
-  await expect(familyTab).toBeFocused()
-  await expect(familyTab).toHaveAttribute('aria-selected', 'true')
-  await expect(familyPanel).toBeVisible()
+  await infoNav.getByRole('link', { name: /Reseñas/ }).click()
+  await expect(page).toHaveURL(/#informacion-producto$/)
+  await expect(reviewsTab).toHaveAttribute('aria-selected', 'true')
+  await expect(reviewsPanel).toBeVisible()
+  await expect(familyPanel).toBeHidden()
   await expect(descriptionPanel).toBeHidden()
+  await expect(
+    reviewsPanel.getByRole('heading', { name: 'Reseñas.' }),
+  ).toBeVisible()
+
+  await reviewsTab.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(descriptionTab).toBeFocused()
+  await expect(descriptionTab).toHaveAttribute('aria-selected', 'true')
+  await expect(descriptionPanel).toBeVisible()
+  await expect(reviewsPanel).toBeHidden()
 })
 
-test('Las reseñas aparecen tras el perfil y antes de los productos sugeridos', async ({
+test('Las reseñas se despliegan como tercer detalle antes de los productos sugeridos', async ({
   page,
 }) => {
   await page.goto('/producto/petale-nu')
   const preview = page.locator('.product-reviews-preview')
+  await expect(preview).toBeHidden()
+  await page.getByRole('tab', { name: 'Reseñas' }).click()
   await expect(preview).toBeVisible()
   await expect(preview.getByRole('heading', { name: 'Reseñas.' })).toBeVisible()
   await expect(preview.locator('.product-review-list > li')).toHaveCount(3)
@@ -273,6 +291,9 @@ test('Las reseñas aparecen tras el perfil y antes de los productos sugeridos', 
   await expect(
     preview.getByRole('img', { name: '5 de 5 estrellas' }).first(),
   ).toBeVisible()
+  expect(await preview.evaluate((element) => element.parentElement?.id)).toBe(
+    'product-info-panel-reviews',
+  )
   expect(
     await page
       .locator(
@@ -303,6 +324,7 @@ test('Reseñas y recomendaciones comparten el ancho de la ficha sin agrandar las
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/producto/petale-nu')
+    await page.getByRole('tab', { name: 'Reseñas' }).click()
     const intro = await page.locator('.product-intro').boundingBox()
     const reviews = await page.locator('.product-reviews-inner').boundingBox()
     const recommendations = await page
@@ -371,6 +393,7 @@ test('Las reseñas numerosas se muestran por tandas y conservan el foco', async 
   page,
 }) => {
   await page.goto('/producto/petale-nu')
+  await page.getByRole('tab', { name: 'Reseñas' }).click()
   const preview = page.locator('.product-reviews-preview')
   const reviews = preview.locator('.product-review-list > li')
   const more = preview.getByRole('button', { name: 'Siguiente' })

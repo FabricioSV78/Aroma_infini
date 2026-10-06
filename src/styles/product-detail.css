@@ -332,8 +332,8 @@
 }
 .product-info-nav {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(8px, 2vw, 18px);
   margin-top: 20px;
 }
 .product-info-nav a {
@@ -369,7 +369,7 @@
   min-height: 58px;
   align-items: stretch;
   justify-content: center;
-  gap: clamp(30px, 7vw, 76px);
+  gap: clamp(20px, 6vw, 72px);
   border-bottom: 1px solid var(--color-line);
   background: color-mix(in srgb, var(--color-canvas) 96%, transparent);
 }
@@ -565,6 +565,12 @@
   display: grid;
   min-height: 310px;
   place-items: center;
+}
+.product-info-panel--reviews {
+  padding-block: 0;
+}
+.product-info-panel--reviews .product-reviews-preview {
+  border-top: 0;
 }
 .product-description-copy {
   max-width: 840px;

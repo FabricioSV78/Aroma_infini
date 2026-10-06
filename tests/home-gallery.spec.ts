@@ -38,6 +38,46 @@ for (const { width, height } of [
   })
 }
 
+for (const width of [1280, 1600, 1904]) {
+  test(`Las fotografías de categorías conservan su encuadre en escritorio de ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 947 })
+    await page.goto('/')
+
+    const categories = page.locator('.category-grid .category')
+    await categories.first().scrollIntoViewIfNeeded()
+
+    const { ratios, gridHeight } = await categories.evaluateAll((elements) => {
+      const grid = elements[0]?.parentElement
+      return {
+        gridHeight: grid?.getBoundingClientRect().height ?? 0,
+        ratios: elements.map((element) => {
+          const image = element.querySelector<HTMLElement>('.category-image')
+          if (!image) return 0
+          const bounds = image.getBoundingClientRect()
+          return bounds.width / bounds.height
+        }),
+      }
+    })
+
+    // La fotografía vertical puede adaptarse al mosaico, pero no debe
+    // convertirse en una franja horizontal en monitores amplios.
+    expect(ratios[0]).toBeLessThanOrEqual(1.5)
+    // Un encuadre 9:4 conserva completos los frascos y permite recorrer el
+    // mosaico sin convertirlo en una sección excesivamente alta.
+    expect(ratios[1]).toBeCloseTo(2.25, 1)
+    expect(ratios[2]).toBeCloseTo(2.25, 1)
+    expect(gridHeight).toBeLessThanOrEqual(820)
+
+    if (width === 1904) {
+      await page.locator('#descubrir').screenshot({
+        path: 'artifacts/home-categories-1904.png',
+      })
+    }
+  })
+}
+
 test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', async ({
   page,
 }) => {

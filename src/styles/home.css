@@ -585,6 +585,15 @@
 }
 
 @media (min-width: 1200px) {
+  .category--landscape .category-image,
+  .category--panorama .category-image {
+    flex: none;
+    aspect-ratio: 9 / 4;
+  }
+  .category--landscape img,
+  .category--panorama img {
+    object-position: center 35%;
+  }
   .category--portrait .category-image {
     min-height: 670px;
   }
