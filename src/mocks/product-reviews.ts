@@ -1,12 +1,5 @@
-export interface ProductReview {
-  id: string
-  author: string
-  date: string
-  sizeMl: number
-  title: string
-  comment: string
-  rating: 1 | 2 | 3 | 4 | 5
-}
+import type { ProductReview } from '../types/review'
+export type { ProductReview } from '../types/review'
 
 const reviewsByProduct: Record<string, ProductReview[]> = {
   cedre: [

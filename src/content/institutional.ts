@@ -1,8 +1,8 @@
 // Textos y datos editables de Nosotros y Contacto.
 export const aboutPageContent = {
-  title: 'El perfume se descubre a tu manera.',
+  title: 'Aroma Infini, una forma de elegir perfume.',
   introduction:
-    'En Aroma Infini reunimos fragancias para que explores, compares y elijas a tu propio ritmo.',
+    'Reunimos perfumes de distintas casas para que conozcas sus notas, perfiles y presentaciones con calma.',
   image: {
     desktop: '/images/editorial-essential-v3-1536.webp',
     desktopSet:
@@ -14,20 +14,20 @@ export const aboutPageContent = {
   },
   approach: {
     eyebrow: 'Nuestra propuesta',
-    title: 'Explora. Compara. Elige.',
+    title: 'Información para decidir.',
     description:
-      'Presentamos cada fragancia con la información esencial para ayudarte a encontrar la que va contigo.',
+      'Cada ficha explica cómo se siente el perfume y muestra sus opciones de compra.',
   },
   principles: [
     {
       number: '01',
       title: 'Explora',
-      description: 'Descubre marcas, familias olfativas y notas.',
+      description: 'Conoce las casas y sus colecciones.',
     },
     {
       number: '02',
       title: 'Compara',
-      description: 'Revisa el perfil, la presentación y el precio.',
+      description: 'Compara notas, intensidad, tamaños y precios.',
     },
     {
       number: '03',
@@ -41,16 +41,16 @@ export const aboutPageContent = {
 export const contactPageContent = {
   title: '¿En qué podemos ayudarte?',
   introduction:
-    'Escríbenos tu duda o encuentra rápidamente la información que necesitas.',
+    'Consulta información de pedidos, envíos o productos, o escríbenos por WhatsApp.',
   direct: {
     eyebrow: 'Atención directa',
     title: 'Hablemos por WhatsApp.',
-    description: 'Cuéntanos qué necesitas. Te responderemos por este canal.',
+    description: 'Si preguntas por una compra, incluye tu código de pedido.',
     action: 'Escribir por WhatsApp',
   },
   guide: {
     eyebrow: 'Enlaces útiles',
-    title: 'Encuentra lo que necesitas.',
+    title: 'Ve directo a la información.',
   },
   topics: [
     { title: 'Elegir un perfume', to: '/tienda' },

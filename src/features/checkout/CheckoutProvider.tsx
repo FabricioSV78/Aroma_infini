@@ -3,12 +3,12 @@ import type { ResolvedCart } from '../../services/commerce-service'
 import {
   createCheckoutDraft,
   createMockOrder,
+  persistDemoCheckout,
   type MockOrder,
 } from '../../services/checkout-service'
 import { CheckoutContext, type CheckoutContextValue } from './checkout-context'
 import { saveTrackingRecord } from '../../services/order-tracking-service'
 import { useAccount } from '../account/account-context'
-import { adminService } from '../../services/admin-service'
 
 export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState(createCheckoutDraft)
@@ -19,11 +19,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     async (cart: ResolvedCart) => {
       const result = createMockOrder(cart, draft)
       if (!result) return null
-      const registration = adminService.recordApprovedCheckout(result)
-      if (registration.kind === 'validation') return null
-      // Wait for the local snapshot before sending the shopper to confirmation.
-      // The current session still works if private browsing blocks IndexedDB.
-      await adminService.flush().catch(() => undefined)
+      if (!(await persistDemoCheckout(result))) return null
       saveTrackingRecord(result)
       addCheckoutOrder(result)
       setOrder(result)

@@ -6,7 +6,7 @@
   .category h3,
   .editorial-copy h2,
   .featured-intro h2,
-  .product-meta h3,
+  .product-meta :is(h2, h3),
   .catalog-heading h1,
   .catalog-empty h1,
   .catalog-empty h2,
@@ -65,7 +65,7 @@
   letter-spacing: -0.03em;
 }
 
-.product-meta h3 {
+.product-meta :is(h2, h3) {
   font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
@@ -139,12 +139,7 @@
   line-height: 1.6;
 }
 
-:where(
-  .product-volume,
-  .price-prefix,
-  .product-kind,
-  .brand-scent
-) {
+:where(.product-volume, .price-prefix, .product-kind, .brand-scent) {
   font-size: var(--type-small);
   line-height: 1.5;
 }
@@ -163,7 +158,7 @@
     font-size: 1.75rem;
   }
 
-  .product-meta h3 {
+  .product-meta :is(h2, h3) {
     font-size: clamp(1.125rem, 1rem + 0.4vw, 1.375rem);
   }
 
@@ -188,7 +183,7 @@
 }
 
 @media (min-width: 1200px) {
-  .product-meta h3 {
+  .product-meta :is(h2, h3) {
     font-size: 1.375rem;
   }
 

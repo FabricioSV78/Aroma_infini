@@ -17,7 +17,7 @@ import {
 } from '../../services/account-service'
 import type { MockOrder } from '../../services/checkout-service'
 import { AccountContext, type AccountContextValue } from './account-context'
-import { adminService } from '../../services/admin-service'
+import { orderStatusService } from '../../services/order-status-service'
 
 interface AccountState {
   active: boolean
@@ -69,9 +69,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       // La cuenta sigue disponible durante esta visita si el almacenamiento falla.
     }
   }, [state])
-  const adminState = useSyncExternalStore(
-    adminService.subscribe,
-    adminService.getSnapshot,
+  const adminOrders = useSyncExternalStore(
+    orderStatusService.subscribe,
+    orderStatusService.getSnapshot,
   )
 
   const activateDemo = useCallback(() => {
@@ -103,7 +103,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AccountContextValue>(() => {
     const orders = state.orders.map((order) => {
-      const adminOrder = adminState.orders.find(
+      const adminOrder = adminOrders.find(
         (item) => item.reference === order.reference,
       )
       return adminOrder ? { ...order, status: adminOrder.status } : order
@@ -123,7 +123,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, [
     activateDemo,
     addCheckoutOrder,
-    adminState,
+    adminOrders,
     leaveDemo,
     removeAddress,
     saveAddress,

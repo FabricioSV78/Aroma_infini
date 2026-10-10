@@ -20,13 +20,9 @@ export function BrandsPage() {
       <header className="catalog-heading" data-scroll-reveal="copy">
         <div>
           <p className="eyebrow brand-label">La selección de Aroma Infini</p>
-          <h1>
-            Un universo.
-            <br />
-            Distintas firmas.
-          </h1>
+          <h1>Marcas de perfume</h1>
         </div>
-        <p>Explora cada marca y encuentra tu próxima fragancia.</p>
+        <p>Conoce el estilo de cada firma y entra a su colección.</p>
       </header>
       <div className="brands-directory" data-scroll-reveal="stagger">
         {data.kind === 'error' ? (
@@ -41,7 +37,7 @@ export function BrandsPage() {
           </div>
         ) : (
           data.brands.map((brand) => (
-            <Link key={brand.id} to={`/tienda?marca=${brand.slug}`}>
+            <Link key={brand.id} to={`/marcas/${brand.slug}`}>
               <h2>{brand.name}</h2>
               {brand.previewImage ? (
                 <img

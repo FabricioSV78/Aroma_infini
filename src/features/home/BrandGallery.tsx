@@ -3,11 +3,11 @@ import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import type { HomeData } from '../../services/home-service'
 import type { Product } from '../../types/catalog'
-import { getAdminProduct } from '../../services/admin-service'
+import { getCatalogProductGallery } from '../../services/catalog-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
 
 function alternateImage(product: Product) {
-  return getAdminProduct(product.id)?.detail.gallery[1]?.image ?? product.image
+  return getCatalogProductGallery(product.id)[1]?.image ?? product.image
 }
 
 const galleryMedia = '(min-width: 768px)'
@@ -55,7 +55,7 @@ export function BrandGallery({
         <div className="brand-list" data-reveal="copy">
           {selection.map(({ brand, product }, index) => (
             <Link
-              to={`/tienda?marca=${brand.slug}`}
+              to={`/marcas/${brand.slug}`}
               key={brand.id}
               className={
                 activeId === brand.id

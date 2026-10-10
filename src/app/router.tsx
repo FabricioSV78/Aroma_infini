@@ -14,7 +14,6 @@ import { CheckoutPage } from '../features/checkout/CheckoutPage'
 import { CheckoutConfirmationPage } from '../features/checkout/CheckoutConfirmationPage'
 import { OrderTrackingPage } from '../features/checkout/OrderTrackingPage'
 import {
-  brandCatalogRedirectLoader,
   catalogLoader,
   brandsLoader,
 } from '../features/catalog/catalog-loaders'
@@ -54,7 +53,7 @@ export const router = createBrowserRouter([
       },
       { path: 'buscar', loader: catalogLoader, Component: CatalogPage },
       { path: 'marcas', loader: brandsLoader, Component: BrandsPage },
-      { path: 'marcas/:slug', loader: brandCatalogRedirectLoader },
+      { path: 'marcas/:slug', loader: catalogLoader, Component: CatalogPage },
       {
         path: 'producto/:slug',
         loader: productLoader,

@@ -1,7 +1,14 @@
 import { getDeliveryZoneLabel, type MockOrder } from './checkout-service'
-import type { AdminOrderStatus } from './admin-service'
+import type {
+  DeliveryAddress,
+  DeliveryMethod,
+  OrderStatus,
+  OrderTotals,
+  PaymentProvider,
+  PurchasedLine,
+} from '../types/commerce'
 
-export type AccountOrderStatus = AdminOrderStatus
+export type AccountOrderStatus = OrderStatus
 
 export interface AccountProfile {
   firstName: string
@@ -10,41 +17,27 @@ export interface AccountProfile {
   phone: string
 }
 
-export interface AccountAddress {
+export interface AccountAddress extends DeliveryAddress {
   id: string
   label: string
   recipient: string
-  department: string
-  province: string
-  district: string
-  street: string
   reference: string
 }
 
-export interface AccountOrderLine {
-  variantId: string
+export interface AccountOrderLine extends PurchasedLine {
   productSlug: string
   image: string
-  brand: string
-  name: string
-  ml: number
-  quantity: number
-  unitPriceCents: number
 }
 
-export interface AccountOrder {
+export interface AccountOrder extends OrderTotals {
   reference: string
   placedAt: string
   status: AccountOrderStatus
   lines: AccountOrderLine[]
-  subtotalCents: number
-  discountCents: number
-  shippingCents: number
-  totalCents: number
-  deliveryMethod: 'courier' | 'motorizado'
+  deliveryMethod: DeliveryMethod
   address: AccountAddress
   payment: {
-    provider: 'mercado-pago'
+    provider: PaymentProvider
     status: 'approved-demo'
   }
 }

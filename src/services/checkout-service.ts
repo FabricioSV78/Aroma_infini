@@ -1,5 +1,6 @@
 import type { ResolvedCart } from './commerce-service'
 import {
+  adminService,
   getPromotionByCode,
   getShippingSettings,
   getShippingZoneForAddress,
@@ -9,26 +10,25 @@ import {
   isValidAlternateRecipient,
   type AlternateRecipient,
 } from './shipping-recipient'
+import type {
+  CustomerContact,
+  DeliveryAddress,
+  DeliveryMethod as SharedDeliveryMethod,
+  OrderTotals,
+  PaymentProvider,
+  PurchasedLine,
+} from '../types/commerce'
 
 export { isValidAlternateRecipient } from './shipping-recipient'
 
 export type CheckoutMode = 'guest' | 'demo-account'
-export type DeliveryMethod = 'courier' | 'motorizado'
+export type DeliveryMethod = SharedDeliveryMethod
 export type PaymentScenario = 'approved' | 'rejected' | 'error'
 export type AppliedPromotion = string
 
-export interface CheckoutContact {
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-}
+export type CheckoutContact = CustomerContact
 
-export interface CheckoutAddress {
-  department: string
-  province: string
-  district: string
-  street: string
+export interface CheckoutAddress extends DeliveryAddress {
   reference: string
 }
 
@@ -42,18 +42,12 @@ export interface CheckoutDraft {
   appliedPromotion: AppliedPromotion | null
 }
 
-export interface MockOrderLine {
-  variantId: string
+export interface MockOrderLine extends PurchasedLine {
   productSlug: string
   image: string
-  name: string
-  brand: string
-  ml: number
-  quantity: number
-  unitPriceCents: number
 }
 
-export interface MockOrder {
+export interface MockOrder extends OrderTotals {
   reference: string
   mode: CheckoutMode
   placedAt: string
@@ -62,12 +56,8 @@ export interface MockOrder {
   address: CheckoutAddress
   alternateRecipient: AlternateRecipient | null
   deliveryMethod: DeliveryMethod
-  paymentProvider: 'mercado-pago'
+  paymentProvider: PaymentProvider
   promotionCode: AppliedPromotion | null
-  subtotalCents: number
-  discountCents: number
-  shippingCents: number
-  totalCents: number
 }
 
 export interface DeliveryZoneOption {
@@ -304,6 +294,15 @@ export function createMockOrder(
     shippingCents: amount.shipping.feeCents,
     totalCents: amount.totalCents,
   }
+}
+
+/** Demo-only order write boundary; a verified server workflow replaces this later. */
+export async function persistDemoCheckout(order: MockOrder): Promise<boolean> {
+  const registration = adminService.recordApprovedCheckout(order)
+  if (registration.kind === 'validation') return false
+  // The in-memory order remains usable if private browsing blocks IndexedDB.
+  await adminService.flush().catch(() => undefined)
+  return true
 }
 
 export function simulatePayment(scenario: PaymentScenario) {

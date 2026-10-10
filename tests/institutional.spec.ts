@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const institutionalRoutes = [
-  ['/nosotros', 'El perfume se descubre a tu manera.'],
+  ['/nosotros', 'Aroma Infini, una forma de elegir perfume.'],
   ['/contacto', '¿En qué podemos ayudarte?'],
   ['/envios', 'Tu pedido, de principio a fin.'],
   ['/devoluciones', 'Cambios y devoluciones.'],
@@ -34,11 +34,7 @@ test('Las rutas institucionales tienen contenido propio y contacto funcional', a
   )
   await expect(whatsappLink).toHaveAttribute('target', '_blank')
 
-  for (const path of [
-    '/tienda',
-    '/seguir-pedido',
-    '/envios',
-  ]) {
+  for (const path of ['/tienda', '/seguir-pedido', '/envios']) {
     await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
   }
 

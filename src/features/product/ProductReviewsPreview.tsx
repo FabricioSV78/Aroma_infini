@@ -3,13 +3,11 @@ import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { useAccount } from '../account/account-context'
 import {
-  getProductReviews,
-  type ProductReview,
-} from '../../mocks/product-reviews'
-import {
+  getPublishedReviews,
   readLocalReviews,
   saveLocalReview,
 } from '../../services/review-service'
+import type { ProductReview } from '../../types/review'
 import { ReviewForm } from './ReviewForm'
 
 const reviewsPerPage = 3
@@ -30,7 +28,7 @@ export function ProductReviewsPreview({
   const [localReviews, setLocalReviews] = useState(() =>
     readLocalReviews(productId),
   )
-  const reviews = [...localReviews, ...getProductReviews(productId)]
+  const reviews = [...localReviews, ...getPublishedReviews(productId)]
   const { active } = useAccount()
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState(0)

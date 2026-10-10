@@ -343,20 +343,28 @@ export function AdminHomePage() {
             <div
               className={`admin-home-hero-preview admin-home-hero-preview--${heroPreview}`}
               data-tone={defaultSlide.tone}
+              data-layout={defaultSlide.layout}
+              data-default-image={!currentSlide.desktopImage}
             >
               <img src={heroPreviewImage} alt="" />
               <div className="admin-home-hero-preview-copy">
-                <span>{currentSlide.eyebrow || 'Etiqueta'}</span>
-                <strong>{currentSlide.title || 'Título de campaña'}</strong>
-                <p>{currentSlide.description || 'Descripción de campaña'}</p>
-                <span className="admin-home-hero-preview-cta">
-                  {currentSlide.cta || 'Botón'}
-                </span>
+                <div className="admin-home-hero-preview-heading">
+                  <span>{currentSlide.eyebrow || 'Etiqueta'}</span>
+                  <strong>{currentSlide.title || 'Título de campaña'}</strong>
+                </div>
+                <div className="admin-home-hero-preview-details">
+                  <p>{currentSlide.description || 'Descripción de campaña'}</p>
+                  <span className="admin-home-hero-preview-cta">
+                    {currentSlide.cta || 'Botón'}
+                  </span>
+                </div>
               </div>
             </div>
             <p className="admin-home-preview-note">
-              La vista previa muestra el encuadre y texto. El Home conserva las
-              flechas y el cambio automático cada 3 segundos.
+              {defaultSlide.layout === 'right' && heroPreview === 'desktop'
+                ? 'En escritorio el mensaje se ubica a la derecha. Al subir una imagen propia, deja espacio libre en ese lado.'
+                : 'La vista previa muestra el encuadre y texto.'}{' '}
+              El Home conserva las flechas y cambia cada 3 segundos.
             </p>
           </section>
           <section

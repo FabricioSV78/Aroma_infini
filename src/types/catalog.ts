@@ -17,6 +17,8 @@ export interface Brand {
   name: string
 }
 
+export type ProductAudience = 'hombre' | 'mujer' | 'unisex'
+
 export interface Product {
   id: string
   slug: string

@@ -104,10 +104,10 @@ export function FeaturedPerfumes({
 }: Pick<HomeData, 'brands' | 'featured' | 'media'>) {
   const title =
     featured.length === 2
-      ? 'Dos aromas. Dos formas de dejar huella.'
+      ? 'Dos perfumes, dos perfiles.'
       : featured.length === 1
-        ? 'Un aroma. Una forma de dejar huella.'
-        : 'Aromas para dejar huella.'
+        ? 'Un perfume en primer plano.'
+        : 'Perfumes en primer plano.'
   return (
     <section
       className="featured-section"
@@ -118,21 +118,21 @@ export function FeaturedPerfumes({
       <div className="featured-inner container">
         <header className="featured-intro" data-reveal="copy">
           <div>
-            <p className="eyebrow">Encuentro editorial</p>
+            <p className="eyebrow">Selección editorial</p>
             <h2 id="featured-title">{title}</h2>
           </div>
           <Link
             className="text-link featured-action"
             to="/tienda?seleccion=destacados"
           >
-            Explorar destacados <Icon name="arrow" />
+            Ver perfumes destacados <Icon name="arrow" />
           </Link>
         </header>
         <Link
           className="featured-visual"
           data-reveal="image"
           to="/tienda?seleccion=destacados"
-          aria-label="Descubrir la selección editorial de perfumes destacados"
+          aria-label="Ver los perfumes destacados"
         >
           <img
             src={imageSource(media.featured ?? 'featured-duo-v3', 960)}
@@ -177,8 +177,8 @@ export function TrustInformation() {
       id: 'tracking',
       to: '/seguir-pedido',
       icon: 'clock',
-      title: 'Tu pedido',
-      description: 'Encuentra el estado de tu selección con su código.',
+      title: 'Seguimiento',
+      description: 'Consulta el estado de tu pedido con su código.',
       action: 'Seguir pedido',
     },
     {

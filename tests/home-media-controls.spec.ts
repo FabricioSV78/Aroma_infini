@@ -9,7 +9,7 @@ test('Los indicadores visibles permiten elegir una campaña en móvil', async ({
   await indicator.click()
   await expect(indicator).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Aromas que',
+    'Ámbar y madera,',
   )
   await expect(page.locator('.hero-position-tracks > button')).toHaveCount(5)
 })

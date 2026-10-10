@@ -38,7 +38,7 @@ test('Cinco campañas cambian cada tres segundos sin alterar la altura', async (
   const titles = [
     'Lo sutil también',
     'Tu esencia.',
-    'Aromas que',
+    'Ámbar y madera,',
     'La frescura',
     'Una fragancia.',
   ]
@@ -213,7 +213,7 @@ test('Una fotografía fallida se omite sin interrumpir las campañas disponibles
   })
   await page.clock.runFor(3100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Aromas que',
+    'Ámbar y madera,',
   )
   await expect(page.locator('.hero-slide.is-active img')).toBeVisible()
 })

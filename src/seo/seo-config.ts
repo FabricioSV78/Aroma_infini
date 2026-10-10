@@ -1,7 +1,4 @@
-import {
-  getStoreBrands,
-  getStoreProductBySlug,
-} from '../services/admin-service'
+import type { Brand, Product, ProductDetail } from '../types/catalog'
 
 export interface SeoBreadcrumb {
   name: string
@@ -18,6 +15,36 @@ export interface SeoPageConfig {
   imageAlt?: string
   type?: 'website' | 'product'
   breadcrumbs?: SeoBreadcrumb[]
+  product?: {
+    id: string
+    name: string
+    brand: string | null
+    description: string
+    imagePath?: string
+    variants: {
+      id: string
+      priceCents: number
+      stock: number
+      active?: boolean
+    }[]
+  }
+}
+
+/** Read-only data supplied by the active route loader, shared with its UI. */
+export interface SeoRouteData {
+  kind?: 'ready' | 'missing' | 'error'
+  brand?: Brand
+  brands?: Brand[]
+  product?: Product
+  items?: Product[]
+  detail?: ProductDetail
+}
+
+function shareableProductImage(image: string): string | undefined {
+  if (/^https:\/\//i.test(image)) return image
+  if (/^\/images\/[a-z0-9-]+\.webp$/i.test(image)) return image
+  if (/^[a-z0-9-]+$/i.test(image)) return `/images/${image}-960.webp`
+  return undefined
 }
 
 const homeDescription =
@@ -39,6 +66,7 @@ function normalizePath(pathname: string) {
 export function resolveSeoPage(
   pathname: string,
   search: string,
+  routeData?: SeoRouteData,
 ): SeoPageConfig {
   const path = normalizePath(pathname)
   const hasQuery = Boolean(search)
@@ -65,22 +93,19 @@ export function resolveSeoPage(
     const brand =
       selectedBrands.length === 1 &&
       [...params.keys()].every((key) => key === 'marca')
-        ? getStoreBrands().find((item) => item.slug === selectedBrands[0])
+        ? routeData?.brands?.find((item) => item.slug === selectedBrands[0])
         : undefined
     if (brand)
       return {
         title: `${brand.name}: perfumes | Aroma Infini`,
-        description: `Descubre los perfumes de ${brand.name} seleccionados por Aroma Infini.`,
-        canonicalPath: `/tienda?marca=${encodeURIComponent(brand.slug)}`,
-        indexable: true,
+        description: `Conoce los perfumes de ${brand.name} y sus presentaciones en Aroma Infini.`,
+        canonicalPath: `/marcas/${brand.slug}`,
+        indexable: false,
         follow: true,
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
           { name: 'Marcas', path: '/marcas' },
-          {
-            name: brand.name,
-            path: `/tienda?marca=${encodeURIComponent(brand.slug)}`,
-          },
+          { name: brand.name, path: `/marcas/${brand.slug}` },
         ],
       }
     return {
@@ -116,16 +141,19 @@ export function resolveSeoPage(
     }
 
   if (path.startsWith('/marcas/')) {
-    const brands = getStoreBrands()
     const slug = path.slice('/marcas/'.length)
-    const brand = brands.find((item) => item.slug === slug)
+    const brand = routeData?.brand?.slug === slug ? routeData.brand : undefined
     if (brand)
       return {
         title: `${brand.name}: perfumes | Aroma Infini`,
-        description: `Descubre los perfumes de ${brand.name} seleccionados por Aroma Infini.`,
+        description: `Conoce los perfumes de ${brand.name} y sus presentaciones en Aroma Infini.`,
         canonicalPath: `/marcas/${brand.slug}`,
         indexable: !hasQuery,
         follow: true,
+        imagePath: routeData?.items?.[0]
+          ? shareableProductImage(routeData.items[0].image)
+          : undefined,
+        imageAlt: `Perfume de ${brand.name} en Aroma Infini`,
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
           { name: 'Marcas', path: '/marcas' },
@@ -136,23 +164,29 @@ export function resolveSeoPage(
 
   if (path.startsWith('/producto/')) {
     const slug = path.slice('/producto/'.length)
-    const record = getStoreProductBySlug(slug)
-    const product = record?.product
-    const brands = getStoreBrands()
-    const brand = product
-      ? brands.find((item) => item.id === product.brandId)
-      : undefined
-    const detail = record?.detail
+    const product =
+      routeData?.product?.slug === slug ? routeData.product : undefined
+    const brand = routeData?.brand
+    const detail = routeData?.detail
+    const imagePath = product ? shareableProductImage(product.image) : undefined
     if (product && detail)
       return {
         title: `${product.name}${brand ? ` de ${brand.name}` : ''} | Aroma Infini`,
         description: detail.shortDescription,
         canonicalPath: `/producto/${product.slug}`,
-        indexable: true,
+        indexable: !hasQuery,
         follow: true,
         type: 'product',
-        imagePath: `/images/${product.image}-960.webp`,
+        imagePath,
         imageAlt: `${product.name}${brand ? ` de ${brand.name}` : ''}`,
+        product: {
+          id: product.id,
+          name: product.name,
+          brand: brand?.name ?? null,
+          description: detail.shortDescription,
+          imagePath,
+          variants: product.variants,
+        },
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
           { name: 'Perfumes', path: '/tienda' },

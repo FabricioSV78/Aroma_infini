@@ -7,9 +7,8 @@ import {
   createDefaultHomeContent,
   normalizeHomeContent,
   validateHomeContent,
-  type HomeContent,
 } from '../content/home-editor'
-import { readAdminState, writeAdminState } from './admin-persistence'
+import { localAdminStateRepository } from './admin-persistence'
 import {
   isValidAlternateRecipient,
   type AlternateRecipient,
@@ -26,17 +25,33 @@ import {
 import type {
   Brand,
   Product,
+  ProductAudience,
   ProductDetail,
   ProductVariant,
 } from '../types/catalog'
+import type {
+  CustomerContact,
+  CustomerRecord,
+  DeliveryAddress,
+  DeliveryMethod,
+  OrderStatus,
+  OrderTotals,
+  PaymentProvider,
+  PaymentStatus,
+  PurchasedLine,
+} from '../types/commerce'
+import type {
+  HomeContent,
+  HomeMedia as SharedHomeMedia,
+  HomeMediaKey as SharedHomeMediaKey,
+} from '../types/home'
+import type { ShippingSettings, ShippingZone } from '../types/shipping'
 
-export type AdminGender = 'hombre' | 'mujer' | 'unisex'
-export type HomeMediaKey = AdminGender | 'featured'
-export type HomeMedia = Record<HomeMediaKey, string | null>
-export type AdminOrderStatus =
-  'received' | 'preparing' | 'shipped' | 'delivered'
-export type AdminOrderPaymentStatus =
-  'pending' | 'approved' | 'rejected' | 'refunded'
+export type AdminGender = ProductAudience
+export type HomeMediaKey = SharedHomeMediaKey
+export type HomeMedia = SharedHomeMedia
+export type AdminOrderStatus = OrderStatus
+export type AdminOrderPaymentStatus = PaymentStatus
 export type AdminPromotionType = 'percent' | 'fixed'
 
 export interface AdminBrand extends Brand {
@@ -54,16 +69,9 @@ export interface AdminProduct {
   lowStockThreshold: number
 }
 
-export interface AdminOrderLine {
-  variantId: string
-  brand: string
-  name: string
-  ml: number
-  quantity: number
-  unitPriceCents: number
-}
+export type AdminOrderLine = PurchasedLine
 
-export interface AdminOrder {
+export interface AdminOrder extends OrderTotals {
   reference: string
   customerId: string
   customerName: string
@@ -74,20 +82,10 @@ export interface AdminOrder {
   status: AdminOrderStatus
   paymentStatus: AdminOrderPaymentStatus
   lines: AdminOrderLine[]
-  subtotalCents: number
-  discountCents: number
-  shippingCents: number
-  totalCents: number
   promotionCode: string | null
-  paymentProvider: 'mercado-pago'
-  deliveryMethod: 'courier' | 'motorizado'
-  address: {
-    department: string
-    province: string
-    district: string
-    street: string
-    reference?: string
-  }
+  paymentProvider: PaymentProvider
+  deliveryMethod: DeliveryMethod
+  address: DeliveryAddress
 }
 
 export function hasCompleteOrderDelivery(
@@ -109,39 +107,19 @@ export function hasCompleteOrderDelivery(
   )
 }
 
-export interface ApprovedCheckoutOrderInput {
+export interface ApprovedCheckoutOrderInput extends OrderTotals {
   reference: string
   placedAt: string
   lines: AdminOrderLine[]
-  contact: {
-    firstName: string
-    lastName: string
-    email: string
-    phone: string
-  }
-  address: {
-    department: string
-    province: string
-    district: string
-    street: string
-    reference?: string
-  }
+  contact: CustomerContact
+  address: DeliveryAddress
   alternateRecipient?: AlternateRecipient | null
-  deliveryMethod: 'courier' | 'motorizado'
-  paymentProvider: 'mercado-pago'
-  subtotalCents: number
-  discountCents: number
-  shippingCents: number
-  totalCents: number
+  deliveryMethod: DeliveryMethod
+  paymentProvider: PaymentProvider
   promotionCode: string | null
 }
 
-export interface AdminCustomer {
-  id: string
-  name: string
-  email: string
-  phone: string
-}
+export type AdminCustomer = CustomerRecord
 
 export interface AdminPromotion {
   id: string
@@ -156,24 +134,8 @@ export interface AdminPromotion {
   used: number
 }
 
-export interface AdminShippingZone {
-  id: string
-  name: string
-  department: string
-  province: string | null
-  district: string | null
-  courierFeeCents: number
-  motorizadoFeeCents: number | null
-  estimate: string
-  active: boolean
-}
-
-export interface AdminShippingSettings {
-  freeThresholdCents: number
-  nationalCourierFeeCents: number
-  nationalEstimate: string
-  zones: AdminShippingZone[]
-}
+export type AdminShippingZone = ShippingZone
+export type AdminShippingSettings = ShippingSettings
 
 export interface AdminState {
   products: AdminProduct[]
@@ -504,7 +466,7 @@ let hydrationPromise: Promise<void> | undefined
 export function hydrateAdminStore() {
   hydrationPromise ??= (async () => {
     try {
-      const saved = await readAdminState()
+      const saved = await localAdminStateRepository.read()
       if (
         !saved ||
         !Array.isArray(saved.products) ||
@@ -592,7 +554,7 @@ export function hydrateAdminStore() {
 function persist(snapshot: AdminState) {
   persistenceQueue = persistenceQueue
     .catch(() => undefined)
-    .then(() => writeAdminState(snapshot))
+    .then(() => localAdminStateRepository.write(snapshot))
 }
 
 function commit(update: (current: AdminState) => AdminState) {

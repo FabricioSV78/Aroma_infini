@@ -49,6 +49,21 @@ test('Agotados y productos sin variantes no anuncian un precio comprable', () =>
   ).toBe(false)
 })
 
+test('Los productos respetan la jerarquía de encabezados en tienda y Home', async ({
+  page,
+}) => {
+  await page.goto('/tienda')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await expect(
+    page.locator('.catalog-listing .product-card h2'),
+  ).not.toHaveCount(0)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+  await expect(page.locator('#mas-vendidos .product-card h3')).not.toHaveCount(
+    0,
+  )
+})
+
 test('Favoritos compartidos: botón, teclado y estado coherente al repetir un producto', async ({
   page,
 }) => {

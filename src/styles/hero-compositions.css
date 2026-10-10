@@ -1,0 +1,203 @@
+/* One photographic campaign system: copy stays together and the image stays full bleed. */
+.home .hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.home .hero-copy-heading,
+.home .hero-copy-details {
+  position: relative;
+  min-width: 0;
+}
+
+.home .hero-copy-heading .eyebrow {
+  margin-bottom: 14px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+
+.home .hero-copy-details {
+  margin-top: 18px;
+}
+
+.home .hero-copy-details .hero-description {
+  margin: 0 0 22px;
+}
+
+@media (min-width: 1024px) {
+  .home .hero-image::before {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.33),
+      rgb(255 255 255 / 0.12) 38%,
+      transparent 66%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .home .hero-slide[data-layout='right'] .hero-image::before {
+    background: linear-gradient(
+      270deg,
+      rgb(255 255 255 / 0.43),
+      rgb(255 255 255 / 0.14) 38%,
+      transparent 66%
+    );
+  }
+
+  .home .hero-slide[data-tone='warm'] .hero-image::before {
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.57),
+      rgb(255 255 255 / 0.23) 42%,
+      transparent 70%
+    );
+  }
+
+  /* The two default still lifes have no lettering and can be art-directed to the opposite side. */
+  .home
+    .hero-slide[data-layout='right'][data-default-image='true']
+    .hero-image
+    img {
+    transform: scaleX(-1);
+  }
+
+  .home .hero-copy {
+    justify-content: center;
+    padding-block: 140px 140px;
+    background: transparent;
+  }
+
+  .home .hero-copy-heading .eyebrow {
+    margin-bottom: 22px;
+    font-size: 11px;
+  }
+
+  .home .hero-title {
+    max-width: min(49vw, 670px);
+    font-size: clamp(55px, 5.5vw, 88px);
+    line-height: 1.04;
+  }
+
+  .home .hero-copy-details {
+    margin-top: 24px;
+  }
+
+  .home .hero-copy-details .hero-description {
+    margin-bottom: 28px;
+  }
+
+  .home .hero-slide[data-layout='right'] .hero-copy {
+    width: 52%;
+    margin-left: auto;
+    padding-right: max(var(--entrance-gutter), 80px);
+    padding-left: clamp(24px, 5vw, 100px);
+  }
+
+  .home .hero-slide[data-layout='right'] .hero-title {
+    max-width: 100%;
+  }
+
+  .home .hero-slide:nth-child(3) .hero-copy {
+    transform: translateY(24px);
+  }
+
+  .home .hero-slide:nth-child(4) .hero-copy {
+    transform: translateY(-18px);
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  .home .hero-copy {
+    padding-block: 115px 80px;
+  }
+
+  .home .hero-title {
+    font-size: clamp(52px, 5vw, 72px);
+  }
+}
+
+@media (max-width: 1023px) {
+  .home .hero-image::before {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    background: linear-gradient(
+      0deg,
+      rgb(255 255 255 / 0.88),
+      rgb(255 255 255 / 0.68) 25%,
+      rgb(255 255 255 / 0.14) 57%,
+      transparent 80%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .home .hero-copy {
+    background: transparent;
+  }
+}
+
+@media (max-width: 599px) {
+  .home .hero-copy-details {
+    margin-top: 14px;
+  }
+
+  .home .hero-copy-details .hero-description {
+    margin-bottom: 17px;
+  }
+}
+
+/* Keep the campaign in a single frame on shorter phones as well. */
+@media (max-width: 599px) and (max-height: 650px) {
+  .home .hero,
+  .home .hero-stage {
+    min-height: calc(100svh - 26px);
+  }
+
+  .home .hero-slide {
+    display: grid;
+    align-items: end;
+  }
+
+  .home .hero-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .home .hero-image img {
+    object-position: 55% 24%;
+  }
+
+  .home .hero-image::before {
+    content: '';
+    background: linear-gradient(
+      0deg,
+      rgb(255 255 255 / 0.98),
+      rgb(255 255 255 / 0.96) 28%,
+      rgb(255 255 255 / 0.72) 42%,
+      transparent 73%
+    );
+  }
+
+  .home .hero-copy {
+    justify-content: flex-start;
+    padding: 280px var(--entrance-gutter) 51px;
+    background: transparent;
+  }
+
+  .home .hero-position {
+    top: auto;
+    bottom: 0;
+  }
+}

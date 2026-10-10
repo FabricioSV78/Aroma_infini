@@ -1,5 +1,6 @@
 import type { CheckoutMode, MockOrder } from './checkout-service'
-import { getAdminOrder, type AdminOrderStatus } from './admin-service'
+import type { OrderStatus } from '../types/commerce'
+import { orderStatusService } from './order-status-service'
 
 const STORAGE_KEY = 'aroma-infini:order-tracking:v1'
 const REFERENCE_PATTERN = /^AI-(?:DEMO-)?[A-F0-9]{16}$/
@@ -8,7 +9,7 @@ const MAX_RECORDS = 30
 export interface TrackingRecord {
   reference: string
   placedAt: string
-  status: AdminOrderStatus
+  status: OrderStatus
   mode: CheckoutMode
 }
 
@@ -75,7 +76,7 @@ export function getTrackingRecord(reference: string): TrackingRecord | null {
     (item) => item.reference === normalized,
   )
   if (!record) return null
-  const adminOrder = getAdminOrder(normalized)
+  const adminOrder = orderStatusService.getByReference(normalized)
   return adminOrder ? { ...record, status: adminOrder.status } : record
 }
 

@@ -78,7 +78,7 @@ function ProductReady({
               {brand ? (
                 <Link
                   className="product-brand"
-                  to={`/tienda?marca=${brand.slug}`}
+                  to={`/marcas/${brand.slug}`}
                 >
                   {brand.name}
                 </Link>

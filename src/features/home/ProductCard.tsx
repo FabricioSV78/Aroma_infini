@@ -4,7 +4,7 @@ import { Icon } from '../../components/ui/Icon'
 import { useFavorites } from '../favorites/favorites-context'
 import { getProductPresentation } from '../../services/product-presentation'
 import { formatPEN } from '../../services/currency'
-import { getAdminProduct } from '../../services/admin-service'
+import { getCatalogProductGallery } from '../../services/catalog-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
 
 interface ProductCardProps {
@@ -12,12 +12,14 @@ interface ProductCardProps {
   brand: Brand | undefined
   variant?: 'standard' | 'editorial'
   imageSizes?: string
+  headingLevel?: 2 | 3
 }
 export function ProductCard({
   product,
   brand,
   variant = 'standard',
   imageSizes: imageSizesOverride,
+  headingLevel = 3,
 }: ProductCardProps) {
   const { favoriteIds, toggleFavorite } = useFavorites()
   const isFavorite = favoriteIds.has(product.id)
@@ -29,9 +31,12 @@ export function ProductCard({
     (variant === 'standard'
       ? '(min-width: 1440px) 296px, (min-width: 768px) 23vw, 46vw'
       : '(min-width: 1024px) 120px, 76px')
-  const gallery = getAdminProduct(product.id)?.detail.gallery
+  const gallery = getCatalogProductGallery(product.id)
   const alternateImage = gallery?.[1]?.image
-  const productImageAlt = gallery?.[0]?.alt ?? `Frasco de ${product.name}`
+  const productImageAlt =
+    gallery[0]?.alt.trim() ||
+    `Frasco de ${product.name}${brand ? ` de ${brand.name}` : ''}`
+  const Heading = headingLevel === 2 ? 'h2' : 'h3'
   return (
     <article className={`product-card product-card--${variant}`}>
       <div className="product-photo">
@@ -84,12 +89,12 @@ export function ProductCard({
       </div>
       <div className="product-meta">
         <p className="eyebrow brand-label">{brand?.name}</p>
-        <h3>
+        <Heading>
           <Link to={`/producto/${product.slug}`}>
             {product.name}
             <Icon name="arrow" />
           </Link>
-        </h3>
+        </Heading>
         {variant === 'standard' && (
           <p className="product-family">{product.family}</p>
         )}

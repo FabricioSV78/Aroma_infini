@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from 'react'
-import { useLocation } from 'react-router'
-import { resolveSeoPage, type SeoPageConfig } from './seo-config'
+import { useLocation, useMatches } from 'react-router'
+import {
+  resolveSeoPage,
+  type SeoPageConfig,
+  type SeoRouteData,
+} from './seo-config'
 
 const SITE_NAME = 'Aroma Infini'
 const DEFAULT_DESCRIPTION =
@@ -62,8 +66,13 @@ function addManagedLink(rel: string, href: string, hreflang?: string) {
   document.head.append(element)
 }
 
-function structuredData(config: SeoPageConfig, origin: string) {
+function structuredData(
+  config: SeoPageConfig,
+  origin: string,
+  publishCommercialData: boolean,
+) {
   const graph: Record<string, unknown>[] = []
+  const productImagePath = config.product?.imagePath
   if (config.canonicalPath === '/') {
     graph.push(
       {
@@ -71,6 +80,7 @@ function structuredData(config: SeoPageConfig, origin: string) {
         '@id': `${origin}/#organization`,
         name: SITE_NAME,
         url: `${origin}/`,
+        logo: absoluteUrl(origin, '/brand/logo-on-light.svg'),
       },
       {
         '@type': 'WebSite',
@@ -92,6 +102,44 @@ function structuredData(config: SeoPageConfig, origin: string) {
         item: absoluteUrl(origin, item.path),
       })),
     })
+  if (
+    publishCommercialData &&
+    config.product &&
+    productImagePath &&
+    config.canonicalPath
+  ) {
+    const product = config.product
+    const variants = product.variants.filter(
+      (variant) => variant.active !== false,
+    )
+    const prices = variants.map((variant) => variant.priceCents / 100)
+    const url = absoluteUrl(origin, config.canonicalPath)
+    graph.push({
+      '@type': 'Product',
+      '@id': `${url}#product`,
+      name: product.name,
+      description: product.description,
+      image: absoluteUrl(origin, productImagePath),
+      ...(product.brand
+        ? { brand: { '@type': 'Brand', name: product.brand } }
+        : {}),
+      ...(prices.length
+        ? {
+            offers: {
+              '@type': 'AggregateOffer',
+              url,
+              priceCurrency: 'PEN',
+              lowPrice: Math.min(...prices).toFixed(2),
+              highPrice: Math.max(...prices).toFixed(2),
+              offerCount: prices.length,
+              availability: variants.some((variant) => variant.stock > 0)
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
+            },
+          }
+        : {}),
+    })
+  }
   return graph.length
     ? { '@context': 'https://schema.org', '@graph': graph }
     : null
@@ -99,9 +147,18 @@ function structuredData(config: SeoPageConfig, origin: string) {
 
 export function SeoManager() {
   const { pathname, search } = useLocation()
+  const matches = useMatches()
+  const loaderData = matches.at(-1)?.data
   const config = useMemo(
-    () => resolveSeoPage(pathname, search),
-    [pathname, search],
+    () =>
+      resolveSeoPage(
+        pathname,
+        search,
+        typeof loaderData === 'object' && loaderData !== null
+          ? (loaderData as SeoRouteData)
+          : undefined,
+      ),
+    [pathname, search, loaderData],
   )
 
   useEffect(() => {
@@ -110,7 +167,10 @@ export function SeoManager() {
       .forEach((element) => element.remove())
 
     const origin = siteOrigin()
-    const indexingEnabled = import.meta.env.VITE_ALLOW_INDEXING === 'true'
+    const indexingEnabled =
+      import.meta.env.PROD && import.meta.env.VITE_ALLOW_INDEXING === 'true'
+    const publishCommercialData =
+      indexingEnabled && import.meta.env.VITE_CATALOG_IS_REAL === 'true'
     const robots = indexingEnabled
       ? config.indexable
         ? PRODUCTION_ROBOTS
@@ -150,7 +210,7 @@ export function SeoManager() {
       setSocialMeta('name', 'twitter:image', image)
       setSocialMeta('name', 'twitter:image:alt', config.imageAlt ?? SITE_NAME)
     }
-    const schema = structuredData(config, origin)
+    const schema = structuredData(config, origin, publishCommercialData)
     if (schema) {
       const script = document.createElement('script')
       script.type = 'application/ld+json'

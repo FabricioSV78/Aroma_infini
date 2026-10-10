@@ -27,7 +27,7 @@ test('Los accesos de ayuda del Home conducen a sus páginas y se recorren con te
   const section = page.locator('.trust-section')
   const destinations = [
     { title: 'Opciones de entrega', href: '/envios' },
-    { title: 'Tu pedido', href: '/seguir-pedido' },
+    { title: 'Seguimiento', href: '/seguir-pedido' },
     { title: 'Conversemos', href: '/contacto' },
   ]
   const links = destinations.map(({ href }) =>

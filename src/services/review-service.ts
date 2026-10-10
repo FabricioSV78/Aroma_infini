@@ -1,4 +1,10 @@
-import type { ProductReview } from '../mocks/product-reviews'
+import { getProductReviews } from '../mocks/product-reviews'
+import type { ProductReview } from '../types/review'
+
+/** Temporary published-review fixture behind the same service boundary as local drafts. */
+export function getPublishedReviews(productId: string): ProductReview[] {
+  return getProductReviews(productId)
+}
 
 const key = (productId: string) => `aroma-infini:reviews:${productId}`
 

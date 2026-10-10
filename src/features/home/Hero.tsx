@@ -190,6 +190,8 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
               key={slide.image}
               className={`hero-slide ${isActive ? 'is-active' : ''}`}
               data-tone={slide.tone}
+              data-layout={slide.layout}
+              data-default-image={!slide.desktopImage}
               role="group"
               aria-roledescription="diapositiva"
               aria-label={`${index + 1} de ${slides.length}`}
@@ -254,24 +256,29 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
                 </picture>
               )}
               <div className="hero-copy">
-                <p className="eyebrow">{slide.eyebrow}</p>
-                <Heading className="hero-title">
-                  {slide.title.map((line, lineIndex) => (
-                    <span key={lineIndex}>{line}</span>
-                  ))}
-                </Heading>
-                <p className="hero-description">{slide.description}</p>
-                <Link
-                  className="button button--primary hero-cta"
-                  to={slide.to}
-                  onPointerEnter={(event) => {
-                    if (event.pointerType === 'mouse') rotation.setHovered(true)
-                  }}
-                  onPointerLeave={() => rotation.setHovered(false)}
-                >
-                  {slide.cta}
-                  <Icon name="arrow" />
-                </Link>
+                <div className="hero-copy-heading">
+                  <p className="eyebrow">{slide.eyebrow}</p>
+                  <Heading className="hero-title">
+                    {slide.title.map((line, lineIndex) => (
+                      <span key={lineIndex}>{line}</span>
+                    ))}
+                  </Heading>
+                </div>
+                <div className="hero-copy-details">
+                  <p className="hero-description">{slide.description}</p>
+                  <Link
+                    className="button button--primary hero-cta"
+                    to={slide.to}
+                    onPointerEnter={(event) => {
+                      if (event.pointerType === 'mouse')
+                        rotation.setHovered(true)
+                    }}
+                    onPointerLeave={() => rotation.setHovered(false)}
+                  >
+                    {slide.cta}
+                    <Icon name="arrow" />
+                  </Link>
+                </div>
               </div>
             </div>
           )

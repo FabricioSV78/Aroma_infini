@@ -113,9 +113,9 @@ test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', asyn
   expect(after?.height).toBeCloseTo(before?.height ?? 0, 2)
   expect(after?.width).toBeCloseTo(before?.width ?? 0, 2)
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL('/tienda?marca=studio-sillage')
+  await expect(page).toHaveURL('/marcas/studio-sillage')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Elige tu próxima fragancia.',
+    'Studio sillage',
   )
 })
 
@@ -147,7 +147,7 @@ test('Marcas móvil: cada enlace tiene fotografía y el cambio de tamaño conser
   await expect(gallery.locator('.brand-thumbnail')).toHaveCount(0)
   await page.setViewportSize({ width: 390, height: 844 })
   await gallery.getByRole('link', { name: /^Matière 04/ }).click()
-  await expect(page).toHaveURL('/tienda?marca=matiere-04')
+  await expect(page).toHaveURL('/marcas/matiere-04')
 })
 
 test('Más vendidos blanco y galería respetuosa con movimiento reducido', async ({

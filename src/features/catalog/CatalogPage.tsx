@@ -259,8 +259,8 @@ export function CatalogPage() {
           </div>
           <p>
             {brand
-              ? 'Descubre sus perfumes y presentaciones.'
-              : 'Distintas firmas. Una forma muy personal de elegir.'}
+              ? `Conoce los perfumes de ${brand.name} y sus presentaciones.`
+              : 'Compara marcas, perfiles olfativos y presentaciones en un solo lugar.'}
           </p>
         </header>
       </div>
@@ -446,6 +446,7 @@ export function CatalogPage() {
                     <ProductCard
                       key={product.id}
                       product={product}
+                      headingLevel={2}
                       brand={data.brands.find(
                         (item) => item.id === product.brandId,
                       )}

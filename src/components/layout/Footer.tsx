@@ -19,7 +19,7 @@ export function Footer() {
                 loading="lazy"
               />
             </Link>
-            <p>Perfumes. Identidad. Descubrimiento.</p>
+            <p>Encuentra tu perfume, nota a nota.</p>
             <span className="eyebrow">PERÚ</span>
             <div
               className="footer-social"

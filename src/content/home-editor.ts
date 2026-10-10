@@ -1,28 +1,9 @@
 import { heroSlides } from './home'
-
-export interface HomeHeroContent {
-  eyebrow: string
-  title: string
-  description: string
-  cta: string
-  alt: string
-  desktopImage: string | null
-  mobileImage: string | null
-}
-
-export interface HomeFilmContent {
-  eyebrow: string
-  title: string
-  description: string
-  cta: string
-  video: string | null
-  poster: string | null
-}
-
-export interface HomeContent {
-  hero: HomeHeroContent[]
-  film: HomeFilmContent
-}
+import type {
+  HomeContent,
+  HomeFilmContent,
+} from '../types/home'
+export type { HomeContent, HomeFilmContent, HomeHeroContent } from '../types/home'
 
 const defaultFilm: HomeFilmContent = {
   eyebrow: 'El ritual del perfume',

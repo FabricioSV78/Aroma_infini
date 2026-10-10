@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { useSyncExternalStore } from 'react'
 import { Icon } from '../../components/ui/Icon'
-import { adminService } from '../../services/admin-service'
+import { shippingService } from '../../services/shipping-service'
 import { formatPEN } from '../../services/currency'
 import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
 
@@ -10,10 +10,7 @@ interface InstitutionalIntroProps {
   description: string
 }
 
-function InstitutionalIntro({
-  title,
-  description,
-}: InstitutionalIntroProps) {
+function InstitutionalIntro({ title, description }: InstitutionalIntroProps) {
   return (
     <header className="institutional-intro" data-scroll-reveal="copy">
       <h1>{title}</h1>
@@ -32,9 +29,9 @@ function ContactAction({ label = 'Escríbenos' }: { label?: string }) {
 
 export function ShippingPage() {
   const shipping = useSyncExternalStore(
-    adminService.subscribe,
-    adminService.getSnapshot,
-  ).shipping
+    shippingService.subscribe,
+    shippingService.getSnapshot,
+  )
   return (
     <article className="store-page institutional-page institutional-shipping container">
       <InstitutionalBreadcrumb current="Envíos y entregas" />
@@ -163,10 +160,7 @@ function InformationPage({
   return (
     <article className="store-page institutional-page institutional-legal container">
       <InstitutionalBreadcrumb current={current} />
-      <InstitutionalIntro
-        title={title}
-        description={description}
-      />
+      <InstitutionalIntro title={title} description={description} />
       <div
         className="institutional-legal-sections"
         data-scroll-reveal="stagger"
@@ -202,7 +196,7 @@ export function PrivacyPage() {
         },
         {
           title: 'Información en este navegador',
-          body: 'La cuenta y las preferencias de compra se conservan durante la sesión en este navegador para que puedas continuar donde quedaste.',
+          body: 'La cuenta se conserva durante la sesión; el carrito y los favoritos permanecen guardados en este navegador.',
         },
       ]}
     />

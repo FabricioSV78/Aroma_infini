@@ -31,28 +31,37 @@ for (const width of [390, 1440]) {
       },
       {
         section: '#marcas',
-        href: '/tienda?marca=atelier-01',
+        href: '/marcas/atelier-01',
         products: ['Bois Clair', 'Néroli Matin'],
       },
       {
         section: '#marcas',
-        href: '/tienda?marca=forme',
+        href: '/marcas/forme',
         products: ['Pétale Nu', 'Iris Velours'],
       },
       {
         section: '#marcas',
-        href: '/tienda?marca=studio-sillage',
+        href: '/marcas/studio-sillage',
         products: ['Vert Silence', 'Figue Douce'],
       },
       {
         section: '#marcas',
-        href: '/tienda?marca=matiere-04',
+        href: '/marcas/matiere-04',
         products: ['Ambre Lent', 'Santal Nuit'],
       },
       {
         section: '.editorial-film',
         href: '/tienda',
-        products: ['Bois Clair', 'Pétale Nu', 'Ambre Lent', 'Vert Silence', 'Néroli Matin', 'Iris Velours', 'Figue Douce', 'Santal Nuit'],
+        products: [
+          'Bois Clair',
+          'Pétale Nu',
+          'Ambre Lent',
+          'Vert Silence',
+          'Néroli Matin',
+          'Iris Velours',
+          'Figue Douce',
+          'Santal Nuit',
+        ],
       },
       {
         section: '#destacados',
@@ -86,7 +95,9 @@ for (const width of [390, 1440]) {
       await expect(page.locator('.product-card')).toHaveCount(
         destination.products.length,
       )
-      const names = await page.locator('.product-card h3').allTextContents()
+      const names = await page
+        .locator('.product-card h2, .product-card h3')
+        .allTextContents()
       expect(names.sort()).toEqual([...destination.products].sort())
       const breadcrumb = page
         .locator('main')

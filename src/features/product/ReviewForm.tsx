@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import type { ProductReview } from '../../mocks/product-reviews'
+import type { ProductReview } from '../../types/review'
 
 interface ReviewFormProps {
   sizes: number[]

@@ -1,51 +1,53 @@
 import type { Brand, Product } from '../types/catalog'
-import type { HomeContent } from '../content/home-editor'
+import type { HomeContent, HomeMedia } from '../types/home'
+import type { ShippingSettings } from '../types/shipping'
 import {
-  getFeaturedProducts,
-  getStoreBrands,
-  getStoreProducts,
-  getAdminProduct,
-  getShippingSettings,
-  adminService,
-  hydrateAdminStore,
-  type AdminShippingSettings,
-  type HomeMedia,
-} from './admin-service'
+  localStorefrontRepository,
+  type StorefrontProductRecord,
+} from './storefront-repository'
 
 export interface HomeData {
   brands: Brand[]
   bestsellers: Product[]
   featured: Product[]
-  shipping: AdminShippingSettings
+  shipping: ShippingSettings
   media: HomeMedia
   content: HomeContent
 }
 
-// Único contrato de datos requerido en las fases 1 y 2.
 export interface HomeService {
   getHome(): Promise<HomeData>
 }
 
-export function getBestsellingProducts(): Product[] {
-  return [...getStoreProducts()]
-    .sort(
-      (a, b) =>
-        (getAdminProduct(a.id)?.popularity ?? Infinity) -
-        (getAdminProduct(b.id)?.popularity ?? Infinity),
-    )
+function bestsellersFromRecords(records: StorefrontProductRecord[]): Product[] {
+  return [...records]
+    .sort((a, b) => a.popularity - b.popularity)
     .slice(0, 4)
+    .map((record) => record.product)
+}
+
+export function getBestsellingProducts(): Product[] {
+  return bestsellersFromRecords(
+    localStorefrontRepository.peekSnapshot().products,
+  )
 }
 
 export const homeService: HomeService = {
   async getHome() {
-    await hydrateAdminStore()
+    const snapshot = await localStorefrontRepository.readSnapshot()
+    const productsById = new Map(
+      snapshot.products.map((record) => [record.product.id, record.product]),
+    )
     return {
-      brands: getStoreBrands(),
-      bestsellers: getBestsellingProducts(),
-      featured: getFeaturedProducts(),
-      shipping: getShippingSettings(),
-      media: { ...adminService.getSnapshot().homeMedia },
-      content: adminService.getSnapshot().homeContent,
+      brands: snapshot.brands,
+      bestsellers: bestsellersFromRecords(snapshot.products),
+      featured: snapshot.featuredOrder.flatMap((id) => {
+        const product = productsById.get(id)
+        return product ? [product] : []
+      }),
+      shipping: snapshot.shipping,
+      media: { ...snapshot.media },
+      content: snapshot.content,
     }
   },
 }

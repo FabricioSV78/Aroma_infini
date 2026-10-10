@@ -197,17 +197,21 @@
     inset: auto;
     flex: none;
     width: 100%;
-    height: clamp(280px, 90vw, 360px);
+    height: clamp(260px, 75vw, 300px);
     margin-top: 44px;
   }
   .home .hero-image img {
-    object-position: 55% top;
+    object-position: 55% 4%;
   }
   .home .hero-copy {
     flex: 1;
     width: 100%;
-    padding: 24px var(--entrance-gutter) 72px;
+    padding: 10px var(--entrance-gutter) 16px;
     background: var(--color-canvas);
+  }
+  .home .hero-position {
+    top: calc(44px + clamp(260px, 75vw, 300px) - 52px);
+    bottom: auto;
   }
   .home .hero-title {
     font-size: 36px;

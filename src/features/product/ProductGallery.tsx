@@ -83,7 +83,7 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
                 loading={index === 0 ? 'eager' : 'lazy'}
                 fetchPriority={index === 0 ? 'high' : 'auto'}
                 decoding="async"
-                alt={view.alt}
+                alt={view.alt.trim() || `Vista ${index + 1} de ${name}`}
               />
             </figure>
           ))}

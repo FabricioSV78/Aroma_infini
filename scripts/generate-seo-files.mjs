@@ -1,38 +1,6 @@
-import { existsSync } from 'node:fs'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import indexablePaths from '../src/seo/indexable-paths.json' with { type: 'json' }
-
-const mode =
-  process.env.NODE_ENV === 'development' ? 'development' : 'production'
-
-function parseEnv(source) {
-  const result = {}
-  for (const rawLine of source.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const separator = line.indexOf('=')
-    if (separator < 1) continue
-    const key = line.slice(0, separator).trim()
-    let value = line.slice(separator + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    )
-      value = value.slice(1, -1)
-    result[key] = value
-  }
-  return result
-}
-
-async function environment() {
-  const files = ['.env', '.env.local', `.env.${mode}`, `.env.${mode}.local`]
-  const values = {}
-  for (const file of files) {
-    if (!existsSync(file)) continue
-    Object.assign(values, parseEnv(await readFile(file, 'utf8')))
-  }
-  return { ...values, ...process.env }
-}
+import { readSeoEnvironment } from './seo-environment.mjs'
 
 function escapeXml(value) {
   return value
@@ -43,8 +11,9 @@ function escapeXml(value) {
     .replaceAll("'", '&apos;')
 }
 
-const env = await environment()
+const env = await readSeoEnvironment()
 const indexingEnabled = env.VITE_ALLOW_INDEXING === 'true'
+const catalogIsReal = env.VITE_CATALOG_IS_REAL === 'true'
 const rawSiteUrl = env.VITE_SITE_URL?.trim()
 let origin = null
 
@@ -55,10 +24,23 @@ if (rawSiteUrl) {
   origin = url.origin
 }
 
-if (indexingEnabled && (!origin || /localhost|127\.0\.0\.1/.test(origin)))
+if (
+  indexingEnabled &&
+  (!origin || /localhost|127\.0\.0\.1|dominio-confirmado\.pe/.test(origin))
+)
   throw new Error(
-    'Para habilitar la indexación configura VITE_SITE_URL con el dominio público definitivo.',
+    'Para habilitar la indexación configura VITE_SITE_URL con el dominio público definitivo, no el valor de ejemplo.',
   )
+
+if (indexingEnabled && !catalogIsReal)
+  throw new Error(
+    'No se puede indexar el catálogo de muestra. Confirma datos comerciales reales y configura VITE_CATALOG_IS_REAL=true.',
+  )
+
+if (new Set(indexablePaths).size !== indexablePaths.length)
+  throw new Error('La lista de rutas SEO contiene duplicados.')
+if (indexablePaths.some((path) => !path.startsWith('/') || path.includes('?')))
+  throw new Error('El sitemap solo puede incluir rutas canónicas limpias.')
 
 const robots = [
   'User-agent: *',

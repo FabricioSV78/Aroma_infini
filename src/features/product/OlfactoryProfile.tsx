@@ -34,7 +34,14 @@ export function OlfactoryProfile({
     <div className={`olfactory-profile-card${image ? ' has-image' : ''}`}>
       {image ? (
         <figure className="olfactory-profile-visual">
-          <img src={image} alt="" loading="lazy" decoding="async" />
+          <img
+            src={image}
+            alt=""
+            width={960}
+            height={1200}
+            loading="lazy"
+            decoding="async"
+          />
         </figure>
       ) : null}
 

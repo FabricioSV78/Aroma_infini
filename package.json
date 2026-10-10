@@ -11,6 +11,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint . --max-warnings 0",
     "prebuild": "node scripts/generate-seo-files.mjs",
+    "postbuild": "node scripts/prerender-seo.mjs",
     "test:e2e": "playwright test",
     "format": "prettier --write src tests scripts *.ts *.js *.json index.html",
     "build": "tsc -b && vite build",

@@ -1,5 +1,11 @@
 import type { AdminState } from './admin-service'
 
+/** Persistence contract for the current browser-local demo snapshot. */
+export interface AdminStateRepository {
+  read(): Promise<AdminState | undefined>
+  write(snapshot: AdminState): Promise<void>
+}
+
 const databaseName = 'aroma-infini-admin'
 const storeName = 'snapshot'
 const schemaVersion = 1
@@ -45,4 +51,9 @@ export async function writeAdminState(snapshot: AdminState): Promise<void> {
     transaction.onerror = () => reject(transaction.error)
     transaction.onabort = () => reject(transaction.error)
   })
+}
+
+export const localAdminStateRepository: AdminStateRepository = {
+  read: readAdminState,
+  write: writeAdminState,
 }

@@ -6,7 +6,6 @@ import {
 } from '../src/services/catalog-service'
 import { products } from '../src/mocks/home'
 import {
-  brandCatalogRedirectLoader,
   catalogLoader,
   brandsLoader,
 } from '../src/features/catalog/catalog-loaders'
@@ -105,29 +104,35 @@ test('Loaders: marca inexistente y fallos recuperables', async () => {
   }
   expect((await catalogLoader(args)).kind).toBe('missing')
   const original = catalogService.getBrands
+  const originalPreviews = catalogService.getBrandPreviews
   try {
     catalogService.getBrands = async () => {
       throw new Error('test')
     }
     expect((await catalogLoader(args)).kind).toBe('error')
+    catalogService.getBrandPreviews = async () => {
+      throw new Error('test')
+    }
     expect((await brandsLoader()).kind).toBe('error')
   } finally {
     catalogService.getBrands = original
+    catalogService.getBrandPreviews = originalPreviews
   }
 })
 
-test('Las rutas anteriores de marca redirigen al filtro de la tienda', async () => {
-  const response = await brandCatalogRedirectLoader({
+test('La ruta limpia de marca abre su catálogo con la marca aplicada', async () => {
+  const result = await catalogLoader({
     request: new Request('http://localhost/marcas/forme'),
     params: { slug: 'forme' },
     context: {},
     url: new URL('http://localhost/marcas/forme'),
     pattern: '/marcas/:slug',
   })
-  expect(response).toBeInstanceOf(Response)
-  expect((response as Response).headers.get('Location')).toBe(
-    '/tienda?marca=forme',
-  )
+  expect(result.kind).toBe('ready')
+  if (result.kind !== 'ready') return
+  expect(result.brand?.slug).toBe('forme')
+  expect(result.query.brands).toEqual(['forme'])
+  expect(result.items).toHaveLength(2)
 })
 
 test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
@@ -335,10 +340,8 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
     .locator('.brands-directory')
     .getByRole('link', { name: /Forme/ })
     .click()
-  await expect(page).toHaveURL('/tienda?marca=forme')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Elige tu próxima fragancia.',
-  )
+  await expect(page).toHaveURL('/marcas/forme')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forme')
   await expect(page.locator('.product-card')).toHaveCount(2)
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
   await page.getByRole('dialog').getByLabel('Perfume o marca').fill('petale')
@@ -359,6 +362,13 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   ).toBeVisible()
   await page.goto('/marcas/inexistente')
   await expect(page.locator('.product-card')).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Esta marca no está en la selección.',
+  )
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    'content',
+    'noindex,nofollow',
+  )
 })
 
 for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {

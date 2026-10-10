@@ -23,8 +23,14 @@
 }
 
 .store-layout .site-header .wordmark {
-  width: 104px;
+  width: 96px;
   min-width: 0;
+  transform: translateY(2px);
+}
+
+.store-layout .announcement {
+  background: var(--color-surface);
+  color: var(--color-muted);
 }
 .store-layout .site-header .brand-logo,
 .store-layout .footer-brand .brand-logo {
@@ -204,7 +210,7 @@
   font-size: 11px;
   font-weight: 700;
 }
-.store-layout .catalog-page .product-card--standard .product-meta h3 {
+.store-layout .catalog-page .product-card--standard .product-meta :is(h2, h3) {
   font-size: clamp(18px, 1.35vw, 22px);
   line-height: 1.15;
 }
@@ -233,7 +239,7 @@
   font-size: 12px;
   line-height: 1.4;
 }
-.store-layout .product-card h3 a:is(:hover, :focus-visible) {
+.store-layout .product-card :is(h2, h3) a:is(:hover, :focus-visible) {
   color: var(--color-brand);
 }
 .store-layout .product-favorite[aria-pressed='true'],
@@ -413,7 +419,7 @@
 
 @media (min-width: 768px) {
   .store-layout .site-header .wordmark {
-    width: 110px;
+    width: 102px;
   }
   .store-layout .brands-directory > a {
     grid-template-columns: minmax(0, 1fr) 96px auto;
@@ -478,7 +484,7 @@
 }
 @media (min-width: 1200px) {
   .store-layout .site-header .wordmark {
-    width: 128px;
+    width: 116px;
   }
 }
 

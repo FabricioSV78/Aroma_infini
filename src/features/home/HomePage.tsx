@@ -25,30 +25,32 @@ export function HomePage() {
   const data = useLoaderData<HomeData>()
   const sections = {
     hero: <Hero content={data.content.hero} />,
-    brands: (
+    brands: data.brands.length ? (
       <BrandGallery brands={data.brands} bestsellers={data.bestsellers} />
-    ),
+    ) : null,
     categories: <Categories media={data.media} />,
-    bestsellers: (
+    bestsellers: data.bestsellers.length ? (
       <Bestsellers brands={data.brands} bestsellers={data.bestsellers} />
-    ),
+    ) : null,
     editorial: <EditorialFilm content={data.content.film} />,
-    featured: (
+    featured: data.featured.length ? (
       <FeaturedPerfumes
         brands={data.brands}
         featured={data.featured}
         media={data.media}
       />
-    ),
+    ) : null,
     trust: <TrustInformation />,
   }
   return (
     <div className="home">
-      {sectionOrder.map((id) => (
-        <div key={id} data-home-section={id}>
-          {sections[id]}
-        </div>
-      ))}
+      {sectionOrder.map((id) =>
+        sections[id] ? (
+          <div key={id} data-home-section={id}>
+            {sections[id]}
+          </div>
+        ) : null,
+      )}
     </div>
   )
 }

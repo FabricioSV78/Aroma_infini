@@ -1,15 +1,69 @@
 import { expect, test } from '@playwright/test'
 import { resolveSeoPage } from '../src/seo/seo-config'
+import { catalogService } from '../src/services/catalog-service'
+
+test('Una foto local de administración no se anuncia como imagen pública para compartir', async () => {
+  const record = await catalogService.getProduct('petale-nu')
+  expect(record).toBeDefined()
+  if (!record) return
+  const config = resolveSeoPage('/producto/petale-nu', '', {
+    kind: 'ready',
+    product: {
+      ...record.product,
+      image: 'data:image/webp;base64,AA==',
+    },
+    detail: record.detail,
+    brand: record.brand,
+  })
+  expect(config.imagePath).toBeUndefined()
+  expect(config.product?.imagePath).toBeUndefined()
+
+  const remoteConfig = resolveSeoPage('/producto/petale-nu', '', {
+    kind: 'ready',
+    product: {
+      ...record.product,
+      image: 'https://cdn.example.com/petale.webp',
+    },
+    detail: record.detail,
+    brand: record.brand,
+  })
+  expect(remoteConfig.imagePath).toBe('https://cdn.example.com/petale.webp')
+
+  const brandConfig = resolveSeoPage('/marcas/forme', '', {
+    kind: 'ready',
+    brand: record.brand,
+    items: [record.product],
+  })
+  expect(brandConfig.imagePath).toBe('/images/petale-960.webp')
+})
+import { brands, products } from '../src/mocks/home'
+import { getProductDetail } from '../src/mocks/product-details'
 
 test('La política SEO distingue páginas públicas, facetas y recorridos privados', () => {
   expect(resolveSeoPage('/', '').indexable).toBe(true)
   expect(resolveSeoPage('/tienda', '').indexable).toBe(true)
   expect(resolveSeoPage('/tienda', '?genero=unisex').indexable).toBe(false)
-  expect(resolveSeoPage('/tienda', '?marca=forme')).toMatchObject({
-    indexable: true,
-    canonicalPath: '/tienda?marca=forme',
+  expect(resolveSeoPage('/tienda', '?marca=forme', { brands })).toMatchObject({
+    indexable: false,
+    canonicalPath: '/marcas/forme',
   })
-  expect(resolveSeoPage('/producto/petale-nu', '').type).toBe('product')
+  expect(
+    resolveSeoPage('/marcas/forme', '', { brand: brands[1] }),
+  ).toMatchObject({ indexable: true, canonicalPath: '/marcas/forme' })
+  expect(
+    resolveSeoPage('/producto/petale-nu', '', {
+      product: products[1],
+      detail: getProductDetail(products[1]),
+      brand: brands[1],
+    }).type,
+  ).toBe('product')
+  expect(
+    resolveSeoPage('/producto/petale-nu', '?presentacion=50', {
+      product: products[1],
+      detail: getProductDetail(products[1]),
+      brand: brands[1],
+    }).indexable,
+  ).toBe(false)
   expect(resolveSeoPage('/buscar', '?q=petale').indexable).toBe(false)
   expect(resolveSeoPage('/checkout', '').follow).toBe(false)
   expect(resolveSeoPage('/ruta-inexistente', '').canonicalPath).toBeNull()
@@ -74,4 +128,18 @@ test('Tienda, ficha y utilidades actualizan SEO sin duplicar etiquetas', async (
     'content',
     'noindex,nofollow',
   )
+})
+
+test('La página de marca tiene canonical limpio y una marca inválida queda fuera del índice', async ({
+  page,
+}) => {
+  await page.goto('/marcas/forme')
+  await expect(page).toHaveTitle('Forme: perfumes | Aroma Infini')
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'http://127.0.0.1:5173/marcas/forme',
+  )
+  await page.goto('/marcas/inexistente')
+  await expect(page).toHaveTitle('Página no encontrada | Aroma Infini')
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
 })
