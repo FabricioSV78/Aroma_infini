@@ -2,7 +2,7 @@
   margin-block: 24px 20px;
 }
 .admin-olfactory-editor .olfactory-profile-card {
-  padding: 28px 20px;
+  border: 1px solid var(--admin-border);
   background: white;
 }
 .admin-olfactory-editor :is(input, select) {
@@ -20,9 +20,12 @@
 .admin-olfactory-editor .olfactory-profile-intensity select {
   max-width: 180px;
 }
-.admin-olfactory-editor .olfactory-profile-notes {
-  white-space: normal;
-  overflow: visible;
+.admin-olfactory-editor .olfactory-profile-details {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.admin-olfactory-editor .olfactory-profile-traits {
+  gap: 18px;
 }
 .admin-profile-notes {
   display: grid;
@@ -33,6 +36,19 @@
   gap: 4px;
   font-size: 12px;
   text-align: left;
+}
+.admin-profile-notes-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--profile-accent);
+  font-weight: 700;
+}
+.admin-profile-notes-heading svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  stroke-width: 1.75;
 }
 .admin-profile-notes small {
   color: var(--color-muted);
@@ -63,13 +79,14 @@
   width: 100%;
   max-height: 320px;
   aspect-ratio: 4 / 5;
-  background: #fbfaf8;
+  background: #f4f4f1;
 }
 
 .admin-product-preview-main img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  mix-blend-mode: darken;
 }
 
 .admin-product-preview-main p {
@@ -140,6 +157,11 @@
   border-left: 2px solid var(--admin-accent);
   background: var(--admin-accent-soft);
   color: var(--admin-text);
+}
+.admin-product-upload-area .admin-product-upload-feedback.is-error {
+  border-left-color: var(--admin-danger);
+  background: var(--admin-danger-soft);
+  color: var(--admin-danger);
 }
 
 .admin-product-upload-area > .button {
@@ -213,6 +235,37 @@
   font-size: 11px;
 }
 
+.admin-editor-page .admin-fields label > small {
+  color: var(--admin-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.admin-editor-page .admin-error:focus {
+  outline: 2px solid var(--admin-danger);
+  outline-offset: 3px;
+}
+
+.admin-product-save-state {
+  margin-right: auto;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+.admin-products-page .admin-row-actions a {
+  color: var(--admin-accent);
+  font-weight: 700;
+}
+
+.admin-products-page .admin-row-actions button.is-deactivate {
+  color: var(--admin-danger);
+}
+
+.admin-products-page .admin-row-actions button.is-activate {
+  color: var(--admin-accent);
+}
+
 @media (max-width: 640px) {
   .admin-product-upload-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -258,8 +311,6 @@
   }
 
   .admin-editor-page .admin-editor > section:nth-child(2) {
-    position: sticky;
-    top: 96px;
     grid-column: 2;
     grid-row: 1;
     align-self: start;
@@ -308,6 +359,10 @@
 
   .admin-editor-page .admin-editor-actions {
     gap: 8px;
+  }
+
+  .admin-editor-page .admin-product-save-state {
+    flex-basis: 100%;
   }
 
   .admin-editor-page .admin-editor-actions .button {

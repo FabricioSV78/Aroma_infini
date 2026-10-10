@@ -10,7 +10,7 @@
   --color-line: #dededa;
   --color-control: #767676;
   --color-accent: var(--color-ink);
-  --font-body: 'IBM Plex Sans', Arial, sans-serif;
+  --font-body: 'Lato', Arial, sans-serif;
   --font-display: var(--font-body);
   --font-sans: var(--font-body);
   --type-label: 0.6875rem;

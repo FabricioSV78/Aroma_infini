@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       allowedHosts: ['.trycloudflare.com'],
+      watch: {
+        ignored: ['**/artifacts/**'],
+      },
     },
     build: {
       rolldownOptions: {

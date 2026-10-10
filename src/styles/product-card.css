@@ -29,18 +29,18 @@
 /* One neutral surface and the same framing for both catalog photographs. */
 .catalog-page .product-photo,
 .catalog-page .product-image-link {
-  background: #faf9f6;
+  background: var(--color-surface);
 }
 .catalog-page .product-card--standard .product-image-link img {
   object-fit: contain;
   object-position: center;
   mix-blend-mode: multiply;
 }
-.catalog-page .product-image-link--swap:focus-visible > img:first-child {
+.product-image-link--swap:focus-visible > .product-image-primary {
   opacity: 0;
 }
 @media (hover: hover) and (pointer: fine) {
-  .catalog-page .product-image-link--swap:hover > img:first-child {
+  .product-image-link--swap:hover > .product-image-primary {
     opacity: 0;
   }
 }

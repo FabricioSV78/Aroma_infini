@@ -1,4 +1,5 @@
 import type { Brand, Product } from '../types/catalog'
+import type { HomeContent } from '../content/home-editor'
 import {
   getFeaturedProducts,
   getStoreBrands,
@@ -17,6 +18,7 @@ export interface HomeData {
   featured: Product[]
   shipping: AdminShippingSettings
   media: HomeMedia
+  content: HomeContent
 }
 
 // Único contrato de datos requerido en las fases 1 y 2.
@@ -43,6 +45,7 @@ export const homeService: HomeService = {
       featured: getFeaturedProducts(),
       shipping: getShippingSettings(),
       media: { ...adminService.getSnapshot().homeMedia },
+      content: adminService.getSnapshot().homeContent,
     }
   },
 }

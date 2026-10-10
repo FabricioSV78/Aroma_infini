@@ -3,7 +3,7 @@ import {
   catalogService,
   readCatalogQuery,
 } from '../../services/catalog-service'
-import { hydrateAdminStore } from '../../services/admin-service'
+import { getStoreProducts, hydrateAdminStore } from '../../services/admin-service'
 export async function catalogLoader({ request, params }: LoaderFunctionArgs) {
   await hydrateAdminStore()
   const query = readCatalogQuery(new URL(request.url).searchParams)
@@ -23,7 +23,16 @@ export async function catalogLoader({ request, params }: LoaderFunctionArgs) {
 export async function brandsLoader() {
   await hydrateAdminStore()
   try {
-    return { kind: 'ready' as const, brands: await catalogService.getBrands() }
+    const brands = await catalogService.getBrands()
+    const products = getStoreProducts()
+    return {
+      kind: 'ready' as const,
+      brands: brands.map((brand) => ({
+        ...brand,
+        previewImage: products.find((product) => product.brandId === brand.id)
+          ?.image,
+      })),
+    }
   } catch {
     return { kind: 'error' as const }
   }

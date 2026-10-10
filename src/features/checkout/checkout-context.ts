@@ -11,7 +11,7 @@ export interface CheckoutContextValue {
   draft: CheckoutDraft
   setDraft: Dispatch<SetStateAction<CheckoutDraft>>
   order: MockOrder | null
-  completeOrder: (cart: ResolvedCart) => MockOrder | null
+  completeOrder: (cart: ResolvedCart) => Promise<MockOrder | null>
 }
 
 export const CheckoutContext = createContext<CheckoutContextValue | null>(null)

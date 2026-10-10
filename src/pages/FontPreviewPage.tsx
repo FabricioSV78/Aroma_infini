@@ -46,7 +46,7 @@ export function FontPreviewPage() {
       <header className="font-preview__header">
         <h1>Encuentra la voz de Aroma Infini.</h1>
         <p>
-          Compara cinco fuentes con los mismos tamaños y espaciados. Tu elección
+          Compara seis fuentes con los mismos tamaños y espaciados. Tu elección
           se aplica a la tienda y al panel, solo en este navegador.
         </p>
       </header>
@@ -83,8 +83,8 @@ export function FontPreviewPage() {
       </fieldset>
       <div className="font-preview__actions">
         <p role="status">{status}</p>
-        <button type="button" onClick={() => void selectFont('ibm-plex-sans')}>
-          Restaurar fuente original
+        <button type="button" onClick={() => void selectFont('lato')}>
+          Restaurar fuente de marca
         </button>
       </div>
       <section

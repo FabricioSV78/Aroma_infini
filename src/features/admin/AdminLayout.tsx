@@ -81,7 +81,9 @@ export function AdminLayout() {
     if (!navigationOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    window.requestAnimationFrame(() => menuCloseButtonRef.current?.focus({ preventScroll: true }))
+    window.requestAnimationFrame(() =>
+      menuCloseButtonRef.current?.focus({ preventScroll: true }),
+    )
     const handleDrawerKeys = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setNavigationOpen(false)
@@ -89,7 +91,11 @@ export function AdminLayout() {
         return
       }
       if (event.key !== 'Tab' || !sidebarRef.current) return
-      const items = [...sidebarRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')]
+      const items = [
+        ...sidebarRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled])',
+        ),
+      ]
       const first = items[0]
       const last = items.at(-1)
       if (!first || !last) return
@@ -120,7 +126,7 @@ export function AdminLayout() {
   function resetDemo() {
     if (
       window.confirm(
-        '¿Restablecer productos, pedidos y configuración guardados en este navegador?',
+        'Se borrarán los productos, pedidos, clientes, promociones, contenido del Home y tarifas guardados en este navegador. Esta acción no se puede deshacer. ¿Continuar?',
       )
     ) {
       adminService.reset()
@@ -227,10 +233,10 @@ export function AdminLayout() {
         </nav>
         <div className="admin-sidebar-footer">
           <button className="admin-reset" type="button" onClick={resetDemo}>
-            Restablecer datos
+            Borrar datos de este navegador
           </button>
           <span className="admin-side-status">
-            <span aria-hidden="true" /> Sesión local
+            <span aria-hidden="true" /> Datos locales
           </span>
         </div>
       </aside>
@@ -244,7 +250,12 @@ export function AdminLayout() {
           window.requestAnimationFrame(() => menuButtonRef.current?.focus())
         }}
       />
-      <main id="admin-content" className="admin-main" tabIndex={-1} inert={navigationOpen}>
+      <main
+        id="admin-content"
+        className="admin-main"
+        tabIndex={-1}
+        inert={navigationOpen}
+      >
         <div className="admin-demo-banner">
           Los cambios de este panel se guardan en este navegador.
         </div>

@@ -1,0 +1,251 @@
+/* Home only: preserve the brand surfaces and let scale and composition lead. */
+.home .hero-slide:last-child .hero-title {
+  max-width: 16ch;
+}
+.home .section-heading h2,
+.home .brand-intro h2,
+.home .featured-intro h2 {
+  font-size: clamp(32px, 2.8vw, 48px);
+  line-height: 1.12;
+}
+.home .section-heading h2 {
+  max-width: 24ch;
+}
+.home .featured-intro h2 {
+  max-width: 19ch;
+  text-wrap: balance;
+}
+.home .category p,
+.home .brand-scent,
+.home .product-volume {
+  font-size: 12px;
+}
+.home .product-card--standard .product-meta > .eyebrow {
+  color: var(--color-brand);
+  font-size: 11px;
+  font-weight: 700;
+}
+.home .product-meta h3 {
+  line-height: 1.2;
+}
+.home .product-price {
+  gap: 4px;
+}
+.home .price-prefix {
+  margin-inline-end: 3px;
+}
+.home .brand-gallery-inner {
+  padding-block: clamp(44px, 4.5vw, 72px);
+}
+.home .featured-section {
+  padding-block: clamp(44px, 4.5vw, 72px);
+}
+.home .editorial-film-copy h2 {
+  font-size: clamp(32px, 3vw, 48px);
+  line-height: 1.12;
+}
+.home .editorial-film-copy > p:not(.eyebrow) {
+  font-size: 15px;
+}
+/* Keep the face and photography luminous, with contrast concentrated by the copy. */
+.home .editorial-film-media::after {
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.76),
+    rgb(0 0 0 / 0.52) 32%,
+    rgb(0 0 0 / 0.04) 78%
+  );
+}
+.home .editorial-film-toggle {
+  position: absolute;
+  z-index: 2;
+  right: var(--gutter);
+  bottom: 20px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.25);
+  color: #fff;
+  transition: background-color 200ms ease;
+}
+.home .editorial-film-toggle:is(:hover, :focus-visible) {
+  background: rgb(0 0 0 / 0.55);
+}
+.home .editorial-film-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+@media (min-width: 768px) {
+  .home [data-home-section='categories'],
+  .home [data-home-section='bestsellers'] {
+    padding-bottom: clamp(48px, 4vw, 72px);
+  }
+  .home .discovery-section,
+  .home .bestsellers-section {
+    padding-top: clamp(48px, 4vw, 72px);
+  }
+  .home .category-grid {
+    grid-template-columns: 1.6fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 24px;
+  }
+  .home .category--portrait .category-image {
+    min-height: 0;
+  }
+  .home .category--portrait img {
+    object-position: center 44%;
+  }
+  .home .category--landscape .category-image,
+  .home .category--panorama .category-image {
+    flex: none;
+    aspect-ratio: 2 / 1;
+  }
+  .home .category--landscape img,
+  .home .category--panorama img {
+    object-position: center 35%;
+  }
+  .home .category-copy {
+    padding-top: 12px;
+  }
+  .home .brand-preview {
+    max-width: 420px;
+  }
+  .home .brand-gallery-inner {
+    gap: 32px clamp(32px, 5vw, 80px);
+  }
+}
+/* Shallow laptop displays show the three entrances together instead of a tall mosaic. */
+@media (min-width: 1024px) and (max-height: 800px) {
+  .home .category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+  .home .category {
+    grid-row: auto;
+    grid-column: auto;
+  }
+  .home .category .category-image {
+    flex: none;
+    aspect-ratio: 1;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .home .bestsellers-section .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 24px;
+  }
+  .home .brand-entry {
+    grid-template-columns: 24px minmax(0, 1fr) 20px;
+    gap: 12px;
+    min-height: 92px;
+  }
+  .home .editorial-film-copy {
+    max-width: 40%;
+  }
+  .home .editorial-film-copy h2 {
+    font-size: 30px;
+    margin-block: 12px;
+  }
+  .home .editorial-film-copy > p:not(.eyebrow) {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .home .editorial-film-copy .text-link {
+    margin-top: 12px;
+  }
+}
+@media (max-width: 767px) {
+  .home .editorial-film-media::after {
+    background: linear-gradient(
+      0deg,
+      rgb(0 0 0 / 0.82),
+      rgb(0 0 0 / 0.58) 48%,
+      transparent 90%
+    );
+  }
+  .home .featured-products {
+    gap: 0;
+  }
+  .home .product-card--editorial {
+    padding-block: 16px;
+  }
+}
+@media (max-width: 1199px) {
+  .store-layout--home > .help-button {
+    width: fit-content;
+    padding-inline: 20px;
+    margin: 8px auto 16px;
+    border: 0;
+    background: transparent;
+  }
+}
+/* Short phones need room for both the bottle and the message. */
+@media (max-width: 599px) and (max-height: 650px) {
+  .home .hero,
+  .home .hero-stage {
+    min-height: 0;
+  }
+  .home .hero-slide {
+    display: flex;
+    flex-direction: column;
+  }
+  .home .hero-image {
+    position: relative;
+    inset: auto;
+    flex: none;
+    width: 100%;
+    height: clamp(280px, 90vw, 360px);
+    margin-top: 44px;
+  }
+  .home .hero-image img {
+    object-position: 55% top;
+  }
+  .home .hero-copy {
+    flex: 1;
+    width: 100%;
+    padding: 24px var(--entrance-gutter) 72px;
+    background: var(--color-canvas);
+  }
+  .home .hero-title {
+    font-size: 36px;
+  }
+  .home .hero-navigation {
+    top: 165px;
+  }
+}
+@media (min-width: 600px) and (max-width: 1023px) and (max-height: 500px) {
+  .home .bestsellers-section .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .home .hero {
+    min-height: 480px;
+  }
+  .home .hero-copy {
+    min-height: inherit;
+    padding: 108px 64px 72px;
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.76),
+      rgb(255 255 255 / 0.4) 38%,
+      transparent 70%
+    );
+  }
+  .home .hero-title {
+    font-size: 36px;
+  }
+  .home .hero-description {
+    max-width: 32ch;
+    font-size: 14px;
+  }
+  .home .hero-navigation {
+    top: 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home .editorial-film-toggle {
+    transition: none;
+  }
+}

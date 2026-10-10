@@ -20,6 +20,12 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
     })
 
     await page.goto('/producto/petale-nu')
+    await page.locator('.product-gallery').evaluate((gallery) => {
+      window.scrollTo({
+        top: gallery.getBoundingClientRect().bottom + window.scrollY - 64,
+        behavior: 'instant',
+      })
+    })
     const productNotice = page.locator('.product-popularity-preview')
     await expect(productNotice).toBeVisible()
     await productNotice.getByRole('button', { name: /Cerrar aviso/ }).click()
@@ -27,6 +33,12 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
     await page.screenshot({
       path: `artifacts/review-product-intro-${width}.png`,
     })
+    await page.locator('#product-info-tab-family').click()
+    await page
+      .locator('.olfactory-profile-visual img')
+      .evaluate(async (element) => {
+        await (element as HTMLImageElement).decode()
+      })
     const information = page.locator('#informacion-producto')
     await information.evaluate((element) => {
       const top = element.getBoundingClientRect().top + window.scrollY
@@ -38,7 +50,10 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
       path: `artifacts/review-product-family-${width}.png`,
     })
 
-    await page.getByRole('tab', { name: 'Reseñas' }).click()
+    await page
+      .locator('.product-info-tabs')
+      .getByRole('button', { name: 'Reseñas' })
+      .click()
     const reviews = page.locator('.product-reviews-preview')
     await reviews.evaluate((element) => {
       const top = element.getBoundingClientRect().top + window.scrollY

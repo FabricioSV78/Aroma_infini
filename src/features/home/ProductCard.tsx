@@ -11,11 +11,13 @@ interface ProductCardProps {
   product: Product
   brand: Brand | undefined
   variant?: 'standard' | 'editorial'
+  imageSizes?: string
 }
 export function ProductCard({
   product,
   brand,
   variant = 'standard',
+  imageSizes: imageSizesOverride,
 }: ProductCardProps) {
   const { favoriteIds, toggleFavorite } = useFavorites()
   const isFavorite = favoriteIds.has(product.id)
@@ -23,9 +25,10 @@ export function ProductCard({
     product.variants,
   )
   const imageSizes =
-    variant === 'standard'
+    imageSizesOverride ??
+    (variant === 'standard'
       ? '(min-width: 1440px) 296px, (min-width: 768px) 23vw, 46vw'
-      : '(min-width: 1024px) 120px, 76px'
+      : '(min-width: 1024px) 120px, 76px')
   const gallery = getAdminProduct(product.id)?.detail.gallery
   const alternateImage = gallery?.[1]?.image
   const productImageAlt = gallery?.[0]?.alt ?? `Frasco de ${product.name}`
@@ -42,6 +45,7 @@ export function ProductCard({
           aria-label={`Ver ${product.name}`}
         >
           <img
+            className="product-image-primary"
             src={imageSource(product.image)}
             srcSet={imageSourceSet(product.image, [480, 960])}
             sizes={imageSizes}
@@ -86,6 +90,9 @@ export function ProductCard({
             <Icon name="arrow" />
           </Link>
         </h3>
+        {variant === 'standard' && (
+          <p className="product-family">{product.family}</p>
+        )}
         <div className="product-price">
           <span>
             {showFrom && <span className="price-prefix">Desde </span>}

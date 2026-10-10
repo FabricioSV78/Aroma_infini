@@ -4,7 +4,16 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import {
+  getPeruDepartmentLabel,
+  getPeruDistrictLabel,
+  getPeruDistrictOptions,
+  getPeruProvinceLabel,
+  getPeruProvinceOptions,
+  peruDepartments,
+} from '../../content/peru'
+import {
   adminService,
+  hasCompleteOrderDelivery,
   type AdminBrand,
   type AdminOrderStatus,
   type AdminOrder,
@@ -26,43 +35,116 @@ import {
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
+import { AdminShippingSummary } from './AdminShippingSummary'
 
-function hasDeliveryDetails(order: AdminOrder, phone?: string) {
-  return Boolean(
-    order.customerEmail &&
-    order.customerEmail !== '—' &&
-    phone &&
-    phone !== '—' &&
-    order.address.street &&
-    order.address.street !== 'Dirección registrada',
+function brandSlug(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat('es-PE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+function matchingLocationValue(
+  value: string | undefined,
+  options: { value: string; label: string }[],
+) {
+  if (!value) return ''
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLocaleLowerCase('es')
+  return (
+    options.find(
+      (option) =>
+        option.value === value ||
+        option.label
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLocaleLowerCase('es') === normalized,
+    )?.value ?? ''
   )
+}
+
+function editableLocation(address: AdminOrder['address'] | undefined) {
+  const department = matchingLocationValue(address?.department, peruDepartments)
+  const province = matchingLocationValue(
+    address?.province,
+    getPeruProvinceOptions(department),
+  )
+  const district = matchingLocationValue(
+    address?.district,
+    getPeruDistrictOptions(province),
+  )
+  return { department, province, district }
 }
 
 export function AdminBrandsPage() {
   const state = useAdminStore()
   const [form, setForm] = useState<AdminBrand | null>(null)
+  const [originalForm, setOriginalForm] = useState<AdminBrand | null>(null)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const editorHeadingRef = useRef<HTMLHeadingElement>(null)
   const pagination = useAdminPagination(state.brands, 12)
+  const dirty = Boolean(
+    form &&
+    originalForm &&
+    JSON.stringify(form) !== JSON.stringify(originalForm),
+  )
+  useUnsavedChanges(dirty)
+
+  function openEditor(brand: AdminBrand) {
+    setError('')
+    setActionError('')
+    setMessage('')
+    setForm(brand)
+    setOriginalForm(brand)
+    window.requestAnimationFrame(() => editorHeadingRef.current?.focus())
+  }
+
+  function closeEditor() {
+    if (dirty && !window.confirm('¿Descartar los cambios de esta marca?'))
+      return
+    setForm(null)
+    setOriginalForm(null)
+    setError('')
+  }
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form) return
     const result = adminService.saveBrand(form)
     if (result.kind === 'validation') {
-      setMessage(result.message)
+      setError(result.message)
       return
     }
+    setError('')
     setForm(null)
-    setMessage('Marca guardada durante esta sesión.')
+    setOriginalForm(null)
+    setMessage('Marca guardada.')
   }
 
   function toggle(brand: AdminBrand) {
     const result = adminService.setBrandActive(brand.id, !brand.active)
-    setMessage(
-      result.kind === 'saved'
-        ? `Marca ${brand.active ? 'desactivada' : 'activada'}.`
-        : result.message,
-    )
+    if (result.kind === 'saved') {
+      setActionError('')
+      setMessage(`Marca ${brand.active ? 'desactivada' : 'activada'}.`)
+    } else {
+      setMessage('')
+      setActionError(result.message)
+    }
   }
 
   return (
@@ -82,8 +164,7 @@ export function AdminBrandsPage() {
             className="button button--primary"
             type="button"
             onClick={() => {
-              setMessage('')
-              setForm({
+              openEditor({
                 id: `brand-${crypto.randomUUID().slice(0, 8)}`,
                 name: '',
                 slug: '',
@@ -98,12 +179,15 @@ export function AdminBrandsPage() {
       {form ? (
         <form className="admin-compact-form" onSubmit={save}>
           <header>
-            <h2>
+            <h2 ref={editorHeadingRef} tabIndex={-1}>
               {state.brands.some((brand) => brand.id === form.id)
                 ? 'Editar marca'
                 : 'Nueva marca'}
             </h2>
-            <p>Nombre y dirección visible en la tienda.</p>
+            <p>
+              El nombre se muestra en la tienda. La URL se completa
+              automáticamente.
+            </p>
           </header>
           <div className="admin-inline-fields">
             <label>
@@ -111,11 +195,17 @@ export function AdminBrandsPage() {
               <input
                 value={form.name}
                 onChange={(event) =>
-                  setForm((current) =>
-                    current
-                      ? { ...current, name: event.target.value }
-                      : current,
-                  )
+                  setForm((current) => {
+                    if (!current) return current
+                    const nextName = event.target.value
+                    const automaticSlug =
+                      !current.slug || current.slug === brandSlug(current.name)
+                    return {
+                      ...current,
+                      name: nextName,
+                      slug: automaticSlug ? brandSlug(nextName) : current.slug,
+                    }
+                  })
                 }
                 required
               />
@@ -132,21 +222,32 @@ export function AdminBrandsPage() {
                   )
                 }
                 pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                title="Usa letras minúsculas, números y guiones."
                 required
               />
             </label>
           </div>
+          {error ? (
+            <p className="admin-form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
           <div className="admin-inline-actions">
             <button className="button button--primary" type="submit">
               Guardar marca
             </button>
-            <button type="button" onClick={() => setForm(null)}>
+            <button type="button" onClick={closeEditor}>
               Cancelar
             </button>
           </div>
         </form>
       ) : null}
       <AdminNotice>{message}</AdminNotice>
+      {actionError ? (
+        <p className="admin-form-error" role="alert">
+          {actionError}
+        </p>
+      ) : null}
       <div className="admin-table-wrap">
         <table className="admin-table">
           <caption className="sr-only">Marcas de la tienda</caption>
@@ -178,15 +279,15 @@ export function AdminBrandsPage() {
                     <button
                       type="button"
                       aria-label={`Editar ${brand.name}`}
-                      onClick={() => {
-                        setMessage('')
-                        setForm({ ...brand })
-                      }}
+                      onClick={() => openEditor({ ...brand })}
                     >
                       Editar
                     </button>
                     <button
                       type="button"
+                      className={
+                        brand.active ? 'admin-action-danger' : undefined
+                      }
                       onClick={() => toggle(brand)}
                       aria-label={`${brand.active ? 'Desactivar' : 'Activar'} ${brand.name}`}
                     >
@@ -199,6 +300,12 @@ export function AdminBrandsPage() {
           </tbody>
         </table>
       </div>
+      {!state.brands.length && !form ? (
+        <div className="admin-empty admin-operations-empty">
+          <h2>Aún no hay marcas</h2>
+          <p>Crea la primera marca para organizar el catálogo.</p>
+        </div>
+      ) : null}
       <AdminPagination
         label="marcas"
         page={pagination.page}
@@ -223,7 +330,13 @@ export function AdminOrdersPage() {
   const state = useAdminStore()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
+  const [quickMessage, setQuickMessage] = useState('')
+  const [quickError, setQuickError] = useState('')
   const search = params.get('q') ?? ''
+  const customerFilter = params.get('cliente') ?? ''
+  const selectedCustomer = state.customers.find(
+    (customer) => customer.id === customerFilter,
+  )
   const preparationFilter = [
     'received',
     'preparing',
@@ -237,7 +350,7 @@ export function AdminOrdersPage() {
   const orders = [...state.orders]
     .filter((order) => {
       const matchesSearch =
-        `${order.reference} ${order.customerName} ${order.customerEmail}`
+        `${order.reference} ${order.customerName} ${order.customerEmail} ${order.contactPhone ?? ''} ${getPeruDistrictLabel(order.address.district)} ${getPeruProvinceLabel(order.address.province)}`
           .toLocaleLowerCase('es')
           .includes(normalizedSearch)
       const matchesPreparation =
@@ -245,7 +358,11 @@ export function AdminOrdersPage() {
         (preparationFilter === 'atencion' &&
           ['received', 'preparing'].includes(order.status)) ||
         order.status === preparationFilter
-      return matchesSearch && matchesPreparation
+      return (
+        matchesSearch &&
+        matchesPreparation &&
+        (!customerFilter || order.customerId === customerFilter)
+      )
     })
     .sort(
       (first, second) =>
@@ -254,7 +371,31 @@ export function AdminOrdersPage() {
         first.reference.localeCompare(second.reference),
     )
   const pagination = useAdminPagination(orders, 20)
-  const hasFilters = Boolean(search) || preparationFilter !== 'all'
+  const hasFilters =
+    Boolean(search) || Boolean(customerFilter) || preparationFilter !== 'all'
+
+  function advanceOrder(order: AdminOrder, nextStatus: AdminOrderStatus) {
+    if (
+      (nextStatus === 'shipped' || nextStatus === 'delivered') &&
+      !window.confirm(
+        nextStatus === 'shipped'
+          ? `¿Confirmas que el pedido ${order.reference} ya fue enviado?`
+          : `¿Confirmas que el pedido ${order.reference} ya fue entregado?`,
+      )
+    )
+      return
+    const result = adminService.setOrderStatus(order.reference, nextStatus)
+    if (result.kind === 'saved') {
+      setQuickError('')
+      setQuickMessage(
+        `Pedido ${order.reference}: ${adminOrderStatusMeta[nextStatus].label.toLowerCase()}.`,
+      )
+    } else {
+      setQuickMessage('')
+      setQuickError(result.message)
+    }
+  }
+
   return (
     <div className="admin-page admin-orders-page">
       <AdminPageHeader
@@ -271,7 +412,11 @@ export function AdminOrdersPage() {
             ['delivered', 'Entregados', 'success'],
           ] as const
         ).map(([status, label, tone]) => (
-          <Link key={status} to={`/admin/pedidos?preparacion=${status}`}>
+          <Link
+            key={status}
+            to={`/admin/pedidos?preparacion=${status}`}
+            aria-current={preparationFilter === status ? 'page' : undefined}
+          >
             <AdminBadge tone={tone}>{label}</AdminBadge>
             <strong>
               {state.orders.filter((order) => order.status === status).length}
@@ -288,12 +433,19 @@ export function AdminOrdersPage() {
           const next = new URLSearchParams()
           const query = data.get('q')?.toString().trim()
           const preparation = data.get('preparacion')?.toString()
+          const customerId = data.get('cliente')?.toString()
           if (query) next.set('q', query)
           if (preparation && preparation !== 'all')
             next.set('preparacion', preparation)
+          if (customerId) next.set('cliente', customerId)
           setParams(next)
+          setQuickMessage('')
+          setQuickError('')
         }}
       >
+        {customerFilter ? (
+          <input type="hidden" name="cliente" value={customerFilter} />
+        ) : null}
         <div className="admin-filter-fields">
           <label>
             Buscar
@@ -302,7 +454,7 @@ export function AdminOrdersPage() {
               key={search}
               type="search"
               defaultValue={search}
-              placeholder="Código, cliente o correo"
+              placeholder="Código, cliente, correo o destino"
             />
           </label>
           <label>
@@ -322,20 +474,34 @@ export function AdminOrdersPage() {
             </select>
           </label>
           <button className="button button--primary" type="submit">
-            <Icon name="search" /> Aplicar
+            <Icon name="search" /> Aplicar filtros
           </button>
         </div>
         <div className="admin-filter-result" aria-live="polite">
           <span>
             {orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'}
+            {selectedCustomer ? ` de ${selectedCustomer.name}` : ''}
           </span>
           {hasFilters ? (
-            <button type="button" onClick={() => setParams({})}>
+            <button
+              type="button"
+              onClick={() => {
+                setParams({})
+                setQuickMessage('')
+                setQuickError('')
+              }}
+            >
               Limpiar filtros
             </button>
           ) : null}
         </div>
       </form>
+      <AdminNotice>{quickMessage}</AdminNotice>
+      {quickError ? (
+        <p className="admin-form-error" role="alert">
+          {quickError}
+        </p>
+      ) : null}
       <div className="admin-table-wrap">
         <table className="admin-table admin-table--orders">
           <caption className="sr-only">Pedidos</caption>
@@ -360,7 +526,10 @@ export function AdminOrdersPage() {
               const customer = state.customers.find(
                 (item) => item.id === order.customerId,
               )
-              const deliveryReady = hasDeliveryDetails(order, customer?.phone)
+              const deliveryReady = hasCompleteOrderDelivery(
+                order,
+                customer?.phone,
+              )
               return (
                 <tr key={order.reference}>
                   <th scope="row">
@@ -373,6 +542,15 @@ export function AdminOrdersPage() {
                     <span className="admin-cell-label">Cliente</span>
                     <span>
                       {order.customerName}
+                      {deliveryReady ? (
+                        <small className="admin-order-destination">
+                          {getPeruDistrictLabel(order.address.district)},{' '}
+                          {getPeruProvinceLabel(order.address.province)}
+                          {(order.contactPhone ?? customer?.phone)
+                            ? ` · ${order.contactPhone ?? customer?.phone}`
+                            : ''}
+                        </small>
+                      ) : null}
                       {!deliveryReady ? (
                         <small className="admin-data-gap">
                           Datos de entrega pendientes
@@ -407,29 +585,26 @@ export function AdminOrdersPage() {
                     <div className="admin-row-actions">
                       <Link
                         to={`/admin/pedidos/${order.reference}`}
+                        aria-label={`Ver ${order.reference}`}
                         state={{
                           returnTo: `${location.pathname}${location.search}`,
                         }}
                       >
-                        Ver <span className="sr-only">{order.reference}</span>
+                        Ver detalle
                       </Link>
                       {nextStatus &&
                       canAdvance &&
                       (nextStatus !== 'shipped' || deliveryReady) ? (
                         <button
                           type="button"
-                          onClick={() =>
-                            adminService.setOrderStatus(
-                              order.reference,
-                              nextStatus,
-                            )
-                          }
+                          className="admin-order-next-action"
+                          onClick={() => advanceOrder(order, nextStatus)}
                         >
                           {nextStatus === 'preparing'
                             ? 'Preparar'
                             : nextStatus === 'shipped'
-                              ? 'Enviar'
-                              : 'Entregar'}
+                              ? 'Marcar enviado'
+                              : 'Marcar entregado'}
                           <span className="sr-only"> {order.reference}</span>
                         </button>
                       ) : null}
@@ -453,11 +628,19 @@ export function AdminOrdersPage() {
       {!orders.length ? (
         <div className="admin-empty">
           <Icon name="search" />
-          <h2>No encontramos pedidos</h2>
-          <p>Prueba con otros filtros o limpia la búsqueda.</p>
-          <button type="button" onClick={() => setParams({})}>
-            Limpiar filtros
-          </button>
+          <h2>
+            {hasFilters ? 'No encontramos pedidos' : 'Aún no hay pedidos'}
+          </h2>
+          <p>
+            {hasFilters
+              ? 'Prueba con otros filtros o limpia la búsqueda.'
+              : 'Los pedidos confirmados aparecerán aquí.'}
+          </p>
+          {hasFilters ? (
+            <button type="button" onClick={() => setParams({})}>
+              Limpiar filtros
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -481,23 +664,30 @@ export function AdminOrderDetailPage() {
     order?.status ?? 'received',
   )
   const [saved, setSaved] = useState(false)
+  const [statusError, setStatusError] = useState('')
   const [editingDelivery, setEditingDelivery] = useState(false)
   const [deliveryMessage, setDeliveryMessage] = useState('')
+  const [deliveryError, setDeliveryError] = useState('')
   const [deliveryDraft, setDeliveryDraft] = useState(() => {
     const customer = state.customers.find(
       (item) => item.id === order?.customerId,
     )
+    const location = editableLocation(order?.address)
     return {
       customerName: /^Cliente \d+$/.test(order?.customerName ?? '')
         ? ''
         : (order?.customerName ?? ''),
       customerEmail:
         order?.customerEmail === '—' ? '' : (order?.customerEmail ?? ''),
-      phone: customer?.phone === '—' ? '' : (customer?.phone ?? ''),
+      phone:
+        (order?.contactPhone ?? customer?.phone) === '—'
+          ? ''
+          : (order?.contactPhone ?? customer?.phone ?? ''),
       street:
         order?.address.street === 'Dirección registrada'
           ? ''
           : (order?.address.street ?? ''),
+      ...location,
     }
   })
   const [savedDeliveryDraft, setSavedDeliveryDraft] = useState(deliveryDraft)
@@ -512,7 +702,8 @@ export function AdminOrderDetailPage() {
       </div>
     )
   const customer = state.customers.find((item) => item.id === order.customerId)
-  const deliveryReady = hasDeliveryDetails(order, customer?.phone)
+  const contactPhone = order.contactPhone ?? customer?.phone
+  const deliveryReady = hasCompleteOrderDelivery(order, customer?.phone)
   const orderStatus = adminOrderStatusMeta[order.status]
   const paymentStatus = adminPaymentStatusMeta[order.paymentStatus]
   const orderReference = order.reference
@@ -533,19 +724,22 @@ export function AdminOrderDetailPage() {
       !window.confirm('¿Confirmas que deseas retroceder el estado del pedido?')
     )
       return
-    adminService.setOrderStatus(orderReference, status)
-    setSaved(true)
+    const result = adminService.setOrderStatus(orderReference, status)
+    setStatusError(result.kind === 'validation' ? result.message : '')
+    setSaved(result.kind === 'saved')
   }
 
   function saveDelivery(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const result = adminService.saveOrderDelivery(orderReference, deliveryDraft)
-    setDeliveryMessage(
-      result.kind === 'saved' ? 'Datos de entrega guardados.' : result.message,
-    )
     if (result.kind === 'saved') {
+      setDeliveryError('')
+      setDeliveryMessage('Datos de entrega guardados.')
       setSavedDeliveryDraft(deliveryDraft)
       setEditingDelivery(false)
+    } else {
+      setDeliveryMessage('')
+      setDeliveryError(result.message)
     }
   }
 
@@ -559,16 +753,36 @@ export function AdminOrderDetailPage() {
         title="Detalle del pedido"
         description="Productos, pago, entrega y preparación en una sola vista."
       />
-      <div
-        className="admin-inline-actions"
-        aria-label="Estado de preparación del pedido"
-      >
-        <AdminBadge tone={orderStatus.tone}>{orderStatus.label}</AdminBadge>
-      </div>
+      <dl className="admin-order-highlights" aria-label="Resumen del pedido">
+        <div>
+          <dt>Preparación</dt>
+          <dd>
+            <AdminBadge tone={orderStatus.tone}>{orderStatus.label}</AdminBadge>
+          </dd>
+        </div>
+        <div>
+          <dt>Pago</dt>
+          <dd>
+            <AdminBadge tone={paymentStatus.tone}>
+              {paymentStatus.label}
+            </AdminBadge>
+          </dd>
+        </div>
+        <div>
+          <dt>Total</dt>
+          <dd>
+            <strong>{formatPEN(order.totalCents)}</strong>
+          </dd>
+        </div>
+        <div>
+          <dt>Datos de envío</dt>
+          <dd>{deliveryReady ? 'Completos' : 'Por completar'}</dd>
+        </div>
+      </dl>
       {!deliveryReady ? (
         <p className="admin-inline-warning" role="status">
-          Faltan datos de contacto o una dirección verificable. Verifica la
-          información antes de coordinar el envío.
+          Faltan datos de contacto o ubicación. Complétalos antes de marcar el
+          pedido como enviado o imprimir el resumen.
         </p>
       ) : null}
       <div className="admin-order-layout">
@@ -580,6 +794,7 @@ export function AdminOrderDetailPage() {
                 value={status}
                 onChange={(event) => {
                   setSaved(false)
+                  setStatusError('')
                   setStatus(event.target.value as AdminOrderStatus)
                 }}
               >
@@ -611,9 +826,12 @@ export function AdminOrderDetailPage() {
                   : 'Faltan datos de contacto y entrega para marcar el pedido como enviado.'}
               </p>
             ) : null}
-            <AdminNotice>
-              {saved ? 'Estado actualizado en esta sesión.' : ''}
-            </AdminNotice>
+            <AdminNotice>{saved ? 'Estado actualizado.' : ''}</AdminNotice>
+            {statusError ? (
+              <p className="admin-form-error" role="alert">
+                {statusError}
+              </p>
+            ) : null}
           </form>
           <section aria-labelledby="admin-order-customer">
             <h2 id="admin-order-customer">Cliente</h2>
@@ -624,9 +842,9 @@ export function AdminOrderDetailPage() {
                 : order.customerEmail}
             </p>
             <p>
-              {!customer?.phone || customer.phone === '—'
+              {!contactPhone || contactPhone === '—'
                 ? 'Teléfono no disponible'
-                : customer.phone}
+                : contactPhone}
             </p>
           </section>
           <section aria-labelledby="admin-order-payment">
@@ -692,9 +910,19 @@ export function AdminOrderDetailPage() {
                 : order.address.street}
             </p>
             <p>
-              {order.address.district}, {order.address.province},{' '}
-              {order.address.department}
+              {getPeruDistrictLabel(order.address.district)},{' '}
+              {getPeruProvinceLabel(order.address.province)},{' '}
+              {getPeruDepartmentLabel(order.address.department)}
             </p>
+            {order.address.reference?.trim() ? (
+              <p>Referencia: {order.address.reference}</p>
+            ) : null}
+            {order.alternateRecipient ? (
+              <p>
+                Recibe: {order.alternateRecipient.name} · DNI{' '}
+                {order.alternateRecipient.dni}
+              </p>
+            ) : null}
             <button
               className="admin-delivery-edit-button"
               type="button"
@@ -710,6 +938,7 @@ export function AdminOrderDetailPage() {
                 }
                 setEditingDelivery((open) => !open)
                 setDeliveryMessage('')
+                setDeliveryError('')
               }}
             >
               {editingDelivery
@@ -776,12 +1005,87 @@ export function AdminOrderDetailPage() {
                     }
                   />
                 </label>
+                <label>
+                  Departamento
+                  <select
+                    required
+                    value={deliveryDraft.department}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        department: event.target.value,
+                        province: '',
+                        district: '',
+                      }))
+                    }
+                  >
+                    <option value="">Selecciona un departamento</option>
+                    {peruDepartments.map((department) => (
+                      <option key={department.value} value={department.value}>
+                        {department.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Provincia
+                  <select
+                    required
+                    value={deliveryDraft.province}
+                    disabled={!deliveryDraft.department}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        province: event.target.value,
+                        district: '',
+                      }))
+                    }
+                  >
+                    <option value="">Selecciona una provincia</option>
+                    {getPeruProvinceOptions(deliveryDraft.department).map(
+                      (province) => (
+                        <option key={province.value} value={province.value}>
+                          {province.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <label>
+                  Distrito
+                  <select
+                    required
+                    value={deliveryDraft.district}
+                    disabled={!deliveryDraft.province}
+                    onChange={(event) =>
+                      setDeliveryDraft((current) => ({
+                        ...current,
+                        district: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Selecciona un distrito</option>
+                    {getPeruDistrictOptions(deliveryDraft.province).map(
+                      (district) => (
+                        <option key={district.value} value={district.value}>
+                          {district.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
                 <button className="button button--secondary" type="submit">
                   Guardar datos de entrega
                 </button>
               </form>
             ) : null}
             <AdminNotice>{deliveryMessage}</AdminNotice>
+            {deliveryError ? (
+              <p className="admin-form-error" role="alert">
+                {deliveryError}
+              </p>
+            ) : null}
+            <AdminShippingSummary order={order} legacyPhone={customer?.phone} />
           </section>
         </div>
       </div>
@@ -791,16 +1095,30 @@ export function AdminOrderDetailPage() {
 
 export function AdminCustomersPage() {
   const state = useAdminStore()
+  const [search, setSearch] = useState('')
   const orderCountByCustomer = new Map<string, number>()
-  state.orders.forEach((order) =>
+  const latestOrderByCustomer = new Map<string, AdminOrder>()
+  state.orders.forEach((order) => {
     orderCountByCustomer.set(
       order.customerId,
       (orderCountByCustomer.get(order.customerId) ?? 0) + 1,
-    ),
-  )
-  const customers = [...state.customers].sort((first, second) =>
-    first.name.localeCompare(second.name, 'es'),
-  )
+    )
+    const latest = latestOrderByCustomer.get(order.customerId)
+    if (!latest || Date.parse(order.placedAt) > Date.parse(latest.placedAt))
+      latestOrderByCustomer.set(order.customerId, order)
+  })
+  const query = search.trim().toLocaleLowerCase('es')
+  const customers = [...state.customers]
+    .filter((customer) => {
+      const address = latestOrderByCustomer.get(customer.id)?.address
+      return (
+        !query ||
+        `${customer.name} ${customer.email} ${customer.phone} ${address?.province ? getPeruProvinceLabel(address.province) : ''} ${address?.district ? getPeruDistrictLabel(address.district) : ''}`
+          .toLocaleLowerCase('es')
+          .includes(query)
+      )
+    })
+    .sort((first, second) => first.name.localeCompare(second.name, 'es'))
   const pagination = useAdminPagination(customers, 25)
   return (
     <div className="admin-page admin-customers-page">
@@ -809,6 +1127,25 @@ export function AdminCustomersPage() {
         title="Clientes"
         description="Consulta los clientes y su historial de pedidos."
       />
+      <div className="admin-customer-toolbar">
+        <label>
+          Buscar cliente
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Nombre, correo, celular o ubicación"
+          />
+        </label>
+        <div className="admin-customer-result" role="status" aria-live="polite">
+          {customers.length} {customers.length === 1 ? 'cliente' : 'clientes'}
+          {search ? (
+            <button type="button" onClick={() => setSearch('')}>
+              Limpiar búsqueda
+            </button>
+          ) : null}
+        </div>
+      </div>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <caption className="sr-only">Clientes</caption>
@@ -817,33 +1154,72 @@ export function AdminCustomersPage() {
               <th scope="col">Cliente</th>
               <th scope="col">Correo</th>
               <th scope="col">Celular</th>
+              <th scope="col">Provincia</th>
+              <th scope="col">Distrito</th>
               <th scope="col">Pedidos</th>
             </tr>
           </thead>
           <tbody>
-            {pagination.items.map((customer) => (
-              <tr key={customer.id}>
-                <th scope="row">
-                  <span className="admin-cell-label">Cliente</span>
-                  {customer.name}
-                </th>
-                <td>
-                  <span className="admin-cell-label">Correo</span>
-                  {customer.email}
-                </td>
-                <td>
-                  <span className="admin-cell-label">Celular</span>
-                  {customer.phone}
-                </td>
-                <td>
-                  <span className="admin-cell-label">Pedidos</span>
-                  {orderCountByCustomer.get(customer.id) ?? 0}
-                </td>
-              </tr>
-            ))}
+            {pagination.items.map((customer) => {
+              const address = latestOrderByCustomer.get(customer.id)?.address
+              return (
+                <tr key={customer.id}>
+                  <th scope="row">
+                    <span className="admin-cell-label">Cliente</span>
+                    {customer.name}
+                  </th>
+                  <td>
+                    <span className="admin-cell-label">Correo</span>
+                    {customer.email}
+                  </td>
+                  <td>
+                    <span className="admin-cell-label">Celular</span>
+                    {customer.phone}
+                  </td>
+                  <td>
+                    <span className="admin-cell-label">Provincia</span>
+                    {address?.province
+                      ? getPeruProvinceLabel(address.province)
+                      : '—'}
+                  </td>
+                  <td>
+                    <span className="admin-cell-label">Distrito</span>
+                    {address?.district
+                      ? getPeruDistrictLabel(address.district)
+                      : '—'}
+                  </td>
+                  <td>
+                    <span className="admin-cell-label">Pedidos</span>
+                    <span className="admin-customer-orders">
+                      <strong>
+                        {orderCountByCustomer.get(customer.id) ?? 0}
+                      </strong>
+                      {(orderCountByCustomer.get(customer.id) ?? 0) > 0 ? (
+                        <Link
+                          to={`/admin/pedidos?cliente=${encodeURIComponent(customer.id)}`}
+                          aria-label={`Ver pedidos de ${customer.name}`}
+                        >
+                          Ver pedidos
+                        </Link>
+                      ) : null}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+      {!customers.length ? (
+        <div className="admin-empty admin-operations-empty">
+          <h2>{query ? 'No encontramos clientes' : 'Aún no hay clientes'}</h2>
+          <p>
+            {query
+              ? 'Prueba con otro nombre, correo, celular o ubicación.'
+              : 'Los clientes aparecerán después de completar una compra.'}
+          </p>
+        </div>
+      ) : null}
       <AdminPagination
         label="clientes"
         page={pagination.page}
@@ -875,17 +1251,35 @@ function createPromotionDraft(): AdminPromotion {
 export function AdminPromotionsPage() {
   const state = useAdminStore()
   const [form, setForm] = useState<AdminPromotion | null>(null)
+  const [originalForm, setOriginalForm] = useState<AdminPromotion | null>(null)
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
   const editorHeadingRef = useRef<HTMLHeadingElement>(null)
   const promotions = [...state.promotions].sort((first, second) =>
     first.code.localeCompare(second.code),
   )
   const pagination = useAdminPagination(promotions, 10)
+  const dirty = Boolean(
+    form &&
+    originalForm &&
+    JSON.stringify(form) !== JSON.stringify(originalForm),
+  )
+  useUnsavedChanges(dirty)
 
   function openEditor(nextForm: AdminPromotion) {
     setMessage('')
+    setError('')
     setForm(nextForm)
+    setOriginalForm(nextForm)
     window.requestAnimationFrame(() => editorHeadingRef.current?.focus())
+  }
+
+  function closeEditor() {
+    if (dirty && !window.confirm('¿Descartar los cambios de la promoción?'))
+      return
+    setForm(null)
+    setOriginalForm(null)
+    setError('')
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -893,11 +1287,27 @@ export function AdminPromotionsPage() {
     if (!form) return
     const result = adminService.savePromotion(form)
     if (result.kind === 'validation') {
-      setMessage(result.message)
+      setError(result.message)
       return
     }
+    setError('')
     setMessage('Promoción guardada.')
     setForm(null)
+    setOriginalForm(null)
+  }
+
+  function togglePromotion(promotion: AdminPromotion) {
+    if (
+      promotion.active &&
+      !window.confirm(
+        `¿Desactivar ${promotion.code}? El código dejará de aplicarse en la tienda.`,
+      )
+    )
+      return
+    adminService.setPromotionActive(promotion.id, !promotion.active)
+    setMessage(
+      `Promoción ${promotion.code} ${promotion.active ? 'desactivada' : 'activada'}.`,
+    )
   }
 
   return (
@@ -945,6 +1355,8 @@ export function AdminPromotionsPage() {
                 Código
                 <input
                   value={form.code}
+                  autoCapitalize="characters"
+                  autoComplete="off"
                   onChange={(event) =>
                     setForm((current) =>
                       current
@@ -982,6 +1394,7 @@ export function AdminPromotionsPage() {
                 <input
                   type="number"
                   min="0.01"
+                  max={form.type === 'percent' ? '100' : undefined}
                   step="0.01"
                   value={form.value}
                   onChange={(event) =>
@@ -1033,6 +1446,7 @@ export function AdminPromotionsPage() {
                 Final
                 <input
                   type="datetime-local"
+                  min={form.startsAt || undefined}
                   value={form.endsAt}
                   onChange={(event) =>
                     setForm((current) =>
@@ -1079,11 +1493,16 @@ export function AdminPromotionsPage() {
                 Promoción activa
               </label>
             </div>
+            {error ? (
+              <p className="admin-form-error" role="alert">
+                {error}
+              </p>
+            ) : null}
             <div className="admin-inline-actions">
               <button className="button button--primary" type="submit">
                 Guardar promoción
               </button>
-              <button type="button" onClick={() => setForm(null)}>
+              <button type="button" onClick={closeEditor}>
                 Cancelar
               </button>
             </div>
@@ -1091,6 +1510,15 @@ export function AdminPromotionsPage() {
         </form>
       ) : null}
       <AdminNotice>{message}</AdminNotice>
+      {!promotions.length && !form ? (
+        <div className="admin-empty admin-operations-empty">
+          <h2>Aún no hay códigos</h2>
+          <p>
+            Crea un código solo cuando tengas una campaña o descuento para
+            ofrecer.
+          </p>
+        </div>
+      ) : null}
       <ul className="admin-promotion-list">
         {pagination.items.map((promotion) => {
           const status = getPromotionStatus(promotion)
@@ -1113,6 +1541,16 @@ export function AdminPromotionsPage() {
                     : formatPEN(promotion.value * 100)}{' '}
                   · mínimo {formatPEN(promotion.minimumCents)}
                 </span>
+                <small>
+                  {promotion.startsAt || promotion.endsAt
+                    ? `Vigencia: ${promotion.startsAt ? formatShortDate(promotion.startsAt) : 'sin inicio'} – ${promotion.endsAt ? formatShortDate(promotion.endsAt) : 'sin final'}`
+                    : 'Sin fechas de vigencia'}
+                  {promotion.usageLimit !== null
+                    ? ` · ${promotion.used}/${promotion.usageLimit} usos`
+                    : promotion.used > 0
+                      ? ` · ${promotion.used} usos`
+                      : ''}
+                </small>
               </div>
               <AdminBadge tone={tone}>{status.label}</AdminBadge>
               <div className="admin-row-actions">
@@ -1125,11 +1563,9 @@ export function AdminPromotionsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    adminService.setPromotionActive(
-                      promotion.id,
-                      !promotion.active,
-                    )
+                  onClick={() => togglePromotion(promotion)}
+                  className={
+                    promotion.active ? 'admin-action-danger' : undefined
                   }
                   aria-label={`${promotion.active ? 'Desactivar' : 'Activar'} ${promotion.code}`}
                 >

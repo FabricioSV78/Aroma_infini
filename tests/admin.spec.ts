@@ -287,13 +287,19 @@ test('La tarifa nacional cubre rutas sin excepción activa y conserva las locale
   shipping.zones.find((zone) => zone.id === 'zone-arequipa')!.active = false
   expect(adminService.saveShipping(shipping)).toMatchObject({ kind: 'saved' })
   expect(quoteShipping('cusco', 'courier', 30000)).toMatchObject({
-    kind: 'quoted', feeCents: 3800, estimate: 'De 3 a 6 días',
+    kind: 'quoted',
+    feeCents: 3800,
+    estimate: 'De 3 a 6 días',
   })
   expect(quoteShipping('arequipa', 'courier', 30000)).toMatchObject({
-    kind: 'quoted', feeCents: 3800,
+    kind: 'quoted',
+    feeCents: 3800,
   })
-  expect(quoteShipping('lima', 'courier', 30000, '1501', '150122')).toMatchObject({
-    kind: 'quoted', feeCents: 2000,
+  expect(
+    quoteShipping('lima', 'courier', 30000, '1501', '150122'),
+  ).toMatchObject({
+    kind: 'quoted',
+    feeCents: 2000,
   })
   expect(quoteShipping('cusco', 'motorizado', 30000).kind).toBe('unavailable')
 })
@@ -302,7 +308,9 @@ test('El panel permite preparar una excepción nueva sin publicarla por accident
   page,
 }) => {
   await page.goto('/admin/envios')
-  await expect(page.getByRole('heading', { name: 'Todo el Perú' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Todo el Perú' }),
+  ).toBeVisible()
   const previousZones = await page.locator('.admin-shipping-row').count()
 
   await page.getByRole('button', { name: 'Agregar excepción' }).click()
@@ -311,7 +319,9 @@ test('El panel permite preparar una excepción nueva sin publicarla por accident
     previousZones + 1,
   )
   await expect(newZone.getByLabel('Departamento')).toHaveValue('amazonas')
-  await expect(newZone.getByLabel('Nombre de la excepción')).toHaveValue('Amazonas')
+  await expect(newZone.getByLabel('Nombre de la excepción')).toHaveValue(
+    'Amazonas',
+  )
   await expect(newZone.getByLabel('Excepción activa')).not.toBeChecked()
 
   await newZone.getByLabel('Courier (S/)').fill('42')
@@ -322,9 +332,7 @@ test('El panel permite preparar una excepción nueva sin publicarla por accident
   ).toBeVisible()
 
   await newZone.getByRole('button', { name: 'Quitar excepción' }).click()
-  await expect(page.locator('.admin-shipping-row')).toHaveCount(
-    previousZones,
-  )
+  await expect(page.locator('.admin-shipping-row')).toHaveCount(previousZones)
 })
 
 test('El panel de envíos comparte el ubigeo encadenado con la tienda', async ({
@@ -351,21 +359,31 @@ test('El panel de envíos comparte el ubigeo encadenado con la tienda', async ({
   await expect(province.locator('option')).toHaveCount(9)
 })
 
-test('La tarifa nacional se edita en un solo lugar y persiste al recargar', async ({ page }) => {
+test('La tarifa nacional se edita en un solo lugar y persiste al recargar', async ({
+  page,
+}) => {
   await page.goto('/admin/envios')
   await page.getByLabel('Tarifa base de courier (S/)').fill('38')
   await page.getByLabel('Plazo estimado general').fill('De 3 a 6 días')
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
-  await expect(page.getByText('Configuración aplicada a la tienda.')).toBeVisible()
+  await expect(
+    page.getByText('Configuración aplicada a la tienda.'),
+  ).toBeVisible()
   await page.reload()
   await expect(page.getByLabel('Tarifa base de courier (S/)')).toHaveValue('38')
-  await expect(page.getByLabel('Plazo estimado general')).toHaveValue('De 3 a 6 días')
+  await expect(page.getByLabel('Plazo estimado general')).toHaveValue(
+    'De 3 a 6 días',
+  )
 })
 
-test('Una configuración guardada antes de la tarifa nacional conserva sus excepciones', async ({ page }) => {
+test('Una configuración guardada antes de la tarifa nacional conserva sus excepciones', async ({
+  page,
+}) => {
   await page.goto('/admin/envios')
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
-  await expect(page.getByText('Configuración aplicada a la tienda.')).toBeVisible()
+  await expect(
+    page.getByText('Configuración aplicada a la tienda.'),
+  ).toBeVisible()
   await page.evaluate(async () => {
     const request = indexedDB.open('aroma-infini-admin', 1)
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -604,8 +622,11 @@ test('Los datos de pedidos recientes conservan separación en tablet y escritori
 test('Desactivar un producto lo retira de la tienda durante la misma sesión', async ({
   page,
 }) => {
-  await page.goto('/admin/productos')
+  await page.goto('/admin/productos?guardado=1')
+  await expect(page.getByText('Producto guardado.')).toBeVisible()
   await page.getByRole('button', { name: 'Desactivar Bois Clair' }).click()
+  await expect(page.getByText('Producto guardado.')).toHaveCount(0)
+  await expect(page.getByText('Bois Clair desactivado.')).toBeVisible()
   const row = page
     .locator('.admin-table tbody tr')
     .filter({ hasText: 'Bois Clair' })
@@ -917,7 +938,7 @@ test('Limpiar una búsqueda administrativa vacía también el campo y la URL', a
   await expect(
     page.getByRole('heading', { name: 'No encontramos productos' }),
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Limpiar búsqueda' }).click()
+  await page.getByRole('button', { name: 'Limpiar filtros' }).click()
 
   await expect(page).toHaveURL('/admin/productos')
   await expect(search).toHaveValue('')

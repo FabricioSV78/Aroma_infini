@@ -185,6 +185,104 @@ test('Móvil: cancelar borrador, Escape, retorno de foco y aplicación', async (
   await expect(trigger).toBeFocused()
 })
 
+test('El diálogo de filtros mantiene Aplicar filtros visible al abrir en un móvil bajo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.goto('/tienda')
+  await page.getByRole('button', { name: /^Filtros/ }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Afinar la selección' })
+  const fields = dialog.locator('.catalog-filter-fields')
+  const actions = dialog.locator('.catalog-filter-actions')
+  const apply = actions.getByRole('button', { name: 'Aplicar filtros' })
+  await expect(dialog).toBeVisible()
+  await expect(apply).toBeInViewport({ ratio: 1 })
+  expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0)
+  const initial = await fields.evaluate((element) => ({
+    scrollTop: element.scrollTop,
+    scrollable: element.scrollHeight > element.clientHeight,
+    bottom: element.getBoundingClientRect().bottom,
+  }))
+  const initialFooter = await actions.boundingBox()
+  expect(initial.scrollTop).toBe(0)
+  expect(initial.scrollable).toBe(true)
+  expect(initial.bottom).toBeLessThanOrEqual(initialFooter!.y + 1)
+
+  await fields.evaluate((element) =>
+    element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }),
+  )
+  await expect
+    .poll(() => fields.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0)
+  const footer = await actions.boundingBox()
+  for (const name of ['Mínimo', 'Máximo']) {
+    const input = fields.getByRole('spinbutton', { name })
+    await expect(input).toBeInViewport({ ratio: 1 })
+    const box = await input.boundingBox()
+    expect(box!.y + box!.height).toBeLessThanOrEqual(footer!.y + 1)
+  }
+  await expect(apply).toBeInViewport({ ratio: 1 })
+})
+
+for (const width of [1024, 1440]) {
+  test(`El panel y las acciones de filtros comparten un fondo continuo a ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/tienda')
+
+    const colors = await page
+      .locator('.catalog-sidebar')
+      .evaluate((sidebar) => {
+        const actions = sidebar.querySelector('.catalog-filter-actions')
+        if (!actions) throw new Error('Faltan las acciones de los filtros')
+        const effectiveBackground = (element: Element) => {
+          for (
+            let node: Element | null = element;
+            node;
+            node = node.parentElement
+          ) {
+            const color = getComputedStyle(node).backgroundColor
+            if (color !== 'transparent' && !/^rgba?\([^)]*,\s*0\)$/.test(color))
+              return color
+          }
+          return ''
+        }
+        return {
+          sidebar: effectiveBackground(sidebar),
+          actions: effectiveBackground(actions),
+        }
+      })
+
+    expect(colors.sidebar).not.toBe('')
+    expect(colors.actions).toBe(colors.sidebar)
+  })
+}
+
+test('Aplicar filtros desde el final del panel devuelve los resultados a la vista', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 600 })
+  await page.goto('/tienda')
+
+  const sidebar = page.getByRole('complementary', {
+    name: 'Filtros de la tienda',
+  })
+  await sidebar.getByLabel('Forme', { exact: true }).check()
+  await sidebar.getByLabel('Para ella', { exact: true }).check()
+  await sidebar.getByLabel('Mínimo').fill('400')
+  await sidebar.getByLabel('Máximo').fill('630')
+  await sidebar.locator('.catalog-filter-actions').scrollIntoViewIfNeeded()
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+  await sidebar.getByRole('button', { name: 'Aplicar filtros' }).click()
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  await expect(page.locator('.product-card').first()).toBeInViewport({
+    ratio: 0.25,
+  })
+})
+
 test('El panel móvil cierra al pasar a la columna desktop', async ({
   page,
 }) => {
@@ -200,6 +298,35 @@ test('El panel móvil cierra al pasar a la columna desktop', async ({
   expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
     'hidden',
   )
+})
+
+test('Una búsqueda con un resultado conserva filtros accesibles sin alargar el listado', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/buscar?q=petale')
+  const disclosure = page.locator('.catalog-filter-disclosure')
+  const summary = disclosure.locator('summary')
+  await expect(summary).toBeVisible()
+  await expect(disclosure.getByRole('checkbox', { name: 'Forme' })).toBeHidden()
+
+  await summary.focus()
+  await summary.press('Enter')
+  await expect(
+    disclosure.getByRole('checkbox', { name: 'Forme' }),
+  ).toBeVisible()
+  await disclosure.getByRole('checkbox', { name: 'Forme' }).check()
+  await disclosure.getByRole('button', { name: 'Aplicar filtros' }).click()
+  await expect(page).toHaveURL(/marca=forme/)
+  await expect(page.locator('.product-card')).toHaveCount(1)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(summary).toBeHidden()
+  await page.getByRole('button', { name: /^Filtros/ }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(summary).toBeFocused()
 })
 
 test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) => {

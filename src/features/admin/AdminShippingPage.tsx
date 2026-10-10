@@ -18,6 +18,14 @@ import { useUnsavedChanges } from './useUnsavedChanges'
 
 const pageSize = 5
 
+function moneyInputValue(cents: number): number | '' {
+  return Number.isFinite(cents) ? cents / 100 : ''
+}
+
+function parseMoneyInput(value: string): number {
+  return value === '' ? Number.NaN : Math.round(Number(value) * 100)
+}
+
 function scopeLabel(zone: AdminShippingZone) {
   return [
     peruDepartments.find((item) => item.value === zone.department)?.label ??
@@ -84,16 +92,29 @@ export function AdminShippingPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [message, setMessage] = useState('')
+  const [messageIsError, setMessageIsError] = useState(false)
+  const [removedZones, setRemovedZones] = useState<AdminShippingZone[]>([])
+  const [saving, setSaving] = useState(false)
   const editorRef = useRef<HTMLFieldSetElement>(null)
   const [savedVersion, setSavedVersion] = useState(() => JSON.stringify(form))
   const dirty = JSON.stringify(form) !== savedVersion
   useUnsavedChanges(dirty)
   function selectZone(id: string) {
     setSelectedId(id)
-    if (window.matchMedia('(max-width: 860px)').matches)
-      window.requestAnimationFrame(() => editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    if (window.matchMedia('(max-width: 860px)').matches) {
+      const reduceMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches
+      window.requestAnimationFrame(() =>
+        editorRef.current?.scrollIntoView({
+          behavior: reduceMotion ? 'instant' : 'smooth',
+          block: 'start',
+        }),
+      )
+    }
   }
   const selected = form.zones.find((zone) => zone.id === selectedId)
+  const activeZoneCount = form.zones.filter((zone) => zone.active).length
   const filtered = form.zones.filter((zone) =>
     (zone.name + ' ' + scopeLabel(zone))
       .toLocaleLowerCase('es-PE')
@@ -109,6 +130,7 @@ export function AdminShippingPage() {
   function updateGeneral(changes: Partial<AdminShippingSettings>) {
     setForm((current) => ({ ...current, ...changes }))
     setMessage('')
+    setMessageIsError(false)
   }
 
   function updateZone(id: string, changes: Partial<AdminShippingZone>) {
@@ -119,10 +141,11 @@ export function AdminShippingPage() {
       ),
     }))
     setMessage('')
+    setMessageIsError(false)
   }
 
   function addZone() {
-    const scope = nextExceptionScope(form.zones)
+    const scope = nextExceptionScope([...form.zones, ...removedZones])
     if (!scope) return
     const id = 'zone-' + crypto.randomUUID().slice(0, 8)
     setForm((current) => ({
@@ -142,24 +165,48 @@ export function AdminShippingPage() {
     selectZone(id)
     setSearch('')
     setPage(Math.ceil((form.zones.length + 1) / pageSize))
+    setMessageIsError(false)
     setMessage('Completa la excepción y actívala cuando quieras aplicarla.')
+  }
+
+  function undoRemove() {
+    const removedZone = removedZones.at(-1)
+    if (!removedZone) return
+    setForm((current) => ({
+      ...current,
+      zones: [...current.zones, removedZone],
+    }))
+    setSelectedId(removedZone.id)
+    setRemovedZones((current) => current.slice(0, -1))
+    setMessageIsError(false)
+    setMessage(
+      'Excepción recuperada. Guarda la configuración para aplicar los cambios.',
+    )
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving) return
     const result = adminService.saveShipping(form)
     if (result.kind === 'validation') {
+      setMessageIsError(true)
       setMessage(result.message)
       return
     }
+    setSaving(true)
     try {
       await adminService.flush()
       setSavedVersion(JSON.stringify(form))
+      setRemovedZones([])
+      setMessageIsError(false)
       setMessage('Configuración aplicada a la tienda.')
     } catch {
+      setMessageIsError(true)
       setMessage(
         'Los cambios están aplicados, pero no se pudieron guardar en este navegador.',
       )
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -190,11 +237,11 @@ export function AdminShippingPage() {
                 min="0"
                 step="0.01"
                 required
-                value={form.nationalCourierFeeCents / 100}
+                value={moneyInputValue(form.nationalCourierFeeCents)}
                 onChange={(event) =>
                   updateGeneral({
-                    nationalCourierFeeCents: Math.round(
-                      Number(event.target.value) * 100,
+                    nationalCourierFeeCents: parseMoneyInput(
+                      event.target.value,
                     ),
                   })
                 }
@@ -205,6 +252,7 @@ export function AdminShippingPage() {
               <input
                 required
                 maxLength={80}
+                placeholder="Por ejemplo: de 3 a 6 días hábiles"
                 value={form.nationalEstimate}
                 onChange={(event) =>
                   updateGeneral({ nationalEstimate: event.target.value })
@@ -218,12 +266,10 @@ export function AdminShippingPage() {
                 min="0"
                 step="0.01"
                 required
-                value={form.freeThresholdCents / 100}
+                value={moneyInputValue(form.freeThresholdCents)}
                 onChange={(event) =>
                   updateGeneral({
-                    freeThresholdCents: Math.round(
-                      Number(event.target.value) * 100,
-                    ),
+                    freeThresholdCents: parseMoneyInput(event.target.value),
                   })
                 }
               />
@@ -243,7 +289,13 @@ export function AdminShippingPage() {
             <div>
               <p className="eyebrow">Ajustes opcionales</p>
               <h2 id="exceptions-title">Excepciones de tarifa</h2>
-              <p>Se aplican al departamento, provincia o distrito indicado.</p>
+              <p>
+                {activeZoneCount}{' '}
+                {activeZoneCount === 1
+                  ? 'excepción activa'
+                  : 'excepciones activas'}
+                . Se aplican a la ubicación indicada.
+              </p>
             </div>
             <button
               className="button button--secondary"
@@ -296,7 +348,9 @@ export function AdminShippingPage() {
                   ))
                 ) : (
                   <p className="admin-shipping-empty">
-                    No hay excepciones con ese nombre.
+                    {form.zones.length === 0
+                      ? 'No hay excepciones. La tarifa general cubre todos los destinos.'
+                      : 'No hay excepciones para esa búsqueda. Prueba otro departamento o nombre.'}
                   </p>
                 )}
               </div>
@@ -413,12 +467,10 @@ export function AdminShippingPage() {
                       min="0"
                       step="0.01"
                       required
-                      value={selected.courierFeeCents / 100}
+                      value={moneyInputValue(selected.courierFeeCents)}
                       onChange={(event) =>
                         updateZone(selected.id, {
-                          courierFeeCents: Math.round(
-                            Number(event.target.value) * 100,
-                          ),
+                          courierFeeCents: parseMoneyInput(event.target.value),
                         })
                       }
                     />
@@ -449,6 +501,7 @@ export function AdminShippingPage() {
                     <input
                       required
                       maxLength={80}
+                      placeholder="Por ejemplo: de 1 a 2 días hábiles"
                       value={selected.estimate}
                       onChange={(event) =>
                         updateZone(selected.id, {
@@ -482,6 +535,8 @@ export function AdminShippingPage() {
                         ),
                       }))
                       setSelectedId(null)
+                      setRemovedZones((current) => [...current, selected])
+                      setMessageIsError(false)
                       setMessage(
                         'La excepción se quitará al guardar. La tarifa general seguirá cubriendo esa ubicación.',
                       )
@@ -495,9 +550,33 @@ export function AdminShippingPage() {
           </div>
         </section>
         <div className="admin-shipping-footer">
-          <AdminNotice>{message}</AdminNotice>
-          <button className="button button--primary" type="submit">
-            Guardar configuración
+          <div className="admin-shipping-feedback">
+            <span className={dirty ? 'is-unsaved' : 'is-saved'}>
+              {dirty ? 'Cambios sin guardar' : 'Todo guardado'}
+            </span>
+            {messageIsError ? (
+              <p className="admin-form-notice" role="alert">
+                {message}
+              </p>
+            ) : (
+              <AdminNotice>{message}</AdminNotice>
+            )}
+          </div>
+          {removedZones.length ? (
+            <button
+              className="admin-shipping-undo"
+              type="button"
+              onClick={undoRemove}
+            >
+              Deshacer eliminación
+            </button>
+          ) : null}
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={saving}
+          >
+            {saving ? 'Guardando…' : 'Guardar configuración'}
           </button>
         </div>
       </form>

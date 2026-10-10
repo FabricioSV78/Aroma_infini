@@ -132,7 +132,8 @@ export function CheckoutPage() {
       setPaymentStatus(outcome)
       return
     }
-    const order = completeOrder(cart)
+    const order = await completeOrder(cart)
+    if (request !== paymentRequest.current || finalized.current) return
     if (!order) {
       setPaymentStatus('error')
       return
@@ -256,6 +257,12 @@ export function CheckoutPage() {
                   </p>
                   {draft.address.reference ? (
                     <p>Ref.: {draft.address.reference}</p>
+                  ) : null}
+                  {draft.alternateRecipient ? (
+                    <p>
+                      Recibe: {draft.alternateRecipient.name} · DNI{' '}
+                      {draft.alternateRecipient.dni}
+                    </p>
                   ) : null}
                   <p>
                     {draft.deliveryMethod === 'courier'

@@ -15,6 +15,7 @@ interface DashboardMetric {
   label: string
   value: number
   detail: string
+  action: string
   to: string
   icon: IconName
   tone: AdminTone
@@ -56,6 +57,7 @@ export function AdminDashboardPage() {
       label: 'Pedidos por preparar',
       value: ordersToPrepare.length,
       detail: 'Aprobados y aún no enviados',
+      action: 'Ver pedidos por preparar',
       to: '/admin/pedidos?preparacion=atencion',
       icon: 'orders',
       tone: ordersToPrepare.length ? 'info' : 'success',
@@ -64,6 +66,7 @@ export function AdminDashboardPage() {
       label: 'Unidades disponibles',
       value: totalStock,
       detail: 'En presentaciones activas',
+      action: 'Ver productos',
       to: '/admin/productos',
       icon: 'package',
       tone: 'success',
@@ -72,6 +75,7 @@ export function AdminDashboardPage() {
       label: 'Alertas de stock',
       value: inventoryAlerts.length,
       detail: 'Presentaciones bajas o agotadas',
+      action: 'Revisar alertas',
       to: '/admin/productos?stock=alert&visibilidad=active',
       icon: 'alert',
       tone: inventoryAlerts.length ? 'danger' : 'success',
@@ -80,6 +84,7 @@ export function AdminDashboardPage() {
       label: 'Envíos en curso',
       value: shipmentsInProgress.length,
       detail: 'Pedidos despachados por entregar',
+      action: 'Ver detalle de envíos',
       to: '/admin/pedidos?preparacion=shipped',
       icon: 'truck',
       tone: shipmentsInProgress.length ? 'info' : 'success',
@@ -122,8 +127,11 @@ export function AdminDashboardPage() {
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
             <small>{metric.detail}</small>
-            <Link to={metric.to} aria-label={`${metric.label}: ver detalle`}>
-              Ver detalle <Icon name="arrow" />
+            <Link
+              to={metric.to}
+              aria-label={`${metric.label}: ${metric.action.toLowerCase()}`}
+            >
+              {metric.action} <Icon name="arrow" />
             </Link>
           </article>
         ))}
@@ -289,7 +297,7 @@ export function AdminDashboardPage() {
                     state={{ returnTo: '/admin' }}
                     aria-label={`Ver pedido ${order.reference}`}
                   >
-                    Ver
+                    Abrir
                   </Link>
                 </li>
               )
@@ -304,26 +312,16 @@ export function AdminDashboardPage() {
         className="admin-quick-links"
         aria-labelledby="quick-links-title"
       >
-        <h2 id="quick-links-title">Acciones rápidas</h2>
+        <h2 id="quick-links-title">Crear y editar</h2>
         <div>
           <Link to="/admin/productos/nuevo">
             <Icon name="package" />
             <span>Nuevo producto</span>
             <Icon name="arrow" />
           </Link>
-          <Link to="/admin/pedidos?preparacion=atencion">
-            <Icon name="orders" />
-            <span>Preparar pedidos</span>
-            <Icon name="arrow" />
-          </Link>
-          <Link to="/admin/productos?stock=alert&visibilidad=active">
-            <Icon name="alert" />
-            <span>Revisar inventario</span>
-            <Icon name="arrow" />
-          </Link>
-          <Link to="/">
-            <Icon name="store" />
-            <span>Ver tienda</span>
+          <Link to="/admin/home">
+            <Icon name="home" />
+            <span>Editar contenido del Home</span>
             <Icon name="arrow" />
           </Link>
         </div>

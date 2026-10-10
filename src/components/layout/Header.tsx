@@ -181,7 +181,13 @@ export function Header() {
             aria-label="Aroma Infini, inicio"
             onClick={closeNavigation}
           >
-            Aroma Infini<span className="wordmark-dot">.</span>
+            <img
+              className="brand-logo"
+              src="/brand/logo-on-light.svg"
+              alt=""
+              width="774"
+              height="374"
+            />
           </Link>
           <nav
             className="desktop-nav"

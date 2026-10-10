@@ -7,10 +7,7 @@ import { getAdminProduct } from '../../services/admin-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
 
 function alternateImage(product: Product) {
-  return (
-    getAdminProduct(product.id)?.detail.gallery[1]?.image ??
-    `${product.image}-alternate`
-  )
+  return getAdminProduct(product.id)?.detail.gallery[1]?.image ?? product.image
 }
 
 const galleryMedia = '(min-width: 768px)'

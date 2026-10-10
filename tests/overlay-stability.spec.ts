@@ -1,5 +1,32 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test('La ayuda no tapa el resumen del carrito en móvil y tablet', async ({
+  page,
+}) => {
+  for (const width of [390, 768]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto('/producto/petale-nu')
+    await page.getByRole('button', { name: 'Añadir al carrito' }).click()
+    await page.goto('/carrito')
+    await expect(page.locator('.cart-summary')).toBeVisible()
+
+    const geometry = await page.evaluate(() => {
+      const summary = document.querySelector('.cart-summary')
+      const help = document.querySelector('.help-button')
+      if (!summary || !help) return null
+      return {
+        summaryBottom: summary.getBoundingClientRect().bottom,
+        helpTop: help.getBoundingClientRect().top,
+        position: getComputedStyle(help).position,
+      }
+    })
+
+    expect(geometry).not.toBeNull()
+    expect(geometry!.position).not.toBe('fixed')
+    expect(geometry!.helpTop).toBeGreaterThanOrEqual(geometry!.summaryBottom)
+  }
+})
+
 async function geometry(page: Page, anchor: string) {
   return page.locator(anchor).evaluate((element) => {
     const bounds = element.getBoundingClientRect()
@@ -7,11 +34,17 @@ async function geometry(page: Page, anchor: string) {
   })
 }
 
-for (const width of [390, 768, 1440]) {
+for (const { width, height } of [
+  { width: 390, height: 900 },
+  { width: 768, height: 900 },
+  { width: 1440, height: 900 },
+  { width: 844, height: 390 },
+  { width: 1280, height: 600 },
+]) {
   test(`Las ventanas conservan el ancho y el scroll del fondo a ${width}px`, async ({
     page,
   }) => {
-    await page.setViewportSize({ width, height: 900 })
+    await page.setViewportSize({ width, height })
     await page.emulateMedia({ reducedMotion: 'reduce' })
     const cases = [
       {
@@ -25,13 +58,6 @@ for (const width of [390, 768, 1440]) {
         route: '/tienda',
         trigger: 'Carrito',
         dialog: '#cart-drawer',
-        anchor: '.catalog-page',
-        scroll: 260,
-      },
-      {
-        route: '/tienda',
-        trigger: 'Abrir ayuda y contacto',
-        dialog: '#help',
         anchor: '.catalog-page',
         scroll: 260,
       },
@@ -71,7 +97,10 @@ for (const width of [390, 768, 1440]) {
     for (const item of cases) {
       await page.goto(item.route)
       if (item.trigger === 'Escribir una reseña')
-        await page.getByRole('tab', { name: 'Reseñas' }).click()
+        await page
+          .locator('.product-info-tabs')
+          .getByRole('button', { name: 'Reseñas' })
+          .click()
       await expect(page.locator(item.anchor)).toBeVisible()
       const trigger = page.getByRole('button', {
         name: item.trigger,
@@ -88,6 +117,16 @@ for (const width of [390, 768, 1440]) {
       const before = await geometry(page, item.anchor)
       await page.keyboard.press('Enter')
       await expect(page.locator(item.dialog)).toBeVisible()
+      const bounds = await page.locator(item.dialog).boundingBox()
+      expect(bounds).not.toBeNull()
+      expect(bounds!.x, item.trigger).toBeGreaterThanOrEqual(-1)
+      expect(bounds!.y, item.trigger).toBeGreaterThanOrEqual(-1)
+      expect(bounds!.x + bounds!.width, item.trigger).toBeLessThanOrEqual(
+        width + 1,
+      )
+      expect(bounds!.y + bounds!.height, item.trigger).toBeLessThanOrEqual(
+        height + 1,
+      )
       expect(
         await geometry(page, item.anchor),
         `${item.trigger}: abrir`,

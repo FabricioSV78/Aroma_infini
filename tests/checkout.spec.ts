@@ -72,9 +72,13 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
     estimate: 'Hasta 5 días',
   })
   expect(quoteShipping('Cusco', 'motorizado', 39000).kind).toBe('unavailable')
-  expect(quoteShipping('departamento inexistente', 'courier', 39000).kind).toBe('pending')
+  expect(quoteShipping('departamento inexistente', 'courier', 39000).kind).toBe(
+    'pending',
+  )
   for (const department of peruDepartments) {
-    expect(quoteShipping(department.value, 'courier', 39000).kind).toBe('quoted')
+    expect(quoteShipping(department.value, 'courier', 39000).kind).toBe(
+      'quoted',
+    )
   }
 
   expect(evaluatePromotion('', 39000).kind).toBe('empty')
@@ -108,14 +112,19 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
   ).toBeNull()
 })
 
-test('El checkout cotiza courier para un departamento sin excepción', async ({ page }) => {
+test('El checkout cotiza courier para un departamento sin excepción', async ({
+  page,
+}) => {
   const province = getPeruProvinceOptions('cusco')[0]
   const district = getPeruDistrictOptions(province.value)[0]
   await page.addInitScript(() => {
-    localStorage.setItem('aroma-infini:cart:v1', JSON.stringify({
-      version: 1,
-      items: [{ variantId: 'cedre-50', quantity: 1 }],
-    }))
+    localStorage.setItem(
+      'aroma-infini:cart:v1',
+      JSON.stringify({
+        version: 1,
+        items: [{ variantId: 'cedre-50', quantity: 1 }],
+      }),
+    )
   })
   await page.goto('/checkout')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
@@ -127,9 +136,13 @@ test('El checkout cotiza courier para un departamento sin excepción', async ({ 
   await page.getByLabel('Departamento').selectOption('cusco')
   await page.getByLabel('Provincia').selectOption(province.value)
   await page.getByLabel('Distrito').selectOption(district.value)
-  await expect(page.locator('.checkout-delivery-quote')).toContainText(/S\/\s*35/)
+  await expect(page.locator('.checkout-delivery-quote')).toContainText(
+    /S\/\s*35/,
+  )
   await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Revisar selección' })).toBeEnabled()
+  await expect(
+    page.getByRole('button', { name: 'Revisar selección' }),
+  ).toBeEnabled()
 })
 
 test('El checkout vacío o con variantes no disponibles pide corregir el carrito', async ({
@@ -216,9 +229,7 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
   await page.getByRole('link', { name: 'Ver pedido' }).first().click()
   await expect(page.getByRole('heading', { name: 'Recibido.' })).toBeVisible()
   await page.reload()
-  await expect(
-    page.getByRole('heading', { name: 'Recibido.' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Recibido.' })).toBeVisible()
 })
 
 test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confirmación', async ({
@@ -232,13 +243,12 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await page.goto('/checkout?demo=1')
   await expect(page.getByRole('radio', { name: /Como invitado/ })).toBeChecked()
   await expect(page.locator('.help-button')).toBeVisible()
-  const helpButton = page.getByRole('button', {
-    name: 'Abrir ayuda y contacto',
+  const helpLink = page.getByRole('link', {
+    name: 'Abrir WhatsApp para recibir ayuda',
   })
-  await helpButton.click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(helpButton).toBeFocused()
+  await expect(helpLink).toHaveAttribute('href', 'https://wa.me/51955565209')
+  await expect(helpLink).toHaveAttribute('target', '_blank')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
   await expect(page.getByRole('heading', { name: 'Tus datos.' })).toBeVisible()

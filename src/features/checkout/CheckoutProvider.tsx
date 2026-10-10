@@ -16,11 +16,14 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   const { addCheckoutOrder } = useAccount()
 
   const completeOrder = useCallback(
-    (cart: ResolvedCart) => {
+    async (cart: ResolvedCart) => {
       const result = createMockOrder(cart, draft)
       if (!result) return null
       const registration = adminService.recordApprovedCheckout(result)
       if (registration.kind === 'validation') return null
+      // Wait for the local snapshot before sending the shopper to confirmation.
+      // The current session still works if private browsing blocks IndexedDB.
+      await adminService.flush().catch(() => undefined)
       saveTrackingRecord(result)
       addCheckoutOrder(result)
       setOrder(result)

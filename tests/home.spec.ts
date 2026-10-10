@@ -152,21 +152,16 @@ test('Movimiento reducido y ayuda accesible', async ({ page }) => {
     .first()
     .evaluate((element) => getComputedStyle(element).transitionDuration)
   expect(parseFloat(duration)).toBeLessThan(0.01)
-  const trigger = page.getByRole('button', {
-    name: /Abrir ayuda y contacto/,
+  const helpLink = page.getByRole('link', {
+    name: 'Abrir WhatsApp para recibir ayuda',
   })
-  await trigger.click()
-  const dialog = page.getByRole('dialog', {
-    name: '¿En qué podemos ayudarte?',
-  })
-  await expect(dialog).toBeVisible()
-  await expect(dialog.locator('a[href^="tel:"]')).toHaveCount(0)
-  await expect(dialog.getByLabel('Tu consulta')).toBeFocused()
-  await page.keyboard.press('Escape')
-  await expect(trigger).toBeFocused()
+  await expect(helpLink).toHaveAttribute('href', 'https://wa.me/51955565209')
+  await helpLink.focus()
+  await expect(helpLink).toBeFocused()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('La ayuda móvil permanece flotante y dentro de la pantalla', async ({
+test('La ayuda móvil aparece después del contenido y dentro de la pantalla', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -174,10 +169,16 @@ test('La ayuda móvil permanece flotante y dentro de la pantalla', async ({
 
   const help = page.locator('.help-button')
   await expect(help).toBeVisible()
-  await expect(help).toHaveAccessibleName(/Abrir ayuda y contacto/)
+  await expect(help).toHaveAccessibleName('Abrir WhatsApp para recibir ayuda')
   expect(
     await help.evaluate((element) => getComputedStyle(element).position),
-  ).toBe('fixed')
+  ).toBe('relative')
+  expect(
+    await help.evaluate((element) =>
+      Boolean(element.previousElementSibling?.matches('main')),
+    ),
+  ).toBe(true)
+  await help.scrollIntoViewIfNeeded()
   const box = await help.boundingBox()
   expect(box).not.toBeNull()
   if (!box) return

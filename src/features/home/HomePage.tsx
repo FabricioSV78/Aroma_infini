@@ -24,7 +24,7 @@ const sectionOrder = [
 export function HomePage() {
   const data = useLoaderData<HomeData>()
   const sections = {
-    hero: <Hero />,
+    hero: <Hero content={data.content.hero} />,
     brands: (
       <BrandGallery brands={data.brands} bestsellers={data.bestsellers} />
     ),
@@ -32,7 +32,7 @@ export function HomePage() {
     bestsellers: (
       <Bestsellers brands={data.brands} bestsellers={data.bestsellers} />
     ),
-    editorial: <EditorialFilm />,
+    editorial: <EditorialFilm content={data.content.film} />,
     featured: (
       <FeaturedPerfumes
         brands={data.brands}

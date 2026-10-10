@@ -1,5 +1,5 @@
 import { OlfactoryProfile } from './OlfactoryProfile'
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 import { Link, useLoaderData, useRevalidator } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { ProductCard } from '../home/ProductCard'
@@ -12,6 +12,7 @@ import { formatPEN } from '../../services/currency'
 import { ProductReviewsPreview } from './ProductReviewsPreview'
 import { ProductPopularityPreview } from './ProductPopularityPreview'
 import { getBestsellingProducts } from '../../services/home-service'
+import { getOlfactoryImage } from '../../content/olfactory-imagery'
 
 interface ProductReadyProps {
   product: Product
@@ -21,8 +22,7 @@ interface ProductReadyProps {
   brands: Brand[]
 }
 
-const productInfoTabs = ['family', 'description', 'reviews'] as const
-type ProductInfoTab = (typeof productInfoTabs)[number]
+type ProductInfoPanel = 'family' | 'description' | 'reviews'
 
 function ProductReady({
   product,
@@ -40,7 +40,9 @@ function ProductReady({
   )
   const { favoriteIds, toggleFavorite } = useFavorites()
   const { addItem } = useCart()
-  const [activeInfoTab, setActiveInfoTab] = useState<ProductInfoTab>('family')
+  const [openInfoPanel, setOpenInfoPanel] = useState<ProductInfoPanel | null>(
+    null,
+  )
   const selectedVariant =
     product.variants.find(
       (variant) => variant.id === selectedVariantId && variant.active !== false,
@@ -50,25 +52,8 @@ function ProductReady({
     ? formatPEN(selectedVariant.priceCents)
     : 'Precio no disponible'
 
-  function handleInfoTabKeyDown(
-    event: KeyboardEvent<HTMLButtonElement>,
-    currentTab: ProductInfoTab,
-  ) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-    event.preventDefault()
-    const currentIndex = productInfoTabs.indexOf(currentTab)
-    const nextIndex =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? productInfoTabs.length - 1
-          : event.key === 'ArrowRight'
-            ? (currentIndex + 1) % productInfoTabs.length
-            : (currentIndex - 1 + productInfoTabs.length) %
-              productInfoTabs.length
-    const nextTab = productInfoTabs[nextIndex]
-    setActiveInfoTab(nextTab)
-    document.getElementById(`product-info-tab-${nextTab}`)?.focus()
+  function toggleInfoPanel(panel: ProductInfoPanel) {
+    setOpenInfoPanel((current) => (current === panel ? null : panel))
   }
 
   return (
@@ -176,19 +161,19 @@ function ProductReady({
           >
             <a
               href="#informacion-producto"
-              onClick={() => setActiveInfoTab('family')}
+              onClick={() => setOpenInfoPanel('family')}
             >
               Familia olfativa <span aria-hidden="true">↓</span>
             </a>
             <a
               href="#informacion-producto"
-              onClick={() => setActiveInfoTab('description')}
+              onClick={() => setOpenInfoPanel('description')}
             >
               Descripción <span aria-hidden="true">↓</span>
             </a>
             <a
               href="#informacion-producto"
-              onClick={() => setActiveInfoTab('reviews')}
+              onClick={() => setOpenInfoPanel('reviews')}
             >
               Reseñas <span aria-hidden="true">↓</span>
             </a>
@@ -203,61 +188,63 @@ function ProductReady({
         tabIndex={-1}
         data-scroll-reveal="copy"
       >
-        <div className="product-info-tabs" role="tablist" aria-label="Detalles">
+        <div
+          className="product-info-tabs"
+          role="group"
+          aria-label="Detalles del perfume"
+        >
           <button
             id="product-info-tab-family"
             type="button"
-            role="tab"
-            aria-selected={activeInfoTab === 'family'}
+            aria-expanded={openInfoPanel === 'family'}
             aria-controls="product-info-panel-family"
-            tabIndex={activeInfoTab === 'family' ? 0 : -1}
-            onClick={() => setActiveInfoTab('family')}
-            onKeyDown={(event) => handleInfoTabKeyDown(event, 'family')}
+            onClick={() => toggleInfoPanel('family')}
           >
             Familia olfativa
+            <Icon name="chevron" className="product-info-chevron" />
           </button>
           <button
             id="product-info-tab-description"
             type="button"
-            role="tab"
-            aria-selected={activeInfoTab === 'description'}
+            aria-expanded={openInfoPanel === 'description'}
             aria-controls="product-info-panel-description"
-            tabIndex={activeInfoTab === 'description' ? 0 : -1}
-            onClick={() => setActiveInfoTab('description')}
-            onKeyDown={(event) => handleInfoTabKeyDown(event, 'description')}
+            onClick={() => toggleInfoPanel('description')}
           >
             Descripción
+            <Icon name="chevron" className="product-info-chevron" />
           </button>
           <button
             id="product-info-tab-reviews"
             type="button"
-            role="tab"
-            aria-selected={activeInfoTab === 'reviews'}
+            aria-expanded={openInfoPanel === 'reviews'}
             aria-controls="product-info-panel-reviews"
-            tabIndex={activeInfoTab === 'reviews' ? 0 : -1}
-            onClick={() => setActiveInfoTab('reviews')}
-            onKeyDown={(event) => handleInfoTabKeyDown(event, 'reviews')}
+            onClick={() => toggleInfoPanel('reviews')}
           >
             Reseñas
+            <Icon name="chevron" className="product-info-chevron" />
           </button>
         </div>
 
         <div
           id="product-info-panel-family"
           className="product-info-panel product-info-panel--family container"
-          role="tabpanel"
+          role="region"
           aria-labelledby="product-info-tab-family"
-          hidden={activeInfoTab !== 'family'}
+          hidden={openInfoPanel !== 'family'}
         >
-          <OlfactoryProfile family={product.family} detail={detail} />
+          <OlfactoryProfile
+            family={product.family}
+            detail={detail}
+            image={getOlfactoryImage(product.id, detail.notes)}
+          />
         </div>
 
         <div
           id="product-info-panel-description"
           className="product-info-panel product-info-panel--description container"
-          role="tabpanel"
+          role="region"
           aria-labelledby="product-info-tab-description"
-          hidden={activeInfoTab !== 'description'}
+          hidden={openInfoPanel !== 'description'}
         >
           <p className="product-description-copy">{detail.description}</p>
         </div>
@@ -265,9 +252,9 @@ function ProductReady({
         <div
           id="product-info-panel-reviews"
           className="product-info-panel product-info-panel--reviews"
-          role="tabpanel"
+          role="region"
           aria-labelledby="product-info-tab-reviews"
-          hidden={activeInfoTab !== 'reviews'}
+          hidden={openInfoPanel !== 'reviews'}
         >
           <ProductReviewsPreview
             productId={product.id}

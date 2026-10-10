@@ -1,156 +1,70 @@
 import { expect, test } from '@playwright/test'
 import { buildWhatsAppUrl } from '../src/utils/whatsapp'
 
+const helpName = 'Abrir WhatsApp para recibir ayuda'
+const whatsappUrl = 'https://wa.me/51955565209'
+
 test('El enlace de WhatsApp requiere destinatario y consulta válidos', () => {
   expect(
     buildWhatsAppUrl('+51 955-565-209', '  ¿Tienen Bois Clair? & gracias  '),
   ).toBe(
     'https://wa.me/51955565209?text=%C2%BFTienen%20Bois%20Clair%3F%20%26%20gracias',
   )
-  expect(buildWhatsAppUrl('51955565209')).toBe('https://wa.me/51955565209')
+  expect(buildWhatsAppUrl('51955565209')).toBe(whatsappUrl)
   expect(buildWhatsAppUrl('51955565209', '  ')).toBeNull()
   expect(buildWhatsAppUrl(null, 'Hola')).toBeNull()
   expect(buildWhatsAppUrl('número pendiente', 'Hola')).toBeNull()
 })
 
-test('La ayuda permite redactar, conserva el borrador y se cierra con Escape', async ({
+test('La ayuda abre directamente WhatsApp sin mostrar un diálogo', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
+  await page
+    .context()
+    .route('https://wa.me/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: 'Prueba' }),
+    )
   await page.goto('/tienda')
+  const help = page.getByRole('link', { name: helpName })
+  await expect(help).toHaveAttribute('href', whatsappUrl)
+  await expect(help).toHaveAttribute('target', '_blank')
+  await expect(help).toHaveAttribute('rel', /noopener/)
+  await expect(help).toHaveAttribute('rel', /noreferrer/)
+  await expect(help).not.toHaveAttribute('aria-haspopup', 'dialog')
+  await expect(page.locator('#help')).toHaveCount(0)
 
-  const trigger = page.getByRole('button', { name: 'Abrir ayuda y contacto' })
-  await trigger.focus()
-  await page.keyboard.press('Enter')
-
-  const dialog = page.getByRole('dialog', {
-    name: '¿En qué podemos ayudarte?',
-  })
-  const question = dialog.getByRole('textbox', { name: 'Tu consulta' })
-  const submit = dialog.getByRole('button', { name: 'Enviar por WhatsApp' })
-  await expect(dialog).toBeVisible()
-  await expect(question).toBeFocused()
-  await expect(submit).toBeDisabled()
-  await expect(
-    dialog.getByText(
-      'Escribe tu duda y continúa la conversación por WhatsApp.',
-    ),
-  ).toHaveCount(0)
-  await expect(
-    dialog.getByText('WhatsApp abrirá tu mensaje listo para enviarlo.'),
-  ).toHaveCount(0)
-  expect(
-    await page
-      .locator('.help-button')
-      .evaluate((button) => getComputedStyle(button).backgroundColor),
-  ).toBe('rgba(0, 0, 0, 0)')
-  await expect(page.locator('.help-button')).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  )
-
-  await question.fill('¿Tienen Bois Clair?')
-  await expect(submit).toBeEnabled()
-  await page.keyboard.press('Escape')
-  await expect(dialog).toHaveCount(0)
-  await expect(
-    page.getByRole('button', { name: 'Abrir ayuda y contacto' }),
-  ).toBeFocused()
-
-  await page.getByRole('button', { name: 'Abrir ayuda y contacto' }).click()
-  await expect(question).toHaveValue('¿Tienen Bois Clair?')
-  await dialog.getByRole('button', { name: 'Cerrar ayuda' }).click()
-  await expect(dialog).toHaveCount(0)
+  const popupPromise = page.waitForEvent('popup')
+  await help.click()
+  const popup = await popupPromise
+  await expect(popup).toHaveURL(whatsappUrl)
+  await popup.close()
+  await expect(page).toHaveURL('/tienda')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('La consulta abre WhatsApp con destinatario y texto codificado', async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    const browserWindow = window as typeof window & { openedHelpUrl?: string }
-    browserWindow.open = (url) => {
-      browserWindow.openedHelpUrl = String(url)
-      return null
-    }
-  })
-  await page.goto('/contacto')
-  await page.getByRole('button', { name: 'Abrir ayuda y contacto' }).click()
-  const dialog = page.getByRole('dialog', {
-    name: '¿En qué podemos ayudarte?',
-  })
-  await dialog
-    .getByRole('textbox', { name: 'Tu consulta' })
-    .fill('  ¿Tienen Bois Clair? & gracias  ')
-  await dialog.getByRole('button', { name: 'Enviar por WhatsApp' }).click()
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window as typeof window & { openedHelpUrl?: string }).openedHelpUrl,
-      ),
-    )
-    .toBe(
-      'https://wa.me/51955565209?text=%C2%BFTienen%20Bois%20Clair%3F%20%26%20gracias',
-    )
-  await expect(
-    dialog.getByRole('textbox', { name: 'Tu consulta' }),
-  ).toHaveValue('  ¿Tienen Bois Clair? & gracias  ')
-})
-
-test('La ayuda abre en checkout y su enlace adicional lleva a contacto', async ({
+test('La ayuda de checkout enlaza a WhatsApp sin interrumpir la compra', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/checkout?demo=1')
-  const trigger = page.getByRole('button', { name: 'Abrir ayuda y contacto' })
-  await expect(trigger).toBeVisible()
-  await trigger.click()
-  const dialog = page.getByRole('dialog', {
-    name: '¿En qué podemos ayudarte?',
-  })
-  await expect(dialog).toBeVisible()
-  await dialog.getByRole('link', { name: 'Más opciones de ayuda' }).click()
-  await expect(page).toHaveURL('/contacto')
-  await expect(dialog).toHaveCount(0)
-})
-
-test('El panel cabe en una pantalla baja y se cierra al pulsar fuera', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 320, height: 568 })
-  await page.goto('/tienda')
-  await page.getByRole('button', { name: 'Abrir ayuda y contacto' }).click()
-  const dialog = page.getByRole('dialog', {
-    name: '¿En qué podemos ayudarte?',
-  })
-  const bounds = await dialog.boundingBox()
-  expect(bounds).not.toBeNull()
-  if (!bounds) return
-  expect(bounds.x).toBeGreaterThanOrEqual(0)
-  expect(bounds.y).toBeGreaterThanOrEqual(0)
-  expect(bounds.x + bounds.width).toBeLessThanOrEqual(320)
-  expect(bounds.y + bounds.height).toBeLessThanOrEqual(568)
-  await expect(
-    dialog.getByRole('button', { name: 'Enviar por WhatsApp' }),
-  ).toBeVisible()
-  await page.locator('main').click({ position: { x: 5, y: 5 } })
-  await expect(dialog).toHaveCount(0)
+  const help = page.getByRole('link', { name: helpName })
+  await expect(help).toBeVisible()
+  await expect(help).toHaveAttribute('href', whatsappUrl)
+  await expect(help).toHaveAttribute('target', '_blank')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 for (const width of [320, 390, 768, 1024, 1440, 1920]) {
-  test(`La ayuda flota sin desbordar a ${width}px`, async ({ page }) => {
+  test(`La ayuda es accesible sin desbordar a ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 })
-    for (const route of [
-      '/',
-      '/tienda',
-      '/producto/bois-clair',
-      '/contacto',
-    ]) {
+    for (const route of ['/', '/tienda', '/producto/bois-clair', '/contacto']) {
       await page.goto(route)
-      const help = page.getByRole('button', { name: 'Abrir ayuda y contacto' })
+      const help = page.getByRole('link', { name: helpName })
       await expect(help).toBeVisible()
-      const geometry = await help.evaluate((button) => {
-        const box = button.getBoundingClientRect()
+      await expect(help).toHaveAttribute('href', whatsappUrl)
+      await help.scrollIntoViewIfNeeded()
+      const geometry = await help.evaluate((element) => {
+        const box = element.getBoundingClientRect()
         return {
           width: box.width,
           height: box.height,
@@ -158,11 +72,11 @@ for (const width of [320, 390, 768, 1024, 1440, 1920]) {
           top: box.top,
           right: box.right,
           bottom: box.bottom,
-          position: getComputedStyle(button).position,
+          position: getComputedStyle(element).position,
           overflow: document.documentElement.scrollWidth > innerWidth,
         }
       })
-      expect(geometry.position, route).toBe('fixed')
+      expect(geometry.position, route).toBe(width < 1200 ? 'relative' : 'fixed')
       expect(geometry.width, route).toBeGreaterThanOrEqual(44)
       expect(geometry.height, route).toBeGreaterThanOrEqual(44)
       expect(geometry.left, route).toBeGreaterThanOrEqual(0)
@@ -170,23 +84,11 @@ for (const width of [320, 390, 768, 1024, 1440, 1920]) {
       expect(geometry.right, route).toBeLessThanOrEqual(width)
       expect(geometry.bottom, route).toBeLessThanOrEqual(844)
       expect(geometry.overflow, route).toBe(false)
-
-      await help.click()
-      const panel = page.getByRole('dialog', {
-        name: '¿En qué podemos ayudarte?',
-      })
-      const panelBox = await panel.boundingBox()
-      expect(panelBox, route).not.toBeNull()
-      if (!panelBox) continue
-      expect(panelBox.x, route).toBeGreaterThanOrEqual(0)
-      expect(panelBox.y, route).toBeGreaterThanOrEqual(0)
-      expect(panelBox.x + panelBox.width, route).toBeLessThanOrEqual(width)
-      expect(panelBox.y + panelBox.height, route).toBeLessThanOrEqual(844)
     }
   })
 }
 
-test('El botón queda separado de avisos y enlaces del pie', async ({
+test('El enlace queda separado de avisos y enlaces del pie', async ({
   page,
 }) => {
   for (const width of [390, 1440]) {

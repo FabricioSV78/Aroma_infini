@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './brand-font.css';
 @import './tokens.css';
 @import './base.css';
 @import './entrance.css';
@@ -25,12 +26,15 @@
 @import './admin-home-editor.css';
 @import './admin-shipping.css';
 @import './editorial-refinements.css';
+@import './brand-refresh.css';
+@import './section-balance.css';
+@import './olfactory-profile.css';
+@import './home-refinements.css';
 
 /* Preserve the editorial spelling of business and perfume brand names. */
 .brand-label,
 .bestsellers-section .section-heading .eyebrow,
-.footer-top h2.brand-label,
-.contact-help-panel-heading p.brand-label {
+.footer-top h2.brand-label {
   text-transform: none;
   letter-spacing: 0.02em;
 }

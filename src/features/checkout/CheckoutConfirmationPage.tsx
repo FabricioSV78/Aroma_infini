@@ -139,6 +139,12 @@ export function CheckoutConfirmationPage() {
             {order.address.reference ? (
               <p>Ref.: {order.address.reference}</p>
             ) : null}
+            {order.alternateRecipient ? (
+              <p>
+                Recibe: {order.alternateRecipient.name} · DNI{' '}
+                {order.alternateRecipient.dni}
+              </p>
+            ) : null}
           </div>
           <div className="checkout-confirmation-detail">
             <h3>Modalidad</h3>

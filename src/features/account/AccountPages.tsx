@@ -53,7 +53,7 @@ export function AccountOverviewPage() {
         <section aria-labelledby="overview-orders-title">
           <span>{String(orders.length).padStart(2, '0')}</span>
           <h2 id="overview-orders-title">Mis pedidos</h2>
-          <p>
+          <p className={latestOrder ? 'account-overview-status' : undefined}>
             {latestOrder
               ? `Último estado: ${accountStatusLabels[latestOrder.status]}.`
               : 'Todavía no hay pedidos.'}

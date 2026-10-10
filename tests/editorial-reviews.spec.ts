@@ -3,9 +3,11 @@ import { getProductReviews } from '../src/mocks/product-reviews'
 import { products } from '../src/mocks/home'
 
 async function openReviews(page: Page) {
-  const tab = page.getByRole('tab', { name: 'Reseñas' })
-  await tab.click()
-  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  const button = page
+    .locator('.product-info-tabs')
+    .getByRole('button', { name: 'Reseñas' })
+  await button.click()
+  await expect(button).toHaveAttribute('aria-expanded', 'true')
   await expect(page.locator('#product-info-panel-reviews')).toBeVisible()
 }
 
@@ -53,6 +55,8 @@ for (const viewport of [
   { width: 768, height: 900 },
   { width: 1440, height: 900 },
   { width: 1904, height: 947 },
+  { width: 844, height: 390 },
+  { width: 1280, height: 600 },
 ]) {
   test(`El video conserva el encuadre completo a ${viewport.width}px`, async ({
     page,
@@ -68,6 +72,13 @@ for (const viewport of [
     await expect(media.locator('video')).toHaveCSS('object-fit', 'contain')
     await expect(media.locator('img')).toHaveCSS('object-fit', 'contain')
     const bounds = await section.boundingBox()
+    const copy = await section.locator('.editorial-film-copy').boundingBox()
+    expect(bounds).not.toBeNull()
+    expect(copy).not.toBeNull()
+    expect(copy!.y).toBeGreaterThanOrEqual(bounds!.y)
+    expect(copy!.y + copy!.height).toBeLessThanOrEqual(
+      bounds!.y + bounds!.height,
+    )
     const layoutWidth = await page.evaluate(() => document.body.clientWidth)
     expect(bounds?.width).toBeCloseTo(layoutWidth, 0)
     expect(bounds?.height).toBeLessThanOrEqual(viewport.height)
@@ -119,7 +130,7 @@ test('Con 50 reseñas la lista mantiene tres filas y permite saltar a la última
   await expect(rows).toHaveCount(3)
 })
 
-test('El video sin controles respeta movimiento reducido y se pausa fuera de vista', async ({
+test('El video respeta movimiento reducido, ofrece control manual y se pausa fuera de vista', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -127,7 +138,9 @@ test('El video sin controles respeta movimiento reducido y se pausa fuera de vis
   const video = page.locator('.editorial-film video')
   await page.locator('.editorial-film').scrollIntoViewIfNeeded()
   await expect(video).not.toHaveAttribute('src')
-  await expect(page.locator('.editorial-film button')).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Reproducir video editorial' }),
+  ).toBeVisible()
   expect(
     await video.evaluate(
       (node: HTMLVideoElement) => node.muted && node.playsInline,

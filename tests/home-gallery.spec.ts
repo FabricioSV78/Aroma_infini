@@ -64,10 +64,10 @@ for (const width of [1280, 1600, 1904]) {
     // La fotografía vertical puede adaptarse al mosaico, pero no debe
     // convertirse en una franja horizontal en monitores amplios.
     expect(ratios[0]).toBeLessThanOrEqual(1.5)
-    // Un encuadre 9:4 conserva completos los frascos y permite recorrer el
+    // Un encuadre 2:1 conserva completos los frascos y permite recorrer el
     // mosaico sin convertirlo en una sección excesivamente alta.
-    expect(ratios[1]).toBeCloseTo(2.25, 1)
-    expect(ratios[2]).toBeCloseTo(2.25, 1)
+    expect(ratios[1]).toBeCloseTo(2, 1)
+    expect(ratios[2]).toBeCloseTo(2, 1)
     expect(gridHeight).toBeLessThanOrEqual(820)
 
     if (width === 1904) {

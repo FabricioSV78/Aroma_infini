@@ -5,6 +5,16 @@ export interface ImagePreset {
 }
 
 export const homeImagePresets = {
+  heroDesktop: {
+    width: 1536,
+    height: 864,
+    label: '16:9 · mínimo 1536 × 864 px',
+  },
+  heroMobile: {
+    width: 780,
+    height: 1170,
+    label: '2:3 · mínimo 780 × 1170 px',
+  },
   hombre: { width: 960, height: 1440, label: '2:3 · mínimo 960 × 1440 px' },
   mujer: { width: 1200, height: 800, label: '3:2 · mínimo 1200 × 800 px' },
   unisex: { width: 1200, height: 800, label: '3:2 · mínimo 1200 × 800 px' },
@@ -36,7 +46,9 @@ export async function prepareImageFile(file: File, preset: ImagePreset) {
   try {
     bitmap = await createImageBitmap(file)
   } catch {
-    throw new Error('No se pudo abrir la imagen. Prueba con otro archivo JPG, PNG, WebP o AVIF.')
+    throw new Error(
+      'No se pudo abrir la imagen. Prueba con otro archivo JPG, PNG, WebP o AVIF.',
+    )
   }
   try {
     const targetRatio = preset.width / preset.height

@@ -213,3 +213,17 @@ export function getProductDetail(product: Product): ProductDetail | undefined {
     ],
   }
 }
+
+export function matchesDemoOlfactoryNotes(
+  productId: string,
+  notes: ProductDetail['notes'],
+): boolean {
+  const original = content[productId]?.notes
+  if (!original) return false
+
+  return (['top', 'heart', 'base'] as const).every(
+    (stage) =>
+      original[stage].length === notes[stage].length &&
+      original[stage].every((note, index) => note === notes[stage][index]),
+  )
+}

@@ -351,13 +351,17 @@
   min-height: 44px;
   border: 0;
   background: transparent;
-  color: var(--admin-nav-strong);
+  color: #f3b3a9;
   font: inherit;
   font-size: var(--type-small);
   text-decoration: underline;
   text-underline-offset: 4px;
   display: inline-flex;
   align-items: center;
+}
+
+.admin-reset:hover {
+  color: #ffe2dc;
 }
 
 .admin-side-status {
@@ -444,6 +448,10 @@
   margin: 14px 0;
   color: var(--admin-accent);
   font-size: var(--type-small);
+}
+
+.admin-form-notice[role='alert'] {
+  color: var(--admin-danger);
 }
 
 .admin-status {

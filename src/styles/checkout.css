@@ -190,6 +190,36 @@
   font-size: 11px;
   line-height: 1.45;
 }
+.checkout-recipient {
+  margin: 28px 0 0;
+  padding: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+.checkout-recipient legend {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.checkout-recipient-toggle {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.checkout-recipient-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-ink);
+}
+.checkout-recipient-fields {
+  margin-top: 10px;
+}
 .checkout-delivery-options {
   margin-top: 32px;
 }

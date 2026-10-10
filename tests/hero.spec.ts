@@ -71,7 +71,7 @@ test('Una pulsación rápida de ida y vuelta no activa una fotografía tardía',
   await page.waitForFunction(
     () =>
       [...document.querySelectorAll<HTMLImageElement>('.hero-image img')]
-        .length === 3 &&
+        .length >= 3 &&
       [...document.querySelectorAll<HTMLImageElement>('.hero-image img')].every(
         (image) => image.complete && image.naturalWidth > 0,
       ),
@@ -182,18 +182,21 @@ test('El fundido se reduce con la preferencia de movimiento reducido', async ({
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
+  await expect(page.locator('.hero')).toHaveCSS('--duration-crossfade', '550ms')
   const slide = page.locator('.hero-slide').first()
-  const reducedDuration = await slide.evaluate((element) =>
-    parseFloat(getComputedStyle(element).transitionDuration),
-  )
-  expect(reducedDuration).toBeLessThan(0.01)
+  await expect
+    .poll(() =>
+      slide.evaluate((element) =>
+        Number(getComputedStyle(element).transitionDuration.replace(/s$/, '')),
+      ),
+    )
+    .toBeLessThan(0.01)
   await page.getByRole('button', { name: 'Ver campaña 2' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.locator('.hero-slide.is-active')).toHaveCSS('opacity', '1')
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  const regularDuration = await page.locator('.hero-slide.is-active').evaluate((element) =>
-    parseFloat(getComputedStyle(element).transitionDuration),
+  await expect(page.locator('.hero-slide.is-active')).toHaveCSS(
+    'transition-duration',
+    '0.55s',
   )
-  expect(regularDuration).toBeGreaterThanOrEqual(1.3)
-  expect(regularDuration).toBeLessThanOrEqual(1.5)
 })

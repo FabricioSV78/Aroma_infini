@@ -1,0 +1,323 @@
+/* A photographic introduction and a readable scent progression, without nested panels. */
+.store-layout .product-information,
+.store-layout .product-info-panel--family {
+  background: var(--color-canvas);
+}
+
+.store-layout .product-info-tabs {
+  background: color-mix(in srgb, var(--color-canvas) 97%, transparent);
+}
+
+.olfactory-profile-card {
+  --profile-accent: #315d53;
+  --profile-tint: #e8efed;
+  display: grid;
+  width: min(100%, 1120px);
+  margin-inline: auto;
+  border-block: 1px solid var(--color-line);
+  background: var(--color-canvas);
+}
+
+.olfactory-profile-card.has-image {
+  grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+}
+
+.olfactory-profile-visual {
+  position: relative;
+  min-height: 490px;
+  margin: 0;
+  overflow: hidden;
+  background: #f4f4f1;
+}
+
+.olfactory-profile-visual img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.olfactory-profile-content {
+  min-width: 0;
+  padding: clamp(26px, 3.5vw, 52px);
+}
+
+.olfactory-profile-kicker {
+  color: var(--profile-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.olfactory-profile-kicker span {
+  padding-inline: 5px;
+  color: var(--color-muted);
+}
+
+.olfactory-profile-family {
+  margin-top: 12px;
+  color: var(--color-ink);
+  font-size: clamp(30px, 3.4vw, 48px);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.olfactory-profile-summary {
+  max-width: 48ch;
+  margin-top: 14px;
+  color: var(--color-muted);
+  font-size: clamp(15px, 1.45vw, 18px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.olfactory-profile-evolution {
+  margin-top: clamp(24px, 3vw, 36px);
+  padding-top: 21px;
+  border-top: 1px solid var(--color-line);
+}
+
+.olfactory-profile-evolution h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-ink);
+  font-size: clamp(17px, 1.5vw, 20px);
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.olfactory-profile-evolution h3 svg {
+  width: 24px;
+  height: 24px;
+  color: var(--profile-accent);
+}
+
+.olfactory-note-groups {
+  display: grid;
+  margin-top: 11px;
+}
+
+.olfactory-note-groups > div {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.olfactory-note-groups > div:last-child {
+  border-bottom: 0;
+}
+
+.olfactory-note-groups dt {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  color: var(--profile-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+}
+
+.olfactory-note-icon {
+  width: 25px;
+  height: 25px;
+  flex: none;
+  stroke-width: 1.75;
+}
+
+.olfactory-note-index {
+  color: #789489;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.olfactory-note-groups dd {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0 34px;
+  overflow-wrap: anywhere;
+}
+
+.olfactory-note-cue {
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.olfactory-note-ingredients {
+  color: var(--color-ink);
+  font-size: clamp(14px, 1.25vw, 16px);
+  line-height: 1.4;
+}
+
+.olfactory-profile-pending {
+  margin-top: 14px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.olfactory-profile-details {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(20px, 3vw, 36px);
+  margin-top: 8px;
+  padding-top: 19px;
+  border-top: 1px solid var(--color-line);
+}
+
+.olfactory-profile-intensity-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.olfactory-profile-intensity-label p {
+  color: var(--color-muted);
+}
+
+.olfactory-profile-intensity-label strong {
+  color: var(--profile-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.olfactory-meter {
+  position: relative;
+  height: 6px;
+  margin-top: 15px;
+  background: var(--profile-tint);
+}
+
+.olfactory-meter::before,
+.olfactory-meter::after {
+  position: absolute;
+  z-index: 2;
+  top: -4px;
+  width: 1px;
+  height: 14px;
+  background: var(--profile-accent);
+  content: '';
+}
+
+.olfactory-meter::before {
+  left: 33.333%;
+}
+
+.olfactory-meter::after {
+  left: 66.666%;
+}
+
+.olfactory-meter > span {
+  position: relative;
+  display: block;
+  height: 100%;
+  background: var(--profile-accent);
+}
+
+.olfactory-meter[data-level='1'] > span {
+  width: 33.333%;
+}
+
+.olfactory-meter[data-level='2'] > span {
+  width: 66.666%;
+}
+
+.olfactory-meter[data-level='3'] > span {
+  width: 100%;
+}
+
+.olfactory-meter i {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 1px;
+  height: 14px;
+  background: var(--profile-accent);
+}
+
+.olfactory-profile-traits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.olfactory-profile-traits > div {
+  display: grid;
+  grid-template-columns: 23px minmax(0, 1fr);
+  gap: 2px 7px;
+  min-width: 0;
+}
+
+.olfactory-profile-traits svg {
+  grid-row: 1 / 3;
+  width: 21px;
+  height: 21px;
+  color: var(--profile-accent);
+}
+
+.olfactory-profile-traits dt {
+  color: var(--color-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.olfactory-profile-traits dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .olfactory-profile-card.has-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .olfactory-profile-visual {
+    min-height: 0;
+    height: clamp(185px, 31vw, 280px);
+  }
+
+  .olfactory-profile-visual img {
+    object-position: center 48%;
+  }
+}
+
+@media (max-width: 600px) {
+  .product-info-panel--family {
+    padding-block: 28px 44px;
+  }
+
+  .olfactory-profile-content {
+    padding: 24px 4px 27px;
+  }
+
+  .olfactory-profile-family {
+    font-size: clamp(28px, 8vw, 36px);
+  }
+
+  .olfactory-profile-summary {
+    font-size: 15px;
+  }
+
+  .olfactory-profile-evolution {
+    margin-top: 23px;
+  }
+
+  .olfactory-profile-details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 21px;
+  }
+
+  .olfactory-profile-traits {
+    gap: 8px;
+  }
+}

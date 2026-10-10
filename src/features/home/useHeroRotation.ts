@@ -52,7 +52,7 @@ export function useHeroRotation({
   useEffect(
     function scheduleRotation() {
       if (!playing) return
-      const timer = window.setInterval(() => advance(), 5000)
+      const timer = window.setInterval(() => advance(), 3000)
       return function cancelRotation() {
         window.clearInterval(timer)
       }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { Header } from './Header'
 import { Footer } from './Footer'
@@ -10,57 +10,109 @@ import { CheckoutProvider } from '../../features/checkout/CheckoutProvider'
 import { SeoManager } from '../../seo/SeoManager'
 import { AccountProvider } from '../../features/account/AccountProvider'
 import { useStoreReveal } from './useStoreReveal'
-import { ContactHelpDialog } from './ContactHelpDialog'
-import { useCart } from '../../features/cart/cart-context'
+import { contactDetails } from '../../content/institutional'
+import { buildWhatsAppUrl } from '../../utils/whatsapp'
 
 function StoreFrame() {
-  const [helpOpen, setHelpOpen] = useState(false)
   const [helpOffset, setHelpOffset] = useState(16)
   const location = useLocation()
-  const { dismissNotice } = useCart()
-  const helpTriggerRef = useRef<HTMLButtonElement>(null)
-  const closeHelp = useCallback((restoreFocus = false) => {
-    setHelpOpen(false)
-    if (restoreFocus)
-      requestAnimationFrame(() => helpTriggerRef.current?.focus())
-  }, [])
+  const helpTriggerRef = useRef<HTMLAnchorElement>(null)
+  const whatsappUrl = buildWhatsAppUrl(contactDetails.whatsappNumber)
   const previousKey = useRef(location.key)
   const previousPath = useRef(location.pathname)
   const storeRef = useRef<HTMLDivElement>(null)
   useStoreReveal(storeRef, location.key)
   useEffect(() => {
-    if (helpOpen) return
     let frame = 0
     function placeHelp() {
       cancelAnimationFrame(frame)
+      if (window.matchMedia('(max-width: 1199px)').matches) {
+        setHelpOffset((current) => (current === 16 ? current : 16))
+        return
+      }
       frame = requestAnimationFrame(() => {
         const trigger = helpTriggerRef.current
         if (!trigger) return
         const width = trigger.offsetWidth
         const height = trigger.offsetHeight
-        const right = Math.max(16, Number.parseFloat(getComputedStyle(trigger).right) || 16)
+        const right = Math.max(
+          16,
+          Number.parseFloat(getComputedStyle(trigger).right) || 16,
+        )
         const left = window.innerWidth - right - width
         const actions = document.querySelectorAll<HTMLElement>(
-          'main button, main a[href], main label, main input, main select, main textarea, footer button, footer a[href], [role="dialog"] button, .cart-notice, .product-popularity-preview',
+          'main button, main a[href], main label, main input, main select, main textarea, main .product-variants, footer button, footer a[href], [role="dialog"] button, .cart-notice, .product-popularity-preview',
         )
-        const next = [16, 96, 176, 256, 336, 416, 496].find((bottom) => {
-          const top = window.innerHeight - bottom - height
-          if (top < 72) return false
-          return !Array.from(actions).some((action) => {
-            if (action === trigger || !action.getClientRects().length) return false
-            const rect = action.getBoundingClientRect()
-            if (action.tagName === 'A' && rect.height > 120 && !action.classList.contains('button'))
-              return false
-            return rect.right > left - 20 && rect.left < left + width + 20 &&
-              rect.bottom > top - 8 && rect.top < top + height + 8
-          })
+        const actionRects = Array.from(actions).flatMap((action) => {
+          if (action === trigger || !action.getClientRects().length) return []
+          const rect = action.getBoundingClientRect()
+          if (rect.bottom < 72 || rect.top > window.innerHeight) return []
+          if (
+            action.tagName === 'A' &&
+            rect.height > 120 &&
+            !action.classList.contains('button')
+          )
+            return []
+          return [rect]
         })
+        const textRects = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            'main h1, main h2, main h3, main p, main .product-selected-price, footer h2, footer p',
+          ),
+        ).flatMap((element) => {
+          if (!element.getClientRects().length) return []
+          const rect = element.getBoundingClientRect()
+          if (rect.bottom < 72 || rect.top > window.innerHeight) return []
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          return Array.from(range.getClientRects())
+        })
+        const candidates = Array.from(
+          { length: Math.ceil(window.innerHeight / 64) },
+          (_, index) => 16 + index * 64,
+        ).filter((bottom) => window.innerHeight - bottom - height >= 72)
+        const scored = candidates.map((bottom) => {
+          const top = window.innerHeight - bottom - height
+          const overlap = (rects: DOMRect[]) =>
+            rects.reduce((total, rect) => {
+              const sharedWidth = Math.max(
+                0,
+                Math.min(rect.right, left + width + 8) -
+                  Math.max(rect.left, left - 8),
+              )
+              const sharedHeight = Math.max(
+                0,
+                Math.min(rect.bottom, top + height + 8) -
+                  Math.max(rect.top, top - 8),
+              )
+              return total + sharedWidth * sharedHeight
+            }, 0)
+          return {
+            bottom,
+            actionOverlap: overlap(actionRects),
+            textOverlap: overlap(textRects),
+          }
+        })
+        const next =
+          scored.find(
+            (candidate) =>
+              candidate.actionOverlap === 0 && candidate.textOverlap === 0,
+          )?.bottom ??
+          scored
+            .filter((candidate) => candidate.actionOverlap === 0)
+            .sort((a, b) => a.textOverlap - b.textOverlap)[0]?.bottom ??
+          scored.sort(
+            (a, b) =>
+              a.actionOverlap - b.actionOverlap ||
+              a.textOverlap - b.textOverlap,
+          )[0]?.bottom
         setHelpOffset(next ?? 16)
       })
     }
     placeHelp()
     const observer = new MutationObserver(placeHelp)
-    if (storeRef.current) observer.observe(storeRef.current, { childList: true, subtree: true })
+    if (storeRef.current)
+      observer.observe(storeRef.current, { childList: true, subtree: true })
     window.addEventListener('scroll', placeHelp, { passive: true })
     window.addEventListener('resize', placeHelp)
     return () => {
@@ -69,13 +121,12 @@ function StoreFrame() {
       window.removeEventListener('scroll', placeHelp)
       window.removeEventListener('resize', placeHelp)
     }
-  }, [helpOpen, location.key])
+  }, [location.key])
   useEffect(() => {
     if (previousKey.current === location.key) return
     previousKey.current = location.key
     if (previousPath.current === location.pathname && !location.hash) return
     previousPath.current = location.pathname
-    setHelpOpen(false)
     const target = location.hash
       ? document.getElementById(location.hash.slice(1))
       : document.getElementById('contenido')
@@ -98,33 +149,20 @@ function StoreFrame() {
       <main id="contenido" tabIndex={-1}>
         <Outlet />
       </main>
-      <button
+      <a
         ref={helpTriggerRef}
-        type="button"
+        href={whatsappUrl ?? '/contacto'}
+        target={whatsappUrl ? '_blank' : undefined}
+        rel={whatsappUrl ? 'noopener noreferrer' : undefined}
         aria-label={
-          helpOpen ? 'Cerrar ayuda y contacto' : 'Abrir ayuda y contacto'
+          whatsappUrl ? 'Abrir WhatsApp para recibir ayuda' : 'Ir a contacto'
         }
         className="help-button"
-        onClick={() => {
-          if (!helpOpen) {
-            dismissNotice()
-            setHelpOffset(16)
-          }
-          setHelpOpen((current) => !current)
-        }}
-        aria-haspopup="dialog"
-        aria-expanded={helpOpen}
-        aria-controls="help"
       >
-        <Icon name={helpOpen ? 'close' : 'chat'} />
+        <Icon name="chat" />
         <span>Ayuda</span>
-      </button>
+      </a>
       <Footer />
-      <ContactHelpDialog
-        open={helpOpen}
-        onClose={closeHelp}
-        triggerRef={helpTriggerRef}
-      />
       <CartNotice />
     </div>
   )

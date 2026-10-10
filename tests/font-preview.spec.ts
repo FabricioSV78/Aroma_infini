@@ -23,12 +23,12 @@ test('font selection applies globally, persists and restores', async ({
   await page.reload()
   await expect(page.locator('body')).toHaveCSS('font-family', /Source Sans 3/)
   await page.goto('/fuente')
-  await page.getByRole('button', { name: 'Restaurar fuente original' }).click()
+  await page.getByRole('button', { name: 'Restaurar fuente de marca' }).click()
   await expect(
-    page.getByRole('radio', { name: 'IBM Plex Sans', exact: true }),
+    page.getByRole('radio', { name: 'Lato', exact: true }),
   ).toBeChecked()
   expect(
-    await page.evaluate(() => localStorage.getItem('aroma-infini:font')),
+    await page.evaluate(() => localStorage.getItem('aroma-infini:font-v2')),
   ).toBeNull()
   await page.getByRole('radio', { name: 'IBM Plex Sans', exact: true }).focus()
   await page.keyboard.press('ArrowRight')
@@ -58,13 +58,13 @@ for (const width of [320, 390, 768, 1440]) {
   })
 }
 
-test('invalid stored font falls back to original', async ({ page }) => {
+test('invalid stored font falls back to the brand font', async ({ page }) => {
   await page.addInitScript(() =>
-    localStorage.setItem('aroma-infini:font', 'invalid'),
+    localStorage.setItem('aroma-infini:font-v2', 'invalid'),
   )
   await page.goto('/fuente')
   await expect(
-    page.getByRole('radio', { name: 'IBM Plex Sans', exact: true }),
+    page.getByRole('radio', { name: 'Lato', exact: true }),
   ).toBeChecked()
-  await expect(page.locator('body')).toHaveCSS('font-family', /IBM Plex Sans/)
+  await expect(page.locator('body')).toHaveCSS('font-family', /Lato/)
 })

@@ -1,10 +1,123 @@
 import { expect, test } from '@playwright/test'
 
+test('El panel publica cinco campañas editables y el video editorial tras guardar y recargar', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/admin/home')
+  await page.getByRole('button', { name: 'Carrusel principal' }).click()
+  await expect(page.locator('.admin-home-slide-picker button')).toHaveCount(5)
+  await page
+    .getByRole('textbox', { name: 'Etiqueta superior' })
+    .fill('Firma personal')
+  await page
+    .getByRole('textbox', { name: /^Título/ })
+    .fill('Una\nesencia\npara\nti')
+  await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
+  await expect(page.locator('.admin-home-savebar')).toContainText(
+    'una a tres líneas',
+  )
+  await page
+    .getByRole('textbox', { name: /^Título/ })
+    .fill('Una esencia.\nTu momento.')
+  await page
+    .getByRole('textbox', { name: 'Descripción', exact: true })
+    .fill('Un perfume para expresar tu momento.')
+  await page
+    .getByRole('textbox', { name: 'Texto del botón' })
+    .fill('Ver la colección')
+  await page
+    .getByLabel('Subir imagen de escritorio de campaña 1')
+    .setInputFiles('public/images/hero-v4-citrus-desktop-2048.webp')
+  await expect(page.locator('.admin-home-hero-preview img')).toHaveAttribute(
+    'src',
+    /^data:image\/webp;base64,/,
+  )
+  await page
+    .getByLabel('Subir imagen móvil de campaña 1')
+    .setInputFiles('public/images/hero-v4-citrus-mobile-1024.webp')
+  await page.getByRole('button', { name: 'Móvil', exact: true }).click()
+  await expect(page.locator('.admin-home-hero-preview')).toHaveClass(/--mobile/)
+  await expect(page.locator('.admin-home-hero-preview img')).toHaveAttribute(
+    'src',
+    /^data:image\/webp;base64,/,
+  )
+  await page.locator('.admin-home-slide-picker button').nth(4).click()
+  await page
+    .getByRole('textbox', { name: /^Título/ })
+    .fill('Quinta campaña.\nTu aroma.')
+
+  await page.getByRole('button', { name: 'Video editorial' }).click()
+  await page
+    .getByRole('textbox', { name: /^Título/ })
+    .fill('Un ritual.\nMuy tuyo.')
+  await page
+    .getByRole('textbox', { name: 'Descripción', exact: true })
+    .fill('Un momento para elegir tu fragancia.')
+  await page
+    .getByLabel('Subir video editorial')
+    .setInputFiles('public/videos/README.md')
+  await expect(page.locator('.admin-home-savebar')).toContainText(
+    'Elige un video MP4',
+  )
+  await page
+    .getByLabel('Subir video editorial')
+    .setInputFiles('public/videos/perfume-editorial-wide.mp4')
+  await expect(page.locator('.admin-home-film-preview video')).toHaveAttribute(
+    'src',
+    /^data:video\/mp4;base64,/,
+  )
+  await expect(page.locator('.admin-home-film-preview video')).toHaveAttribute(
+    'poster',
+    /^data:image\/webp;base64,/,
+  )
+  await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
+  await expect(page.getByText(/Cambios guardados/)).toBeVisible()
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Una esencia.',
+  )
+  await expect(
+    page.locator('.hero-slide').first().locator('img'),
+  ).toHaveAttribute('src', /^data:image\/webp;base64,/)
+  await expect(page.locator('.editorial-film-copy')).toContainText('Un ritual.')
+  await expect(page.locator('.editorial-film-copy')).toContainText(
+    'Un momento para elegir tu fragancia.',
+  )
+  await expect(page.locator('.editorial-film-media img')).toHaveAttribute(
+    'src',
+    /^data:image\/webp;base64,/,
+  )
+  await page.locator('.editorial-film-media').scrollIntoViewIfNeeded()
+  await expect(page.locator('.editorial-film-media video')).toHaveAttribute(
+    'src',
+    /^data:video\/mp4;base64,/,
+  )
+  await expect(page.locator('.editorial-film-fallback')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Ver campaña 5' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Quinta campaña.',
+  )
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Una esencia.',
+  )
+  await expect(page.locator('.editorial-film-copy')).toContainText('Un ritual.')
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390)
+})
+
 test('El Home muestra la edición visual, cambia imágenes y conserva los cambios tras recargar', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/admin/home')
+  await page
+    .getByRole('button', { name: 'Para él, para ella y unisex' })
+    .click()
 
   const categoryPreview = page.locator('.admin-home-category--portrait img')
   await page
@@ -94,7 +207,7 @@ test('Un producto nuevo admite archivos, previsualiza la galería y se publica c
     'src',
     /^data:image\/webp;base64,/,
   )
-  await page.getByRole('button', { name: 'Añadir vista' }).click()
+  await page.getByRole('button', { name: 'Añadir otra foto' }).click()
   await page
     .getByLabel('Subir vista 2 del producto')
     .setInputFiles('public/images/cedre-960.webp')
@@ -132,9 +245,24 @@ test('Un producto nuevo admite archivos, previsualiza la galería y se publica c
 test('Los editores visuales conservan controles y composición en móvil, tablet y escritorio', async ({
   page,
 }) => {
-  for (const width of [390, 768, 1440]) {
+  for (const width of [390, 768, 1366, 1920]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/admin/home')
+    await page.getByRole('button', { name: 'Carrusel principal' }).click()
+    await expect(page.locator('.admin-home-hero-preview')).toBeVisible()
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width)
+    await page.screenshot({ path: `artifacts/admin-home-hero-${width}.png` })
+    await page.getByRole('button', { name: 'Video editorial' }).click()
+    await expect(page.locator('.admin-home-film-preview')).toBeVisible()
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width)
+    await page.screenshot({ path: `artifacts/admin-home-film-${width}.png` })
+    await page
+      .getByRole('button', { name: 'Para él, para ella y unisex' })
+      .click()
     await expect(page.locator('.admin-home-category-preview')).toBeVisible()
     await page.screenshot({
       path: `artifacts/admin-home-categories-${width}.png`,

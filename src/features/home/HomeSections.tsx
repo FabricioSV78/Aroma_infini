@@ -88,6 +88,7 @@ export function Bestsellers({
           <ProductCard
             key={product.id}
             product={product}
+            imageSizes="(min-width: 1760px) 396px, (min-width: 1024px) 23vw, 46vw"
             brand={brands.find((brand) => brand.id === product.brandId)}
           />
         ))}
@@ -163,6 +164,33 @@ export function FeaturedPerfumes({
 }
 
 export function TrustInformation() {
+  const links = [
+    {
+      id: 'delivery',
+      to: '/envios',
+      icon: 'truck',
+      title: 'Opciones de entrega',
+      description: 'Consulta las opciones disponibles para tu ubicación.',
+      action: 'Ver entregas',
+    },
+    {
+      id: 'tracking',
+      to: '/seguir-pedido',
+      icon: 'clock',
+      title: 'Tu pedido',
+      description: 'Encuentra el estado de tu selección con su código.',
+      action: 'Seguir pedido',
+    },
+    {
+      id: 'contact',
+      to: '/contacto',
+      icon: 'chat',
+      title: 'Conversemos',
+      description: 'Escríbenos si necesitas orientación.',
+      action: 'Ver contacto',
+    },
+  ] as const
+
   return (
     <section
       className="trust-section container"
@@ -171,25 +199,25 @@ export function TrustInformation() {
       aria-label="Información de entregas y atención"
       data-reveal="copy"
     >
-      <div>
-        <Icon name="truck" />
-        <h2>Opciones de entrega</h2>
-        <p>Consulta las opciones disponibles para tu ubicación.</p>
-      </div>
-      <div>
-        <Icon name="clock" />
-        <h2>Tu pedido</h2>
-        <p>Encuentra el estado de tu selección con su código.</p>
-      </div>
-      <div>
-        <Icon name="chat" />
-        <h2>Conversemos</h2>
-        <p>Escríbenos si necesitas orientación.</p>
-        <Link className="text-link" to="/contacto">
-          Ver contacto
-          <Icon name="arrow" />
+      {links.map(({ id, to, icon, title, description, action }) => (
+        <Link
+          className="trust-item"
+          to={to}
+          aria-labelledby={`trust-${id}-title`}
+          key={id}
+        >
+          <span className="trust-icon">
+            <Icon name={icon} />
+          </span>
+          <div className="trust-content">
+            <h2 id={`trust-${id}-title`}>{title}</h2>
+            <p>{description}</p>
+            <span className="trust-action">
+              {action} <Icon name="arrow" />
+            </span>
+          </div>
         </Link>
-      </div>
+      ))}
     </section>
   )
 }

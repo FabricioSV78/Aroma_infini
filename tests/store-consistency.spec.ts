@@ -80,6 +80,6 @@ test('La tienda y el panel usan una sola familia tipográfica', async ({
         ),
       ]
     })
-    expect(families, route).toEqual(['"IBM Plex Sans", Arial, sans-serif'])
+    expect(families, route).toEqual(['Lato, Arial, sans-serif'])
   }
 })

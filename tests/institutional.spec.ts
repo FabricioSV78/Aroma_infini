@@ -82,7 +82,7 @@ for (const width of [390, 1440]) {
           h2Font: h2Style.fontFamily,
           h1Size: parseFloat(h1Style.fontSize),
           h2Size: parseFloat(h2Style.fontSize),
-          fontLoaded: document.fonts.check('400 16px "IBM Plex Sans"'),
+          fontLoaded: document.fonts.check('400 16px "Lato"'),
         }
       })
 

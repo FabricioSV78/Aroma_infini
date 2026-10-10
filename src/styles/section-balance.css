@@ -1,0 +1,11 @@
+/* Let photography and typography separate storefront sections without nested panels. */
+.store-layout .home .featured-products {
+  padding-inline: 0;
+  background: transparent;
+}
+
+.store-layout .brands-page .catalog-heading {
+  padding-inline: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-canvas);
+}

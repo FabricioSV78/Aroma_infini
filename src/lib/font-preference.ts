@@ -1,5 +1,11 @@
 export const fontOptions = [
   {
+    id: 'lato',
+    name: 'Lato',
+    note: 'Fuente de marca',
+    description: 'La familia indicada en el manual de Aroma Infini.',
+  },
+  {
     id: 'ibm-plex-sans',
     name: 'IBM Plex Sans',
     note: 'Original',
@@ -32,14 +38,14 @@ export const fontOptions = [
 ] as const
 
 export type FontId = (typeof fontOptions)[number]['id']
-const storageKey = 'aroma-infini:font'
+const storageKey = 'aroma-infini:font-v2'
 
 export function getFontPreference(): FontId {
   try {
     const saved = localStorage.getItem(storageKey)
-    return fontOptions.find((font) => font.id === saved)?.id ?? 'ibm-plex-sans'
+    return fontOptions.find((font) => font.id === saved)?.id ?? 'lato'
   } catch {
-    return 'ibm-plex-sans'
+    return 'lato'
   }
 }
 
@@ -51,7 +57,7 @@ export function applyFontPreference(id: FontId, persist = true): boolean {
   )
   if (!persist) return true
   try {
-    if (font.id === 'ibm-plex-sans') localStorage.removeItem(storageKey)
+    if (font.id === 'lato') localStorage.removeItem(storageKey)
     else localStorage.setItem(storageKey, font.id)
     return true
   } catch {

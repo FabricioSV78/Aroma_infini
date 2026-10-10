@@ -3,7 +3,17 @@ import {
   products as fixtureProducts,
 } from '../mocks/home'
 import { getProductDetail } from '../mocks/product-details'
+import {
+  createDefaultHomeContent,
+  normalizeHomeContent,
+  validateHomeContent,
+  type HomeContent,
+} from '../content/home-editor'
 import { readAdminState, writeAdminState } from './admin-persistence'
+import {
+  isValidAlternateRecipient,
+  type AlternateRecipient,
+} from './shipping-recipient'
 import { formatBrandName } from '../utils/brand-name'
 import {
   getPeruDepartmentLabel,
@@ -58,6 +68,8 @@ export interface AdminOrder {
   customerId: string
   customerName: string
   customerEmail: string
+  contactPhone?: string
+  alternateRecipient?: AlternateRecipient | null
   placedAt: string
   status: AdminOrderStatus
   paymentStatus: AdminOrderPaymentStatus
@@ -74,7 +86,27 @@ export interface AdminOrder {
     province: string
     district: string
     street: string
+    reference?: string
   }
+}
+
+export function hasCompleteOrderDelivery(
+  order: AdminOrder,
+  legacyPhone?: string,
+) {
+  const phone = (order.contactPhone?.trim() || legacyPhone || '').trim()
+  const address = order.address
+  return Boolean(
+    order.customerName.trim().length >= 2 &&
+    !/^Cliente \d+$/i.test(order.customerName.trim()) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.customerEmail.trim()) &&
+    /^[+\d\s()-]{9,20}$/.test(phone) &&
+    address.street?.trim().length >= 5 &&
+    address.street.trim() !== 'Dirección registrada' &&
+    address.department?.trim() &&
+    address.province?.trim() &&
+    address.district?.trim(),
+  )
 }
 
 export interface ApprovedCheckoutOrderInput {
@@ -92,7 +124,9 @@ export interface ApprovedCheckoutOrderInput {
     province: string
     district: string
     street: string
+    reference?: string
   }
+  alternateRecipient?: AlternateRecipient | null
   deliveryMethod: 'courier' | 'motorizado'
   paymentProvider: 'mercado-pago'
   subtotalCents: number
@@ -150,6 +184,7 @@ export interface AdminState {
   shipping: AdminShippingSettings
   featuredOrder: string[]
   homeMedia: HomeMedia
+  homeContent: HomeContent
   revision: number
 }
 
@@ -456,6 +491,7 @@ function createInitialState(): AdminState {
     },
     featuredOrder: ['sillage', 'cedre'],
     homeMedia: { hombre: null, mujer: null, unisex: null, featured: null },
+    homeContent: createDefaultHomeContent(),
     revision: 0,
   }
 }
@@ -543,6 +579,7 @@ export function hydrateAdminStore() {
           unisex: saved.homeMedia?.unisex ?? null,
           featured: saved.homeMedia?.featured ?? null,
         },
+        homeContent: normalizeHomeContent(saved.homeContent),
       }
       listeners.forEach((listener) => listener())
     } catch {
@@ -747,6 +784,131 @@ export const adminService = {
     })
     return { kind: 'saved' }
   },
+  saveProductsBatch(
+    records: readonly AdminProduct[],
+    expectedRevision: number,
+  ): AdminSaveResult {
+    if (state.revision !== expectedRevision)
+      return {
+        kind: 'validation',
+        message:
+          'El catálogo cambió mientras revisabas el archivo. Vuelve a cargarlo para validar los datos actuales.',
+      }
+    if (!records.length)
+      return {
+        kind: 'validation',
+        message: 'No hay productos válidos para importar.',
+      }
+    const existingSlugs = new Set(
+      state.products.map((item) => item.product.slug.toLowerCase()),
+    )
+    const existingIds = new Set(state.products.map((item) => item.product.id))
+    const existingNames = new Set(
+      state.products.map(
+        (item) => `${item.product.brandId}:${normalizeKey(item.product.name)}`,
+      ),
+    )
+    const batchSlugs = new Set<string>()
+    const batchIds = new Set<string>()
+    const batchNames = new Set<string>()
+    const variantIds = new Set(
+      state.products.flatMap((item) =>
+        item.product.variants.map((variant) => variant.id),
+      ),
+    )
+    for (const record of records) {
+      const product = record.product
+      const slug = product.slug.toLowerCase()
+      const nameKey = `${product.brandId}:${normalizeKey(product.name)}`
+      const brand = state.brands.find((item) => item.id === product.brandId)
+      if (
+        !validSlug(product.slug) ||
+        !product.name.trim() ||
+        !product.family.trim() ||
+        !record.detail.description.trim()
+      )
+        return {
+          kind: 'validation',
+          message: `Revisa nombre, slug, familia y descripción de ${product.name || product.slug}.`,
+        }
+      if (
+        existingSlugs.has(slug) ||
+        batchSlugs.has(slug) ||
+        existingIds.has(product.id) ||
+        batchIds.has(product.id) ||
+        existingNames.has(nameKey) ||
+        batchNames.has(nameKey)
+      )
+        return {
+          kind: 'validation',
+          message: `El producto ${product.name} ya existe o está duplicado en el archivo.`,
+        }
+      if (!brand || (record.active && !brand.active))
+        return {
+          kind: 'validation',
+          message: `La marca de ${product.name} no está disponible.`,
+        }
+      if (!['hombre', 'mujer', 'unisex'].includes(record.gender))
+        return {
+          kind: 'validation',
+          message: `El género de ${product.name} no es válido.`,
+        }
+      if (record.active && (!product.image || !record.detail.gallery[0]?.image))
+        return {
+          kind: 'validation',
+          message: `${product.name} necesita una imagen antes de publicarse.`,
+        }
+      if (record.detail.gallery.some((view) => !view.alt.trim()))
+        return {
+          kind: 'validation',
+          message: `Describe cada imagen de ${product.name}.`,
+        }
+      if (
+        !isNonNegativeInteger(record.lowStockThreshold) ||
+        !product.variants.length
+      )
+        return {
+          kind: 'validation',
+          message: `Revisa el umbral y las presentaciones de ${product.name}.`,
+        }
+      const sizes = new Set<number>()
+      for (const variant of product.variants) {
+        if (
+          !isPositiveInteger(variant.ml) ||
+          !isPositiveInteger(variant.priceCents) ||
+          !isNonNegativeInteger(variant.stock) ||
+          sizes.has(variant.ml) ||
+          variantIds.has(variant.id)
+        )
+          return {
+            kind: 'validation',
+            message: `Revisa precios, tamaños y stock de ${product.name}.`,
+          }
+        sizes.add(variant.ml)
+        variantIds.add(variant.id)
+      }
+      batchSlugs.add(slug)
+      batchIds.add(product.id)
+      batchNames.add(nameKey)
+    }
+    const saved = records.map((record) => ({
+      ...record,
+      featured: record.active && record.featured,
+      product: cloneProduct(record.product),
+      detail: cloneDetail(record.detail),
+    }))
+    commit((current) => ({
+      ...current,
+      products: [...current.products, ...saved],
+      featuredOrder: [
+        ...current.featuredOrder,
+        ...saved
+          .filter((record) => record.featured)
+          .map((record) => record.product.id),
+      ],
+    }))
+    return { kind: 'saved' }
+  },
   setProductActive(id: string, active: boolean): AdminSaveResult {
     const record = state.products.find((item) => item.product.id === id)
     if (!record)
@@ -794,7 +956,11 @@ export const adminService = {
       })),
     }))
   },
-  saveHome(featuredOrder: string[], homeMedia: HomeMedia): AdminSaveResult {
+  saveHome(
+    featuredOrder: string[],
+    homeMedia: HomeMedia,
+    homeContent: HomeContent,
+  ): AdminSaveResult {
     const unique = [...new Set(featuredOrder)]
     if (
       unique.length !== 2 ||
@@ -814,10 +980,13 @@ export const adminService = {
         message: 'Selecciona dos productos activos diferentes para destacados.',
       }
     }
+    const contentError = validateHomeContent(homeContent)
+    if (contentError) return { kind: 'validation', message: contentError }
     commit((current) => ({
       ...current,
       featuredOrder: unique,
       homeMedia: { ...homeMedia },
+      homeContent: normalizeHomeContent(homeContent),
       products: current.products.map((item) => ({
         ...item,
         featured: unique.includes(item.product.id),
@@ -885,7 +1054,10 @@ export const adminService = {
       !customerName ||
       !customerEmail ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) ||
-      !order.contact.phone.trim() ||
+      !/^9\d{8}$/.test(order.contact.phone.trim()) ||
+      (order.alternateRecipient !== null &&
+        order.alternateRecipient !== undefined &&
+        !isValidAlternateRecipient(order.alternateRecipient)) ||
       !order.address.department.trim() ||
       !order.address.province.trim() ||
       !order.address.district.trim() ||
@@ -1013,6 +1185,13 @@ export const adminService = {
       customerId,
       customerName,
       customerEmail,
+      contactPhone: order.contact.phone.trim(),
+      alternateRecipient: order.alternateRecipient
+        ? {
+            name: order.alternateRecipient.name.trim(),
+            dni: order.alternateRecipient.dni.trim(),
+          }
+        : null,
       placedAt: order.placedAt,
       status: 'received',
       paymentStatus: 'approved',
@@ -1026,11 +1205,10 @@ export const adminService = {
       deliveryMethod: order.deliveryMethod,
       address: {
         ...order.address,
-        department:
-          deliveryZone?.name ??
-          getPeruDepartmentLabel(order.address.department),
+        department: getPeruDepartmentLabel(order.address.department),
         province: getPeruProvinceLabel(order.address.province),
         district: getPeruDistrictLabel(order.address.district),
+        reference: order.address.reference?.trim() ?? '',
       },
     }
 
@@ -1092,18 +1270,11 @@ export const adminService = {
       const customer = state.customers.find(
         (item) => item.id === order.customerId,
       )
-      if (
-        !order.customerEmail ||
-        order.customerEmail === '—' ||
-        !customer?.phone ||
-        customer.phone === '—' ||
-        !order.address.street ||
-        order.address.street === 'Dirección registrada'
-      )
+      if (!hasCompleteOrderDelivery(order, customer?.phone))
         return {
           kind: 'validation',
           message:
-            'Completa el contacto y la dirección antes de marcar el pedido como enviado.',
+            'Completa el nombre, contacto y ubicación de entrega antes de marcar el pedido como enviado.',
         }
     }
     const statuses: AdminOrderStatus[] = [
@@ -1134,6 +1305,9 @@ export const adminService = {
       customerEmail: string
       phone: string
       street: string
+      department?: string
+      province?: string
+      district?: string
     },
   ): AdminSaveResult {
     const order = state.orders.find((item) => item.reference === reference)
@@ -1143,15 +1317,33 @@ export const adminService = {
     const email = normalizeEmail(details.customerEmail)
     const phone = details.phone.trim()
     const street = details.street.trim()
+    const department = details.department?.trim() ?? order.address.department
+    const province = details.province?.trim() ?? order.address.province
+    const district = details.district?.trim() ?? order.address.district
+    const unchangedLegacyLocation =
+      department === order.address.department &&
+      province === order.address.province &&
+      district === order.address.district &&
+      Boolean(department && province && district)
     if (
       name.length < 2 ||
+      /^Cliente \d+$/i.test(name) ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
       !/^[+\d\s()-]{9,20}$/.test(phone) ||
-      street.length < 5
+      street.length < 5 ||
+      street === 'Dirección registrada'
     )
       return {
         kind: 'validation',
-        message: 'Revisa el nombre, correo, teléfono y dirección de entrega.',
+        message: 'Revisa el nombre, correo, teléfono y dirección exacta.',
+      }
+    if (
+      !isValidPeruLocation(department, province, district) &&
+      !unchangedLegacyLocation
+    )
+      return {
+        kind: 'validation',
+        message: 'Selecciona un departamento, provincia y distrito válidos.',
       }
     commit((current) => ({
       ...current,
@@ -1161,7 +1353,14 @@ export const adminService = {
               ...item,
               customerName: name,
               customerEmail: email,
-              address: { ...item.address, street },
+              contactPhone: phone,
+              address: {
+                ...item.address,
+                department,
+                province,
+                district,
+                street,
+              },
             }
           : item,
       ),

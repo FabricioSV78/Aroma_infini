@@ -8,6 +8,9 @@ const viewports = [
   { width: 1366, height: 768 },
   { width: 1600, height: 900 },
   { width: 1904, height: 947 },
+  { width: 844, height: 390 },
+  { width: 1280, height: 600 },
+  { width: 2560, height: 1440 },
 ]
 
 const storeRoutes = [

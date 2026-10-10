@@ -19,8 +19,11 @@ export function CatalogPage() {
   const navigation = useNavigation()
   const revalidator = useRevalidator()
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [scrollResultsOnApply, setScrollResultsOnApply] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
+  const toolbar = useRef<HTMLDivElement>(null)
   const sidebarTitle = useRef<HTMLHeadingElement>(null)
+  const sidebarSummary = useRef<HTMLElement>(null)
   useEffect(
     function closeMobileFiltersOnDesktop() {
       const desktop = window.matchMedia('(min-width: 1024px)')
@@ -28,7 +31,9 @@ export function CatalogPage() {
         if (desktop.matches && filtersOpen) {
           setFiltersOpen(false)
           requestAnimationFrame(() =>
-            sidebarTitle.current?.focus({ preventScroll: true }),
+            (sidebarSummary.current ?? sidebarTitle.current)?.focus({
+              preventScroll: true,
+            }),
           )
         }
       }
@@ -37,6 +42,19 @@ export function CatalogPage() {
     },
     [filtersOpen],
   )
+  useEffect(() => {
+    if (!scrollResultsOnApply || navigation.state !== 'idle') return
+    const frame = requestAnimationFrame(() => {
+      toolbar.current?.scrollIntoView({
+        block: 'start',
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+      })
+      setScrollResultsOnApply(false)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [scrollResultsOnApply, navigation.state, location.search])
   const searchMode = location.pathname === '/buscar'
   const title =
     data.kind === 'ready' && data.brand
@@ -81,6 +99,7 @@ export function CatalogPage() {
       min,
       max,
     })
+    if (!filtersOpen) setScrollResultsOnApply(true)
     if (filtersOpen) closeFilters()
   }
   if (data.kind !== 'ready')
@@ -118,73 +137,76 @@ export function CatalogPage() {
     query.genders.length +
     Number(Boolean(query.min || query.max)) +
     Number(query.featured)
+  const compactSidebar = searchMode && data.total === 1
   const filterForm = (
     <form onSubmit={applyFilters} className="catalog-filter-form">
-      {!brand && (
-        <fieldset key={'brands-' + params.toString()}>
-          <legend>Marca</legend>
-          {data.brands.map((item) => (
-            <label key={item.id}>
+      <div className="catalog-filter-fields">
+        {!brand && (
+          <fieldset key={'brands-' + params.toString()}>
+            <legend>Marca</legend>
+            {data.brands.map((item) => (
+              <label key={item.id}>
+                <input
+                  type="checkbox"
+                  name="marca"
+                  value={item.slug}
+                  defaultChecked={query.brands.includes(item.slug)}
+                />
+                {item.name}
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <fieldset key={'gender-' + params.toString()}>
+          <legend>Género</legend>
+          {data.genders.map((item) => (
+            <label key={item.value}>
               <input
                 type="checkbox"
-                name="marca"
-                value={item.slug}
-                defaultChecked={query.brands.includes(item.slug)}
+                name="genero"
+                value={item.value}
+                defaultChecked={query.genders.includes(item.value)}
               />
-              {item.name}
+              {item.label}
             </label>
           ))}
         </fieldset>
-      )}
-      <fieldset key={'gender-' + params.toString()}>
-        <legend>Género</legend>
-        {data.genders.map((item) => (
-          <label key={item.value}>
-            <input
-              type="checkbox"
-              name="genero"
-              value={item.value}
-              defaultChecked={query.genders.includes(item.value)}
-            />
-            {item.label}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset key={'price-' + params.toString()}>
-        <legend>Precio en soles</legend>
-        <div className="catalog-price-fields">
-          <label>
-            Mínimo
-            <input
-              type="number"
-              name="min"
-              min="0"
-              max="1000000"
-              step="0.01"
-              defaultValue={query.min}
-              onInput={(event) =>
-                (
-                  event.currentTarget.form?.elements.namedItem(
-                    'max',
-                  ) as HTMLInputElement
-                ).setCustomValidity('')
-              }
-            />
-          </label>
-          <label>
-            Máximo
-            <input
-              type="number"
-              name="max"
-              min="0"
-              max="1000000"
-              step="0.01"
-              defaultValue={query.max}
-              onInput={(event) => event.currentTarget.setCustomValidity('')}
-            />
-          </label>
-        </div>
-      </fieldset>
+        <fieldset key={'price-' + params.toString()}>
+          <legend>Precio en soles</legend>
+          <div className="catalog-price-fields">
+            <label>
+              Mínimo
+              <input
+                type="number"
+                name="min"
+                min="0"
+                max="1000000"
+                step="0.01"
+                defaultValue={query.min}
+                onInput={(event) =>
+                  (
+                    event.currentTarget.form?.elements.namedItem(
+                      'max',
+                    ) as HTMLInputElement
+                  ).setCustomValidity('')
+                }
+              />
+            </label>
+            <label>
+              Máximo
+              <input
+                type="number"
+                name="max"
+                min="0"
+                max="1000000"
+                step="0.01"
+                defaultValue={query.max}
+                onInput={(event) => event.currentTarget.setCustomValidity('')}
+              />
+            </label>
+          </div>
+        </fieldset>
+      </div>
       <div className="catalog-filter-actions">
         <button
           type="button"
@@ -208,36 +230,40 @@ export function CatalogPage() {
   )
   return (
     <div className="store-page catalog-page container">
-      <nav
-        className="catalog-breadcrumb"
-        aria-label="Ruta de navegación"
-        data-scroll-reveal="fade"
-      >
-        <Link to="/">Inicio</Link>
-        <span aria-hidden="true">/</span>
-        {brand ? (
-          <>
-            <Link to="/marcas">Marcas</Link>
-            <span aria-hidden="true">/</span>
-            <span aria-current="page">{brand.name}</span>
-          </>
-        ) : (
-          <span aria-current="page">{searchMode ? 'Búsqueda' : 'Tienda'}</span>
-        )}
-      </nav>
-      <header className="catalog-heading" data-scroll-reveal="copy">
-        <div>
-          <p className={brand ? 'eyebrow' : 'eyebrow brand-label'}>
-            {brand ? 'Universo de marca' : 'La selección de Aroma Infini'}
+      <div className="catalog-intro">
+        <nav
+          className="catalog-breadcrumb"
+          aria-label="Ruta de navegación"
+          data-scroll-reveal="fade"
+        >
+          <Link to="/">Inicio</Link>
+          <span aria-hidden="true">/</span>
+          {brand ? (
+            <>
+              <Link to="/marcas">Marcas</Link>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{brand.name}</span>
+            </>
+          ) : (
+            <span aria-current="page">
+              {searchMode ? 'Búsqueda' : 'Tienda'}
+            </span>
+          )}
+        </nav>
+        <header className="catalog-heading" data-scroll-reveal="copy">
+          <div>
+            <p className={brand ? 'eyebrow' : 'eyebrow brand-label'}>
+              {brand ? 'Universo de marca' : 'La selección de Aroma Infini'}
+            </p>
+            <h1>{title}</h1>
+          </div>
+          <p>
+            {brand
+              ? 'Descubre sus perfumes y presentaciones.'
+              : 'Distintas firmas. Una forma muy personal de elegir.'}
           </p>
-          <h1>{title}</h1>
-        </div>
-        <p>
-          {brand
-            ? 'Descubre sus perfumes y presentaciones.'
-            : 'Distintas firmas. Una forma muy personal de elegir.'}
-        </p>
-      </header>
+        </header>
+      </div>
       {searchMode && (
         <form
           className="catalog-search"
@@ -293,19 +319,46 @@ export function CatalogPage() {
           )}
         </section>
       ) : (
-        <div className="catalog-layout">
+        <div
+          className={
+            compactSidebar
+              ? 'catalog-layout catalog-layout--single-result'
+              : 'catalog-layout'
+          }
+        >
           <aside
-            className="catalog-sidebar"
+            className={
+              compactSidebar
+                ? 'catalog-sidebar catalog-sidebar--compact'
+                : 'catalog-sidebar'
+            }
             aria-label="Filtros de la tienda"
             data-scroll-reveal="copy"
           >
-            <h2 ref={sidebarTitle} tabIndex={-1}>
-              Filtrar por
-            </h2>
-            {filterForm}
+            {compactSidebar ? (
+              <details className="catalog-filter-disclosure">
+                <summary ref={sidebarSummary}>
+                  Filtrar resultados{count ? ` (${count})` : ''}
+                </summary>
+                <div className="catalog-filter-disclosure-content">
+                  {filterForm}
+                </div>
+              </details>
+            ) : (
+              <>
+                <h2 ref={sidebarTitle} tabIndex={-1}>
+                  Filtrar por
+                </h2>
+                {filterForm}
+              </>
+            )}
           </aside>
           <div className="catalog-listing">
-            <div className="catalog-toolbar" data-scroll-reveal="copy">
+            <div
+              ref={toolbar}
+              className="catalog-toolbar"
+              data-scroll-reveal="copy"
+            >
               <button
                 ref={trigger}
                 className="button button--secondary catalog-filter-trigger"

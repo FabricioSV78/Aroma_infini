@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router'
 import { editorialFilm } from '../../content/editorial-film'
+import type { HomeFilmContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 
 function subscribeViewport(onChange: () => void) {
@@ -10,17 +11,24 @@ function subscribeViewport(onChange: () => void) {
 }
 const wideViewport = () => matchMedia('(min-width: 768px)').matches
 
-export function EditorialFilm() {
+export function EditorialFilm({ content }: { content: HomeFilmContent }) {
   const wide = useSyncExternalStore(
     subscribeViewport,
     wideViewport,
     () => false,
   )
-  const source = wide ? editorialFilm.src : editorialFilm.mobileSrc
-  const poster = wide ? editorialFilm.poster : editorialFilm.mobilePoster
+  const source =
+    content.video ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc)
+  const poster =
+    content.poster ?? (wide ? editorialFilm.poster : editorialFilm.mobilePoster)
   const frame = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
-  const [failed, setFailed] = useState(false)
+  const [failedSource, setFailedSource] = useState<string | null>(null)
+  const failed = failedSource === source
+  const [playback, setPlayback] = useState<'auto' | 'paused' | 'playing'>(
+    'auto',
+  )
+  const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
     const element = video.current
@@ -40,8 +48,8 @@ export function EditorialFilm() {
       if (
         !inView ||
         document.hidden ||
-        motion.matches ||
-        connection?.saveData
+        playback === 'paused' ||
+        (playback === 'auto' && (motion.matches || connection?.saveData))
       ) {
         element.pause()
         return
@@ -50,7 +58,12 @@ export function EditorialFilm() {
       void element
         .play()
         .then(() => {
-          if (disposed || !inView || document.hidden || motion.matches)
+          if (
+            disposed ||
+            !inView ||
+            document.hidden ||
+            (playback === 'auto' && motion.matches)
+          )
             element.pause()
         })
         .catch(() => {
@@ -75,24 +88,28 @@ export function EditorialFilm() {
       document.removeEventListener('visibilitychange', synchronize)
       element.pause()
     }
-  }, [source])
+  }, [source, playback])
 
   return (
-    <section className="editorial-film" aria-labelledby="editorial-film-title">
+    <section
+      className="editorial-film"
+      id="ritual"
+      aria-labelledby="editorial-film-title"
+    >
       <div className="editorial-film-inner container">
         <div className="editorial-film-copy">
-          <p className="eyebrow">El ritual del perfume</p>
+          <p className="eyebrow">{content.eyebrow}</p>
           <h2 id="editorial-film-title">
-            Un gesto.
-            <br />
-            Algo muy tuyo.
+            {content.title.split('\n').map((line, index) => (
+              <span key={index}>
+                {index > 0 && <br />}
+                {line}
+              </span>
+            ))}
           </h2>
-          <p>
-            Hay pequeños momentos que cambian el día. Elegir un aroma, sentirlo
-            en la piel y hacerlo parte de ti.
-          </p>
+          <p>{content.description}</p>
           <Link className="text-link" to="/tienda">
-            Encuentra tu perfume <Icon name="arrow" />
+            {content.cta} <Icon name="arrow" />
           </Link>
         </div>
         <div className="editorial-film-media" ref={frame}>
@@ -113,10 +130,26 @@ export function EditorialFilm() {
             aria-label={editorialFilm.description}
             poster={poster}
             hidden={failed}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
             onError={() => {
-              setFailed(true)
+              setFailedSource(source)
             }}
           />
+          {!failed && (
+            <button
+              type="button"
+              className="editorial-film-toggle"
+              aria-label={
+                playing
+                  ? 'Pausar video editorial'
+                  : 'Reproducir video editorial'
+              }
+              onClick={() => setPlayback(playing ? 'paused' : 'playing')}
+            >
+              <Icon name={playing ? 'pause' : 'play'} />
+            </button>
+          )}
           {failed && (
             <p className="editorial-film-fallback" role="status">
               El video no está disponible. Puedes seguir explorando la

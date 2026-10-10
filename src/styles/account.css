@@ -607,8 +607,8 @@
 
 .account-payment-provider strong {
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 400;
+  font-size: 1.125rem;
+  font-weight: 700;
 }
 
 .account-transactions {
@@ -640,6 +640,47 @@
   font-size: 12px;
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+
+.store-layout .account-overview-grid > section {
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.store-layout .account-overview-grid > section:first-child {
+  border-color: #cbdad3;
+  background: var(--color-sage);
+}
+
+.store-layout .account-overview-grid > section:is(:hover, :focus-within) {
+  border-color: #a9bdb3;
+}
+
+.account-overview-grid .account-overview-status {
+  justify-self: start;
+  width: fit-content;
+  padding: 6px 9px;
+  background: var(--color-canvas);
+  color: var(--color-brand);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.account-transactions h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.account-transactions li > span {
+  justify-self: start;
+  padding: 5px 9px;
+  background: var(--color-sage);
+  color: var(--color-brand);
+}
+
+.account-transactions li > strong {
+  color: var(--color-brand);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 @media (min-width: 640px) {

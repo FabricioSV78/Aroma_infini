@@ -110,9 +110,12 @@ test('Las fotos de Más vendidos conservan tamaño, alineación y fundido sin zo
     }),
   )
   for (const box of boxes) expect(box).toEqual(boxes[0])
+  const primary = links.first().locator('.product-image-primary')
   const alternate = links.first().locator('.product-image-alternate')
+  await expect(primary).toHaveCSS('opacity', '1')
   await expect(alternate).toHaveCSS('opacity', '0')
   await links.first().hover()
+  await expect(primary).toHaveCSS('opacity', '0')
   await expect(alternate).toHaveCSS('opacity', '1')
   await expect(alternate).toHaveCSS('transform', 'none')
   expect(
@@ -123,7 +126,10 @@ test('Las fotos de Más vendidos conservan tamaño, alineación y fundido sin zo
     ),
   ).toBeGreaterThan(0.3)
   await page.mouse.move(0, 0)
+  await expect(primary).toHaveCSS('opacity', '1')
+  await expect(alternate).toHaveCSS('opacity', '0')
   await links.first().focus()
+  await expect(primary).toHaveCSS('opacity', '0')
   await expect(alternate).toHaveCSS('opacity', '1')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   expect(
@@ -133,4 +139,24 @@ test('Las fotos de Más vendidos conservan tamaño, alineación y fundido sin zo
       ),
     ),
   ).toBeLessThan(0.01)
+})
+
+test('Las recomendaciones sustituyen la foto sin superponer dos frascos', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/producto/petale-nu')
+  const imageLink = page
+    .locator('.product-recommendations .product-image-link--swap')
+    .last()
+  await imageLink.scrollIntoViewIfNeeded()
+  await imageLink.hover()
+  await expect(imageLink.locator('.product-image-primary')).toHaveCSS(
+    'opacity',
+    '0',
+  )
+  await expect(imageLink.locator('.product-image-alternate')).toHaveCSS(
+    'opacity',
+    '1',
+  )
 })

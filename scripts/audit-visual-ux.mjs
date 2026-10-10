@@ -14,6 +14,13 @@ const storeRoutes = [
   ['marcas', '/marcas'],
   ['marca', '/marcas/forme'],
   ['producto', '/producto/petale-nu'],
+  ['producto-verde', '/producto/vert-silence'],
+  ['producto-ambar', '/producto/ambre-lent'],
+  ['producto-neroli', '/producto/neroli-matin'],
+  ['producto-iris', '/producto/iris-velours'],
+  ['producto-figue', '/producto/figue-douce'],
+  ['producto-santal', '/producto/santal-nuit'],
+  ['producto-cedre', '/producto/bois-clair'],
   ['favoritos', '/favoritos'],
   ['carrito', '/carrito'],
   ['checkout', '/checkout'],
@@ -24,7 +31,8 @@ const storeRoutes = [
   ['cuenta-datos', '/cuenta/datos'],
   ['cuenta-direcciones', '/cuenta/direcciones'],
   ['cuenta-pedidos', '/cuenta/pedidos'],
-  ['cuenta-pedido', '/cuenta/pedidos/AI-DEMO-A1B2C3D4E5F60708'],
+  ['cuenta-pedido', '/cuenta/pedidos/AI-A1B2C3D4E5F60708'],
+  ['cuenta-favoritos', '/cuenta/favoritos'],
   ['cuenta-pagos', '/cuenta/pagos'],
   ['nosotros', '/nosotros'],
   ['contacto', '/contacto'],
@@ -41,9 +49,8 @@ const adminRoutes = [
   ['admin-producto-nuevo', '/admin/productos/nuevo'],
   ['admin-producto-editar', '/admin/productos/cedre'],
   ['admin-marcas', '/admin/marcas'],
-  ['admin-categorias', '/admin/categorias'],
   ['admin-pedidos', '/admin/pedidos'],
-  ['admin-pedido', '/admin/pedidos/AI-DEMO-A1B2C3D4E5F60708'],
+  ['admin-pedido', '/admin/pedidos/AI-A1B2C3D4E5F60708'],
   ['admin-clientes', '/admin/clientes'],
   ['admin-promociones', '/admin/promociones'],
   ['admin-envios', '/admin/envios'],
@@ -64,6 +71,9 @@ async function settle(page) {
   await page.locator('h1').first().waitFor({ state: 'visible' })
   await page.evaluate(async () => {
     await document.fonts.ready
+    const images = [...document.images]
+    // Full-page screenshots must wait for photographs below the fold too.
+    for (const image of images) image.loading = 'eager'
     for (
       let top = 0;
       top < document.documentElement.scrollHeight;
@@ -72,6 +82,10 @@ async function settle(page) {
       window.scrollTo({ top, behavior: 'instant' })
       await new Promise((resolve) => window.requestAnimationFrame(resolve))
     }
+    await Promise.race([
+      Promise.allSettled(images.map((image) => image.decode())),
+      new Promise((resolve) => window.setTimeout(resolve, 7000)),
+    ])
     window.scrollTo({ top: 0, behavior: 'instant' })
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
@@ -83,11 +97,12 @@ async function settle(page) {
 }
 
 async function activateAccountDemo(page) {
+  await page.locator('.account-page, .account-access').waitFor()
   const demoNote = page.locator('.account-demo-note')
   if (await demoNote.isVisible().catch(() => false)) return
 
   const access = page.getByRole('button', {
-    name: 'Explorar cuenta de demostración',
+    name: 'Ver mi cuenta',
   })
   await access.waitFor({ state: 'visible' })
   await access.click()
@@ -190,13 +205,20 @@ async function measure(page, name, route, width, messages) {
       brokenImages: [...document.images]
         .filter((image) => image.complete && image.naturalWidth === 0)
         .map((image) => image.currentSrc || image.src),
+      pendingImages: [...document.images]
+        .filter(
+          (image) =>
+            !image.complete &&
+            !image.closest('.hero-slide[aria-hidden="true"]'),
+        )
+        .map((image) => image.currentSrc || image.src),
       smallTargets,
       clipped,
     }
   })
 
   await page.screenshot({
-    path: `${output}/${name}-${width}.jpg`,
+    path: `${output}/${name}-${width}x${metrics.viewportHeight}.jpg`,
     fullPage: true,
     type: 'jpeg',
     quality: 76,
@@ -206,9 +228,20 @@ async function measure(page, name, route, width, messages) {
 }
 
 try {
-  for (const width of [390, 768, 1440]) {
+  for (const { width, height } of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+  ]) {
     const context = await browser.newContext({
-      viewport: { width, height: 900 },
+      viewport: { width, height },
+      hasTouch: width < 1024,
       reducedMotion: 'reduce',
       colorScheme: 'light',
     })
@@ -272,6 +305,7 @@ const failures = report.filter(
   (entry) =>
     entry.horizontalOverflow ||
     entry.brokenImages.length > 0 ||
+    entry.pendingImages.length > 0 ||
     entry.messages.length > 0 ||
     entry.h1Count !== 1,
 )

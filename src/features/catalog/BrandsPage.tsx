@@ -1,12 +1,13 @@
 import { Link, useLoaderData, useRevalidator } from 'react-router'
 import { brandsLoader } from './catalog-loaders'
 import { Icon } from '../../components/ui/Icon'
+import { imageSource } from '../../services/image-source'
 
 export function BrandsPage() {
   const data = useLoaderData<typeof brandsLoader>()
   const revalidator = useRevalidator()
   return (
-    <div className="store-page catalog-page container">
+    <div className="store-page catalog-page brands-page container">
       <nav
         className="catalog-breadcrumb"
         aria-label="Ruta de navegación"
@@ -42,8 +43,17 @@ export function BrandsPage() {
           data.brands.map((brand) => (
             <Link key={brand.id} to={`/tienda?marca=${brand.slug}`}>
               <h2>{brand.name}</h2>
+              {brand.previewImage ? (
+                <img
+                  src={imageSource(brand.previewImage)}
+                  alt=""
+                  width="128"
+                  height="128"
+                  loading="lazy"
+                />
+              ) : null}
               <span>
-                Explorar perfumes <Icon name="arrow" />
+                Ver perfumes <Icon name="arrow" />
               </span>
             </Link>
           ))

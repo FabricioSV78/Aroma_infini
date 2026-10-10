@@ -5,6 +5,12 @@ import {
   getShippingZoneForAddress,
 } from './admin-service'
 import { getPeruDepartmentLabel, peruDepartments } from '../content/peru'
+import {
+  isValidAlternateRecipient,
+  type AlternateRecipient,
+} from './shipping-recipient'
+
+export { isValidAlternateRecipient } from './shipping-recipient'
 
 export type CheckoutMode = 'guest' | 'demo-account'
 export type DeliveryMethod = 'courier' | 'motorizado'
@@ -30,6 +36,7 @@ export interface CheckoutDraft {
   mode: CheckoutMode
   contact: CheckoutContact
   address: CheckoutAddress
+  alternateRecipient: AlternateRecipient | null
   deliveryMethod: DeliveryMethod
   promotionInput: string
   appliedPromotion: AppliedPromotion | null
@@ -53,6 +60,7 @@ export interface MockOrder {
   lines: MockOrderLine[]
   contact: CheckoutContact
   address: CheckoutAddress
+  alternateRecipient: AlternateRecipient | null
   deliveryMethod: DeliveryMethod
   paymentProvider: 'mercado-pago'
   promotionCode: AppliedPromotion | null
@@ -109,6 +117,7 @@ export function createCheckoutDraft(): CheckoutDraft {
       street: '',
       reference: '',
     },
+    alternateRecipient: null,
     deliveryMethod: 'courier',
     promotionInput: '',
     appliedPromotion: null,
@@ -251,6 +260,11 @@ export function createMockOrder(
   draft: CheckoutDraft,
 ): MockOrder | null {
   if (!cart.lines.length || cart.needsAttention) return null
+  if (
+    draft.alternateRecipient &&
+    !isValidAlternateRecipient(draft.alternateRecipient)
+  )
+    return null
   const amount = calculateCheckout(cart, draft)
   if (amount.shipping.kind !== 'quoted' || amount.totalCents === null)
     return null
@@ -276,6 +290,12 @@ export function createMockOrder(
     ),
     contact: { ...draft.contact },
     address: { ...draft.address },
+    alternateRecipient: draft.alternateRecipient
+      ? {
+          name: draft.alternateRecipient.name.trim(),
+          dni: draft.alternateRecipient.dni.trim(),
+        }
+      : null,
     deliveryMethod: draft.deliveryMethod,
     paymentProvider: 'mercado-pago',
     promotionCode: amount.discountCents > 0 ? draft.appliedPromotion : null,

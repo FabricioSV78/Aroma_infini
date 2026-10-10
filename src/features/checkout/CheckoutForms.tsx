@@ -9,6 +9,7 @@ import {
 } from '../../content/peru'
 import { formatPEN } from '../../services/currency'
 import {
+  isValidAlternateRecipient,
   quoteShipping,
   type CheckoutAddress,
   type CheckoutContact,
@@ -244,6 +245,13 @@ export function CheckoutDeliveryForm({
     setDraft((current) => ({ ...current, deliveryMethod: method }))
   }
 
+  function setAlternateRecipient(enabled: boolean) {
+    setDraft((current) => ({
+      ...current,
+      alternateRecipient: enabled ? { name: '', dni: '' } : null,
+    }))
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!reportTrimmedValidity(event.currentTarget)) return
@@ -256,6 +264,11 @@ export function CheckoutDeliveryForm({
     )
       return
     if (quote.kind !== 'quoted') return
+    if (
+      draft.alternateRecipient &&
+      !isValidAlternateRecipient(draft.alternateRecipient)
+    )
+      return
     setDraft((current) => ({
       ...current,
       address: {
@@ -265,6 +278,12 @@ export function CheckoutDeliveryForm({
         street: current.address.street.trim(),
         reference: current.address.reference.trim(),
       },
+      alternateRecipient: current.alternateRecipient
+        ? {
+            name: current.alternateRecipient.name.trim(),
+            dni: current.alternateRecipient.dni.trim(),
+          }
+        : null,
     }))
     onNext()
   }
@@ -375,6 +394,80 @@ export function CheckoutDeliveryForm({
           />
         </div>
       </div>
+
+      <fieldset className="checkout-recipient">
+        <legend>Persona que recibe</legend>
+        <label className="checkout-recipient-toggle">
+          <input
+            type="checkbox"
+            checked={draft.alternateRecipient !== null}
+            onChange={(event) =>
+              setAlternateRecipient(event.currentTarget.checked)
+            }
+            aria-controls={
+              draft.alternateRecipient ? 'checkout-recipient-fields' : undefined
+            }
+          />
+          <span>¿Otra persona recibirá el pedido?</span>
+        </label>
+        {draft.alternateRecipient ? (
+          <div
+            className="checkout-fields checkout-recipient-fields"
+            id="checkout-recipient-fields"
+          >
+            <div className="checkout-field">
+              <label htmlFor="checkout-recipient-name">
+                Nombre de quien recibe
+              </label>
+              <input
+                id="checkout-recipient-name"
+                name="alternate-recipient-name"
+                autoComplete="off"
+                required
+                data-trim-required
+                minLength={2}
+                maxLength={100}
+                value={draft.alternateRecipient.name}
+                onChange={(event) => {
+                  event.currentTarget.setCustomValidity('')
+                  const name = event.target.value
+                  setDraft((current) => ({
+                    ...current,
+                    alternateRecipient: current.alternateRecipient
+                      ? { ...current.alternateRecipient, name }
+                      : null,
+                  }))
+                }}
+              />
+            </div>
+            <div className="checkout-field">
+              <label htmlFor="checkout-recipient-dni">
+                DNI de quien recibe
+              </label>
+              <input
+                id="checkout-recipient-dni"
+                name="alternate-recipient-dni"
+                autoComplete="off"
+                inputMode="numeric"
+                pattern="[0-9]{8}"
+                title="Ingresa los 8 dígitos del DNI."
+                required
+                maxLength={8}
+                value={draft.alternateRecipient.dni}
+                onChange={(event) => {
+                  const dni = event.target.value
+                  setDraft((current) => ({
+                    ...current,
+                    alternateRecipient: current.alternateRecipient
+                      ? { ...current.alternateRecipient, dni }
+                      : null,
+                  }))
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </fieldset>
 
       <fieldset className="checkout-options checkout-delivery-options">
         <legend>Modalidad de entrega</legend>

@@ -131,7 +131,9 @@ export function accountOrderFromCheckout(
     address: {
       id: `checkout-${order.reference}`,
       label: 'Entrega del pedido',
-      recipient: `${order.contact.firstName} ${order.contact.lastName}`.trim(),
+      recipient:
+        order.alternateRecipient?.name ??
+        `${order.contact.firstName} ${order.contact.lastName}`.trim(),
       ...order.address,
       department: getDeliveryZoneLabel(order.address.department),
     },

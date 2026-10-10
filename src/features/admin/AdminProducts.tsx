@@ -1,4 +1,5 @@
 import { OlfactoryProfile } from '../product/OlfactoryProfile'
+import { getOlfactoryImage } from '../../content/olfactory-imagery'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Link,
@@ -9,6 +10,7 @@ import {
   useSearchParams,
 } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { NoteBottleIcon } from '../../components/ui/NoteBottleIcon'
 import {
   adminService,
   createAdminProductDetail,
@@ -33,6 +35,7 @@ import {
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
 import { prepareImageFile, productImagePreset } from './prepareImageFile'
+import { AdminProductImport } from './AdminProductImport'
 
 function productPrice(record: AdminProduct) {
   const active = record.product.variants.filter(
@@ -45,7 +48,9 @@ function productPrice(record: AdminProduct) {
 
 export function AdminProductsPage() {
   const state = useAdminStore()
-  const [pageSize, setPageSize] = useState(() => window.matchMedia('(max-width: 767px)').matches ? 4 : 12)
+  const [pageSize, setPageSize] = useState(() =>
+    window.matchMedia('(max-width: 767px)').matches ? 4 : 12,
+  )
   useEffect(() => {
     const mobile = window.matchMedia('(max-width: 767px)')
     const updatePageSize = () => setPageSize(mobile.matches ? 4 : 12)
@@ -55,6 +60,7 @@ export function AdminProductsPage() {
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const [actionMessage, setActionMessage] = useState('')
+  const [actionError, setActionError] = useState(false)
   const search = params.get('q') ?? ''
   const stockFilter = ['alert', 'out', 'healthy'].includes(
     params.get('stock') ?? '',
@@ -117,6 +123,11 @@ export function AdminProductsPage() {
   const hasFilters =
     Boolean(search) || stockFilter !== 'all' || visibilityFilter !== 'all'
 
+  function clearFilters() {
+    setActionMessage('')
+    setParams({})
+  }
+
   return (
     <div className="admin-page admin-products-page">
       <AdminPageHeader
@@ -126,7 +137,17 @@ export function AdminProductsPage() {
         action={{ label: 'Nuevo producto', to: '/admin/productos/nuevo' }}
       />
       {saved ? <AdminNotice>Producto guardado.</AdminNotice> : null}
-      {actionMessage ? <AdminNotice>{actionMessage}</AdminNotice> : null}
+      {actionMessage ? (
+        actionError ? (
+          <p className="admin-error" role="alert">
+            {actionMessage}
+          </p>
+        ) : (
+          <AdminNotice>{actionMessage}</AdminNotice>
+        )
+      ) : null}
+
+      <AdminProductImport />
 
       <section
         className="admin-inventory-summary"
@@ -159,6 +180,7 @@ export function AdminProductsPage() {
         role="search"
         onSubmit={(event) => {
           event.preventDefault()
+          setActionMessage('')
           const data = new FormData(event.currentTarget)
           const next = new URLSearchParams()
           const query = data.get('q')?.toString().trim()
@@ -205,147 +227,178 @@ export function AdminProductsPage() {
             </select>
           </label>
           <button className="button button--primary" type="submit">
-            <Icon name="search" /> Aplicar
+            <Icon name="search" /> Aplicar filtros
           </button>
         </div>
         <div className="admin-filter-result" aria-live="polite">
           <span>
             {products.length} {products.length === 1 ? 'producto' : 'productos'}
           </span>
-          {hasFilters ? (
-            <button type="button" onClick={() => setParams({})}>
+          {hasFilters && products.length > 0 ? (
+            <button type="button" onClick={clearFilters}>
               Limpiar filtros
             </button>
           ) : null}
         </div>
       </form>
-      <div className="admin-table-wrap admin-table-wrap--products">
-        <table className="admin-table admin-table--products">
-          <caption className="sr-only">Productos</caption>
-          <thead>
-            <tr>
-              <th scope="col">Producto</th>
-              <th scope="col">Inventario</th>
-              <th scope="col">Precio desde</th>
-              <th scope="col">Visibilidad</th>
-              <th scope="col">Destacado</th>
-              <th scope="col">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagination.items.map(({ record, brand, inventory }) => {
-              return (
-                <tr key={record.product.id}>
-                  <th scope="row">
-                    <span className="admin-cell-label">Producto</span>
-                    <div className="admin-product-identity">
-                      <img
-                        src={imageSource(record.product.image)}
-                        width={54}
-                        height={68}
-                        loading="lazy"
-                        alt=""
-                      />
-                      <span>
-                        <strong>{record.product.name}</strong>
-                        <small>{brand?.name}</small>
-                      </span>
-                    </div>
-                  </th>
-                  <td>
-                    <span className="admin-cell-label">Inventario</span>
-                    <ul className="admin-stock-list">
-                      {inventory.variants.map((variant) => (
-                        <li key={variant.variantId}>
-                          <span>{variant.ml} ml</span>
-                          <AdminBadge tone={variant.tone}>
-                            {variant.stock} u. · {variant.label}
-                          </AdminBadge>
-                        </li>
-                      ))}
-                      {!inventory.variants.length ? (
-                        <li>
-                          <AdminBadge tone="danger">
-                            Sin presentaciones activas
-                          </AdminBadge>
-                        </li>
-                      ) : null}
-                    </ul>
-                  </td>
-                  <td>
-                    <span className="admin-cell-label">Precio desde</span>
-                    {productPrice(record)}
-                  </td>
-                  <td>
-                    <span className="admin-cell-label">Estado</span>
-                    <AdminStatus active={record.active} />
-                  </td>
-                  <td>
-                    <span className="admin-cell-label">Destacado</span>
-                    <AdminBadge tone={record.featured ? 'info' : 'neutral'}>
-                      {record.featured ? 'Sí' : 'No'}
-                    </AdminBadge>
-                  </td>
-                  <td>
-                    <span className="admin-cell-label">Acciones</span>
-                    <div className="admin-row-actions">
-                      <Link
-                        to={`/admin/productos/${record.product.id}`}
-                        state={{
-                          returnTo: `${location.pathname}${location.search}`,
-                        }}
-                      >
-                        Editar{' '}
-                        <span className="sr-only">{record.product.name}</span>
-                      </Link>
-                      <button
-                        type="button"
-                        aria-pressed={record.active}
-                        onClick={() => {
-                          const result = adminService.setProductActive(
-                            record.product.id,
-                            !record.active,
-                          )
-                          setActionMessage(
-                            result.kind === 'saved'
-                              ? `Producto ${record.active ? 'desactivado' : 'activado'}.`
-                              : result.message,
-                          )
-                        }}
-                      >
-                        {record.active ? 'Desactivar' : 'Activar'}{' '}
-                        <span className="sr-only">{record.product.name}</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      <AdminPagination
-        label="productos"
-        page={pagination.page}
-        totalPages={pagination.totalPages}
-        totalItems={pagination.totalItems}
-        from={pagination.from}
-        to={pagination.to}
-        onPageChange={pagination.setPage}
-      />
+      {products.length ? (
+        <div className="admin-table-wrap admin-table-wrap--products">
+          <table className="admin-table admin-table--products">
+            <caption className="sr-only">Productos</caption>
+            <thead>
+              <tr>
+                <th scope="col">Producto</th>
+                <th scope="col">Inventario</th>
+                <th scope="col">Precio desde</th>
+                <th scope="col">Visibilidad</th>
+                <th scope="col">Destacado</th>
+                <th scope="col">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagination.items.map(({ record, brand, inventory }) => {
+                return (
+                  <tr key={record.product.id}>
+                    <th scope="row">
+                      <span className="admin-cell-label">Producto</span>
+                      <div className="admin-product-identity">
+                        {record.product.image ? (
+                          <img
+                            src={imageSource(record.product.image)}
+                            width={54}
+                            height={68}
+                            loading="lazy"
+                            alt=""
+                          />
+                        ) : (
+                          <span
+                            className="admin-product-image-placeholder"
+                            aria-hidden="true"
+                          >
+                            Sin foto
+                          </span>
+                        )}
+                        <span>
+                          <strong>{record.product.name}</strong>
+                          <small>{brand?.name}</small>
+                        </span>
+                      </div>
+                    </th>
+                    <td>
+                      <span className="admin-cell-label">Inventario</span>
+                      <ul className="admin-stock-list">
+                        {inventory.variants.map((variant) => (
+                          <li key={variant.variantId}>
+                            <span>{variant.ml} ml</span>
+                            <AdminBadge tone={variant.tone}>
+                              {variant.stock} u. · {variant.label}
+                            </AdminBadge>
+                          </li>
+                        ))}
+                        {!inventory.variants.length ? (
+                          <li>
+                            <AdminBadge tone="danger">
+                              Sin presentaciones activas
+                            </AdminBadge>
+                          </li>
+                        ) : null}
+                      </ul>
+                    </td>
+                    <td>
+                      <span className="admin-cell-label">Precio desde</span>
+                      {productPrice(record)}
+                    </td>
+                    <td>
+                      <span className="admin-cell-label">Estado</span>
+                      <AdminStatus active={record.active} />
+                    </td>
+                    <td>
+                      <span className="admin-cell-label">Destacado</span>
+                      <AdminBadge tone={record.featured ? 'info' : 'neutral'}>
+                        {record.featured ? 'Sí' : 'No'}
+                      </AdminBadge>
+                    </td>
+                    <td>
+                      <span className="admin-cell-label">Acciones</span>
+                      <div className="admin-row-actions">
+                        <Link
+                          to={`/admin/productos/${record.product.id}`}
+                          state={{
+                            returnTo: `${location.pathname}${location.search}`,
+                          }}
+                        >
+                          Editar{' '}
+                          <span className="sr-only">{record.product.name}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          className={
+                            record.active ? 'is-deactivate' : 'is-activate'
+                          }
+                          onClick={() => {
+                            const result = adminService.setProductActive(
+                              record.product.id,
+                              !record.active,
+                            )
+                            if (saved) {
+                              const next = new URLSearchParams(params)
+                              next.delete('guardado')
+                              setParams(next, { replace: true })
+                            }
+                            setActionError(result.kind !== 'saved')
+                            setActionMessage(
+                              result.kind === 'saved'
+                                ? `${record.product.name} ${record.active ? 'desactivado' : 'activado'}.`
+                                : result.message,
+                            )
+                          }}
+                        >
+                          {record.active ? 'Desactivar' : 'Activar'}{' '}
+                          <span className="sr-only">{record.product.name}</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {products.length ? (
+        <AdminPagination
+          label="productos"
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          from={pagination.from}
+          to={pagination.to}
+          onPageChange={pagination.setPage}
+        />
+      ) : null}
       {!products.length ? (
         <div className="admin-empty">
-          <Icon name="search" />
-          <h2>No encontramos productos</h2>
-          <p>Prueba con otra búsqueda o limpia los filtros aplicados.</p>
-          <button
-            type="button"
-            onClick={() => {
-              setParams({})
-            }}
-          >
-            Limpiar búsqueda
-          </button>
+          <Icon name={hasFilters ? 'search' : 'bag'} />
+          <h2>
+            {hasFilters ? 'No encontramos productos' : 'Aún no hay productos'}
+          </h2>
+          <p>
+            {hasFilters
+              ? 'Prueba con otra búsqueda o limpia los filtros aplicados.'
+              : 'Crea el primer producto o usa la plantilla Excel para cargar varios.'}
+          </p>
+          {hasFilters ? (
+            <button type="button" onClick={clearFilters}>
+              Limpiar filtros
+            </button>
+          ) : (
+            <Link
+              className="button button--primary"
+              to="/admin/productos/nuevo"
+            >
+              Crear producto
+            </Link>
+          )}
         </div>
       ) : null}
     </div>
@@ -436,6 +489,15 @@ function createProductDraft(brandId: string): AdminProduct {
   }
 }
 
+function slugFromName(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 export function AdminProductFormPage() {
   const { id } = useParams()
   const state = useAdminStore()
@@ -464,11 +526,15 @@ export function AdminProductFormPage() {
   const [initialNoteDraft] = useState(noteDraft)
   const [message, setMessage] = useState('')
   const [mediaMessage, setMediaMessage] = useState('')
+  const [mediaError, setMediaError] = useState(false)
   const [uploadingImage, setUploadingImage] = useState<number | null>(null)
   const [previewImageIndex, setPreviewImageIndex] = useState(0)
-  const [showPreview, setShowPreview] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+  const [showPreview, setShowPreview] = useState(
+    () => window.matchMedia('(min-width: 768px)').matches,
+  )
   const [saving, setSaving] = useState(false)
   const editing = Boolean(id)
+  const autoSlug = useRef(!editing)
   const hasUnsavedChanges =
     form !== initialForm || noteDraft !== initialNoteDraft
   const allowNavigation = useRef(false)
@@ -522,7 +588,13 @@ export function AdminProductFormPage() {
   ) {
     setMessage('')
     setForm((current) => {
-      const product = { ...current.product, [field]: value }
+      const product = {
+        ...current.product,
+        [field]: value,
+        ...(field === 'name' && autoSlug.current
+          ? { slug: slugFromName(value) }
+          : {}),
+      }
       const shouldUpdateGallery = field === 'image' || field === 'name'
       return {
         ...current,
@@ -545,7 +617,9 @@ export function AdminProductFormPage() {
                     field === 'image'
                       ? index === 0
                         ? product.image
-                        : `${product.image}-alternate`
+                        : view.image === `${current.product.image}-alternate`
+                          ? `${product.image}-alternate`
+                          : view.image
                       : view.image,
                   alt:
                     field === 'name' &&
@@ -564,6 +638,7 @@ export function AdminProductFormPage() {
   async function uploadGalleryImage(file: File, index: number) {
     setUploadingImage(index)
     setMediaMessage('')
+    setMediaError(false)
     try {
       const image = await prepareImageFile(file, productImagePreset)
       setForm((current) => ({
@@ -581,6 +656,7 @@ export function AdminProductFormPage() {
         `${file.name} preparado. Revisa la vista previa y guarda el producto.`,
       )
     } catch (error) {
+      setMediaError(true)
       setMediaMessage(
         error instanceof Error
           ? error.message
@@ -601,7 +677,7 @@ export function AdminProductFormPage() {
           gallery: [
             ...current.detail.gallery,
             {
-              image: current.detail.gallery[1]?.image ?? current.product.image,
+              image: '',
               alt: `Vista alternativa de ${current.product.name}`,
               framing: 'full',
             },
@@ -629,22 +705,30 @@ export function AdminProductFormPage() {
   }
 
   function addVariant() {
-    setForm((current) => ({
-      ...current,
-      product: {
-        ...current.product,
-        variants: [
-          ...current.product.variants,
-          {
-            id: `${current.product.id}-${crypto.randomUUID().slice(0, 6)}`,
-            ml: 100,
-            priceCents: 0,
-            stock: 0,
-            active: true,
-          },
-        ],
-      },
-    }))
+    setForm((current) => {
+      const usedSizes = new Set(
+        current.product.variants.map((variant) => variant.ml),
+      )
+      const nextSize =
+        [100, 150, 200, 30, 50, 75, 125].find((size) => !usedSizes.has(size)) ??
+        Math.max(...usedSizes, 0) + 25
+      return {
+        ...current,
+        product: {
+          ...current.product,
+          variants: [
+            ...current.product.variants,
+            {
+              id: `${current.product.id}-${crypto.randomUUID().slice(0, 6)}`,
+              ml: nextSize,
+              priceCents: 0,
+              stock: 0,
+              active: true,
+            },
+          ],
+        },
+      }
+    })
   }
 
   function syncNoteDraft(note: NoteField) {
@@ -660,6 +744,15 @@ export function AdminProductFormPage() {
     }))
   }
 
+  function showSaveError(text: string) {
+    setMessage(text)
+    window.requestAnimationFrame(() => {
+      const notice = document.getElementById('admin-product-save-error')
+      notice?.scrollIntoView({ block: 'center' })
+      notice?.focus({ preventScroll: true })
+    })
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (uploadingImage !== null || saving) return
@@ -670,17 +763,23 @@ export function AdminProductFormPage() {
         notes: parseNoteDraft(noteDraft),
       },
     }
+    if (productToSave.detail.gallery.some((view) => !view.image)) {
+      showSaveError(
+        'Sube una foto para cada vista añadida o quita la vista vacía.',
+      )
+      return
+    }
     setForm(productToSave)
     const result = adminService.saveProduct(productToSave)
     if (result.kind === 'validation') {
-      setMessage(result.message)
+      showSaveError(result.message)
       return
     }
     setSaving(true)
     try {
       await adminService.flush()
     } catch {
-      setMessage(
+      showSaveError(
         'El producto se ve en esta sesión, pero no se pudo guardar en el navegador. Inténtalo de nuevo.',
       )
       setSaving(false)
@@ -702,7 +801,10 @@ export function AdminProductFormPage() {
         title={editing ? form.product.name : 'Crear producto'}
         description="Actualiza información, inventario y visibilidad."
       />
-      <nav className="admin-editor-section-nav" aria-label="Secciones del producto">
+      <nav
+        className="admin-editor-section-nav"
+        aria-label="Secciones del producto"
+      >
         <a href="#product-general-title">General</a>
         <a href="#product-preview-title">Vista previa</a>
         <a href="#product-content-title">Aroma</a>
@@ -731,12 +833,21 @@ export function AdminProductFormPage() {
               URL del producto
               <input
                 value={form.product.slug}
-                onChange={(event) =>
+                aria-label="URL del producto"
+                onChange={(event) => {
+                  autoSlug.current = false
                   updateProduct('slug', event.target.value.toLowerCase())
-                }
+                }}
                 pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                aria-describedby="admin-product-slug-help"
                 required
               />
+              <small id="admin-product-slug-help">
+                {editing
+                  ? 'Cambiarla también cambia el enlace público del producto.'
+                  : 'Se genera desde el nombre. Puedes cambiarla si lo necesitas.'}{' '}
+                Usa letras minúsculas, números y guiones.
+              </small>
             </label>
             <label>
               Marca
@@ -776,12 +887,14 @@ export function AdminProductFormPage() {
               </select>
             </label>
             <label>
-              Fotografía de la tienda
+              Foto predefinida (opcional)
               <select
                 value={
                   isUploadedImage(form.product.image)
                     ? '__uploaded__'
-                    : form.product.image
+                    : form.product.image.startsWith('https://')
+                      ? '__remote__'
+                      : form.product.image
                 }
                 onChange={(event) => updateProduct('image', event.target.value)}
               >
@@ -791,12 +904,20 @@ export function AdminProductFormPage() {
                     Imagen subida
                   </option>
                 ) : null}
+                {form.product.image.startsWith('https://') ? (
+                  <option value="__remote__" disabled>
+                    Imagen externa del Excel
+                  </option>
+                ) : null}
                 {imageOptions.map((image) => (
                   <option key={image.value} value={image.value}>
                     {image.label}
                   </option>
                 ))}
               </select>
+              <small>
+                Para usar tu propia foto, súbela en Fotografías del producto.
+              </small>
             </label>
           </div>
           <div className="admin-product-upload-area">
@@ -806,7 +927,10 @@ export function AdminProductFormPage() {
               recorta al centro y puedes revisar el resultado antes de guardar.
             </p>
             {mediaMessage ? (
-              <p className="admin-product-upload-feedback" role="status">
+              <p
+                className={`admin-product-upload-feedback${mediaError ? ' is-error' : ''}`}
+                role={mediaError ? 'alert' : 'status'}
+              >
                 {mediaMessage}
               </p>
             ) : null}
@@ -857,7 +981,7 @@ export function AdminProductFormPage() {
                           setPreviewImageIndex(0)
                         }}
                       >
-                        Quitar vista
+                        Quitar foto {index + 1}
                       </button>
                     ) : null}
                   </div>
@@ -891,7 +1015,7 @@ export function AdminProductFormPage() {
                 className="button button--secondary"
                 onClick={addGalleryView}
               >
-                Añadir vista
+                Añadir otra foto
               </button>
             ) : null}
           </div>
@@ -903,80 +1027,93 @@ export function AdminProductFormPage() {
               <h2 id="product-preview-title">Así se verá tu producto</h2>
               <p>Vista previa del borrador, antes de guardar.</p>
             </div>
-            <button type="button" className="admin-preview-toggle" aria-expanded={showPreview} aria-controls="admin-product-preview-content" onClick={() => setShowPreview((open) => !open)}>
+            <button
+              type="button"
+              className="admin-preview-toggle"
+              aria-expanded={showPreview}
+              aria-controls="admin-product-preview-content"
+              onClick={() => setShowPreview((open) => !open)}
+            >
               {showPreview ? 'Ocultar vista previa' : 'Mostrar vista previa'}
             </button>
           </header>
-          {showPreview ? <div id="admin-product-preview-content" className="admin-product-live-preview">
-            <div className="admin-product-preview-photos">
-              <div className="admin-product-preview-main">
-                {form.detail.gallery[previewImageIndex]?.image ? (
-                  <img
-                    src={imageSource(
-                      form.detail.gallery[previewImageIndex].image,
-                    )}
-                    alt={`Vista previa ${previewImageIndex + 1} de ${form.product.name || 'este producto'}`}
-                    width={480}
-                    height={600}
-                  />
-                ) : (
-                  <p>Sube una fotografía para ver cómo quedará el producto.</p>
-                )}
-              </div>
-              <div
-                className="admin-product-preview-thumbnails"
-                aria-label="Elegir imagen de la vista previa"
-              >
-                {form.detail.gallery.map((view, index) => (
-                  <button
-                    type="button"
-                    key={index}
-                    aria-label={`Ver vista ${index + 1} del borrador`}
-                    aria-pressed={previewImageIndex === index}
-                    onClick={() => setPreviewImageIndex(index)}
-                  >
-                    {view.image ? (
-                      <img src={imageSource(view.image)} alt="" />
-                    ) : (
-                      <span aria-hidden="true">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="eyebrow brand-label">
-                {
-                  state.brands.find(
-                    (brand) => brand.id === form.product.brandId,
-                  )?.name
-                }
-              </p>
-              <h3>{form.product.name || 'Nombre del perfume'}</h3>
-              <p>{form.detail.shortDescription}</p>
-              <ul>
-                {form.product.variants
-                  .filter((variant) => variant.active !== false)
-                  .map((variant) => (
-                    <li key={variant.id}>
-                      <strong>
-                        {variant.ml} ml · {formatPEN(variant.priceCents)}
-                      </strong>
-                      <span>
-                        {variant.stock > 0 ? 'Disponible' : 'Agotado'}
-                      </span>
-                    </li>
+          {showPreview ? (
+            <div
+              id="admin-product-preview-content"
+              className="admin-product-live-preview"
+            >
+              <div className="admin-product-preview-photos">
+                <div className="admin-product-preview-main">
+                  {form.detail.gallery[previewImageIndex]?.image ? (
+                    <img
+                      src={imageSource(
+                        form.detail.gallery[previewImageIndex].image,
+                      )}
+                      alt={`Vista previa ${previewImageIndex + 1} de ${form.product.name || 'este producto'}`}
+                      width={480}
+                      height={600}
+                    />
+                  ) : (
+                    <p>
+                      Sube una fotografía para ver cómo quedará el producto.
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="admin-product-preview-thumbnails"
+                  aria-label="Elegir imagen de la vista previa"
+                >
+                  {form.detail.gallery.map((view, index) => (
+                    <button
+                      type="button"
+                      key={index}
+                      aria-label={`Ver vista ${index + 1} del borrador`}
+                      aria-pressed={previewImageIndex === index}
+                      onClick={() => setPreviewImageIndex(index)}
+                    >
+                      {view.image ? (
+                        <img src={imageSource(view.image)} alt="" />
+                      ) : (
+                        <span aria-hidden="true">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                      )}
+                    </button>
                   ))}
-              </ul>
-              <p className="admin-data-note">
-                {form.active
-                  ? 'Visible en la tienda al guardar.'
-                  : 'Borrador oculto en la tienda.'}
-              </p>
+                </div>
+              </div>
+              <div>
+                <p className="eyebrow brand-label">
+                  {
+                    state.brands.find(
+                      (brand) => brand.id === form.product.brandId,
+                    )?.name
+                  }
+                </p>
+                <h3>{form.product.name || 'Nombre del perfume'}</h3>
+                <p>{form.detail.shortDescription}</p>
+                <ul>
+                  {form.product.variants
+                    .filter((variant) => variant.active !== false)
+                    .map((variant) => (
+                      <li key={variant.id}>
+                        <strong>
+                          {variant.ml} ml · {formatPEN(variant.priceCents)}
+                        </strong>
+                        <span>
+                          {variant.stock > 0 ? 'Disponible' : 'Agotado'}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+                <p className="admin-data-note">
+                  {form.active
+                    ? 'Visible en la tienda al guardar.'
+                    : 'Borrador oculto en la tienda.'}
+                </p>
+              </div>
             </div>
-          </div> : null}
+          ) : null}
         </section>
 
         <section aria-labelledby="product-content-title">
@@ -985,8 +1122,8 @@ export function AdminProductFormPage() {
             <div>
               <h2 id="product-content-title">Contenido olfativo</h2>
               <p>
-                Edita el perfil tal como lo verá el cliente. Los cambios se
-                publican al guardar.
+                Edita la familia, notas e intensidad tal como las verá el
+                cliente. La foto editorial es de demostración.
               </p>
             </div>
           </header>
@@ -994,6 +1131,10 @@ export function AdminProductFormPage() {
             <OlfactoryProfile
               family={form.product.family}
               detail={form.detail}
+              image={getOlfactoryImage(
+                form.product.id,
+                parseNoteDraft(noteDraft),
+              )}
               editor={{
                 family: (
                   <input
@@ -1066,12 +1207,17 @@ export function AdminProductFormPage() {
                   <div className="admin-profile-notes">
                     {noteFields.map((note) => (
                       <label key={note}>
-                        Notas de{' '}
-                        {note === 'top'
-                          ? 'salida'
-                          : note === 'heart'
-                            ? 'corazón'
-                            : 'fondo'}
+                        <span className="admin-profile-notes-heading">
+                          <NoteBottleIcon stage={note} />
+                          <span>
+                            Notas de{' '}
+                            {note === 'top'
+                              ? 'salida'
+                              : note === 'heart'
+                                ? 'corazón'
+                                : 'fondo'}
+                          </span>
+                        </span>
                         <input
                           value={noteDraft[note]}
                           onChange={(event) =>
@@ -1253,7 +1399,7 @@ export function AdminProductFormPage() {
                         )
                       }
                     />
-                    Variante activa
+                    Presentación disponible en tienda
                   </label>
                   {form.product.variants.length > 1 ? (
                     <button
@@ -1271,7 +1417,7 @@ export function AdminProductFormPage() {
                         }))
                       }
                     >
-                      Quitar presentación
+                      Quitar presentación de {variant.ml} ml
                     </button>
                   ) : null}
                 </fieldset>
@@ -1326,11 +1472,21 @@ export function AdminProductFormPage() {
         </section>
 
         {message ? (
-          <p className="admin-error" role="alert">
+          <p
+            id="admin-product-save-error"
+            className="admin-error"
+            role="alert"
+            tabIndex={-1}
+          >
             {message}
           </p>
         ) : null}
         <div className="admin-editor-actions">
+          {hasUnsavedChanges ? (
+            <span className="admin-product-save-state">
+              Cambios sin guardar
+            </span>
+          ) : null}
           <button
             className="button button--primary"
             type="submit"

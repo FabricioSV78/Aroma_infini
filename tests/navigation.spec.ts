@@ -20,6 +20,35 @@ test('El footer conserva soporte, seguimiento e información legal', async ({
   }
 })
 
+test('Los accesos de ayuda del Home conducen a sus páginas y se recorren con teclado', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const section = page.locator('.trust-section')
+  const destinations = [
+    { title: 'Opciones de entrega', href: '/envios' },
+    { title: 'Tu pedido', href: '/seguir-pedido' },
+    { title: 'Conversemos', href: '/contacto' },
+  ]
+  const links = destinations.map(({ href }) =>
+    section.locator(`a[href="${href}"]`),
+  )
+
+  for (const [index, { title, href }] of destinations.entries()) {
+    await expect(links[index]).toBeVisible()
+    await expect(links[index]).toContainText(title)
+    await expect(links[index]).toHaveAttribute('href', href)
+  }
+
+  await links[0].focus()
+  for (const [index, link] of links.entries()) {
+    await expect(link).toBeFocused()
+    if (index < links.length - 1) await page.keyboard.press('Tab')
+  }
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/contacto$/)
+})
+
 test('El navbar da acceso a las páginas públicas y las anclas existentes', async ({
   page,
 }) => {

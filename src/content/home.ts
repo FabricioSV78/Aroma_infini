@@ -7,6 +7,7 @@ export const heroSlides = [
     cta: 'Explorar perfumes',
     to: '/tienda',
     image: 'hero-v2-lumiere',
+    tone: 'light',
     alt: 'Frasco de cristal sobre piedra blanca, bañado por luz natural',
   },
   {
@@ -16,6 +17,7 @@ export const heroSlides = [
     cta: 'Descubrir la selección',
     to: '/#destacados',
     image: 'hero-v2-silence',
+    tone: 'light',
     alt: 'Frasco verde sobre un bloque de vidrio entre reflejos de luz',
   },
   {
@@ -25,7 +27,28 @@ export const heroSlides = [
     cta: 'Descubrir Forme',
     to: '/tienda?marca=forme',
     image: 'hero-v3-petale',
+    tone: 'light',
     alt: 'Frasco rosado de Forme sobre piedra clara y seda blanca',
+  },
+  {
+    eyebrow: 'Matices por descubrir',
+    title: ['Aromas que', 'dejan huella.'],
+    description: 'Explora una selección de perfumes con carácter.',
+    cta: 'Explorar perfumes',
+    to: '/tienda',
+    image: 'hero-v4-amber',
+    tone: 'warm',
+    alt: 'Frasco ámbar sin marca sobre piedra clara y madera oscura',
+  },
+  {
+    eyebrow: 'Una nueva perspectiva',
+    title: ['La frescura', 'también tiene voz.'],
+    description: 'Encuentra fragancias luminosas para expresarte a tu manera.',
+    cta: 'Ver la selección',
+    to: '/tienda',
+    image: 'hero-v4-citrus',
+    tone: 'light',
+    alt: 'Frasco claro sin marca junto a bergamota y piedra blanca',
   },
 ]
 

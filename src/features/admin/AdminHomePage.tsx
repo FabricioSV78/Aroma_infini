@@ -1,6 +1,13 @@
 import { useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
 import { categories } from '../../content/home'
+import { heroSlides } from '../../content/home'
+import { editorialFilm } from '../../content/editorial-film'
+import type {
+  HomeContent,
+  HomeFilmContent,
+  HomeHeroContent,
+} from '../../content/home-editor'
 import {
   adminService,
   type HomeMedia,
@@ -10,10 +17,11 @@ import { imageSource } from '../../services/image-source'
 import type { Product } from '../../types/catalog'
 import { AdminNotice, AdminPageHeader } from './AdminShared'
 import { homeImagePresets, prepareImageFile } from './prepareImageFile'
+import { prepareVideoFile } from './prepareVideoFile'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
 
-type HomeTab = 'categories' | 'featured'
+type HomeTab = 'hero' | 'categories' | 'film' | 'featured'
 const resultSize = 5
 
 function normalize(value: string) {
@@ -23,10 +31,29 @@ function normalize(value: string) {
     .toLowerCase()
 }
 
+function sameFields<T extends object>(left: T, right: T) {
+  return (Object.keys(left) as Array<keyof T>).every(
+    (key) => left[key] === right[key],
+  )
+}
+
+function sameHomeContent(left: HomeContent, right: HomeContent) {
+  return (
+    left.hero.length === right.hero.length &&
+    left.hero.every((slide, index) => sameFields(slide, right.hero[index])) &&
+    sameFields(left.film, right.film)
+  )
+}
+
 export function AdminHomePage() {
   const state = useAdminStore()
-  const [tab, setTab] = useState<HomeTab>('categories')
+  const [tab, setTab] = useState<HomeTab>('hero')
   const [media, setMedia] = useState<HomeMedia>(() => ({ ...state.homeMedia }))
+  const [content, setContent] = useState<HomeContent>(() => state.homeContent)
+  const [selectedSlide, setSelectedSlide] = useState(0)
+  const [heroPreview, setHeroPreview] = useState<'desktop' | 'mobile'>(
+    'desktop',
+  )
   const [featuredIds, setFeaturedIds] = useState(() => {
     const available = state.products
       .filter(
@@ -46,9 +73,18 @@ export function AdminHomePage() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [message, setMessage] = useState('')
+  const [messageIsError, setMessageIsError] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [savedVersion, setSavedVersion] = useState(() => JSON.stringify({ media, featuredIds }))
-  const dirty = JSON.stringify({ media, featuredIds }) !== savedVersion
+  const [savedDraft, setSavedDraft] = useState(() => ({
+    media,
+    featuredIds,
+    content,
+  }))
+  const dirty =
+    !sameFields(media, savedDraft.media) ||
+    featuredIds.some((id, index) => id !== savedDraft.featuredIds[index]) ||
+    featuredIds.length !== savedDraft.featuredIds.length ||
+    !sameHomeContent(content, savedDraft.content)
   useUnsavedChanges(dirty)
   const activeProducts = state.products.filter(
     (record) =>
@@ -76,13 +112,94 @@ export function AdminHomePage() {
     (page - 1) * resultSize,
     page * resultSize,
   )
+  const currentSlide = content.hero[selectedSlide]
+  const defaultSlide = heroSlides[selectedSlide]
+  const heroPreviewImage =
+    heroPreview === 'mobile'
+      ? (currentSlide.mobileImage ??
+        currentSlide.desktopImage ??
+        `/images/${defaultSlide.image}-mobile-780.webp`)
+      : (currentSlide.desktopImage ??
+        `/images/${defaultSlide.image}-desktop-1536.webp`)
+
+  function updateHero(index: number, patch: Partial<HomeHeroContent>) {
+    setContent((current) => ({
+      ...current,
+      hero: current.hero.map((slide, slideIndex) =>
+        slideIndex === index ? { ...slide, ...patch } : slide,
+      ),
+    }))
+    setMessage('')
+    setMessageIsError(false)
+  }
+
+  function updateFilm(patch: Partial<HomeFilmContent>) {
+    setContent((current) => ({
+      ...current,
+      film: { ...current.film, ...patch },
+    }))
+    setMessage('')
+    setMessageIsError(false)
+  }
+
+  async function uploadHeroImage(
+    index: number,
+    kind: 'desktopImage' | 'mobileImage',
+    file: File,
+  ) {
+    try {
+      const preset =
+        kind === 'desktopImage'
+          ? homeImagePresets.heroDesktop
+          : homeImagePresets.heroMobile
+      const image = await prepareImageFile(file, preset)
+      updateHero(index, { [kind]: image })
+      setMessageIsError(false)
+      setMessage(`${file.name} preparado. Guarda los cambios para publicarlo.`)
+    } catch (error) {
+      setMessageIsError(true)
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo preparar la imagen.',
+      )
+    }
+  }
+
+  function heroFileChanged(
+    index: number,
+    kind: 'desktopImage' | 'mobileImage',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) void uploadHeroImage(index, kind, file)
+  }
+
+  async function uploadFilm(file: File) {
+    try {
+      const prepared = await prepareVideoFile(file)
+      updateFilm(prepared)
+      setMessageIsError(false)
+      setMessage(`${file.name} preparado. Guarda los cambios para publicarlo.`)
+    } catch (error) {
+      setMessageIsError(true)
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo preparar el video.',
+      )
+    }
+  }
 
   async function uploadImage(key: HomeMediaKey, file: File) {
     try {
       const image = await prepareImageFile(file, homeImagePresets[key])
       setMedia((current) => ({ ...current, [key]: image }))
+      setMessageIsError(false)
       setMessage(`${file.name} preparado. Guarda los cambios para publicarlo.`)
     } catch (error) {
+      setMessageIsError(true)
       setMessage(
         error instanceof Error
           ? error.message
@@ -110,20 +227,24 @@ export function AdminHomePage() {
       return next
     })
     setMessage('')
+    setMessageIsError(false)
   }
 
   async function saveHome() {
-    const result = adminService.saveHome(featuredIds, media)
+    const result = adminService.saveHome(featuredIds, media, content)
     if (result.kind === 'validation') {
+      setMessageIsError(true)
       setMessage(result.message)
       return
     }
     setSaving(true)
     try {
       await adminService.flush()
-      setSavedVersion(JSON.stringify({ media, featuredIds }))
+      setSavedDraft({ media, featuredIds, content })
+      setMessageIsError(false)
       setMessage('Cambios guardados y visibles en el Home de este navegador.')
     } catch {
+      setMessageIsError(true)
       setMessage(
         'Los cambios se ven ahora, pero el navegador no pudo guardarlos. Inténtalo de nuevo.',
       )
@@ -143,10 +264,24 @@ export function AdminHomePage() {
         <div className="admin-home-tabs" aria-label="Apartados del Home">
           <button
             type="button"
+            aria-pressed={tab === 'hero'}
+            onClick={() => setTab('hero')}
+          >
+            Carrusel principal
+          </button>
+          <button
+            type="button"
             aria-pressed={tab === 'categories'}
             onClick={() => setTab('categories')}
           >
             Para él, para ella y unisex
+          </button>
+          <button
+            type="button"
+            aria-pressed={tab === 'film'}
+            onClick={() => setTab('film')}
+          >
+            Video editorial
           </button>
           <button
             type="button"
@@ -158,13 +293,209 @@ export function AdminHomePage() {
         </div>
         <Link
           className="text-link"
-          to={tab === 'categories' ? '/#descubrir' : '/#destacados'}
+          to={
+            tab === 'hero'
+              ? '/'
+              : tab === 'categories'
+                ? '/#descubrir'
+                : tab === 'film'
+                  ? '/#ritual'
+                  : '/#destacados'
+          }
         >
           Ver en tienda ↗
         </Link>
       </div>
 
-      {tab === 'categories' ? (
+      {tab === 'hero' ? (
+        <div className="admin-home-workspace">
+          <section
+            className="admin-home-stage"
+            aria-label="Vista previa del carrusel principal"
+          >
+            <div className="admin-home-stage-toolbar">
+              <div>
+                <span className="eyebrow">Carrusel principal</span>
+                <h2>
+                  Campaña {selectedSlide + 1} de {content.hero.length}
+                </h2>
+              </div>
+              <div
+                className="admin-home-preview-switch"
+                aria-label="Formato de vista previa"
+              >
+                <button
+                  type="button"
+                  aria-pressed={heroPreview === 'desktop'}
+                  onClick={() => setHeroPreview('desktop')}
+                >
+                  Escritorio
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={heroPreview === 'mobile'}
+                  onClick={() => setHeroPreview('mobile')}
+                >
+                  Móvil
+                </button>
+              </div>
+            </div>
+            <div
+              className={`admin-home-hero-preview admin-home-hero-preview--${heroPreview}`}
+              data-tone={defaultSlide.tone}
+            >
+              <img src={heroPreviewImage} alt="" />
+              <div className="admin-home-hero-preview-copy">
+                <span>{currentSlide.eyebrow || 'Etiqueta'}</span>
+                <strong>{currentSlide.title || 'Título de campaña'}</strong>
+                <p>{currentSlide.description || 'Descripción de campaña'}</p>
+                <span className="admin-home-hero-preview-cta">
+                  {currentSlide.cta || 'Botón'}
+                </span>
+              </div>
+            </div>
+            <p className="admin-home-preview-note">
+              La vista previa muestra el encuadre y texto. El Home conserva las
+              flechas y el cambio automático cada 3 segundos.
+            </p>
+          </section>
+          <section
+            className="admin-home-controls"
+            aria-labelledby="admin-home-hero-title"
+          >
+            <h2 id="admin-home-hero-title">Editar campaña</h2>
+            <div
+              className="admin-home-slide-picker"
+              aria-label="Campañas del carrusel"
+            >
+              {content.hero.map((slide, index) => (
+                <button
+                  type="button"
+                  key={defaultSlide.image + index}
+                  aria-pressed={selectedSlide === index}
+                  onClick={() => setSelectedSlide(index)}
+                >
+                  <small>0{index + 1}</small>
+                  <span>
+                    {slide.title.split('\n')[0] || `Campaña ${index + 1}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <label className="admin-home-field">
+              Etiqueta superior
+              <input
+                value={currentSlide.eyebrow}
+                maxLength={60}
+                onChange={(event) =>
+                  updateHero(selectedSlide, { eyebrow: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Título <small>Una línea por renglón; máximo 3</small>
+              <textarea
+                value={currentSlide.title}
+                maxLength={90}
+                rows={3}
+                onChange={(event) =>
+                  updateHero(selectedSlide, { title: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Descripción
+              <textarea
+                value={currentSlide.description}
+                maxLength={180}
+                rows={3}
+                onChange={(event) =>
+                  updateHero(selectedSlide, { description: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Texto del botón
+              <input
+                value={currentSlide.cta}
+                maxLength={45}
+                onChange={(event) =>
+                  updateHero(selectedSlide, { cta: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Descripción de la imagen <small>Para lectores de pantalla</small>
+              <input
+                value={currentSlide.alt}
+                maxLength={160}
+                onChange={(event) =>
+                  updateHero(selectedSlide, { alt: event.target.value })
+                }
+              />
+            </label>
+            <div className="admin-home-image-control">
+              <div>
+                <strong>Fotografía de escritorio</strong>
+                <small>{homeImagePresets.heroDesktop.label}</small>
+              </div>
+              <label className="admin-home-file-button">
+                Cambiar imagen
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  aria-label={`Subir imagen de escritorio de campaña ${selectedSlide + 1}`}
+                  onChange={(event) =>
+                    heroFileChanged(selectedSlide, 'desktopImage', event)
+                  }
+                />
+              </label>
+              {currentSlide.desktopImage && (
+                <button
+                  className="admin-home-reset"
+                  type="button"
+                  onClick={() =>
+                    updateHero(selectedSlide, { desktopImage: null })
+                  }
+                >
+                  Usar original
+                </button>
+              )}
+            </div>
+            <div className="admin-home-image-control">
+              <div>
+                <strong>Fotografía de móvil</strong>
+                <small>
+                  {homeImagePresets.heroMobile.label}. Opcional; sin ella se usa
+                  la imagen de escritorio.
+                </small>
+              </div>
+              <label className="admin-home-file-button">
+                Cambiar imagen
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  aria-label={`Subir imagen móvil de campaña ${selectedSlide + 1}`}
+                  onChange={(event) =>
+                    heroFileChanged(selectedSlide, 'mobileImage', event)
+                  }
+                />
+              </label>
+              {currentSlide.mobileImage && (
+                <button
+                  className="admin-home-reset"
+                  type="button"
+                  onClick={() =>
+                    updateHero(selectedSlide, { mobileImage: null })
+                  }
+                >
+                  Usar imagen de escritorio
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : tab === 'categories' ? (
         <div className="admin-home-workspace">
           <section
             className="admin-home-stage"
@@ -227,9 +558,11 @@ export function AdminHomePage() {
                     <button
                       className="admin-home-reset"
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         setMedia((current) => ({ ...current, [key]: null }))
-                      }
+                        setMessage('')
+                        setMessageIsError(false)
+                      }}
                     >
                       Usar original
                     </button>
@@ -237,6 +570,110 @@ export function AdminHomePage() {
                 </div>
               )
             })}
+          </section>
+        </div>
+      ) : tab === 'film' ? (
+        <div className="admin-home-workspace">
+          <section
+            className="admin-home-stage"
+            aria-label="Vista previa de la sección audiovisual"
+          >
+            <div className="admin-home-film-preview">
+              <div className="admin-home-film-preview-copy">
+                <span className="eyebrow">
+                  {content.film.eyebrow || 'Etiqueta'}
+                </span>
+                <h2>{content.film.title || 'Título del video'}</h2>
+                <p>{content.film.description || 'Texto del video'}</p>
+                <span className="admin-home-preview-link">
+                  {content.film.cta || 'Botón'} ↗
+                </span>
+              </div>
+              <video
+                controls
+                muted
+                playsInline
+                preload="metadata"
+                src={content.film.video ?? editorialFilm.src}
+                poster={content.film.poster ?? editorialFilm.poster}
+                aria-label="Vista previa del video editorial"
+              />
+            </div>
+          </section>
+          <section
+            className="admin-home-controls"
+            aria-labelledby="admin-home-film-title"
+          >
+            <h2 id="admin-home-film-title">Video editorial</h2>
+            <p>Revisa aquí el video y el texto antes de guardar.</p>
+            <label className="admin-home-field">
+              Etiqueta superior
+              <input
+                value={content.film.eyebrow}
+                maxLength={60}
+                onChange={(event) =>
+                  updateFilm({ eyebrow: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Título <small>Una línea por renglón; máximo 2</small>
+              <textarea
+                value={content.film.title}
+                maxLength={90}
+                rows={2}
+                onChange={(event) => updateFilm({ title: event.target.value })}
+              />
+            </label>
+            <label className="admin-home-field">
+              Descripción
+              <textarea
+                value={content.film.description}
+                maxLength={300}
+                rows={4}
+                onChange={(event) =>
+                  updateFilm({ description: event.target.value })
+                }
+              />
+            </label>
+            <label className="admin-home-field">
+              Texto del botón
+              <input
+                value={content.film.cta}
+                maxLength={45}
+                onChange={(event) => updateFilm({ cta: event.target.value })}
+              />
+            </label>
+            <div className="admin-home-image-control">
+              <div>
+                <strong>Archivo de video</strong>
+                <small>
+                  MP4 · 2 a 60 segundos · lado menor de 480 px · hasta 10 MB
+                </small>
+              </div>
+              <label className="admin-home-file-button">
+                Cambiar video
+                <input
+                  type="file"
+                  accept="video/mp4"
+                  aria-label="Subir video editorial"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (file) void uploadFilm(file)
+                  }}
+                />
+              </label>
+              {content.film.video && (
+                <button
+                  className="admin-home-reset"
+                  type="button"
+                  onClick={() => updateFilm({ video: null, poster: null })}
+                >
+                  Usar video original
+                </button>
+              )}
+            </div>
           </section>
         </div>
       ) : (
@@ -296,9 +733,11 @@ export function AdminHomePage() {
                 <button
                   className="admin-home-reset"
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
                     setMedia((current) => ({ ...current, featured: null }))
-                  }
+                    setMessage('')
+                    setMessageIsError(false)
+                  }}
                 >
                   Usar original
                 </button>
@@ -323,9 +762,11 @@ export function AdminHomePage() {
             <button
               className="admin-home-reset"
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setFeaturedIds((current) => [...current].reverse())
-              }
+                setMessage('')
+                setMessageIsError(false)
+              }}
             >
               Invertir orden
             </button>
@@ -370,6 +811,13 @@ export function AdminHomePage() {
                 </li>
               ))}
             </ul>
+            {matchingProducts.length === 0 ? (
+              <p className="admin-home-no-results" role="status">
+                {activeProducts.length === 0
+                  ? 'Todavía no hay productos activos para destacar. Activa uno desde Productos.'
+                  : 'No hay productos con ese nombre o marca. Prueba otra búsqueda.'}
+              </p>
+            ) : null}
             {totalPages > 1 ? (
               <div className="admin-home-pages">
                 <button
@@ -396,7 +844,18 @@ export function AdminHomePage() {
       )}
 
       <div className="admin-home-savebar">
-        <AdminNotice>{message}</AdminNotice>
+        <div className="admin-home-save-status">
+          <span className={dirty ? 'is-unsaved' : 'is-saved'}>
+            {dirty ? 'Cambios sin guardar' : 'Todo guardado'}
+          </span>
+          {messageIsError ? (
+            <p className="admin-form-notice" role="alert">
+              {message}
+            </p>
+          ) : (
+            <AdminNotice>{message}</AdminNotice>
+          )}
+        </div>
         <button
           className="button button--primary"
           type="button"
