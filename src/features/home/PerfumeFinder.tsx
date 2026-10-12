@@ -66,7 +66,7 @@ export function PerfumeFinder({ options }: { options: FinderOptions }) {
 
       <div className="finder-entry container">
         <div className="finder-entry-question">
-          <span>01 / 04 · Tu primera elección</span>
+          <span>1/4 · Tu primera elección</span>
           <h3 id="finder-entry-title">¿Qué aroma te atrae?</h3>
         </div>
         {options.families.length > 0 ? (

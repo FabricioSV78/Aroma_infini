@@ -28,6 +28,9 @@ test('La primera elección del Home inicia el cuestionario y conserva el aroma',
 }) => {
   await page.goto('/')
   const section = page.locator('#encuentra-tu-perfume')
+  await expect(section.locator('.finder-entry-question > span')).toHaveText(
+    '1/4 · Tu primera elección',
+  )
   await expect(
     section.getByRole('heading', { name: '¿Qué aroma te atrae?' }),
   ).toBeVisible()
