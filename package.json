@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "pretypecheck": "npm run cloudflare:types",
     "typecheck": "tsc -b",
     "lint": "eslint . --max-warnings 0",
-    "prebuild": "node scripts/generate-seo-files.mjs",
+    "prebuild": "npm run cloudflare:types && node scripts/generate-seo-files.mjs",
     "postbuild": "node scripts/prerender-seo.mjs",
     "test:e2e": "playwright test",
     "format": "prettier --write src tests scripts *.ts *.js *.json index.html",
