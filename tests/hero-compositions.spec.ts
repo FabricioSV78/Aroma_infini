@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const sides = ['left', 'right', 'left', 'left', 'right']
+const sides = ['left', 'right', 'left', 'right', 'left']
 
 test('Las cinco campañas conservan la fotografía continua, el mensaje unido y los controles visibles', async ({
   page,

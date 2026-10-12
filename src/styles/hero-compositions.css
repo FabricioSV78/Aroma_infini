@@ -115,11 +115,11 @@
     max-width: 100%;
   }
 
-  .home .hero-slide:nth-child(3) .hero-copy {
+  .home .hero-slide[data-campaign='hero-v3-petale'] .hero-copy {
     transform: translateY(24px);
   }
 
-  .home .hero-slide:nth-child(4) .hero-copy {
+  .home .hero-slide[data-campaign='hero-v4-amber'] .hero-copy {
     transform: translateY(-18px);
   }
 }

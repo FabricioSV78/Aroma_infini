@@ -30,6 +30,17 @@ test('Cinco campañas cambian cada tres segundos sin alterar la altura', async (
   await prepare(page)
   const hero = page.locator('.hero')
   const height = (await hero.boundingBox())!.height
+  expect(
+    await page.locator('.hero-slide').evaluateAll((slides) =>
+      slides.map((slide) => slide.getAttribute('data-campaign')),
+    ),
+  ).toEqual([
+    'hero-v2-lumiere',
+    'hero-v5-silence',
+    'hero-v4-amber',
+    'hero-v4-citrus',
+    'hero-v3-petale',
+  ])
   await expect(hero.locator('[role="status"]')).toHaveAttribute(
     'aria-live',
     'off',
@@ -37,9 +48,9 @@ test('Cinco campañas cambian cada tres segundos sin alterar la altura', async (
   await expectCurrentIndicator(page, 0)
   const titles = [
     'Lo sutil también',
-    'Tu esencia',
     'Ámbar y madera,',
     'La frescura',
+    'Tu esencia',
     'Una fragancia',
   ]
   for (const [index, title] of titles.entries()) {
@@ -71,7 +82,7 @@ test('Flechas permiten ir, volver y recorrer el límite del carrusel', async ({
   expect(nextBox.x).toBeGreaterThan(heroBox.x + (heroBox.width * 3) / 4)
   await previous.click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'La frescura',
+    'Tu esencia',
   )
   await expectCurrentIndicator(page, 4)
   await next.click()
@@ -163,7 +174,7 @@ test('El foco pausa el carrusel y el teclado permite navegar sin control de paus
   await page.getByRole('button', { name: 'Ver campaña 5' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'La frescura',
+    'Tu esencia',
   )
   await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
@@ -184,7 +195,7 @@ test('Movimiento reducido desactiva autoplay y permite visitar las cinco campañ
   await page.getByRole('button', { name: 'Ver campaña 5' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'La frescura',
+    'Tu esencia',
   )
 })
 
@@ -192,7 +203,7 @@ test('Una fotografía fallida se omite sin interrumpir las campañas disponibles
   page,
 }) => {
   await page.clock.install()
-  await page.route('**/hero-v3-petale-*.webp', (route) =>
+  await page.route('**/hero-v4-amber-*.webp', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'image/webp',
@@ -207,13 +218,13 @@ test('Una fotografía fallida se omite sin interrumpir las campañas disponibles
   )
   await page.waitForFunction(() => {
     const image = document.querySelector<HTMLImageElement>(
-      '.hero-image img[src*="hero-v4-amber"]',
+      '.hero-image img[src*="hero-v4-citrus"]',
     )
     return image?.complete && image.naturalWidth > 0
   })
   await page.clock.runFor(3100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Ámbar y madera,',
+    'La frescura',
   )
   await expect(page.locator('.hero-slide.is-active img')).toBeVisible()
 })

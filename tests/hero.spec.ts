@@ -16,7 +16,7 @@ test('La segunda campaña espera a la imagen prioritaria y se revela solo cuando
     await firstGate
     await route.continue()
   })
-  await page.route('**/hero-v2-silence-*.webp', async (route) => {
+  await page.route('**/hero-v5-silence-*.webp', async (route) => {
     secondaryRequests++
     await secondGate
     await route.continue()
@@ -58,7 +58,7 @@ test('Una pulsación rápida de ida y vuelta no activa una fotografía tardía',
   const gate = new Promise<void>((resolve) => {
     release = resolve
   })
-  await page.route('**/hero-v2-silence-*.webp', async (route) => {
+  await page.route('**/hero-v5-silence-*.webp', async (route) => {
     await gate
     await route.continue()
   })

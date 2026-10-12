@@ -1,4 +1,4 @@
-import { heroSlides } from './home'
+import { heroDisplayOrder, heroSlides } from './home'
 import type {
   HomeContent,
   HomeFilmContent,
@@ -13,6 +13,13 @@ const defaultFilm: HomeFilmContent = {
   cta: 'Encuentra tu perfume',
   video: null,
   poster: null,
+}
+
+const previousSilenceAlt =
+  'Frasco verde sobre un bloque de vidrio entre reflejos de luz'
+
+function visibleCampaignNumber(sourceIndex: number) {
+  return heroDisplayOrder.findIndex((index) => index === sourceIndex) + 1
 }
 
 export function createDefaultHomeContent(): HomeContent {
@@ -51,7 +58,12 @@ export function normalizeHomeContent(value: unknown): HomeContent {
             ? candidate.description
             : slide.description,
         cta: typeof candidate.cta === 'string' ? candidate.cta : slide.cta,
-        alt: typeof candidate.alt === 'string' ? candidate.alt : slide.alt,
+        alt:
+          index === 1 && candidate.alt === previousSilenceAlt
+            ? slide.alt
+            : typeof candidate.alt === 'string'
+              ? candidate.alt
+              : slide.alt,
         desktopImage:
           typeof candidate.desktopImage === 'string' &&
           candidate.desktopImage.startsWith('data:image/webp;base64,')
@@ -100,15 +112,31 @@ export function validateHomeContent(content: HomeContent): string | null {
     return 'El carrusel debe conservar sus cinco campañas.'
 
   const fields = content.hero.flatMap((slide, index) => [
-    { name: `Etiqueta de campaña ${index + 1}`, value: slide.eyebrow, max: 60 },
-    { name: `Título de campaña ${index + 1}`, value: slide.title, max: 90 },
     {
-      name: `Descripción de campaña ${index + 1}`,
+      name: `Etiqueta de campaña ${visibleCampaignNumber(index)}`,
+      value: slide.eyebrow,
+      max: 60,
+    },
+    {
+      name: `Título de campaña ${visibleCampaignNumber(index)}`,
+      value: slide.title,
+      max: 90,
+    },
+    {
+      name: `Descripción de campaña ${visibleCampaignNumber(index)}`,
       value: slide.description,
       max: 180,
     },
-    { name: `Botón de campaña ${index + 1}`, value: slide.cta, max: 45 },
-    { name: `Descripción de imagen ${index + 1}`, value: slide.alt, max: 160 },
+    {
+      name: `Botón de campaña ${visibleCampaignNumber(index)}`,
+      value: slide.cta,
+      max: 45,
+    },
+    {
+      name: `Descripción de imagen ${visibleCampaignNumber(index)}`,
+      value: slide.alt,
+      max: 160,
+    },
   ])
   fields.push(
     { name: 'Etiqueta del video', value: content.film.eyebrow, max: 60 },

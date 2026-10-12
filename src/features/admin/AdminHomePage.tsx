@@ -1,7 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
-import { categories } from '../../content/home'
-import { heroSlides } from '../../content/home'
+import { categories, heroDisplayOrder, heroSlides } from '../../content/home'
 import { editorialFilm } from '../../content/editorial-film'
 import type {
   HomeContent,
@@ -51,7 +50,7 @@ export function AdminHomePage() {
   const [tab, setTab] = useState<HomeTab>('hero')
   const [media, setMedia] = useState<HomeMedia>(() => ({ ...state.homeMedia }))
   const [content, setContent] = useState<HomeContent>(() => state.homeContent)
-  const [selectedSlide, setSelectedSlide] = useState(0)
+  const [selectedSlide, setSelectedSlide] = useState<number>(heroDisplayOrder[0])
   const [heroPreview, setHeroPreview] = useState<'desktop' | 'mobile'>(
     'desktop',
   )
@@ -115,6 +114,8 @@ export function AdminHomePage() {
   )
   const currentSlide = content.hero[selectedSlide]
   const defaultSlide = heroSlides[selectedSlide]
+  const displayOrder: readonly number[] = heroDisplayOrder
+  const selectedSlideNumber = displayOrder.indexOf(selectedSlide) + 1
   const heroPreviewImage =
     heroPreview === 'mobile'
       ? (currentSlide.mobileImage ??
@@ -318,7 +319,7 @@ export function AdminHomePage() {
               <div>
                 <span className="eyebrow">Carrusel principal</span>
                 <h2>
-                  Campaña {selectedSlide + 1} de {content.hero.length}
+                  Campaña {selectedSlideNumber} de {displayOrder.length}
                 </h2>
               </div>
               <div
@@ -377,16 +378,17 @@ export function AdminHomePage() {
               className="admin-home-slide-picker"
               aria-label="Campañas del carrusel"
             >
-              {content.hero.map((slide, index) => (
+              {displayOrder.map((slideIndex, displayIndex) => (
                 <button
                   type="button"
-                  key={defaultSlide.image + index}
-                  aria-pressed={selectedSlide === index}
-                  onClick={() => setSelectedSlide(index)}
+                  key={slideIndex}
+                  aria-pressed={selectedSlide === slideIndex}
+                  onClick={() => setSelectedSlide(slideIndex)}
                 >
-                  <small>0{index + 1}</small>
+                  <small>0{displayIndex + 1}</small>
                   <span>
-                    {slide.title.split('\n')[0] || `Campaña ${index + 1}`}
+                    {content.hero[slideIndex].title.split('\n')[0] ||
+                      `Campaña ${displayIndex + 1}`}
                   </span>
                 </button>
               ))}
@@ -453,7 +455,7 @@ export function AdminHomePage() {
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif"
-                  aria-label={`Subir imagen de escritorio de campaña ${selectedSlide + 1}`}
+                  aria-label={`Subir imagen de escritorio de campaña ${selectedSlideNumber}`}
                   onChange={(event) =>
                     heroFileChanged(selectedSlide, 'desktopImage', event)
                   }
@@ -484,7 +486,7 @@ export function AdminHomePage() {
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif"
-                  aria-label={`Subir imagen móvil de campaña ${selectedSlide + 1}`}
+                  aria-label={`Subir imagen móvil de campaña ${selectedSlideNumber}`}
                   onChange={(event) =>
                     heroFileChanged(selectedSlide, 'mobileImage', event)
                   }

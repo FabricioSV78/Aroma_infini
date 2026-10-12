@@ -6,18 +6,23 @@ import {
   type PointerEvent,
 } from 'react'
 import { Link } from 'react-router'
-import { heroSlides } from '../../content/home'
+import { heroDisplayOrder, heroSlides } from '../../content/home'
 import type { HomeHeroContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 import { useHeroRotation } from './useHeroRotation'
 import { headingText } from '../../utils/heading-text'
 
 export function Hero({ content }: { content: HomeHeroContent[] }) {
-  const slides = heroSlides.map((slide, index) => ({
-    ...slide,
-    ...content[index],
-    title: (content[index]?.title.split('\n') ?? slide.title).map(headingText),
-  }))
+  const slides = heroDisplayOrder.map((sourceIndex) => {
+    const slide = heroSlides[sourceIndex]
+    return {
+      ...slide,
+      ...content[sourceIndex],
+      title: (content[sourceIndex]?.title.split('\n') ?? slide.title).map(
+        headingText,
+      ),
+    }
+  })
   const [active, setActive] = useState(0)
   const [preparedCount, setPreparedCount] = useState(1)
   const [readySlides, setReadySlides] = useState<ReadonlySet<number>>(
@@ -192,6 +197,7 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
               className={`hero-slide ${isActive ? 'is-active' : ''}`}
               data-tone={slide.tone}
               data-layout={slide.layout}
+              data-campaign={slide.image}
               data-default-image={!slide.desktopImage}
               role="group"
               aria-roledescription="diapositiva"

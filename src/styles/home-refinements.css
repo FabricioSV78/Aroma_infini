@@ -5,7 +5,7 @@
   --home-editorial-rule: #d5d5cc;
 }
 
-.home .hero-slide:last-child .hero-title {
+.home .hero-slide[data-campaign='hero-v4-citrus'] .hero-title {
   max-width: 16ch;
 }
 .home .section-heading h2 {

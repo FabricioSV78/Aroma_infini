@@ -7,6 +7,13 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
   await page.goto('/admin/home')
   await page.getByRole('button', { name: 'Carrusel principal' }).click()
   await expect(page.locator('.admin-home-slide-picker button')).toHaveCount(5)
+  await expect(page.locator('.admin-home-slide-picker button')).toHaveText([
+    /01Una fragancia/,
+    /02Lo sutil también/,
+    /03Ámbar y madera/,
+    /04La frescura/,
+    /05Tu esencia/,
+  ])
   await page
     .getByRole('textbox', { name: 'Etiqueta superior' })
     .fill('Firma personal')

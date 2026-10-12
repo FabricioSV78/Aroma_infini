@@ -17,10 +17,10 @@ export const heroSlides = [
     description: 'Notas verdes y maderas suaves para un momento de calma.',
     cta: 'Ver destacados',
     to: '/tienda?seleccion=destacados',
-    image: 'hero-v2-silence',
+    image: 'hero-v5-silence',
     layout: 'right',
     tone: 'light',
-    alt: 'Frasco verde sobre un bloque de vidrio entre reflejos de luz',
+    alt: 'Frasco verde sobre vidrio ante piedra cálida y hojas de olivo',
   },
   {
     eyebrow: 'La firma Forme',
@@ -56,6 +56,10 @@ export const heroSlides = [
     alt: 'Frasco claro sin marca junto a bergamota y piedra blanca',
   },
 ]
+
+// Presentation order only. Home content stays indexed by its original campaign,
+// so edits already saved in the admin panel remain attached to the same image.
+export const heroDisplayOrder = [0, 1, 3, 4, 2] as const
 
 export const categories = [
   {

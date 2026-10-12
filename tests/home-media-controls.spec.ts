@@ -5,7 +5,7 @@ test('Los indicadores visibles permiten elegir una campaña en móvil', async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
-  const indicator = page.getByRole('button', { name: 'Ver campaña 4' })
+  const indicator = page.getByRole('button', { name: 'Ver campaña 3' })
   await indicator.click()
   await expect(indicator).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
