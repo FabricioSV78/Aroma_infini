@@ -490,12 +490,6 @@
   gap: 16px;
 }
 
-.admin-home-featured-photo {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
 .admin-home-featured-copy {
   display: flex;
   flex-direction: column;
@@ -723,9 +717,6 @@
 }
 
 @media (min-width: 768px) {
-  .admin-home-featured-preview {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  }
   .admin-home-film-preview {
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   }
@@ -738,9 +729,6 @@
   .admin-home-stage {
     position: sticky;
     top: 96px;
-  }
-  .admin-home-featured-preview {
-    grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
   }
   .admin-home-featured-copy h2 {
     font-size: 28px;

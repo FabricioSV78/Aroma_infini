@@ -774,7 +774,7 @@ test('El editor advierte antes de descartar cambios sin guardar', async ({
   await expect(page).toHaveURL(/\/admin\/productos$/)
 })
 
-test('El orden editorial del panel se refleja en los destacados del Home', async ({
+test('La selección de destacados permanece en la tienda tras retirar el bloque del Home', async ({
   page,
 }) => {
   await page.goto('/admin/home')
@@ -783,11 +783,11 @@ test('El orden editorial del panel se refleja en los destacados del Home', async
   await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
   await expect(page.getByText(/Cambios guardados/)).toBeVisible()
   await page.getByRole('link', { name: 'Ver en tienda' }).click()
-  await expect(page.locator('.featured-products .product-card')).toHaveCount(2)
+  await expect(page.locator('.product-card')).toHaveCount(2)
   const names = await page
-    .locator('.featured-products .product-card h3')
+    .locator('.product-card .product-meta :is(h2, h3)')
     .allTextContents()
-  expect(names.map((name) => name.trim())).toEqual([
+  expect(names.map((name) => name.trim()).sort()).toEqual([
     'Bois Clair',
     'Vert Silence',
   ])

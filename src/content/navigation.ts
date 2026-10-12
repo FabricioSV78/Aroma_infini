@@ -32,7 +32,10 @@ export const navigationGroups: NavigationGroup[] = [
       { title: 'Explorar', links: [navigation[0], ...navigation.slice(3)] },
       {
         title: 'Nuestra selección',
-        links: [navigation[2], { label: 'Destacados', to: '/#destacados' }],
+        links: [
+          navigation[2],
+          { label: 'Destacados', to: '/tienda?seleccion=destacados' },
+        ],
       },
     ],
   },

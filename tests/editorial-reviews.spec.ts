@@ -58,7 +58,7 @@ for (const viewport of [
   { width: 844, height: 390 },
   { width: 1280, height: 600 },
 ]) {
-  test(`El video conserva el encuadre completo a ${viewport.width}px`, async ({
+  test(`El video cubre la sección sin franjas a ${viewport.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport)
@@ -69,8 +69,8 @@ for (const viewport of [
     const media = page.locator('.editorial-film-media')
     await section.scrollIntoViewIfNeeded()
 
-    await expect(media.locator('video')).toHaveCSS('object-fit', 'contain')
-    await expect(media.locator('img')).toHaveCSS('object-fit', 'contain')
+    await expect(media.locator('video')).toHaveCSS('object-fit', 'cover')
+    await expect(media.locator('img')).toHaveCSS('object-fit', 'cover')
     const bounds = await section.boundingBox()
     const copy = await section.locator('.editorial-film-copy').boundingBox()
     expect(bounds).not.toBeNull()

@@ -11,6 +11,7 @@ interface ProductCardProps {
   product: Product
   brand: Brand | undefined
   variant?: 'standard' | 'editorial'
+  showAction?: boolean
   imageSizes?: string
   headingLevel?: 2 | 3
 }
@@ -20,6 +21,7 @@ export function ProductCard({
   variant = 'standard',
   imageSizes: imageSizesOverride,
   headingLevel = 3,
+  showAction = false,
 }: ProductCardProps) {
   const { favoriteIds, toggleFavorite } = useFavorites()
   const isFavorite = favoriteIds.has(product.id)
@@ -37,6 +39,18 @@ export function ProductCard({
     gallery[0]?.alt.trim() ||
     `Frasco de ${product.name}${brand ? ` de ${brand.name}` : ''}`
   const Heading = headingLevel === 2 ? 'h2' : 'h3'
+  const favoriteButton = (
+    <button
+      type="button"
+      className="icon-button product-favorite"
+      aria-label={`${isFavorite ? 'Quitar' : 'Guardar'} ${product.name} ${isFavorite ? 'de' : 'en'} favoritos`}
+      aria-pressed={isFavorite}
+      title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+      onClick={() => toggleFavorite(product.id)}
+    >
+      <Icon name="heart" />
+    </button>
+  )
   return (
     <article className={`product-card product-card--${variant}`}>
       <div className="product-photo">
@@ -75,16 +89,7 @@ export function ProductCard({
             />
           )}
         </Link>
-        <button
-          type="button"
-          className="icon-button product-favorite"
-          aria-label={`${isFavorite ? 'Quitar' : 'Guardar'} ${product.name} ${isFavorite ? 'de' : 'en'} favoritos`}
-          aria-pressed={isFavorite}
-          title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-          onClick={() => toggleFavorite(product.id)}
-        >
-          <Icon name="heart" />
-        </button>
+        {favoriteButton}
         {!inStock && <span className="stock-label">Agotado</span>}
       </div>
       <div className="product-meta">
@@ -92,10 +97,10 @@ export function ProductCard({
         <Heading>
           <Link to={`/producto/${product.slug}`}>
             {product.name}
-            <Icon name="arrow" />
+            {!showAction && <Icon name="arrow" />}
           </Link>
         </Heading>
-        {variant === 'standard' && (
+        {variant !== 'editorial' && (
           <p className="product-family">{product.family}</p>
         )}
         <div className="product-price">
@@ -112,6 +117,15 @@ export function ProductCard({
             {variants.map((variant) => `${variant.ml} ml`).join(' · ')}
           </span>
         </div>
+        {showAction && (
+          <Link
+            className="text-link product-action"
+            to={`/producto/${product.slug}`}
+            aria-label={`Ver perfume ${product.name}`}
+          >
+            Ver perfume <Icon name="arrow" />
+          </Link>
+        )}
       </div>
     </article>
   )

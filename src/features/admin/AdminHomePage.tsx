@@ -300,7 +300,7 @@ export function AdminHomePage() {
                 ? '/#descubrir'
                 : tab === 'film'
                   ? '/#ritual'
-                  : '/#destacados'
+                  : '/tienda?seleccion=destacados'
           }
         >
           Ver en tienda ↗
@@ -691,16 +691,11 @@ export function AdminHomePage() {
             aria-label="Vista previa de destacados"
           >
             <div className="admin-home-featured-preview">
-              <img
-                className="admin-home-featured-photo"
-                src={imageSource(media.featured ?? 'featured-duo-v3', 960)}
-                alt="Composición editorial de los destacados"
-              />
               <div className="admin-home-featured-copy">
-                <span className="eyebrow">Encuentro editorial</span>
-                <h2>Dos aromas. Dos formas de dejar huella.</h2>
+                <span className="eyebrow">Selección de la tienda</span>
+                <h2>Perfumes destacados</h2>
                 <span className="admin-home-preview-link">
-                  Explorar destacados ↗
+                  Disponibles en la tienda, sin bloque adicional en el Home
                 </span>
                 <div className="admin-home-featured-products">
                   {selectedProducts.map((product, index) => (
@@ -723,34 +718,6 @@ export function AdminHomePage() {
             aria-labelledby="admin-home-featured-title"
           >
             <h2 id="admin-home-featured-title">Editar destacados</h2>
-            <div className="admin-home-image-control">
-              <div>
-                <strong>Fotografía grande</strong>
-                <small>{homeImagePresets.featured.label}</small>
-              </div>
-              <label className="admin-home-file-button">
-                Cambiar imagen
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif"
-                  aria-label="Subir fotografía grande de destacados"
-                  onChange={(event) => fileChanged('featured', event)}
-                />
-              </label>
-              {media.featured ? (
-                <button
-                  className="admin-home-reset"
-                  type="button"
-                  onClick={() => {
-                    setMedia((current) => ({ ...current, featured: null }))
-                    setMessage('')
-                    setMessageIsError(false)
-                  }}
-                >
-                  Usar original
-                </button>
-              ) : null}
-            </div>
             <div
               className="admin-home-slot-picker"
               aria-label="Posición que vas a editar"

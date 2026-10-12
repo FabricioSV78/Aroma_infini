@@ -16,7 +16,7 @@ export const heroSlides = [
     title: ['Lo sutil también', 'deja huella.'],
     description: 'Notas verdes y maderas suaves para un momento de calma.',
     cta: 'Ver destacados',
-    to: '/#destacados',
+    to: '/tienda?seleccion=destacados',
     image: 'hero-v2-silence',
     layout: 'right',
     tone: 'light',

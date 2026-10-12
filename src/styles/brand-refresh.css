@@ -120,26 +120,10 @@
 .store-layout .home [data-home-section='bestsellers'] {
   background: var(--color-canvas);
 }
-.store-layout .home .brand-gallery {
-  border-top: 1px solid var(--color-line);
-  background: var(--color-surface);
-}
-.store-layout .home .brand-preview {
-  border: 1px solid var(--color-line);
-}
 .store-layout .home [data-home-section='trust'] {
   background: var(--color-canvas);
 }
-.store-layout .home .featured-section {
-  background: var(--color-surface);
-}
-.store-layout .home .featured-products {
-  padding-inline: clamp(16px, 2.5vw, 28px);
-  background: var(--color-canvas);
-}
-.store-layout .home .section-heading .eyebrow,
-.store-layout .home .brand-intro .eyebrow,
-.store-layout .home .featured-intro .eyebrow {
+.store-layout .home .section-heading .eyebrow {
   color: var(--color-brand);
   font-size: 11px;
   font-weight: 700;
@@ -157,19 +141,8 @@
     box-shadow: 0 14px 30px rgb(0 35 31 / 0.08);
   }
 }
-.store-layout .category-image,
-.store-layout .brand-preview,
-.store-layout .brand-thumbnail {
+.store-layout .category-image {
   background: var(--color-surface);
-}
-.store-layout .brand-entry:is(:hover, :focus-visible, .brand-entry--active) {
-  color: var(--color-brand);
-  border-bottom-color: var(--color-brand);
-}
-.store-layout
-  .brand-entry:is(:hover, :focus-visible, .brand-entry--active)
-  .brand-index {
-  color: var(--color-brand);
 }
 
 /* Product photography has one quiet backdrop across discovery and detail. */

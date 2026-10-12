@@ -17,7 +17,7 @@ export function Categories({ media }: Pick<HomeData, 'media'>) {
       <SectionHeading
         id="categories-title"
         eyebrow="Tres formas de explorar"
-        title="Elige por dónde empezar."
+        title="Elige por dónde empezar"
       />
       <div className="category-grid">
         {categories.map((category) => (
@@ -88,76 +88,11 @@ export function Bestsellers({
           <ProductCard
             key={product.id}
             product={product}
+            showAction
             imageSizes="(min-width: 1760px) 396px, (min-width: 1024px) 23vw, 46vw"
             brand={brands.find((brand) => brand.id === product.brandId)}
           />
         ))}
-      </div>
-    </section>
-  )
-}
-
-export function FeaturedPerfumes({
-  brands,
-  featured,
-  media,
-}: Pick<HomeData, 'brands' | 'featured' | 'media'>) {
-  const title =
-    featured.length === 2
-      ? 'Dos perfumes, dos perfiles.'
-      : featured.length === 1
-        ? 'Un perfume en primer plano.'
-        : 'Perfumes en primer plano.'
-  return (
-    <section
-      className="featured-section"
-      id="destacados"
-      tabIndex={-1}
-      aria-labelledby="featured-title"
-    >
-      <div className="featured-inner container">
-        <header className="featured-intro" data-reveal="copy">
-          <div>
-            <p className="eyebrow">Selección editorial</p>
-            <h2 id="featured-title">{title}</h2>
-          </div>
-          <Link
-            className="text-link featured-action"
-            to="/tienda?seleccion=destacados"
-          >
-            Ver perfumes destacados <Icon name="arrow" />
-          </Link>
-        </header>
-        <Link
-          className="featured-visual"
-          data-reveal="image"
-          to="/tienda?seleccion=destacados"
-          aria-label="Ver los perfumes destacados"
-        >
-          <img
-            src={imageSource(media.featured ?? 'featured-duo-v3', 960)}
-            srcSet={imageSourceSet(
-              media.featured ?? 'featured-duo-v3',
-              [480, 960, 1536],
-            )}
-            sizes="(min-width: 1440px) 800px, (min-width: 1024px) 56vw, (min-width: 768px) calc(100vw - 48px), calc(100vw - 32px)"
-            width={1448}
-            height={1086}
-            loading="lazy"
-            decoding="async"
-            alt=""
-          />
-        </Link>
-        <div className="featured-products" data-reveal="copy">
-          {featured.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              variant="editorial"
-              brand={brands.find((brand) => brand.id === product.brandId)}
-            />
-          ))}
-        </div>
       </div>
     </section>
   )

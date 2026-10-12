@@ -3,7 +3,14 @@ import { footerGroups } from '../../content/navigation'
 import { footerSocialProfiles } from '../../content/social'
 import { Icon } from '../ui/Icon'
 
-export function Footer() {
+export function Footer({
+  hidePendingSocials = false,
+}: {
+  hidePendingSocials?: boolean
+}) {
+  const socialProfiles = hidePendingSocials
+    ? footerSocialProfiles.filter((profile) => profile.url)
+    : footerSocialProfiles
   return (
     <footer className="site-footer">
       <div className="container">
@@ -21,41 +28,43 @@ export function Footer() {
             </Link>
             <p>Encuentra tu perfume, nota a nota.</p>
             <span className="eyebrow">PERÚ</span>
-            <div
-              className="footer-social"
-              aria-labelledby="footer-social-title"
-            >
-              <h2 id="footer-social-title">Síguenos</h2>
-              <ul>
-                {footerSocialProfiles.map((profile) => (
-                  <li key={profile.label}>
-                    {profile.url ? (
-                      <a
-                        href={profile.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${profile.label} de Aroma Infini, abre en una nueva pestaña`}
-                      >
-                        <Icon name={profile.icon} />
-                      </a>
-                    ) : (
-                      <span
-                        className="footer-social-placeholder"
-                        title={`${profile.label}: perfil pendiente`}
-                      >
-                        <Icon name={profile.icon} />
-                        <span className="sr-only">
-                          {profile.label}: perfil pendiente
+            {socialProfiles.length > 0 && (
+              <div
+                className="footer-social"
+                aria-labelledby="footer-social-title"
+              >
+                <h2 id="footer-social-title">Síguenos</h2>
+                <ul>
+                  {socialProfiles.map((profile) => (
+                    <li key={profile.label}>
+                      {profile.url ? (
+                        <a
+                          href={profile.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${profile.label} de Aroma Infini, abre en una nueva pestaña`}
+                        >
+                          <Icon name={profile.icon} />
+                        </a>
+                      ) : (
+                        <span
+                          className="footer-social-placeholder"
+                          title={`${profile.label}: perfil pendiente`}
+                        >
+                          <Icon name={profile.icon} />
+                          <span className="sr-only">
+                            {profile.label}: perfil pendiente
+                          </span>
                         </span>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {footerSocialProfiles.some((profile) => !profile.url) && (
-                <p>Perfiles en preparación.</p>
-              )}
-            </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {socialProfiles.some((profile) => !profile.url) && (
+                  <p>Perfiles en preparación.</p>
+                )}
+              </div>
+            )}
           </div>
           {footerGroups.map((group) => (
             <div

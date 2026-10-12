@@ -3,21 +3,18 @@ import type { HomeData } from '../../services/home-service'
 import { Hero } from './Hero'
 import { BrandGallery } from './BrandGallery'
 import { EditorialFilm } from './EditorialFilm'
-import {
-  Bestsellers,
-  Categories,
-  FeaturedPerfumes,
-  TrustInformation,
-} from './HomeSections'
+import { ChoosingGuide } from './ChoosingGuide'
+import { choosingGuideEnabled } from '../../content/choosing-guide'
+import { Bestsellers, Categories, TrustInformation } from './HomeSections'
 
-// Orientar → producto → descubrir firmas → ritual → selección → confianza.
+// Explorar → producto → aprender a elegir → firmas → ritual → confianza.
 const sectionOrder = [
   'hero',
   'categories',
   'bestsellers',
+  'choosing-guide',
   'brands',
   'editorial',
-  'featured',
   'trust',
 ] as const
 
@@ -26,20 +23,16 @@ export function HomePage() {
   const sections = {
     hero: <Hero content={data.content.hero} />,
     brands: data.brands.length ? (
-      <BrandGallery brands={data.brands} bestsellers={data.bestsellers} />
+      <BrandGallery brands={data.brands} brandProfiles={data.brandProfiles} />
     ) : null,
     categories: <Categories media={data.media} />,
     bestsellers: data.bestsellers.length ? (
       <Bestsellers brands={data.brands} bestsellers={data.bestsellers} />
     ) : null,
-    editorial: <EditorialFilm content={data.content.film} />,
-    featured: data.featured.length ? (
-      <FeaturedPerfumes
-        brands={data.brands}
-        featured={data.featured}
-        media={data.media}
-      />
+    'choosing-guide': choosingGuideEnabled ? (
+      <ChoosingGuide example={data.choosingGuideExample} />
     ) : null,
+    editorial: <EditorialFilm content={data.content.film} />,
     trust: <TrustInformation />,
   }
   return (

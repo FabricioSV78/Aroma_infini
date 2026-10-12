@@ -137,13 +137,6 @@ test('El Home muestra la edición visual, cambia imágenes y conserva los cambio
   await expect(page.getByText('2:3 · mínimo 960 × 1440 px')).toBeVisible()
 
   await page.getByRole('button', { name: 'Destacados', exact: true }).click()
-  await page
-    .getByLabel('Subir fotografía grande de destacados')
-    .setInputFiles('public/images/featured-duo-v3-1536.webp')
-  await expect(page.locator('.admin-home-featured-photo')).toHaveAttribute(
-    'src',
-    /^data:image\/webp;base64,/,
-  )
   await page.getByRole('button', { name: /Destacado 01/ }).click()
   await page
     .getByRole('searchbox', { name: /Buscar un producto/ })
@@ -161,22 +154,19 @@ test('El Home muestra la edición visual, cambia imágenes y conserva los cambio
   await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
   await expect(page.getByText(/Cambios guardados/)).toBeVisible()
   await page.getByRole('link', { name: 'Ver en tienda' }).click()
-  await expect(page.locator('.category--portrait img')).toHaveAttribute(
-    'src',
-    /^data:image\/webp;base64,/,
-  )
-  await expect(page.locator('.featured-visual img')).toHaveAttribute(
-    'src',
-    /^data:image\/webp;base64,/,
-  )
-  await expect(page.locator('.featured-products')).toContainText('Pétale Nu')
-
+  await expect(page).toHaveURL('/tienda?seleccion=destacados')
+  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(
+    page.locator('.product-card').filter({ hasText: 'Pétale Nu' }),
+  ).toHaveCount(1)
   await page.reload()
+  await expect(page.locator('.product-card')).toHaveCount(2)
+  await page.goto('/')
   await expect(page.locator('.category--portrait img')).toHaveAttribute(
     'src',
     /^data:image\/webp;base64,/,
   )
-  await expect(page.locator('.featured-products')).toContainText('Pétale Nu')
+  await expect(page.locator('.featured-section')).toHaveCount(0)
 })
 
 test('Un producto nuevo admite archivos, previsualiza la galería y se publica con su foto', async ({

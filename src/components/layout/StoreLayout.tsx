@@ -162,7 +162,7 @@ function StoreFrame() {
         <Icon name="chat" />
         <span>Ayuda</span>
       </a>
-      <Footer />
+      <Footer hidePendingSocials={location.pathname === '/'} />
       <CartNotice />
     </div>
   )

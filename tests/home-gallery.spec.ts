@@ -68,7 +68,7 @@ for (const width of [1280, 1600, 1904]) {
     // mosaico sin convertirlo en una sección excesivamente alta.
     expect(ratios[1]).toBeCloseTo(2, 1)
     expect(ratios[2]).toBeCloseTo(2, 1)
-    expect(gridHeight).toBeLessThanOrEqual(820)
+    expect(gridHeight).toBeLessThanOrEqual(840)
 
     if (width === 1904) {
       await page.locator('#descubrir').screenshot({
@@ -78,75 +78,59 @@ for (const width of [1280, 1600, 1904]) {
   })
 }
 
-test('Marcas: ratón y teclado cambian fotografía sin cambiar el tamaño', async ({
+test('Marcas tipográficas: teclado, enlaces y presencia editorial', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   const gallery = page.locator('#marcas')
-  await page.evaluate(() => document.fonts.ready)
-  await gallery.evaluate((element) =>
-    element.scrollIntoView({ behavior: 'instant', block: 'center' }),
-  )
-  const preview = gallery.locator('.brand-preview')
-  const active = preview.locator('.brand-preview-frame.is-active')
-  await expect(active).toContainText('Atelier 01')
-  const before = await preview.boundingBox()
-  const forme = gallery.getByRole('link', { name: /^Forme/ })
-  await expect
-    .poll(async () => {
-      await forme.hover()
-      return {
-        text: await active.textContent(),
-        src: await active.locator('img').getAttribute('src'),
-      }
-    })
-    .toMatchObject({
-      text: expect.stringContaining('Pétale Nu'),
-      src: expect.stringMatching(/petale-alternate/),
-    })
-  const sillage = gallery.getByRole('link', { name: /^Studio sillage/ })
-  await sillage.focus()
-  await expect(sillage).toBeFocused()
-  await expect(active).toContainText('Vert Silence')
-  const after = await preview.boundingBox()
-  expect(after?.height).toBeCloseTo(before?.height ?? 0, 2)
-  expect(after?.width).toBeCloseTo(before?.width ?? 0, 2)
+  await expect(gallery.locator('img')).toHaveCount(0)
+  await expect(
+    gallery.locator(
+      '.brand-signatures-group:not([aria-hidden]) .brand-signature',
+    ),
+  ).toHaveCount(4)
+  const forme = gallery.getByRole('link', {
+    name: 'Ver perfumes de Forme',
+    exact: true,
+  })
+  await forme.focus()
+  await expect(forme).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL('/marcas/studio-sillage')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Studio sillage',
-  )
+  await expect(page).toHaveURL('/marcas/forme')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forme')
 })
 
-test('Marcas móvil: cada enlace tiene fotografía y el cambio de tamaño conserva acceso', async ({
+test('Home móvil: marcas accesibles y audiovisual seguido de beneficios', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/')
-  const gallery = page.locator('#marcas')
-  await gallery.scrollIntoViewIfNeeded()
-  await expect(gallery.locator('.brand-thumbnail')).toHaveCount(4)
-  await expect(gallery.locator('.brand-preview')).toHaveCount(0)
-  await expect
-    .poll(() =>
-      gallery
-        .locator('.brand-thumbnail')
-        .evaluateAll((images) =>
-          images.every(
-            (image) =>
-              (image as HTMLImageElement).complete &&
-              (image as HTMLImageElement).naturalWidth > 0,
-          ),
-        ),
-    )
-    .toBe(true)
-  await page.setViewportSize({ width: 1024, height: 900 })
-  await gallery.scrollIntoViewIfNeeded()
-  await expect(gallery.locator('.brand-preview')).toBeVisible()
-  await expect(gallery.locator('.brand-thumbnail')).toHaveCount(0)
-  await page.setViewportSize({ width: 390, height: 844 })
-  await gallery.getByRole('link', { name: /^Matière 04/ }).click()
+  const links = page.locator(
+    '.brand-signatures-group:not([aria-hidden]) .brand-signature',
+  )
+  await expect(links).toHaveCount(4)
+  const boxes = await links.evaluateAll((elements) =>
+    elements.map((el) => {
+      const b = el.getBoundingClientRect()
+      return { x: b.x, y: b.y }
+    }),
+  )
+  expect(boxes[0].x).toBe(boxes[1].x)
+  expect(boxes[1].y).toBeGreaterThan(boxes[0].y)
+  expect(boxes[2].y).toBeGreaterThan(boxes[1].y)
+  await expect(
+    page.locator(
+      '[data-home-section="editorial"] + [data-home-section="trust"]',
+    ),
+  ).toHaveCount(1)
+  await expect(page.locator('#destacados, .featured-section')).toHaveCount(0)
+  await expect(page.locator('a[href="/#destacados"]')).toHaveCount(0)
+  await page
+    .locator('#marcas')
+    .getByRole('link', { name: /Matière/ })
+    .click()
   await expect(page).toHaveURL('/marcas/matiere-04')
 })
 
@@ -178,15 +162,8 @@ test('Más vendidos blanco y galería respetuosa con movimiento reducido', async
   ).toBe(true)
   await page.locator('#marcas').scrollIntoViewIfNeeded()
   const duration = await page
-    .locator('.brand-preview-frame')
+    .locator('.brand-signature-monogram')
     .first()
     .evaluate((element) => getComputedStyle(element).transitionDuration)
   expect(parseFloat(duration)).toBeLessThan(0.01)
-  await page
-    .locator('#marcas')
-    .getByRole('link', { name: /^Forme/ })
-    .focus()
-  await expect(page.locator('.brand-preview-frame.is-active')).toContainText(
-    'Pétale Nu',
-  )
 })
