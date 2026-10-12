@@ -31,13 +31,14 @@
 @import './olfactory-profile.css';
 @import './home-refinements.css';
 @import './brand-signatures.css';
-@import './choosing-guide.css';
+@import './fragrance-finder.css';
+@import './fragrance-finder-results.css';
 @import './hero-compositions.css';
+@import './public-page-refinements.css';
 
 /* Preserve the editorial spelling of business and perfume brand names. */
 .brand-label,
-.bestsellers-section .section-heading .eyebrow,
-.footer-top h2.brand-label {
+.bestsellers-section .section-heading .eyebrow {
   text-transform: none;
   letter-spacing: 0.02em;
 }

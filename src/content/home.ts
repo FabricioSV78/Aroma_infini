@@ -2,7 +2,7 @@
 export const heroSlides = [
   {
     eyebrow: 'El arte de encontrar tu aroma',
-    title: ['Una fragancia.', 'Muchas formas', 'de ser tú.'],
+    title: ['Una fragancia', 'Muchas formas', 'de ser tú'],
     description: 'Conoce marcas, notas y presentaciones antes de elegir.',
     cta: 'Explorar perfumes',
     to: '/tienda',
@@ -13,7 +13,7 @@ export const heroSlides = [
   },
   {
     eyebrow: 'Una pausa para descubrir',
-    title: ['Lo sutil también', 'deja huella.'],
+    title: ['Lo sutil también', 'deja huella'],
     description: 'Notas verdes y maderas suaves para un momento de calma.',
     cta: 'Ver destacados',
     to: '/tienda?seleccion=destacados',
@@ -24,7 +24,7 @@ export const heroSlides = [
   },
   {
     eyebrow: 'La firma Forme',
-    title: ['Tu esencia.', 'A tu manera.'],
+    title: ['Tu esencia', 'A tu manera'],
     description: 'Flores suaves y composiciones para llevar cerca de la piel.',
     cta: 'Ver Forme',
     to: '/marcas/forme',
@@ -35,7 +35,7 @@ export const heroSlides = [
   },
   {
     eyebrow: 'Facetas cálidas',
-    title: ['Ámbar y madera,', 'sin prisa.'],
+    title: ['Ámbar y madera,', 'sin prisa'],
     description: 'Especias suaves y resinas en composiciones envolventes.',
     cta: 'Explorar la tienda',
     to: '/tienda',
@@ -46,7 +46,7 @@ export const heroSlides = [
   },
   {
     eyebrow: 'Notas luminosas',
-    title: ['La frescura', 'también tiene voz.'],
+    title: ['La frescura', 'también tiene voz'],
     description: 'Cítricos y acordes ligeros para los días de sol.',
     cta: 'Explorar la tienda',
     to: '/tienda',

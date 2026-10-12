@@ -27,7 +27,7 @@ export function FavoritesCollection() {
       ) : favorites.missingIds.length === 0 ? (
         <div className="commerce-empty" data-scroll-reveal="copy">
           <p className="eyebrow">Tu selección está vacía</p>
-          <h2>Encuentra un aroma para recordar.</h2>
+          <h2>Encuentra un aroma para recordar</h2>
           <p>
             Usa el corazón de cualquier perfume para guardarlo en esta página.
           </p>

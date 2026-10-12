@@ -10,12 +10,13 @@ import { heroSlides } from '../../content/home'
 import type { HomeHeroContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 import { useHeroRotation } from './useHeroRotation'
+import { headingText } from '../../utils/heading-text'
 
 export function Hero({ content }: { content: HomeHeroContent[] }) {
   const slides = heroSlides.map((slide, index) => ({
     ...slide,
     ...content[index],
-    title: content[index]?.title.split('\n') ?? slide.title,
+    title: (content[index]?.title.split('\n') ?? slide.title).map(headingText),
   }))
   const [active, setActive] = useState(0)
   const [preparedCount, setPreparedCount] = useState(1)

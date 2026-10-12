@@ -100,7 +100,7 @@ export function ProductReviewsPreview({
         <header className="product-reviews-heading">
           <div>
             <p className="eyebrow">Opiniones de clientes</p>
-            <h2 id="product-reviews-title">Reseñas.</h2>
+            <h2 id="product-reviews-title">Reseñas</h2>
           </div>
           <button
             ref={writeButton}

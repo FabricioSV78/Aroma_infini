@@ -23,7 +23,7 @@ export function CheckoutConfirmationPage() {
         data-scroll-reveal="fade"
       >
         <p className="eyebrow">Confirmación</p>
-        <h1>No hay una selección reciente.</h1>
+        <h1>No hay una selección reciente</h1>
         <p>Puedes volver a la tienda para explorar los perfumes.</p>
         <Link className="button button--primary" to="/tienda">
           Explorar perfumes <Icon name="arrow" />
@@ -47,7 +47,7 @@ export function CheckoutConfirmationPage() {
         data-scroll-reveal="copy"
       >
         <p className="eyebrow">Selección · {order.reference}</p>
-        <h1>Tu selección quedó guardada.</h1>
+        <h1>Tu selección quedó guardada</h1>
         <p>
           La información está disponible durante esta sesión. No se realizó
           ningún cobro.

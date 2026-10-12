@@ -1,7 +1,4 @@
-import type { Product, ProductAudience, ProductDetail } from './catalog'
-
-export type ChoosingGuideExample = Pick<Product, 'name' | 'slug' | 'family'> &
-  Pick<ProductDetail, 'intensity' | 'occasion'>
+import type { ProductAudience } from './catalog'
 
 export type HomeMediaKey = ProductAudience | 'featured'
 export type HomeMedia = Record<HomeMediaKey, string | null>

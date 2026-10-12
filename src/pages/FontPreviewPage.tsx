@@ -44,7 +44,7 @@ export function FontPreviewPage() {
         <span aria-current="page">Tipografía</span>
       </nav>
       <header className="font-preview__header">
-        <h1>Encuentra la voz de Aroma Infini.</h1>
+        <h1>Encuentra la voz de Aroma Infini</h1>
         <p>
           Compara seis fuentes con los mismos tamaños y espaciados. Tu elección
           se aplica a la tienda y al panel, solo en este navegador.
@@ -93,7 +93,7 @@ export function FontPreviewPage() {
       >
         <div>
           <span className="font-preview__eyebrow">Vista previa</span>
-          <h2 id="font-specimen-title">Un aroma que habla de ti.</h2>
+          <h2 id="font-specimen-title">Un aroma que habla de ti</h2>
           <p>
             Notas suaves, maderas cálidas y una frescura que acompaña. Descubre
             una selección de perfumes con carácter propio.

@@ -3,14 +3,8 @@ import { footerGroups } from '../../content/navigation'
 import { footerSocialProfiles } from '../../content/social'
 import { Icon } from '../ui/Icon'
 
-export function Footer({
-  hidePendingSocials = false,
-}: {
-  hidePendingSocials?: boolean
-}) {
-  const socialProfiles = hidePendingSocials
-    ? footerSocialProfiles.filter((profile) => profile.url)
-    : footerSocialProfiles
+export function Footer() {
+  const socialProfiles = footerSocialProfiles
   return (
     <footer className="site-footer">
       <div className="container">
@@ -71,13 +65,7 @@ export function Footer({
               key={group.title}
               className={`footer-group footer-group--${group.layout ?? 'standard'}`}
             >
-              <h2
-                className={
-                  group.title === 'Aroma Infini' ? 'brand-label' : undefined
-                }
-              >
-                {group.title}
-              </h2>
+              <h2>{group.title}</h2>
               <ul>
                 {group.links.map((link) => (
                   <li key={link.to}>

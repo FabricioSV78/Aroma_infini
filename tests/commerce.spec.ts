@@ -93,7 +93,7 @@ test('Favoritos se comparten entre vistas, persisten y pueden quitarse', async (
   ).toHaveText('1')
   await page.getByRole('link', { name: /Favoritos, 1 guardado/ }).click()
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Tus favoritos.' }),
+    page.getByRole('heading', { level: 1, name: 'Tus favoritos' }),
   ).toBeVisible()
   await expect(page.locator('.favorites-grid .product-card')).toHaveCount(1)
   await page.reload()
@@ -105,7 +105,7 @@ test('Favoritos se comparten entre vistas, persisten y pueden quitarse', async (
     })
     .click()
   await expect(
-    page.getByRole('heading', { name: 'Encuentra un aroma para recordar.' }),
+    page.getByRole('heading', { name: 'Encuentra un aroma para recordar' }),
   ).toBeVisible()
 })
 
@@ -134,7 +134,7 @@ test('Carrito añade variantes, actualiza cantidades, persiste y abre desde el h
   await drawer.getByRole('link', { name: /Revisar carrito/ }).click()
 
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Tu carrito.' }),
+    page.getByRole('heading', { level: 1, name: 'Tu carrito' }),
   ).toBeVisible()
   await expect(page.locator('.cart-summary')).toContainText('S/ 1,370')
   await expect(page.locator('.cart-summary')).toContainText('Según destino')

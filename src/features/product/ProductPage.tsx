@@ -278,7 +278,7 @@ function ProductReady({
         <header data-scroll-reveal="copy">
           <div>
             <p className="eyebrow">Seguir descubriendo</p>
-            <h2 id="recommendations-title">También te puede gustar.</h2>
+            <h2 id="recommendations-title">También te puede gustar</h2>
           </div>
           <Link className="text-link" to="/tienda">
             Ver tienda <Icon name="arrow" />
@@ -314,8 +314,8 @@ export function ProductPage() {
         </p>
         <h1>
           {data.kind === 'missing'
-            ? 'Este perfume no está en la selección.'
-            : 'Volvamos a intentarlo.'}
+            ? 'Este perfume no está en la selección'
+            : 'Volvamos a intentarlo'}
         </h1>
         {data.kind === 'error' ? (
           <button

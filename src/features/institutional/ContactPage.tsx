@@ -34,7 +34,7 @@ export function ContactPage() {
             <h2 id="contact-direct-title">
               {whatsappUrl
                 ? content.direct.title
-                : 'Hablemos.'}
+                : 'Hablemos'}
             </h2>
             <p>
               {whatsappUrl

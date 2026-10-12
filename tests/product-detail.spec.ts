@@ -291,7 +291,7 @@ test('Los detalles comienzan cerrados y los accesos internos abren su contenido'
   await expect(familyPanel).toBeHidden()
   await expect(descriptionPanel).toBeHidden()
   await expect(
-    reviewsPanel.getByRole('heading', { name: 'Reseñas.' }),
+    reviewsPanel.getByRole('heading', { name: 'Reseñas' }),
   ).toBeVisible()
 
   await reviewsButton.click()
@@ -317,7 +317,7 @@ test('Las reseñas se despliegan como tercer detalle antes de los productos suge
     .getByRole('button', { name: 'Reseñas' })
     .click()
   await expect(preview).toBeVisible()
-  await expect(preview.getByRole('heading', { name: 'Reseñas.' })).toBeVisible()
+  await expect(preview.getByRole('heading', { name: 'Reseñas' })).toBeVisible()
   await expect(preview.locator('.product-review-list > li')).toHaveCount(3)
   await expect(preview).toContainText('Un floral delicado')
   await expect(preview).toContainText('Camila R.')
@@ -506,7 +506,7 @@ test('La ficha inexistente ofrece regreso a la tienda', async ({ page }) => {
   await page.goto('/producto/inexistente')
   await expect(
     page.getByRole('heading', {
-      name: 'Este perfume no está en la selección.',
+      name: 'Este perfume no está en la selección',
     }),
   ).toBeVisible()
   await expect(

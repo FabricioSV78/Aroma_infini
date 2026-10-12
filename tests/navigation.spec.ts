@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { footerGroups, navigationGroups } from '../src/content/navigation'
+import { footerSocialProfiles } from '../src/content/social'
 
 test('El footer conserva soporte, seguimiento e información legal', async ({
   page,
@@ -17,6 +18,56 @@ test('El footer conserva soporte, seguimiento e información legal', async ({
     await expect(
       footer.getByRole('link', { name: link.label, exact: true }),
     ).toHaveAttribute('href', link.to)
+  }
+})
+
+test('El footer muestra las mismas redes y estilos en Home y las demás páginas', async ({
+  page,
+}) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    let expectedFooter: {
+      headings: string[]
+      text: string | null
+      background: string
+      headingSize: string
+      paddingTop: string
+    } | null = null
+
+    for (const path of [
+      '/',
+      '/tienda',
+      '/marcas',
+      '/producto/bois-clair',
+      '/contacto',
+    ]) {
+      await page.goto(path)
+      const footer = page.locator('.site-footer')
+      const social = footer.locator('.footer-social')
+      await expect(social.locator('.footer-social-placeholder')).toHaveCount(
+        footerSocialProfiles.filter((profile) => !profile.url).length,
+      )
+      await expect(social.locator('a')).toHaveCount(
+        footerSocialProfiles.filter((profile) => profile.url).length,
+      )
+
+      const snapshot = {
+        headings: await footer.locator('.footer-top h2').allInnerTexts(),
+        text: await footer.textContent(),
+        background: await footer.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+        headingSize: await footer
+          .locator('.footer-top h2')
+          .first()
+          .evaluate((element) => getComputedStyle(element).fontSize),
+        paddingTop: await footer.evaluate(
+          (element) => getComputedStyle(element).paddingTop,
+        ),
+      }
+      if (expectedFooter === null) expectedFooter = snapshot
+      else expect(snapshot).toEqual(expectedFooter)
+    }
   }
 })
 
@@ -84,7 +135,7 @@ test('El navbar da acceso a las páginas públicas y las anclas existentes', asy
     '/tienda',
     '/marcas',
     '/tienda?marca=atelier-01',
-    '/#destacados',
+    '/tienda?seleccion=destacados',
     '/nosotros',
     '/contacto',
     '/seguir-pedido',

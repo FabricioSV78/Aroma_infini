@@ -1,6 +1,6 @@
 // Textos y datos editables de Nosotros y Contacto.
 export const aboutPageContent = {
-  title: 'Aroma Infini, una forma de elegir perfume.',
+  title: 'Aroma Infini, una forma de elegir perfume',
   introduction:
     'Reunimos perfumes de distintas casas para que conozcas sus notas, perfiles y presentaciones con calma.',
   image: {
@@ -14,7 +14,7 @@ export const aboutPageContent = {
   },
   approach: {
     eyebrow: 'Nuestra propuesta',
-    title: 'Información para decidir.',
+    title: 'Información para decidir',
     description:
       'Cada ficha explica cómo se siente el perfume y muestra sus opciones de compra.',
   },
@@ -44,13 +44,13 @@ export const contactPageContent = {
     'Consulta información de pedidos, envíos o productos, o escríbenos por WhatsApp.',
   direct: {
     eyebrow: 'Atención directa',
-    title: 'Hablemos por WhatsApp.',
+    title: 'Hablemos por WhatsApp',
     description: 'Si preguntas por una compra, incluye tu código de pedido.',
     action: 'Escribir por WhatsApp',
   },
   guide: {
     eyebrow: 'Enlaces útiles',
-    title: 'Ve directo a la información.',
+    title: 'Ve directo a la información',
   },
   topics: [
     { title: 'Elegir un perfume', to: '/tienda' },

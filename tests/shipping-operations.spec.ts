@@ -113,7 +113,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   ).toBeVisible()
   await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada' }),
   ).toBeVisible()
   const reference = (await page
     .locator('.checkout-confirmation-tracking strong')
@@ -186,7 +186,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   )
   await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada' }),
   ).toBeVisible()
   const secondReference = (await page
     .locator('.checkout-confirmation-tracking strong')

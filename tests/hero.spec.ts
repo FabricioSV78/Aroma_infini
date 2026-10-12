@@ -23,7 +23,7 @@ test('La segunda campaña espera a la imagen prioritaria y se revela solo cuando
   })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   expect(secondaryRequests).toBe(0)
   await expect(page.locator('.hero-image img')).toHaveCount(1)
@@ -37,7 +37,7 @@ test('La segunda campaña espera a la imagen prioritaria y se revela solo cuando
   await page.getByRole('button', { name: 'Ver campaña 2' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   releaseSecond()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
@@ -77,7 +77,7 @@ test('Una pulsación rápida de ida y vuelta no activa una fotografía tardía',
       ),
   )
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await page.getByRole('button', { name: 'Ver campaña 2' }).focus()
   await page.keyboard.press('Enter')
@@ -125,7 +125,7 @@ for (const width of [390, 1440]) {
     await expect(hero.getByRole('link')).toHaveCount(1)
     await page.keyboard.press('ArrowLeft')
     await expect(page.getByRole('heading', { level: 1 })).toContainText(
-      'Una fragancia.',
+      'Una fragancia',
     )
     const image = page.locator('.hero-slide.is-active img')
     expect(

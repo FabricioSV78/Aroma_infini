@@ -29,7 +29,6 @@ function OrderStatus({ record }: { record: TrackingRecord }) {
           <p className="eyebrow">{record.reference}</p>
           <h2 id="tracking-result-title">
             Estado: {accountStatusLabels[record.status].toLowerCase()}
-            .
           </h2>
         </div>
         <span>{dateFormatter.format(new Date(record.placedAt))}</span>
@@ -79,7 +78,7 @@ export function OrderTrackingPage() {
         <span aria-current="page">Seguir pedido</span>
       </nav>
       <header className="tracking-heading" data-scroll-reveal="copy">
-        <h1>Tu pedido, a la vista.</h1>
+        <h1>Tu pedido, a la vista</h1>
         <p>Consulta el estado con el código que aparece en la confirmación.</p>
       </header>
       <form
@@ -113,8 +112,8 @@ export function OrderTrackingPage() {
       {record ? <OrderStatus record={record} /> : null}
       {code && !record ? (
         <p className="tracking-not-found" role="status">
-          No encontramos ese pedido en este navegador. Revisa el
-          código de la confirmación.
+          No encontramos ese pedido en este navegador. Revisa el código de la
+          confirmación.
         </p>
       ) : null}
     </article>

@@ -575,7 +575,7 @@ export function AdminProductFormPage() {
     return (
       <div className="admin-page admin-empty">
         <p className="eyebrow">Producto no encontrado</p>
-        <h1>No encontramos este producto.</h1>
+        <h1>No encontramos este producto</h1>
         <Link className="text-link" to="/admin/productos">
           Volver a productos <Icon name="arrow" />
         </Link>
@@ -1125,6 +1125,11 @@ export function AdminProductFormPage() {
                 Edita la familia, notas e intensidad tal como las verá el
                 cliente. La foto editorial es de demostración.
               </p>
+              <p id="finder-catalog-help">
+                El recomendador utiliza estos datos. Escribe primero la familia
+                principal (por ejemplo, Amaderado · fresco) y separa los momentos
+                de uso con · (Diario · oficina). Incluye solo información verificada.
+              </p>
             </div>
           </header>
           <div className="admin-olfactory-editor">
@@ -1139,6 +1144,7 @@ export function AdminProductFormPage() {
                 family: (
                   <input
                     aria-label="Familia olfativa"
+                    aria-describedby="finder-catalog-help"
                     value={form.product.family}
                     onChange={(event) =>
                       updateProduct('family', event.target.value)
@@ -1191,6 +1197,7 @@ export function AdminProductFormPage() {
                 occasion: (
                   <input
                     aria-label="Ocasión"
+                    aria-describedby="finder-catalog-help"
                     value={form.detail.occasion}
                     onChange={(event) =>
                       setForm((current) => ({

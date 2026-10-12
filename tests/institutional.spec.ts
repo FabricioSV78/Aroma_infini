@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test'
 
 const institutionalRoutes = [
-  ['/nosotros', 'Aroma Infini, una forma de elegir perfume.'],
+  ['/nosotros', 'Aroma Infini, una forma de elegir perfume'],
   ['/contacto', '¿En qué podemos ayudarte?'],
-  ['/envios', 'Tu pedido, de principio a fin.'],
-  ['/devoluciones', 'Cambios y devoluciones.'],
-  ['/privacidad', 'Privacidad.'],
-  ['/terminos', 'Términos y condiciones.'],
-  ['/libro-de-reclamaciones', 'Libro de reclamaciones.'],
+  ['/envios', 'Tu pedido, de principio a fin'],
+  ['/devoluciones', 'Cambios y devoluciones'],
+  ['/privacidad', 'Privacidad'],
+  ['/terminos', 'Términos y condiciones'],
+  ['/libro-de-reclamaciones', 'Libro de reclamaciones'],
 ] as const
 
 test('Las rutas institucionales tienen contenido propio y contacto funcional', async ({

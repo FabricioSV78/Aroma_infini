@@ -20,6 +20,7 @@ import { homeImagePresets, prepareImageFile } from './prepareImageFile'
 import { prepareVideoFile } from './prepareVideoFile'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
+import { headingText } from '../../utils/heading-text'
 
 type HomeTab = 'hero' | 'categories' | 'film' | 'featured'
 const resultSize = 5
@@ -511,7 +512,7 @@ export function AdminHomePage() {
           >
             <div className="admin-home-stage-heading">
               <span className="eyebrow">Tres formas de explorar</span>
-              <h2>Elige por dónde empezar.</h2>
+              <h2>Elige por dónde empezar</h2>
             </div>
             <div className="admin-home-category-preview">
               {categories.map((category) => {
@@ -591,7 +592,7 @@ export function AdminHomePage() {
                 <span className="eyebrow">
                   {content.film.eyebrow || 'Etiqueta'}
                 </span>
-                <h2>{content.film.title || 'Título del video'}</h2>
+                <h2>{headingText(content.film.title || 'Título del video')}</h2>
                 <p>{content.film.description || 'Texto del video'}</p>
                 <span className="admin-home-preview-link">
                   {content.film.cta || 'Botón'} ↗

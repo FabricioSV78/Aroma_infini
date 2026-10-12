@@ -1,6 +1,8 @@
 import type { Brand, Product } from '../types/catalog'
-import type { ChoosingGuideExample, HomeContent, HomeMedia } from '../types/home'
+import type { HomeContent, HomeMedia } from '../types/home'
 import type { ShippingSettings } from '../types/shipping'
+import type { FinderOptions } from '../types/fragrance-finder'
+import { getFinderOptions } from './fragrance-matching'
 import {
   localStorefrontRepository,
   type StorefrontProductRecord,
@@ -13,7 +15,7 @@ export interface HomeData {
   shipping: ShippingSettings
   media: HomeMedia
   content: HomeContent
-  choosingGuideExample: ChoosingGuideExample | null
+  finderOptions: FinderOptions
 }
 
 export interface HomeService {
@@ -36,15 +38,6 @@ export function getBestsellingProducts(): Product[] {
 export const homeService: HomeService = {
   async getHome() {
     const snapshot = await localStorefrontRepository.readSnapshot()
-    // The teaching example comes from the same published records as product pages.
-    // Omit it when the catalog has no complete profile; never supply invented values.
-    const example = snapshot.products.find(
-      ({ product, detail }) =>
-        product.family.trim() &&
-        detail.intensity &&
-        detail.occasion.trim() &&
-        !/^(por definir|pendiente|—)$/i.test(detail.occasion.trim()),
-    )
     return {
       brands: snapshot.brands,
       brandProfiles: Object.fromEntries(
@@ -69,15 +62,7 @@ export const homeService: HomeService = {
       shipping: snapshot.shipping,
       media: { ...snapshot.media },
       content: snapshot.content,
-      choosingGuideExample: example
-        ? {
-            name: example.product.name,
-            slug: example.product.slug,
-            family: example.product.family,
-            intensity: example.detail.intensity,
-            occasion: example.detail.occasion,
-          }
-        : null,
+      finderOptions: getFinderOptions(snapshot),
     }
   },
 }

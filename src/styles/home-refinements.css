@@ -10,7 +10,7 @@
 }
 .home .section-heading h2 {
   color: var(--color-ink);
-  font-size: clamp(34px, 3.5vw, 60px);
+  font-size: clamp(31px, 3.2vw, 54px);
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: -0.035em;
@@ -38,7 +38,7 @@
   margin-inline-end: 3px;
 }
 .home .editorial-film-copy h2 {
-  font-size: clamp(36px, 4vw, 64px);
+  font-size: clamp(33px, 3.7vw, 58px);
   font-weight: 700;
   line-height: 1.08;
 }
@@ -183,7 +183,7 @@
     font-size: 12px;
   }
   .home .section-heading h2 {
-    font-size: clamp(32px, 8.5vw, 40px);
+    font-size: clamp(29px, 7.8vw, 36px);
   }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
@@ -195,7 +195,7 @@
     max-width: 40%;
   }
   .home .editorial-film-copy h2 {
-    font-size: 30px;
+    font-size: 28px;
     margin-block: 12px;
   }
   .home .editorial-film-copy > p:not(.eyebrow) {
@@ -319,7 +319,7 @@
   margin-bottom: 36px;
 }
 .home .bestsellers-section .section-heading h2 {
-  font-size: clamp(32px, 3vw, 48px);
+  font-size: clamp(30px, 2.75vw, 44px);
 }
 .home .bestsellers-section .section-heading .eyebrow {
   margin-bottom: 8px;
@@ -401,20 +401,6 @@
   margin-top: auto;
   padding-top: 14px;
   min-height: 44px;
-}
-.store-layout--home .site-footer {
-  padding-top: 40px;
-}
-.store-layout--home .footer-top h2 {
-  font-size: 12px;
-  font-weight: 700;
-}
-.store-layout--home .site-footer .footer-top li a {
-  font-size: 14px;
-}
-.store-layout--home .footer-bottom {
-  margin-top: 28px;
-  font-size: 12px;
 }
 @media (min-width: 768px) {
   .home .trust-item {

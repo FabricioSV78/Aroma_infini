@@ -150,7 +150,7 @@ test('El checkout vacío o con variantes no disponibles pide corregir el carrito
 }) => {
   await page.goto('/checkout')
   await expect(
-    page.getByRole('heading', { name: 'Tu selección está vacía.' }),
+    page.getByRole('heading', { name: 'Tu selección está vacía' }),
   ).toBeVisible()
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -163,7 +163,7 @@ test('El checkout vacío o con variantes no disponibles pide corregir el carrito
   })
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'Revisa tu carrito.' }),
+    page.getByRole('heading', { name: 'Revisa tu carrito' }),
   ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'Revisar carrito' }),
@@ -178,7 +178,7 @@ test('El seguimiento descarta registros locales dañados', async ({ page }) => {
   await expect(page.getByText(/No encontramos ese pedido/)).toBeVisible()
   await page.goto('/cuenta/pedidos')
   await expect(
-    page.getByRole('heading', { name: 'Todo en un mismo lugar.' }),
+    page.getByRole('heading', { name: 'Todo en un mismo lugar' }),
   ).toBeVisible()
 })
 
@@ -220,16 +220,16 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
   await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(page).toHaveURL('/checkout/confirmacion')
   await expect(
-    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada' }),
   ).toBeVisible()
   await page.getByRole('link', { name: 'Ver en Mis pedidos' }).click()
   await expect(page).toHaveURL('/cuenta/pedidos')
   await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await expect(page.locator('.account-order-list > li')).toHaveCount(2)
   await page.getByRole('link', { name: 'Ver pedido' }).first().click()
-  await expect(page.getByRole('heading', { name: 'Recibido.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Recibido' })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Recibido.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Recibido' })).toBeVisible()
 })
 
 test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confirmación', async ({
@@ -251,7 +251,7 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await expect(page.getByRole('heading', { name: 'Tus datos.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tus datos' })).toBeVisible()
   await page.getByLabel('Nombre', { exact: true }).fill('María')
   await page.getByLabel('Apellido').fill('Prueba')
   await page.getByLabel('Correo electrónico').fill('maria@ejemplo.invalid')
@@ -269,7 +269,7 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await page.getByRole('button', { name: 'Revisar selección' }).click()
 
   await expect(
-    page.getByRole('heading', { name: 'Revisa tu pedido.' }),
+    page.getByRole('heading', { name: 'Revisa tu pedido' }),
   ).toBeVisible()
   const stored = await page.evaluate(() =>
     Object.values(localStorage).join(' '),
@@ -310,7 +310,7 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await page.getByRole('button', { name: 'Guardar selección' }).click()
   await expect(page).toHaveURL('/checkout/confirmacion')
   await expect(
-    page.getByRole('heading', { name: 'Tu selección quedó guardada.' }),
+    page.getByRole('heading', { name: 'Tu selección quedó guardada' }),
   ).toBeVisible()
   await expect(
     page.locator('.checkout-confirmation-tracking strong'),
@@ -329,11 +329,11 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   expect(saved).not.toContain('Avenida de ejemplo')
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'No hay una selección reciente.' }),
+    page.getByRole('heading', { name: 'No hay una selección reciente' }),
   ).toBeVisible()
   await page.goto(trackingHref!)
   await expect(
-    page.getByRole('heading', { name: 'Estado: recibido.' }),
+    page.getByRole('heading', { name: 'Estado: recibido' }),
   ).toBeVisible()
   await expect(page.getByText('María Prueba')).toHaveCount(0)
   await page.getByLabel('Código de pedido').fill('AI-0000000000000000')
@@ -406,7 +406,7 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, trackingHref)
   await expect(
-    page.getByRole('heading', { name: 'Estado: en preparación.' }),
+    page.getByRole('heading', { name: 'Estado: en preparación' }),
   ).toBeVisible()
   await expect(
     page.locator('.tracking-steps li[aria-current="step"]'),
@@ -486,11 +486,11 @@ test('La cuenta de ejemplo no autentica y el borrador se conserva al editar el c
   await expect(page).toHaveURL('/carrito')
   await page.getByRole('link', { name: 'Continuar al checkout' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Revisa tu pedido.' }),
+    page.getByRole('heading', { name: 'Revisa tu pedido' }),
   ).toBeVisible()
   await expect(page.locator('.checkout-review-detail')).toContainText('Cayma')
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Tus datos.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tus datos' })).toBeVisible()
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('')
 })
 

@@ -15,7 +15,7 @@ export function CartPage() {
     >
       <header className="commerce-heading" data-scroll-reveal="fade">
         <p className="eyebrow">Tu selección</p>
-        <h1 id="cart-page-title">Tu carrito.</h1>
+        <h1 id="cart-page-title">Tu carrito</h1>
         <p>Revisa las presentaciones y cantidades antes de continuar.</p>
       </header>
       {persistence === 'session' ? (
@@ -36,7 +36,7 @@ export function CartPage() {
       ) : (
         <div className="commerce-empty" data-scroll-reveal="copy">
           <p className="eyebrow">Aún no elegiste un perfume</p>
-          <h2>Tu próxima fragancia puede empezar aquí.</h2>
+          <h2>Tu próxima fragancia puede empezar aquí</h2>
           <p>
             Explora la selección y añade la presentación que quieras comparar.
           </p>

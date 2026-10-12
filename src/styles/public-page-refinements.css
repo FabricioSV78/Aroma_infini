@@ -1,0 +1,242 @@
+/* Finishing details for the public store pages. Product photography keeps its
+   shared #F4F4F1 surface; contrast comes from type, proportion and dividers. */
+.store-layout .catalog-page .catalog-heading h1,
+.store-layout .commerce-heading h1,
+.store-layout .checkout-heading h1,
+.store-layout .checkout-confirmation-heading h1,
+.store-layout .tracking-heading h1,
+.store-layout .account-heading h1,
+.store-layout .institutional-about-opening h1,
+.store-layout .institutional-contact-opening h1 {
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.store-layout .catalog-page .catalog-heading h1 {
+  font-size: clamp(2.25rem, 2.25vw + 1rem, 3.4rem);
+}
+
+.store-layout .catalog-toolbar {
+  padding-block: 11px;
+}
+
+.store-layout .catalog-toolbar > p {
+  color: var(--color-ink);
+  font-size: 14px;
+}
+
+.store-layout .catalog-sort select {
+  background: var(--color-canvas);
+}
+
+.store-layout .catalog-page .product-card--standard .product-meta :is(h2, h3) {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.store-layout
+  .catalog-page
+  .product-card--standard
+  .product-meta
+  :is(h2, h3)
+  a {
+  min-height: 38px;
+}
+
+/* A directory reads more like a collection when the names form the grid and
+   the bottle previews act as supporting imagery instead of separate cards. */
+.store-layout .brands-page .catalog-heading {
+  margin-bottom: 20px;
+}
+
+.store-layout .brands-directory {
+  gap: 0 clamp(18px, 2.6vw, 44px);
+  border-top: 1px solid var(--color-line);
+}
+
+.store-layout .brands-directory > a {
+  min-height: 154px;
+  padding: 20px clamp(6px, 1.4vw, 20px);
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.store-layout .brands-directory h2 {
+  color: var(--color-ink);
+  font-size: clamp(1.45rem, 1.15vw + 1rem, 2.2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.store-layout .brands-directory img {
+  background: transparent;
+  mix-blend-mode: darken;
+}
+
+.store-layout .brands-directory span {
+  gap: 12px;
+  color: var(--color-brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.store-layout .brands-directory span svg {
+  transition: transform 220ms ease;
+}
+
+.store-layout .brands-directory > a:is(:hover, :focus-visible) {
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.store-layout .brands-directory > a:is(:hover, :focus-visible) span svg {
+  transform: translateX(3px);
+}
+
+.store-layout .product-purchase h1 {
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.store-layout .product-selected-price strong {
+  color: var(--color-brand);
+  font-weight: 700;
+}
+
+.store-layout .product-recommendations h2 {
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.store-layout .commerce-heading {
+  padding-bottom: clamp(28px, 3vw, 42px);
+}
+
+.store-layout .commerce-heading h1 {
+  font-size: clamp(2.25rem, 2.2vw + 1rem, 3.5rem);
+}
+
+.store-layout .favorites-grid:not(:has(> :nth-child(3))) {
+  max-width: 840px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.store-layout .favorites-grid:has(> :only-child) {
+  max-width: 390px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.store-layout .checkout-heading {
+  padding-block: clamp(22px, 2.6vw, 36px) clamp(24px, 2.8vw, 38px);
+}
+
+.store-layout .checkout-heading h1 {
+  max-width: 24ch;
+  font-size: clamp(2.15rem, 2.2vw + 1rem, 3.45rem);
+}
+
+.store-layout .checkout-progress {
+  margin-bottom: clamp(20px, 2.5vw, 34px);
+}
+
+.store-layout .checkout-step-heading {
+  margin-bottom: clamp(22px, 2.4vw, 30px);
+}
+
+.store-layout .checkout-step-heading h2,
+.store-layout .checkout-summary-heading h2 {
+  font-weight: 600;
+}
+
+.store-layout .checkout-summary-lines strong {
+  font-size: 14px;
+}
+
+.store-layout .checkout-summary-lines small,
+.store-layout .checkout-summary-lines li > span {
+  font-size: 12px;
+}
+
+.store-layout .tracking-heading h1 {
+  font-size: clamp(2.2rem, 2.3vw + 1rem, 3.4rem);
+}
+
+.store-layout .tracking-result {
+  max-width: 960px;
+}
+
+.store-layout .tracking-result-top h2 {
+  font-weight: 600;
+}
+
+.store-layout .tracking-steps {
+  margin-top: 32px;
+}
+
+.store-layout .account-overview-grid > section {
+  min-height: 178px;
+  padding: 20px;
+}
+
+.store-layout .account-overview-grid h2 {
+  margin-top: 18px;
+  font-weight: 600;
+}
+
+.store-layout .account-overview-grid p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.store-layout .account-overview-grid .text-link {
+  margin-top: 14px;
+}
+
+.store-layout .institutional-about-hero {
+  gap: clamp(30px, 4vw, 64px);
+}
+
+.store-layout .institutional-about-opening h1 {
+  font-size: clamp(2.25rem, 2.3vw + 1rem, 3.55rem);
+}
+
+.store-layout .institutional-about-approach h2 {
+  font-size: clamp(1.65rem, 1.25vw + 1rem, 2.25rem);
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .store-layout .institutional-about-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .store-layout .brands-directory h2 {
+    font-size: clamp(1.35rem, 5vw, 1.9rem);
+  }
+
+  .store-layout .brands-directory > a {
+    min-height: 132px;
+  }
+
+  .store-layout .checkout-summary-lines strong {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-layout .brands-directory span svg {
+    transition: none;
+  }
+}

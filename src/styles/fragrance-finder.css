@@ -1,0 +1,712 @@
+.home .perfume-finder {
+  background: #faf9f6;
+}
+.finder-scene {
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(370px, 31vw, 495px);
+  overflow: hidden;
+  color: #fff;
+  background: #2b352e;
+}
+.finder-scene-image {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 48%;
+}
+.finder-scene::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(13 31 27 / 0.88),
+    rgb(13 31 27 / 0.62) 35%,
+    rgb(13 31 27 / 0.04) 82%
+  );
+}
+.finder-scene-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: inherit;
+  padding-block: 45px;
+}
+.finder-scene .eyebrow {
+  color: #f2e7cf;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+.home .finder-scene h2 {
+  max-width: 600px;
+  font-size: clamp(40px, 4.4vw, 68px);
+  line-height: 1.03;
+  letter-spacing: -0.055em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.finder-scene-copy {
+  max-width: 365px;
+  margin-top: 18px;
+  line-height: 1.5;
+  color: #fff;
+}
+.finder-scene-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  min-height: 46px;
+  padding: 8px 0;
+  margin-top: 21px;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.78);
+  font-size: 14px;
+  font-weight: 700;
+}
+.finder-scene-action svg,
+.finder-entry-option > svg {
+  width: 19px;
+  height: 19px;
+  transition: transform 180ms ease;
+}
+.finder-scene-action:hover svg,
+.finder-entry-option:hover > svg {
+  transform: translateX(3px);
+}
+.finder-scene-action:focus-visible {
+  outline-color: #fff;
+}
+.finder-entry {
+  display: grid;
+  grid-template-columns: minmax(205px, 0.85fr) minmax(0, 3.15fr);
+  align-items: stretch;
+  gap: 30px;
+  padding-block: 24px;
+}
+.finder-entry-question {
+  align-self: center;
+}
+.finder-entry-question > span {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--color-brand);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.finder-entry-question h3 {
+  font-size: clamp(19px, 1.7vw, 25px);
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+.finder-entry-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.finder-entry-option {
+  min-width: 0;
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border: 0;
+  border-left: 1px solid #d5d9d4;
+  background: transparent;
+  color: var(--color-ink);
+  text-align: left;
+  font-size: clamp(14px, 1.08vw, 17px);
+  font-weight: 700;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+.finder-entry-option:is(:hover, :focus-visible) {
+  background: #e8efed;
+  color: var(--color-brand);
+}
+.finder-entry-more {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-brand);
+  background: transparent;
+  color: var(--color-brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+.finder-entry-option img,
+.finder-entry-initial {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.finder-entry-initial {
+  display: grid;
+  place-items: center;
+  background: #e8efed;
+  color: var(--color-brand);
+  font-size: 24px;
+}
+.finder-entry-option > svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+.finder-entry-empty {
+  align-self: center;
+  color: var(--color-muted);
+}
+.finder-dialog {
+  width: min(1060px, calc(100% - 48px));
+  overscroll-behavior: contain;
+}
+.finder-dialog .dialog-inner {
+  padding: 0;
+}
+.finder-dialog .dialog-heading {
+  padding: 16px 32px;
+  margin: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: white;
+}
+.finder-dialog .dialog-heading h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.finder-workspace {
+  padding: 28px 40px 32px;
+}
+.finder-progress {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 32px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.finder-progress ol {
+  list-style: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  padding: 0;
+  margin: 0;
+}
+.finder-progress li[aria-current],
+.finder-progress .is-complete {
+  color: var(--color-brand);
+}
+.finder-progress li[aria-current] {
+  font-weight: 700;
+}
+.finder-progress progress {
+  grid-column: 1 / -1;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border: 0;
+  color: var(--color-brand);
+  background: #e8efed;
+}
+.finder-progress progress::-webkit-progress-bar {
+  background: #e8efed;
+}
+.finder-progress progress::-webkit-progress-value {
+  background: var(--color-brand);
+}
+.finder-progress progress::-moz-progress-bar {
+  background: var(--color-brand);
+}
+.finder-question {
+  padding-top: 28px;
+  animation: finder-enter 220ms ease-out;
+}
+.finder-dialog h3 {
+  font-size: clamp(25px, 3vw, 36px);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.finder-dialog h3:focus {
+  outline: none;
+}
+.finder-dialog .finder-explanation {
+  color: var(--color-muted);
+  font-size: 14px;
+  margin-top: 12px;
+  max-width: 740px;
+}
+.finder-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0;
+  margin: 26px 0 0;
+  border: 0;
+  min-width: 0;
+}
+.finder-options--family {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.finder-option {
+  position: relative;
+  cursor: pointer;
+  border: 1px solid #dededa;
+  transition:
+    border-color 180ms,
+    background 180ms;
+  min-width: 0;
+}
+.finder-option:hover {
+  border-color: var(--color-brand);
+}
+.finder-option:has(input:checked) {
+  border-color: var(--color-brand);
+  background: #e8efed;
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+.finder-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+}
+.finder-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.finder-option > img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+.finder-option-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 19px;
+  min-height: 82px;
+}
+.finder-option-content > svg {
+  color: var(--color-brand);
+  flex-shrink: 0;
+}
+.finder-option-content strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+.finder-option-content small {
+  display: block;
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+.finder-option-check {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #aab8b2;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+.finder-option-check svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+.finder-option:has(input:checked) .finder-option-check {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: white;
+}
+.finder-option:has(input:checked) .finder-option-check svg {
+  opacity: 1;
+}
+.finder-option--photo .finder-option-content {
+  padding: 14px 12px;
+  min-height: 86px;
+  gap: 8px;
+}
+.finder-option--any {
+  grid-column: 1 / -1;
+}
+.finder-option--any .finder-option-content {
+  min-height: 54px;
+  padding-block: 12px;
+}
+.finder-option--any strong {
+  font-size: 14px;
+}
+.finder-navigation {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 22px;
+  margin-top: 26px;
+}
+.finder-reset {
+  margin-left: auto;
+}
+.finder-text-button {
+  background: none;
+  border: 0;
+  min-height: 44px;
+  padding: 8px 4px;
+  color: var(--color-brand);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.finder-text-button:disabled {
+  text-decoration: none;
+}
+.finder-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 330px;
+  text-align: center;
+  gap: 20px;
+}
+.finder-status > svg {
+  width: 42px;
+  height: 42px;
+  color: var(--color-brand);
+}
+.finder-result-view > .eyebrow {
+  color: var(--color-brand);
+  margin-bottom: 12px;
+}
+.finder-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+  margin-top: 28px;
+}
+.finder-result {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+}
+.finder-result > img {
+  background: #f4f4f1;
+  width: 100%;
+  height: 230px;
+  object-fit: contain;
+}
+.finder-result-body {
+  display: flex;
+  flex-direction: column;
+  padding-top: 16px;
+}
+.finder-brand {
+  color: var(--color-brand);
+  font-size: 12px;
+}
+.finder-result h4 {
+  margin: 5px 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.finder-profile {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.finder-dialog .finder-price {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-top: 12px;
+}
+.finder-price strong {
+  color: var(--color-brand);
+  font-size: 18px;
+}
+.finder-price span {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.finder-reasons {
+  list-style: none;
+  padding: 16px 0;
+  margin: 0;
+  font-size: 13px;
+  display: grid;
+  gap: 7px;
+}
+.finder-reasons li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.finder-reasons svg {
+  color: var(--color-brand);
+  flex: 0 0 15px;
+  width: 15px;
+  height: 19px;
+}
+.finder-product-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 48px;
+  border-top: 1px solid var(--color-line);
+  margin-top: auto;
+  color: var(--color-brand);
+  font-weight: 600;
+  font-size: 14px;
+}
+.finder-shop-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 20px;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+.finder-product-link svg {
+  transition: transform 180ms ease;
+}
+.finder-product-link:hover svg {
+  transform: translateX(3px);
+}
+.finder-result-actions {
+  border-top: 1px solid var(--color-line);
+  padding-top: 20px;
+  margin-top: 20px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+@keyframes finder-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (min-width: 768px) {
+  .finder-results:has(> :only-child) .finder-result {
+    grid-template-columns: 0.8fr 1fr;
+    grid-template-rows: auto;
+    gap: 32px;
+    max-width: 780px;
+  }
+  .finder-results:has(> :only-child) .finder-result > img {
+    height: 340px;
+  }
+}
+@media (max-width: 900px) {
+  .finder-entry {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-block: 21px;
+  }
+  .finder-entry-options {
+    border-top: 1px solid #d5d9d4;
+  }
+  .finder-entry-option:first-child {
+    border-left: 0;
+  }
+  .finder-entry-option {
+    padding-inline: 8px;
+    gap: 8px;
+  }
+  .finder-entry-option img,
+  .finder-entry-initial {
+    flex-basis: 40px;
+    width: 40px;
+    height: 40px;
+  }
+  .finder-options--family {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finder-option > img {
+    height: 140px;
+  }
+  .finder-option--photo .finder-option-content {
+    min-height: 65px;
+  }
+  .finder-workspace {
+    padding: 24px;
+  }
+  .finder-results {
+    gap: 20px;
+  }
+}
+@media (max-width: 600px) {
+  .finder-scene {
+    min-height: 370px;
+  }
+  .finder-scene-image {
+    object-position: 52% center;
+  }
+  .finder-scene::after {
+    background: linear-gradient(
+      90deg,
+      rgb(13 31 27 / 0.87),
+      rgb(13 31 27 / 0.4)
+    );
+  }
+  .finder-scene-content {
+    justify-content: flex-end;
+    padding-block: 35px;
+  }
+  .home .finder-scene h2 {
+    font-size: clamp(38px, 10vw, 49px);
+  }
+  .finder-scene-copy {
+    font-size: 14px;
+  }
+  .finder-entry {
+    gap: 14px;
+    padding-block: 22px 26px;
+  }
+  .finder-entry-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finder-entry-option {
+    min-height: 72px;
+    border-bottom: 1px solid #d5d9d4;
+    padding-inline: 8px;
+  }
+  .finder-entry-option:nth-child(odd) {
+    border-left: 0;
+  }
+  .finder-entry-option > svg {
+    width: 16px;
+    height: 16px;
+  }
+  .finder-entry-option img,
+  .finder-entry-initial {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+  }
+  .finder-dialog {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+  .finder-dialog .dialog-heading {
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .finder-dialog .dialog-heading h2 {
+    font-size: 16px;
+  }
+  .finder-workspace {
+    padding: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  .finder-progress {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .finder-progress ol {
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .finder-question {
+    padding-top: 24px;
+  }
+  .finder-options {
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .finder-option > img {
+    height: 125px;
+  }
+  .finder-option-content {
+    padding: 14px;
+    gap: 8px;
+    min-height: 78px;
+  }
+  .finder-option-content > svg {
+    display: none;
+  }
+  .finder-option-content strong {
+    font-size: 15px;
+  }
+  .finder-option-content small {
+    display: none;
+  }
+  .finder-option--photo .finder-option-content {
+    min-height: 56px;
+  }
+  .finder-navigation {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: 20px;
+  }
+  .finder-navigation .button {
+    flex-basis: 100%;
+  }
+  .finder-results {
+    grid-template-columns: 1fr;
+  }
+  .finder-result > img {
+    height: 230px;
+  }
+  .finder-result-actions {
+    gap: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finder-question {
+    animation: none;
+  }
+  .finder-option,
+  .finder-product-link svg,
+  .finder-scene-action svg,
+  .finder-entry-option,
+  .finder-entry-option > svg {
+    transition: none;
+  }
+  .finder-product-link:hover svg,
+  .finder-scene-action:hover svg,
+  .finder-entry-option:hover > svg {
+    transform: none;
+  }
+}

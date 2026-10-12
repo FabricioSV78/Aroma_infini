@@ -27,7 +27,7 @@ export const navigationGroups: NavigationGroup[] = [
   {
     id: 'perfumes',
     label: 'Perfumes',
-    title: 'Encuentra tu aroma.',
+    title: 'Encuentra tu aroma',
     columns: [
       { title: 'Explorar', links: [navigation[0], ...navigation.slice(3)] },
       {
@@ -42,7 +42,7 @@ export const navigationGroups: NavigationGroup[] = [
   {
     id: 'marcas',
     label: 'Marcas',
-    title: 'Casas con carácter.',
+    title: 'Casas con carácter',
     columns: [
       {
         title: 'Nuestra selección',
@@ -65,7 +65,7 @@ export const navigationGroups: NavigationGroup[] = [
   {
     id: 'aroma-infini',
     label: 'Aroma Infini',
-    title: 'Conoce nuestro universo.',
+    title: 'Conoce nuestro universo',
     columns: [
       {
         title: 'Nuestra esencia',
@@ -85,7 +85,7 @@ export const navigationGroups: NavigationGroup[] = [
 export const footerGroups = [
   { title: 'Explorar', links: navigation.slice(0, 3) },
   {
-    title: 'Aroma Infini',
+    title: 'AROMA INFINI',
     links: [
       { label: 'Nosotros', to: '/nosotros' },
       { label: 'Contacto', to: '/contacto' },

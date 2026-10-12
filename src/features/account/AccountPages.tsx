@@ -46,7 +46,7 @@ export function AccountOverviewPage() {
     <section className="account-section" aria-labelledby="account-title">
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Resumen</p>
-        <h1 id="account-title">Hola, {profile.firstName}.</h1>
+        <h1 id="account-title">Hola, {profile.firstName}</h1>
         <p>Todo lo necesario para continuar descubriendo.</p>
       </header>
       <div className="account-overview-grid" data-scroll-reveal="stagger">
@@ -95,7 +95,7 @@ export function AccountFavoritesPage() {
     >
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Tu selección personal</p>
-        <h1 id="account-favorites-title">Favoritos.</h1>
+        <h1 id="account-favorites-title">Favoritos</h1>
         <p>Aromas guardados en este navegador.</p>
       </header>
       <FavoritesCollection />
@@ -128,7 +128,7 @@ export function AccountDataPage() {
     <section className="account-section" aria-labelledby="account-data-title">
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Perfil</p>
-        <h1 id="account-data-title">Mis datos.</h1>
+        <h1 id="account-data-title">Mis datos</h1>
         <p>Revisa y actualiza tu información de contacto.</p>
       </header>
       <form
@@ -249,12 +249,12 @@ export function AccountAddressesPage() {
     >
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Entrega</p>
-        <h1 id="account-address-title">Direcciones.</h1>
+        <h1 id="account-address-title">Direcciones</h1>
         <p>Revisa y actualiza tus datos de entrega.</p>
       </header>
       {!address ? (
         <div className="account-empty" data-scroll-reveal="copy">
-          <h2>No hay una dirección guardada.</h2>
+          <h2>No hay una dirección guardada</h2>
           <p>Puedes volver a añadir una dirección cuando la necesites.</p>
           <button
             className="button button--secondary"
@@ -389,7 +389,7 @@ export function AccountOrdersPage() {
     <section className="account-section" aria-labelledby="account-orders-title">
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Historial</p>
-        <h1 id="account-orders-title">Mis pedidos.</h1>
+        <h1 id="account-orders-title">Mis pedidos</h1>
         <p>Consulta el detalle y el estado de cada pedido.</p>
       </header>
       {visibleOrders.length ? (
@@ -421,7 +421,7 @@ export function AccountOrdersPage() {
         </ul>
       ) : (
         <div className="account-empty" data-scroll-reveal="copy">
-          <h2>Aún no hay pedidos.</h2>
+          <h2>Aún no hay pedidos</h2>
           <p>Cuando completes el checkout con esta cuenta aparecerán aquí.</p>
           <Link className="text-link" to="/tienda">
             Explorar perfumes <Icon name="arrow" />
@@ -443,7 +443,7 @@ export function AccountOrderDetailPage() {
         aria-labelledby="missing-order-title"
       >
         <p className="eyebrow">Pedido no encontrado</p>
-        <h1 id="missing-order-title">No encontramos ese pedido.</h1>
+        <h1 id="missing-order-title">No encontramos ese pedido</h1>
         <Link className="text-link" to="/cuenta/pedidos">
           Volver a mis pedidos <Icon name="arrow" />
         </Link>
@@ -464,7 +464,7 @@ export function AccountOrderDetailPage() {
         <div>
           <p className="eyebrow">{order.reference}</p>
           <h1 id="account-order-detail-title">
-            {accountStatusLabels[order.status]}.
+            {accountStatusLabels[order.status]}
           </h1>
         </div>
         <p>{dateFormatter.format(new Date(order.placedAt))}</p>
@@ -567,7 +567,7 @@ export function AccountPaymentsPage() {
     >
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Información de pagos</p>
-        <h1 id="account-payments-title">Pagos.</h1>
+        <h1 id="account-payments-title">Pagos</h1>
         <p>Consulta el historial de importes asociados a tus pedidos.</p>
       </header>
       <div className="account-payment-provider" data-scroll-reveal="copy">

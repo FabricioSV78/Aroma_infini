@@ -27,12 +27,12 @@ function AccountAccessPage() {
       </nav>
       <div className="account-access-layout" data-scroll-reveal="stagger">
         <header>
-          <h1>Tu universo, siempre cerca.</h1>
+          <h1>Tu universo, siempre cerca</h1>
           <p>Reúne tus pedidos, direcciones y favoritos en un solo lugar.</p>
         </header>
         <section aria-labelledby="demo-access-title">
           <p className="eyebrow">Acceso a tu espacio</p>
-          <h2 id="demo-access-title">Todo en un mismo lugar.</h2>
+          <h2 id="demo-access-title">Todo en un mismo lugar</h2>
           <p>Consulta tu selección, tus pedidos y tus datos de entrega.</p>
           <button
             className="button button--primary"

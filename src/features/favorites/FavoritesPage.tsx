@@ -13,7 +13,7 @@ export function FavoritesPage() {
     >
       <header className="commerce-heading" data-scroll-reveal="fade">
         <p className="eyebrow">Tu selección personal</p>
-        <h1 id="favorites-page-title">Tus favoritos.</h1>
+        <h1 id="favorites-page-title">Tus favoritos</h1>
         <p>Guarda los aromas que quieras volver a encontrar.</p>
       </header>
       <FavoritesCollection />

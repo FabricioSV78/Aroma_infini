@@ -152,8 +152,8 @@ export function CheckoutPage() {
         <p className="eyebrow">Tu selección</p>
         <h1>
           {cart.lines.length
-            ? 'Revisa tu carrito.'
-            : 'Tu selección está vacía.'}
+            ? 'Revisa tu carrito'
+            : 'Tu selección está vacía'}
         </h1>
         <p>
           {cart.lines.length
@@ -184,7 +184,7 @@ export function CheckoutPage() {
         <span aria-current="page">Checkout</span>
       </nav>
       <header className="checkout-heading" data-scroll-reveal="copy">
-        <h1>Finaliza tu selección.</h1>
+        <h1>Finaliza tu selección</h1>
         <p>Revisa tus datos y la entrega antes de continuar.</p>
       </header>
 
@@ -224,7 +224,7 @@ export function CheckoutPage() {
               <div className="checkout-step-heading">
                 <p className="eyebrow">03 / 03</p>
                 <h2 id="checkout-step-title" tabIndex={-1}>
-                  Revisa tu pedido.
+                  Revisa tu pedido
                 </h2>
               </div>
 

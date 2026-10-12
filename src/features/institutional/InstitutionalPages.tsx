@@ -36,7 +36,7 @@ export function ShippingPage() {
     <article className="store-page institutional-page institutional-shipping container">
       <InstitutionalBreadcrumb current="Envíos y entregas" />
       <InstitutionalIntro
-        title="Tu pedido, de principio a fin."
+        title="Tu pedido, de principio a fin"
         description="Enviamos a todo el Perú."
       />
       <div className="shipping-editorial-layout">
@@ -118,10 +118,10 @@ export function ShippingPage() {
 
 export function ReturnsPage() {
   return (
-    <article className="store-page institutional-page container">
+    <article className="store-page institutional-page institutional-returns container">
       <InstitutionalBreadcrumb current="Cambios y devoluciones" />
       <InstitutionalIntro
-        title="Cambios y devoluciones."
+        title="Cambios y devoluciones"
         description="Si necesitas ayuda con un producto o un pedido, cuéntanos qué ocurrió para revisar tu caso."
       />
       <div
@@ -187,7 +187,7 @@ export function PrivacyPage() {
   return (
     <InformationPage
       current="Privacidad"
-      title="Privacidad."
+      title="Privacidad"
       description="Conoce qué información compartes al usar la tienda."
       sections={[
         {
@@ -207,7 +207,7 @@ export function TermsPage() {
   return (
     <InformationPage
       current="Términos y condiciones"
-      title="Términos y condiciones."
+      title="Términos y condiciones"
       description="Revisa la información disponible antes de confirmar tu pedido."
       sections={[
         {
@@ -227,7 +227,7 @@ export function ComplaintsBookPage() {
   return (
     <InformationPage
       current="Libro de reclamaciones"
-      title="Libro de reclamaciones."
+      title="Libro de reclamaciones"
       description="Comunícanos una incidencia o consulta relacionada con tu experiencia de compra."
       sections={[
         {

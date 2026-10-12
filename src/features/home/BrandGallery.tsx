@@ -1,8 +1,9 @@
 import { Link } from 'react-router'
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { Icon } from '../../components/ui/Icon'
 import type { HomeData } from '../../services/home-service'
 import { BrandMonogram } from './BrandMonogram'
+import { useBrandRail } from './useBrandRail'
 
 export function BrandGallery({
   brands,
@@ -10,6 +11,7 @@ export function BrandGallery({
 }: Pick<HomeData, 'brands' | 'brandProfiles'>) {
   const [paused, setPaused] = useState(false)
   const looping = brands.length > 1
+  const viewportRef = useBrandRail(looping, paused, brands.length)
   // Enough repeated groups to fill a wide viewport even with only two brands.
   const groupCount = looping ? Math.ceil(4 / brands.length) + 1 : 1
 
@@ -24,7 +26,7 @@ export function BrandGallery({
     >
       <div className="container brand-signatures-inner">
         <header className="brand-signatures-heading" data-reveal="copy">
-          <h2 id="brands-title">Firmas con carácter.</h2>
+          <h2 id="brands-title">Firmas con carácter</h2>
           <div className="brand-signatures-controls">
             <Link to="/marcas" className="text-link">
               Todas las marcas <Icon name="arrow" />
@@ -33,6 +35,7 @@ export function BrandGallery({
               <button
                 type="button"
                 className="brand-signatures-toggle"
+                aria-controls="brand-rail"
                 aria-pressed={paused}
                 onClick={() => setPaused((current) => !current)}
               >
@@ -43,32 +46,14 @@ export function BrandGallery({
         </header>
         <div
           className="brand-signatures-viewport"
+          id="brand-rail"
+          ref={viewportRef}
           data-reveal="copy"
-          onFocusCapture={(event) => {
-            if (
-              event.target instanceof HTMLElement &&
-              event.target.matches(':focus-visible')
-            )
-              event.target.scrollIntoView({
-                block: 'nearest',
-                inline: 'center',
-                behavior: 'instant',
-              })
-          }}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget))
-              event.currentTarget.scrollLeft = 0
-          }}
+          role="group"
+          aria-label="Marcas de perfumes"
+          aria-description="Arrastra o desliza para explorar. Con el teclado, usa Tab para recorrer las marcas y Enter para abrirlas."
         >
-          <div
-            className="brand-signatures-track"
-            style={
-              {
-                '--brand-group-count': groupCount,
-                '--brand-count': brands.length,
-              } as CSSProperties
-            }
-          >
+          <div className="brand-signatures-track">
             {Array.from({ length: groupCount }, (_, copy) => (
               <div
                 key={copy}

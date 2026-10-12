@@ -19,13 +19,13 @@ test('La cuenta diferencia el acceso futuro de la demostración sin pedir creden
   await page.goto('/cuenta')
 
   await expect(
-    page.getByRole('heading', { name: 'Tu universo, siempre cerca.' }),
+    page.getByRole('heading', { name: 'Tu universo, siempre cerca' }),
   ).toBeVisible()
   await expect(page.locator('input')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Hola, Camila.' }),
+    page.getByRole('heading', { name: 'Hola, Camila' }),
   ).toBeVisible()
   await expect(page.getByRole('link', { name: 'Resumen' })).toHaveAttribute(
     'aria-current',
@@ -34,7 +34,7 @@ test('La cuenta diferencia el acceso futuro de la demostración sin pedir creden
 
   await page.getByRole('button', { name: 'Salir de mi cuenta' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Tu universo, siempre cerca.' }),
+    page.getByRole('heading', { name: 'Tu universo, siempre cerca' }),
   ).toBeVisible()
 })
 
@@ -43,7 +43,7 @@ test('Favoritos conserva el formato de cuenta activa y la vista independiente qu
 }) => {
   await page.goto('/favoritos')
   await expect(
-    page.getByRole('heading', { name: 'Tus favoritos.' }),
+    page.getByRole('heading', { name: 'Tus favoritos' }),
   ).toBeVisible()
   await expect(page.locator('.account-page')).toHaveCount(0)
 
@@ -54,7 +54,7 @@ test('Favoritos conserva el formato de cuenta activa y la vista independiente qu
     .click()
   await expect(page).toHaveURL('/cuenta/favoritos')
   await expect(page.locator('.account-page')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Favoritos.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Favoritos' })).toBeVisible()
   await expect(
     page.locator('.account-sidebar').getByRole('link', { name: 'Favoritos' }),
   ).toHaveAttribute('aria-current', 'page')
@@ -77,7 +77,7 @@ test('Favoritos conserva el formato de cuenta activa y la vista independiente qu
   await page.getByRole('link', { name: 'Favoritos, 1 guardado' }).click()
   await expect(page).toHaveURL('/favoritos')
   await expect(
-    page.getByRole('heading', { name: 'Tus favoritos.' }),
+    page.getByRole('heading', { name: 'Tus favoritos' }),
   ).toBeVisible()
 })
 
@@ -96,17 +96,17 @@ test('Los datos y la dirección se conservan al recargar durante la sesión de l
   )
   await page.getByRole('link', { name: 'Resumen' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Hola, Ariana.' }),
+    page.getByRole('heading', { name: 'Hola, Ariana' }),
   ).toBeVisible()
 
   await page.getByRole('link', { name: 'Direcciones' }).click()
   await page.getByRole('button', { name: 'Eliminar dirección' }).click()
   await expect(
-    page.getByRole('heading', { name: 'No hay una dirección guardada.' }),
+    page.getByRole('heading', { name: 'No hay una dirección guardada' }),
   ).toBeVisible()
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: 'No hay una dirección guardada.' }),
+    page.getByRole('heading', { name: 'No hay una dirección guardada' }),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Añadir dirección' }).click()
   await expect(page.getByLabel('Distrito')).toHaveValue('150122')
@@ -120,7 +120,9 @@ test('Los datos y la dirección se conservan al recargar durante la sesión de l
     page.getByRole('textbox', { name: 'Dirección', exact: true }),
   ).toHaveValue('Dirección registrada')
   await page.getByRole('link', { name: 'Resumen' }).click()
-  await expect(page.getByRole('heading', { name: 'Hola, Ariana.' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Hola, Ariana' }),
+  ).toBeVisible()
 })
 
 test('El historial conecta pedido, estado, entrega y pago simulado', async ({
@@ -131,7 +133,7 @@ test('El historial conecta pedido, estado, entrega y pago simulado', async ({
   await expect(page.getByText(demoOrderReference)).toBeVisible()
   await page.getByRole('link', { name: 'Ver pedido' }).click()
   await expect(page).toHaveURL(`/cuenta/pedidos/${demoOrderReference}`)
-  await expect(page.getByRole('heading', { name: 'En camino.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'En camino' })).toBeVisible()
   await expect(
     page.locator('.account-order-timeline li[aria-current="step"]'),
   ).toContainText('En camino')
@@ -146,7 +148,9 @@ test('El historial conecta pedido, estado, entrega y pago simulado', async ({
   await expect(page.getByRole('heading', { name: 'Entrega' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Pagos' }).click()
-  await expect(page.getByRole('heading', { name: 'Pagos.' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Pagos', level: 1 }),
+  ).toBeVisible()
   await expect(page.getByText('Mercado Pago', { exact: true })).toBeVisible()
   await expect(page.locator('input')).toHaveCount(0)
   await expect(page.getByText(/Los datos de tarjeta/)).toBeVisible()
@@ -158,14 +162,14 @@ test('La cuenta contempla historial vacío y pedido inexistente', async ({
 }) => {
   await activateDemoAccount(page, '/cuenta/pedidos?demo=empty')
   await expect(
-    page.getByRole('heading', { name: 'Aún no hay pedidos.' }),
+    page.getByRole('heading', { name: 'Aún no hay pedidos' }),
   ).toBeVisible()
 
   await page.getByRole('link', { name: 'Resumen' }).click()
   await page.goto('/cuenta/pedidos/AI-DEMO-NO-EXISTE')
   await expect(
     page.getByRole('heading', {
-      name: 'No encontramos ese pedido.',
+      name: 'No encontramos ese pedido',
     }),
   ).toBeVisible()
 })
@@ -182,7 +186,7 @@ test('La navegación móvil de cuenta se abre bajo demanda y se repliega al eleg
   await expect(menu).toHaveAttribute('aria-expanded', 'false')
   await expect(navigation).toBeHidden()
   await expect(
-    page.getByRole('heading', { name: 'Hola, Camila.' }),
+    page.getByRole('heading', { name: 'Hola, Camila' }),
   ).toBeInViewport()
 
   await menu.click()
@@ -193,16 +197,14 @@ test('La navegación móvil de cuenta se abre bajo demanda y se repliega al eleg
   await expect(page).toHaveURL('/cuenta/pedidos')
   await expect(navigation).toBeHidden()
   await expect(menu).toContainText('Mis pedidos')
-  await expect(
-    page.getByRole('heading', { name: 'Mis pedidos.' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Mis pedidos' })).toBeVisible()
 
   await menu.click()
   await navigation.getByRole('link', { name: 'Favoritos' }).click()
   await expect(page).toHaveURL('/cuenta/favoritos')
   await expect(navigation).toBeHidden()
   await expect(menu).toContainText('Favoritos')
-  await expect(page.getByRole('heading', { name: 'Favoritos.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Favoritos' })).toBeVisible()
 })
 
 for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
@@ -218,7 +220,7 @@ for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
 
     await activateDemoAccount(page, '/cuenta/pedidos')
     await expect(
-      page.getByRole('heading', { name: 'Mis pedidos.' }),
+      page.getByRole('heading', { name: 'Mis pedidos' }),
     ).toBeVisible()
     const hasOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,

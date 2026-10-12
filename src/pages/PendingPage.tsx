@@ -30,7 +30,7 @@ export function PendingPage() {
       className="store-page pending-page container"
       data-scroll-reveal="fade"
     >
-      <p className="eyebrow">Página no encontrada</p>
+      <p className="eyebrow">Error 404</p>
       <h1>{title}</h1>
       {query && (
         <p className="search-query">
@@ -41,10 +41,15 @@ export function PendingPage() {
         El enlace no corresponde a una página disponible. Puedes volver al
         inicio o explorar los perfumes.
       </p>
-      <Link className="button button--primary" to="/">
-        Volver al inicio
-        <Icon name="arrow" />
-      </Link>
+      <div className="pending-actions">
+        <Link className="button button--primary" to="/">
+          Volver al inicio
+          <Icon name="arrow" />
+        </Link>
+        <Link className="text-link" to="/tienda">
+          Explorar perfumes <Icon name="arrow" />
+        </Link>
+      </div>
     </div>
   )
 }

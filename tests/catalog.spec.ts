@@ -354,7 +354,7 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   await expect(page.locator('.product-card')).toHaveCount(1)
   await page.goto('/buscar?q=inexistente')
   await expect(
-    page.getByRole('heading', { name: 'No encontramos coincidencias.' }),
+    page.getByRole('heading', { name: 'No encontramos coincidencias' }),
   ).toBeVisible()
   await page.goto('/buscar')
   await expect(
@@ -363,7 +363,7 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   await page.goto('/marcas/inexistente')
   await expect(page.locator('.product-card')).toHaveCount(0)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Esta marca no está en la selección.',
+    'Esta marca no está en la selección',
   )
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
     'content',

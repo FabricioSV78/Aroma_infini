@@ -60,8 +60,8 @@ export function CatalogPage() {
     data.kind === 'ready' && data.brand
       ? data.brand.name
       : searchMode
-        ? 'Encuentra tu aroma.'
-        : 'Elige tu próxima fragancia.'
+        ? 'Encuentra tu aroma'
+        : 'Elige tu próxima fragancia'
   function update(patch: Record<string, string | string[] | null>) {
     const next = new URLSearchParams(params)
     next.delete('pagina')
@@ -115,8 +115,8 @@ export function CatalogPage() {
         </p>
         <h1>
           {data.kind === 'missing'
-            ? 'Esta marca no está en la selección.'
-            : 'Volvamos a intentarlo.'}
+            ? 'Esta marca no está en la selección'
+            : 'Volvamos a intentarlo'}
         </h1>
         {data.kind === 'error' && (
           <button
@@ -306,7 +306,7 @@ export function CatalogPage() {
           data-scroll-reveal="copy"
           role="status"
         >
-          <h2>No encontramos coincidencias.</h2>
+          <h2>No encontramos coincidencias</h2>
           <p>Prueba con otro nombre de perfume o marca.</p>
           {count > 0 ? (
             <button className="button button--secondary" onClick={clearFilters}>
@@ -455,7 +455,7 @@ export function CatalogPage() {
                 </div>
               ) : (
                 <section className="catalog-empty">
-                  <h2>No encontramos coincidencias.</h2>
+                  <h2>No encontramos coincidencias</h2>
                   <p>Prueba con otra búsqueda o ajusta los filtros.</p>
                   {count > 0 && (
                     <button

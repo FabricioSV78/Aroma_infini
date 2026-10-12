@@ -14,7 +14,7 @@ export function RouteErrorPage() {
         aria-labelledby="route-error-title"
       >
         <p className="eyebrow">Error de carga</p>
-        <h1 id="route-error-title">No pudimos abrir esta página.</h1>
+        <h1 id="route-error-title">No pudimos abrir esta página</h1>
         <p>Inténtalo de nuevo o vuelve al inicio.</p>
         <button
           className="button button--primary"

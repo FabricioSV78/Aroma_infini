@@ -3,8 +3,7 @@ import type { HomeData } from '../../services/home-service'
 import { Hero } from './Hero'
 import { BrandGallery } from './BrandGallery'
 import { EditorialFilm } from './EditorialFilm'
-import { ChoosingGuide } from './ChoosingGuide'
-import { choosingGuideEnabled } from '../../content/choosing-guide'
+import { PerfumeFinder } from './PerfumeFinder'
 import { Bestsellers, Categories, TrustInformation } from './HomeSections'
 
 // Explorar → producto → aprender a elegir → firmas → ritual → confianza.
@@ -12,7 +11,7 @@ const sectionOrder = [
   'hero',
   'categories',
   'bestsellers',
-  'choosing-guide',
+  'perfume-finder',
   'brands',
   'editorial',
   'trust',
@@ -29,9 +28,7 @@ export function HomePage() {
     bestsellers: data.bestsellers.length ? (
       <Bestsellers brands={data.brands} bestsellers={data.bestsellers} />
     ) : null,
-    'choosing-guide': choosingGuideEnabled ? (
-      <ChoosingGuide example={data.choosingGuideExample} />
-    ) : null,
+    'perfume-finder': <PerfumeFinder options={data.finderOptions} />,
     editorial: <EditorialFilm content={data.content.film} />,
     trust: <TrustInformation />,
   }

@@ -16,7 +16,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
       <article className="cart-line cart-line--unavailable">
         <div>
           <p className="eyebrow">Selección no disponible</p>
-          <h3>Esta presentación cambió.</h3>
+          <h3>Esta presentación cambió</h3>
           <p>Retírala para continuar con tu selección.</p>
         </div>
         <button

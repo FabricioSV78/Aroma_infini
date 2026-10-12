@@ -76,12 +76,12 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
 
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una esencia.',
+    'Una esencia',
   )
   await expect(
     page.locator('.hero-slide').first().locator('img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
-  await expect(page.locator('.editorial-film-copy')).toContainText('Un ritual.')
+  await expect(page.locator('#editorial-film-title')).toContainText('Un ritual')
   await expect(page.locator('.editorial-film-copy')).toContainText(
     'Un momento para elegir tu fragancia.',
   )
@@ -97,14 +97,14 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
   await expect(page.locator('.editorial-film-fallback')).toHaveCount(0)
   await page.getByRole('button', { name: 'Ver campaña 5' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Quinta campaña.',
+    'Quinta campaña',
   )
 
   await page.reload()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una esencia.',
+    'Una esencia',
   )
-  await expect(page.locator('.editorial-film-copy')).toContainText('Un ritual.')
+  await expect(page.locator('#editorial-film-title')).toContainText('Un ritual')
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390)

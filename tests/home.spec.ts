@@ -108,7 +108,7 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
   await page.getByLabel('Perfume o marca').fill('Bois Clair & Forme')
   await page.getByRole('button', { name: 'Buscar', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: 'No encontramos coincidencias.' }),
+    page.getByRole('heading', { name: 'No encontramos coincidencias' }),
   ).toBeVisible()
   await expect(page.locator('main')).toBeFocused()
   await page
@@ -123,7 +123,7 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
   await page.getByRole('button', { name: 'Ver campaña 1' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await page.getByRole('button', { name: 'Carrito', exact: true }).click()
   const cartDialog = page.getByRole('dialog', { name: 'Tu carrito' })

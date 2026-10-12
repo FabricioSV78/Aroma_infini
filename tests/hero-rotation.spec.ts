@@ -37,10 +37,10 @@ test('Cinco campañas cambian cada tres segundos sin alterar la altura', async (
   await expectCurrentIndicator(page, 0)
   const titles = [
     'Lo sutil también',
-    'Tu esencia.',
+    'Tu esencia',
     'Ámbar y madera,',
     'La frescura',
-    'Una fragancia.',
+    'Una fragancia',
   ]
   for (const [index, title] of titles.entries()) {
     await page.clock.runFor(3100)
@@ -76,7 +76,7 @@ test('Flechas permiten ir, volver y recorrer el límite del carrusel', async ({
   await expectCurrentIndicator(page, 4)
   await next.click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await next.click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
@@ -96,7 +96,7 @@ test('Las flechas pausan el carrusel mientras el usuario las explora', async ({
   await next.hover()
   await page.clock.runFor(6100)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await page.mouse.move(0, 0)
   await expect(page.locator('.hero [role="status"]')).toHaveAttribute(
@@ -156,7 +156,7 @@ test('El foco pausa el carrusel y el teclado permite navegar sin control de paus
   await expect(controls).toHaveCSS('clip-path', 'none')
   await page.clock.runFor(9000)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await expect(controls).toBeVisible()
   await expect(controls.getByRole('button')).toHaveCount(5)
@@ -167,7 +167,7 @@ test('El foco pausa el carrusel y el teclado permite navegar sin control de paus
   )
   await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
 })
 
@@ -178,7 +178,7 @@ test('Movimiento reducido desactiva autoplay y permite visitar las cinco campañ
   await prepare(page)
   await page.clock.runFor(22000)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Una fragancia.',
+    'Una fragancia',
   )
   await expect(page.locator('.hero-position-tracks > button')).toHaveCount(5)
   await page.getByRole('button', { name: 'Ver campaña 5' }).focus()

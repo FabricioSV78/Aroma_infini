@@ -75,7 +75,7 @@ export function CheckoutContactForm({ onNext }: ContactFormProps) {
       <div className="checkout-step-heading">
         <p className="eyebrow">01 / 03</p>
         <h2 id="checkout-step-title" tabIndex={-1}>
-          Tus datos.
+          Tus datos
         </h2>
       </div>
 
@@ -293,7 +293,7 @@ export function CheckoutDeliveryForm({
       <div className="checkout-step-heading">
         <p className="eyebrow">02 / 03</p>
         <h2 id="checkout-step-title" tabIndex={-1}>
-          A dónde lo enviamos.
+          A dónde lo enviamos
         </h2>
         <p>Entrega a domicilio en Perú.</p>
       </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { editorialFilm } from '../../content/editorial-film'
 import type { HomeFilmContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
+import { headingText } from '../../utils/heading-text'
 
 function subscribeViewport(onChange: () => void) {
   const query = matchMedia('(min-width: 768px)')
@@ -100,7 +101,7 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
         <div className="editorial-film-copy">
           <p className="eyebrow">{content.eyebrow}</p>
           <h2 id="editorial-film-title">
-            {content.title.split('\n').map((line, index) => (
+            {headingText(content.title).split('\n').map((line, index) => (
               <span key={index}>
                 {index > 0 && <br />}
                 {line}

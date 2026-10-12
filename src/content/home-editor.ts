@@ -7,7 +7,7 @@ export type { HomeContent, HomeFilmContent, HomeHeroContent } from '../types/hom
 
 const defaultFilm: HomeFilmContent = {
   eyebrow: 'El ritual del perfume',
-  title: 'Un gesto.\nAlgo muy tuyo.',
+  title: 'Un gesto\nAlgo muy tuyo',
   description:
     'Hay pequeños momentos que cambian el día. Elegir un aroma, sentirlo en la piel y hacerlo parte de ti.',
   cta: 'Encuentra tu perfume',
