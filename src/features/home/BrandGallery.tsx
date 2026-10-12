@@ -4,6 +4,7 @@ import { Icon } from '../../components/ui/Icon'
 import type { HomeData } from '../../services/home-service'
 import { BrandMonogram } from './BrandMonogram'
 import { useBrandRail } from './useBrandRail'
+import { brandStorePath } from '../../utils/brand-store-path'
 
 export function BrandGallery({
   brands,
@@ -63,7 +64,7 @@ export function BrandGallery({
                 {brands.map((brand) => (
                   <Link
                     key={brand.id}
-                    to={`/marcas/${brand.slug}`}
+                    to={brandStorePath(brand.slug)}
                     className="brand-signature"
                     aria-label={`Ver perfumes de ${brand.name}`}
                     tabIndex={copy > 0 ? -1 : undefined}

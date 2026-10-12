@@ -1,3 +1,5 @@
+import { brandStorePath } from '../utils/brand-store-path'
+
 // Textos editoriales predeterminados; el administrador puede personalizar cada campaña.
 export const heroSlides = [
   {
@@ -27,7 +29,7 @@ export const heroSlides = [
     title: ['Tu esencia', 'A tu manera'],
     description: 'Flores suaves y composiciones para llevar cerca de la piel.',
     cta: 'Ver Forme',
-    to: '/marcas/forme',
+    to: brandStorePath('forme'),
     image: 'hero-v3-petale',
     layout: 'left',
     tone: 'light',

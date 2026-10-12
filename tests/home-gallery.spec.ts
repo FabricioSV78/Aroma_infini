@@ -97,8 +97,8 @@ test('Marcas tipográficas: teclado, enlaces y presencia editorial', async ({
   await forme.focus()
   await expect(forme).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL('/marcas/forme')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forme')
+  await expect(page).toHaveURL('/tienda?marca=forme')
+  await expect(page.getByRole('button', { name: 'Quitar Forme' })).toBeVisible()
 })
 
 test('Home móvil: marcas accesibles y audiovisual seguido de beneficios', async ({
@@ -131,7 +131,7 @@ test('Home móvil: marcas accesibles y audiovisual seguido de beneficios', async
     .locator('#marcas')
     .getByRole('link', { name: /Matière/ })
     .click()
-  await expect(page).toHaveURL('/marcas/matiere-04')
+  await expect(page).toHaveURL('/tienda?marca=matiere-04')
 })
 
 test('Más vendidos blanco y galería respetuosa con movimiento reducido', async ({

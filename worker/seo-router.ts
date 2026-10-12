@@ -1,4 +1,4 @@
-import { brandPathForLegacyQuery, classifyRoute } from './route-policy'
+import { classifyRoute } from './route-policy'
 
 function assetUrl(request: Request, pathname: string) {
   const url = new URL(request.url)
@@ -34,9 +34,6 @@ export default {
     }
 
     if (url.pathname === '/tienda') {
-      const brandPath = brandPathForLegacyQuery(url.search)
-      if (brandPath)
-        return Response.redirect(assetUrl(request, brandPath).toString(), 308)
       const asset = await env.ASSETS.fetch(request)
       const response = asset.ok
         ? asset

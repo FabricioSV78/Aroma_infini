@@ -335,14 +335,29 @@ test('Una búsqueda con un resultado conserva filtros accesibles sin alargar el 
 })
 
 test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/marcas')
   await page
     .locator('.brands-directory')
     .getByRole('link', { name: /Forme/ })
     .click()
-  await expect(page).toHaveURL('/marcas/forme')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forme')
+  await expect(page).toHaveURL('/tienda?marca=forme')
+  const sidebar = page.getByRole('complementary', {
+    name: 'Filtros de la tienda',
+  })
+  await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).toBeChecked()
+  const brandChip = page.getByRole('button', { name: 'Quitar Forme' })
+  await expect(brandChip).toBeVisible()
   await expect(page.locator('.product-card')).toHaveCount(2)
+  await page.reload()
+  await expect(page).toHaveURL('/tienda?marca=forme')
+  await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).toBeChecked()
+  await expect(brandChip).toBeVisible()
+  await expect(page.locator('.product-card')).toHaveCount(2)
+  await brandChip.click()
+  await expect(page).toHaveURL('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(8)
+  await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).not.toBeChecked()
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
   await page.getByRole('dialog').getByLabel('Perfume o marca').fill('petale')
   await expect(page.locator('.search-suggestions')).toContainText('Pétale Nu')

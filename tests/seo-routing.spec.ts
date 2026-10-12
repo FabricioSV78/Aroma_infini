@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { brandPathForLegacyQuery, classifyRoute } from '../worker/route-policy'
+import { classifyRoute } from '../worker/route-policy'
 
 test('Las rutas públicas y privadas se distinguen de URLs inexistentes', () => {
   expect(classifyRoute('/')).toBe('public')
@@ -13,9 +13,26 @@ test('Las rutas públicas y privadas se distinguen de URLs inexistentes', () => 
   expect(classifyRoute('/ruta-inexistente')).toBe('missing')
 })
 
-test('Solo la antigua selección simple por marca redirige a la URL limpia', () => {
-  expect(brandPathForLegacyQuery('?marca=forme')).toBe('/marcas/forme')
-  expect(brandPathForLegacyQuery('?marca=forme&genero=mujer')).toBeNull()
-  expect(brandPathForLegacyQuery('?marca=forme&marca=atelier-01')).toBeNull()
-  expect(brandPathForLegacyQuery('?marca=desconocida')).toBeNull()
+test('La selección simple por marca permanece en Tienda y conserva noindex', async () => {
+  const workerModulePath = '../worker/seo-router'
+  const seoRouter = (await import(workerModulePath)).default as {
+    fetch(request: Request, env: { ASSETS: { fetch(request: Request): Promise<Response> } }): Promise<Response>
+  }
+  const request = new Request('https://aroma.example/tienda?marca=forme')
+  const visited: string[] = []
+  const env = {
+    ASSETS: {
+      async fetch(input: Request) {
+        visited.push(input.url)
+        return new Response('<html></html>', { status: 200 })
+      },
+    },
+  }
+
+  const response = await seoRouter.fetch(request, env)
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Location')).toBeNull()
+  expect(response.headers.get('X-Robots-Tag')).toBe('noindex, follow')
+  expect(visited).toEqual([request.url])
 })

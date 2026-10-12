@@ -98,7 +98,7 @@ test('El ciclo continúa sin espacios y una marca repetida sigue siendo un enlac
     .locator('.brand-signatures-group[aria-hidden="true"] .brand-signature')
     .first()
   await repeated.click()
-  await expect(page).toHaveURL('/marcas/atelier-01')
+  await expect(page).toHaveURL('/tienda?marca=atelier-01')
 })
 
 test('El teclado alcanza cada marca en móvil sin repetir los enlaces del ciclo', async ({
@@ -124,7 +124,7 @@ test('El teclado alcanza cada marca en móvil sin repetir los enlaces del ciclo'
     if (index < 3) await page.keyboard.press('Tab')
   }
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL('/marcas/matiere-04')
+  await expect(page).toHaveURL('/tienda?marca=matiere-04')
 })
 
 test('Movimiento reducido deja todas las marcas estáticas y accesibles', async ({
@@ -210,6 +210,6 @@ test('El deslizamiento táctil permite explorar sin impedir el scroll vertical n
     .toBeGreaterThan(scrollY + 30)
   const link = rail.locator('.brand-signature').nth(1)
   await link.tap()
-  await expect(page).toHaveURL('/marcas/forme')
+  await expect(page).toHaveURL('/tienda?marca=forme')
   await context.close()
 })

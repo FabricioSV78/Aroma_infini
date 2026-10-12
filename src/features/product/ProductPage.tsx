@@ -13,6 +13,7 @@ import { ProductReviewsPreview } from './ProductReviewsPreview'
 import { ProductPopularityPreview } from './ProductPopularityPreview'
 import { getBestsellingProducts } from '../../services/home-service'
 import { getOlfactoryImage } from '../../content/olfactory-imagery'
+import { brandStorePath } from '../../utils/brand-store-path'
 
 interface ProductReadyProps {
   product: Product
@@ -78,7 +79,7 @@ function ProductReady({
               {brand ? (
                 <Link
                   className="product-brand"
-                  to={`/marcas/${brand.slug}`}
+                  to={brandStorePath(brand.slug)}
                 >
                   {brand.name}
                 </Link>

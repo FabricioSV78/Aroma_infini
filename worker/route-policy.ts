@@ -44,12 +44,3 @@ export function classifyRoute(pathname: string): RouteKind {
   if (/^\/admin\/(?:productos|pedidos)\/[^/]+$/.test(path)) return 'app'
   return 'missing'
 }
-
-export function brandPathForLegacyQuery(search: string) {
-  const params = new URLSearchParams(search)
-  const brands = params.getAll('marca')
-  if (brands.length !== 1 || [...params.keys()].some((key) => key !== 'marca'))
-    return null
-  const path = `/marcas/${brands[0]}`
-  return publicPaths.has(path) ? path : null
-}

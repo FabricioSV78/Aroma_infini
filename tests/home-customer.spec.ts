@@ -31,22 +31,22 @@ for (const width of [390, 1440]) {
       },
       {
         section: '#marcas',
-        href: '/marcas/atelier-01',
+        href: '/tienda?marca=atelier-01',
         products: ['Bois Clair', 'Néroli Matin'],
       },
       {
         section: '#marcas',
-        href: '/marcas/forme',
+        href: '/tienda?marca=forme',
         products: ['Pétale Nu', 'Iris Velours'],
       },
       {
         section: '#marcas',
-        href: '/marcas/studio-sillage',
+        href: '/tienda?marca=studio-sillage',
         products: ['Vert Silence', 'Figue Douce'],
       },
       {
         section: '#marcas',
-        href: '/marcas/matiere-04',
+        href: '/tienda?marca=matiere-04',
         products: ['Ambre Lent', 'Santal Nuit'],
       },
       {
@@ -62,11 +62,6 @@ for (const width of [390, 1440]) {
           'Figue Douce',
           'Santal Nuit',
         ],
-      },
-      {
-        section: '#destacados',
-        href: '/tienda?seleccion=destacados',
-        products: ['Bois Clair', 'Vert Silence'],
       },
       {
         section: '#mas-vendidos',

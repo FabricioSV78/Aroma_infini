@@ -1,3 +1,5 @@
+import { brandStorePath } from '../utils/brand-store-path'
+
 export const navigation = [
   { label: 'Tienda', to: '/tienda' },
   { label: 'Marcas', to: '/marcas' },
@@ -47,16 +49,16 @@ export const navigationGroups: NavigationGroup[] = [
       {
         title: 'Nuestra selección',
         links: [
-          { label: 'Atelier 01', to: '/tienda?marca=atelier-01' },
-          { label: 'Forme', to: '/tienda?marca=forme' },
-          { label: 'Studio sillage', to: '/tienda?marca=studio-sillage' },
-          { label: 'Matière 04', to: '/tienda?marca=matiere-04' },
+          { label: 'Atelier 01', to: brandStorePath('atelier-01') },
+          { label: 'Forme', to: brandStorePath('forme') },
+          { label: 'Studio sillage', to: brandStorePath('studio-sillage') },
+          { label: 'Matière 04', to: brandStorePath('matiere-04') },
         ],
       },
       {
         title: 'Descubrir las casas',
         links: [
-          { label: 'Marca destacada', to: '/tienda?marca=atelier-01' },
+          { label: 'Marca destacada', to: brandStorePath('atelier-01') },
           { label: 'Todas las marcas', to: '/marcas' },
         ],
       },

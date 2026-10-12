@@ -2,6 +2,7 @@ import { Link, useLoaderData, useRevalidator } from 'react-router'
 import { brandsLoader } from './catalog-loaders'
 import { Icon } from '../../components/ui/Icon'
 import { imageSource } from '../../services/image-source'
+import { brandStorePath } from '../../utils/brand-store-path'
 
 export function BrandsPage() {
   const data = useLoaderData<typeof brandsLoader>()
@@ -37,7 +38,7 @@ export function BrandsPage() {
           </div>
         ) : (
           data.brands.map((brand) => (
-            <Link key={brand.id} to={`/marcas/${brand.slug}`}>
+            <Link key={brand.id} to={brandStorePath(brand.slug)}>
               <h2>{brand.name}</h2>
               {brand.previewImage ? (
                 <img
