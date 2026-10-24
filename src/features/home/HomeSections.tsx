@@ -3,9 +3,15 @@ import '../../styles/home-categories.css'
 import { SectionHeading } from '../../components/ui/SectionHeading'
 import { Icon } from '../../components/ui/Icon'
 import { categories } from '../../content/home'
+import { fourCategoryImages } from '../../content/category-images'
 import type { HomeData } from '../../services/home-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
 import { ProductCard } from './ProductCard'
+
+// Match the four-column desktop grid and two-column mobile/tablet layout,
+// including the existing 2.5% hover zoom.
+const fourCategorySizes =
+  '(min-width: 1760px) 406px, (min-width: 1600px) calc((100vw - 176px) / 4 * 1.025), (min-width: 1024px) calc((94vw - 80px) / 4 * 1.025), (min-width: 768px) calc((100vw - 64px) / 2 * 1.025), (min-width: 360px) calc((100vw - 48px) / 2 * 1.025), calc((100vw - 44px) / 2 * 1.025)'
 
 export function Categories({
   media,
@@ -30,53 +36,53 @@ export function Categories({
       <div
         className={`category-grid${fourCategories ? ' category-grid--four' : ''}`}
       >
-        {visibleCategories.map((category) => (
-          <Link
-            to={category.to}
-            className={`category category--${category.layout}`}
-            data-reveal={category.reveal}
-            key={category.title}
-          >
-            <div className="category-image">
-              <img
-                src={imageSource(
-                  media[category.id as keyof typeof media] ?? category.image,
-                  480,
-                )}
-                srcSet={imageSourceSet(
-                  media[category.id as keyof typeof media] ?? category.image,
-                  category.imageWidths ?? [480, 960, 1536],
-                )}
-                sizes={
-                  fourCategories
-                    ? '(min-width: 1760px) 396px, (min-width: 1024px) 23vw, 46vw'
-                    : '(min-width: 1440px) 760px, (min-width: 768px) 55vw, (max-width: 767px) 100vw'
-                }
-                style={{
-                  objectPosition: media[category.id as keyof typeof media]
-                    ? 'center'
-                    : fourCategories
-                      ? category.imagePosition
-                      : undefined,
-                }}
-                width={category.width}
-                height={category.height}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-            <div className="category-copy">
-              <div>
-                <h3>{category.title}</h3>
-                <p>{category.description}</p>
+        {visibleCategories.map((category) => {
+          const uploaded = media[category.id as keyof typeof media]
+          const framed = fourCategories
+            ? fourCategoryImages[category.id as keyof typeof fourCategoryImages]
+            : undefined
+          const image = uploaded ?? framed?.image ?? category.image
+          return (
+            <Link
+              to={category.to}
+              className={`category category--${category.layout}`}
+              data-reveal={category.reveal}
+              key={category.title}
+            >
+              <div className="category-image">
+                <img
+                  src={imageSource(image, 480)}
+                  srcSet={imageSourceSet(
+                    image,
+                    framed?.widths ?? category.imageWidths ?? [480, 960, 1536],
+                  )}
+                  sizes={
+                    fourCategories
+                      ? fourCategorySizes
+                      : '(min-width: 1440px) 760px, (min-width: 768px) 55vw, (max-width: 767px) 100vw'
+                  }
+                  style={{
+                    objectPosition: uploaded || framed ? 'center' : undefined,
+                  }}
+                  width={framed?.width ?? category.width}
+                  height={framed?.height ?? category.height}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
-              <span className="category-arrow">
-                <Icon name="arrow" />
-              </span>
-            </div>
-          </Link>
-        ))}
+              <div className="category-copy">
+                <div>
+                  <h3>{category.title}</h3>
+                  <p>{category.description}</p>
+                </div>
+                <span className="category-arrow">
+                  <Icon name="arrow" />
+                </span>
+              </div>
+            </Link>
+          )
+        })}
       </div>
     </section>
   )

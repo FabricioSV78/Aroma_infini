@@ -4,6 +4,17 @@ export interface ImagePreset {
   width: number
   height: number
   label: string
+  /** Retain extra source detail where this placement benefits from high-DPI. */
+  maxWidth?: number
+  quality?: number
+}
+
+const categoryImagePreset: ImagePreset = {
+  width: 800,
+  height: 1000,
+  maxWidth: 1600,
+  quality: 0.9,
+  label: '4:5 · mínimo 800 × 1000 px · recomendado 1600 × 2000 px',
 }
 
 export const homeImagePresets = {
@@ -32,14 +43,10 @@ export const homeImagePresets = {
     height: 480,
     label: '1:1 · mínimo 480 × 480 px',
   },
-  hombre: { width: 800, height: 1000, label: '4:5 · mínimo 800 × 1000 px' },
-  mujer: { width: 800, height: 1000, label: '4:5 · mínimo 800 × 1000 px' },
-  unisex: { width: 800, height: 1000, label: '4:5 · mínimo 800 × 1000 px' },
-  complementos: {
-    width: 800,
-    height: 1000,
-    label: '4:5 · mínimo 800 × 1000 px',
-  },
+  hombre: categoryImagePreset,
+  mujer: categoryImagePreset,
+  unisex: categoryImagePreset,
+  complementos: categoryImagePreset,
 } as const satisfies Record<string, ImagePreset>
 
 export const productImagePreset: ImagePreset = {
@@ -90,14 +97,18 @@ export async function prepareImageFile(file: File, preset: ImagePreset) {
     }
 
     const canvas = document.createElement('canvas')
-    canvas.width = preset.width
-    canvas.height = preset.height
+    canvas.width = Math.floor(
+      Math.min(preset.maxWidth ?? preset.width, cropWidth),
+    )
+    canvas.height = Math.round(canvas.width / targetRatio)
     const context = canvas.getContext('2d')
     if (!context)
       throw new UserFacingError(
         'image-canvas',
         'No se pudo preparar la imagen. Inténtalo de nuevo.',
       )
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
     context.drawImage(
       bitmap,
       (bitmap.width - cropWidth) / 2,
@@ -106,10 +117,10 @@ export async function prepareImageFile(file: File, preset: ImagePreset) {
       cropHeight,
       0,
       0,
-      preset.width,
-      preset.height,
+      canvas.width,
+      canvas.height,
     )
-    const image = canvas.toDataURL('image/webp', 0.82)
+    const image = canvas.toDataURL('image/webp', preset.quality ?? 0.82)
     if (!image.startsWith('data:image/webp;base64,')) {
       throw new UserFacingError(
         'image-webp',

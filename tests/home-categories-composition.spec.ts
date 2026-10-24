@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const viewport of [
   { width: 1920, height: 1080 },
+  { width: 1440, height: 900 },
   { width: 1366, height: 768 },
   { width: 768, height: 1024 },
   { width: 390, height: 844 },
@@ -76,9 +77,15 @@ for (const viewport of [
           width: frame.width,
           height: frame.height,
           textTop: copy.top,
+          copyLeft: copy.left,
+          copyBottom: copy.bottom,
           headingTop: heading.top,
+          headingLeft: heading.left,
           headingRight: text.right,
+          descriptionLeft: description.left,
           descriptionBottom: description.bottom,
+          cardLeft: cardBounds.left,
+          cardWidth: cardBounds.width,
           cardBottom: cardBounds.bottom,
           arrowLeft: arrow.left,
           arrowRight: arrow.right,
@@ -89,8 +96,15 @@ for (const viewport of [
     for (const bounds of geometry) {
       expect(bounds.width).toBeCloseTo(geometry[0].width, 1)
       expect(bounds.height).toBeCloseTo(geometry[0].height, 1)
+      expect(bounds.width).toBeCloseTo(bounds.cardWidth, 1)
+      expect(bounds.x).toBeCloseTo(bounds.cardLeft, 1)
+      expect(bounds.textTop).toBeGreaterThanOrEqual(
+        bounds.y + bounds.height - 1,
+      )
+      expect(bounds.copyLeft).toBeCloseTo(bounds.x, 1)
+      expect(bounds.headingLeft).toBeCloseTo(bounds.x, 1)
+      expect(bounds.descriptionLeft).toBeCloseTo(bounds.x, 1)
       expect(bounds.width / bounds.height).toBeCloseTo(0.8, 2)
-      expect(bounds.textTop - bounds.y - bounds.height).toBeCloseTo(0, 1)
       expect(bounds.headingRight).toBeLessThanOrEqual(bounds.arrowLeft - 4)
       expect(bounds.arrowRight).toBeLessThanOrEqual(bounds.right + 1)
       expect(bounds.descriptionBottom).toBeLessThanOrEqual(
@@ -98,8 +112,15 @@ for (const viewport of [
       )
     }
     if (viewport.width >= 1024) {
-      for (const bounds of geometry)
+      for (const [index, bounds] of geometry.entries()) {
         expect(bounds.y).toBeCloseTo(geometry[0].y, 1)
+        expect(bounds.height).toBeLessThanOrEqual(550)
+        if (index > 0) {
+          expect(bounds.x).toBeGreaterThan(
+            geometry[index - 1].x + geometry[index - 1].width,
+          )
+        }
+      }
     } else {
       expect(geometry[0].y).toBeCloseTo(geometry[1].y, 1)
       expect(geometry[2].y).toBeCloseTo(geometry[3].y, 1)
