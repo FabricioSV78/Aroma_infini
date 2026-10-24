@@ -1,12 +1,15 @@
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { resolveCart } from '../../services/commerce-service'
+import { useOfferPriceRevision } from '../../services/offer-price-clock'
 import { formatPEN } from '../../services/currency'
 import { CartLine } from './CartLine'
 import { useCart } from './cart-context'
 
 export function CartDrawer() {
+  useOfferPriceRevision()
   const { items, drawerOpen, closeCart, persistence } = useCart()
   const cart = resolveCart(items)
   return (
@@ -34,6 +37,11 @@ export function CartDrawer() {
               <span>Subtotal</span>
               <strong>{formatPEN(cart.subtotalCents)}</strong>
             </div>
+            {cart.productDiscountCents > 0 ? (
+              <p className="cart-product-savings">
+                Ahorras {formatPEN(cart.productDiscountCents)} en productos
+              </p>
+            ) : null}
             <Link
               className="button button--primary"
               to="/carrito"
@@ -44,19 +52,23 @@ export function CartDrawer() {
           </div>
         </>
       ) : (
-        <div className="cart-drawer-empty">
-          <p>Tu selección está vacía.</p>
+        <EmptyState
+          className="cart-drawer-empty"
+          icon="bag"
+          title="Tu carrito está vacío"
+          description="Encuentra tu próxima elección en la tienda."
+        >
           <Link
-            className="button button--secondary"
-            to="/carrito"
+            className="button button--primary"
+            to="/tienda"
             onClick={closeCart}
           >
+            Explorar tienda <Icon name="arrow" />
+          </Link>
+          <Link className="text-link" to="/carrito" onClick={closeCart}>
             Ver carrito <Icon name="arrow" />
           </Link>
-          <Link className="text-link" to="/tienda" onClick={closeCart}>
-            Explorar perfumes <Icon name="arrow" />
-          </Link>
-        </div>
+        </EmptyState>
       )}
     </Dialog>
   )

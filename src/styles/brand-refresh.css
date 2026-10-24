@@ -99,12 +99,6 @@
   background: var(--color-brand);
   color: #fff;
 }
-.store-layout .button--primary:is(:hover, :focus-visible) {
-  background: var(--color-brand-hover);
-}
-.store-layout .button--secondary:is(:hover, :focus-visible) {
-  background: var(--color-sage);
-}
 .store-layout .text-link:is(:hover, :focus-visible) {
   color: var(--color-brand);
 }

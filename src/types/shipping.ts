@@ -12,6 +12,8 @@ export interface ShippingZone {
 
 export interface ShippingSettings {
   freeThresholdCents: number
+  /** Public checkout coverage; preparing a provincial rate never enables it. */
+  provinceShippingEnabled: boolean
   nationalCourierFeeCents: number
   nationalEstimate: string
   zones: ShippingZone[]

@@ -5,7 +5,14 @@ import {
   getShippingSettings,
   getShippingZoneForAddress,
 } from './admin-service'
-import { getPeruDepartmentLabel, peruDepartments } from '../content/peru'
+import {
+  getPeruDepartmentLabel,
+  getDeliveryArea,
+  isCoveredDeliveryLocation,
+  deliveryAreas,
+  peruDepartments,
+} from '../content/peru'
+import { isShippingDestinationEnabled } from './shipping-rates'
 import {
   isValidAlternateRecipient,
   type AlternateRecipient,
@@ -92,6 +99,7 @@ export type PromotionResult =
         | 'expired'
         | 'limit-reached'
         | 'minimum-not-met'
+        | 'incompatible'
         | 'error'
       message: string
     }
@@ -132,13 +140,19 @@ export function quoteShipping(
   const normalized = normalizeDepartment(department)
   if (!normalized) return { kind: 'pending' }
   const shipping = getShippingSettings()
+  const area = getDeliveryArea(normalized)
+  if (
+    !shipping.provinceShippingEnabled &&
+    (!area || (province && province !== area.province))
+  )
+    return { kind: 'unavailable' }
+  if (!province || !district) return { kind: 'pending' }
+  if (!isShippingDestinationEnabled(shipping, normalized, province, district))
+    return { kind: 'unavailable' }
+  const isCapital = isCoveredDeliveryLocation(normalized, province, district)
+  if (!isCapital && method === 'motorizado') return { kind: 'unavailable' }
   const zone = getShippingZoneForAddress(normalized, province, district)
-  if (!zone)
-    return method === 'motorizado'
-      ? { kind: 'unavailable' }
-      : { kind: 'pending' }
-  const region =
-    normalized === 'lima' || normalized === 'callao' ? 'capital' : 'province'
+  if (!zone) return { kind: 'unavailable' }
   if (method === 'motorizado' && zone.motorizadoFeeCents === null)
     return { kind: 'unavailable' }
 
@@ -152,7 +166,7 @@ export function quoteShipping(
       : zone.courierFeeCents
   return {
     kind: 'quoted',
-    region,
+    region: isCapital ? 'capital' : 'province',
     feeCents,
     estimate: zone.estimate,
     free,
@@ -160,7 +174,12 @@ export function quoteShipping(
 }
 
 export function getDeliveryZoneOptions(): DeliveryZoneOption[] {
-  return peruDepartments
+  return getShippingSettings().provinceShippingEnabled
+    ? peruDepartments
+    : deliveryAreas.map((area) => ({
+        value: area.department,
+        label: area.label,
+      }))
 }
 
 export function getDeliveryZoneLabel(department: string): string {
@@ -170,10 +189,16 @@ export function getDeliveryZoneLabel(department: string): string {
 export function evaluatePromotion(
   rawCode: string,
   subtotalCents: number,
+  hasProductDiscounts = false,
 ): PromotionResult {
   const code = rawCode.trim().toUpperCase()
   if (!code)
     return { kind: 'empty', message: 'Escribe un código de descuento.' }
+  if (hasProductDiscounts)
+    return {
+      kind: 'incompatible',
+      message: 'Los códigos no se combinan con perfumes en oferta.',
+    }
   if (code === 'ERROR')
     return {
       kind: 'error',
@@ -222,7 +247,11 @@ export function evaluatePromotion(
 
 export function calculateCheckout(cart: ResolvedCart, draft: CheckoutDraft) {
   const promotion = draft.appliedPromotion
-    ? evaluatePromotion(draft.appliedPromotion, cart.subtotalCents)
+    ? evaluatePromotion(
+        draft.appliedPromotion,
+        cart.subtotalCents,
+        cart.productDiscountCents > 0,
+      )
     : null
   const discountCents =
     promotion?.kind === 'applied' ? promotion.discountCents : 0
@@ -236,6 +265,7 @@ export function calculateCheckout(cart: ResolvedCart, draft: CheckoutDraft) {
   )
   return {
     subtotalCents: cart.subtotalCents,
+    productDiscountCents: cart.productDiscountCents,
     discountCents,
     shipping,
     totalCents:
@@ -250,6 +280,7 @@ export function createMockOrder(
   draft: CheckoutDraft,
 ): MockOrder | null {
   if (!cart.lines.length || cart.needsAttention) return null
+  if (draft.appliedPromotion && cart.productDiscountCents > 0) return null
   if (
     draft.alternateRecipient &&
     !isValidAlternateRecipient(draft.alternateRecipient)
@@ -272,8 +303,12 @@ export function createMockOrder(
               name: line.product.name,
               brand: line.brand?.name ?? '',
               ml: line.variant.ml,
+              variantLabel: line.variant.label,
               quantity: line.item.quantity,
-              unitPriceCents: line.variant.priceCents,
+              unitPriceCents: line.unitPriceCents,
+              ...(line.unitPriceCents < line.originalUnitPriceCents
+                ? { originalUnitPriceCents: line.originalUnitPriceCents }
+                : {}),
             },
           ]
         : [],
@@ -306,7 +341,5 @@ export async function persistDemoCheckout(order: MockOrder): Promise<boolean> {
 }
 
 export function simulatePayment(scenario: PaymentScenario) {
-  return new Promise<PaymentScenario>((resolve) => {
-    window.setTimeout(() => resolve(scenario), 650)
-  })
+  return Promise.resolve(scenario)
 }

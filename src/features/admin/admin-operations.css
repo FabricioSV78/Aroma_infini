@@ -16,9 +16,36 @@
   line-height: 1.4;
 }
 
-.admin-orders-page .admin-order-next-action {
+.admin-order-contents {
+  display: -webkit-box;
+  margin-top: 5px;
+  max-width: 170px;
+  overflow: hidden;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-orders-page .admin-row-actions .admin-order-next-action {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 8px;
+  background: var(--admin-surface);
   color: var(--admin-accent);
   font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-orders-page
+  .admin-row-actions
+  .admin-order-next-action:is(:hover, :focus-visible) {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
 }
 
 .admin-order-highlights {
@@ -59,6 +86,13 @@
   align-items: end;
   justify-content: space-between;
   gap: 12px;
+}
+
+.admin-customers-location-note {
+  margin: -2px 0 13px;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 .admin-customer-toolbar label {
@@ -168,6 +202,21 @@
   color: var(--admin-accent);
   font-weight: 600;
   cursor: pointer;
+}
+
+.admin-shipping-summary-panel > summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 150ms ease;
+}
+
+.admin-shipping-summary-panel[open] > summary::after {
+  transform: rotate(225deg);
 }
 
 .admin-shipping-summary-panel > summary:hover {
@@ -315,6 +364,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .admin-shipping-summary-panel > summary::after {
+    transition: none;
+  }
+}
+
 @media (min-width: 768px) {
   .admin-orders-page .admin-filter-fields {
     grid-template-columns: minmax(220px, 1fr) minmax(175px, 0.45fr) minmax(
@@ -362,6 +417,10 @@
 }
 
 @media (max-width: 767px) {
+  .admin-order-contents {
+    max-width: none;
+  }
+
   .admin-customer-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -431,6 +490,48 @@
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
+  .admin-page--order-detail .admin-order-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-page--order-detail .admin-order-primary,
+  .admin-page--order-detail .admin-order-layout > aside {
+    display: contents;
+  }
+
+  .admin-page--order-detail .admin-order-layout aside > form {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    order: -1;
+  }
+
+  .admin-page--order-detail
+    .admin-order-layout
+    aside
+    > form
+    > :not(label, button) {
+    grid-column: 1 / -1;
+  }
+
+  .admin-page--order-detail .admin-order-primary > section:first-child {
+    order: 0;
+  }
+
+  .admin-page--order-detail .admin-order-layout aside > section:first-of-type {
+    order: 1;
+  }
+
+  .admin-page--order-detail .admin-order-primary > section:last-child {
+    order: 2;
+  }
+
+  .admin-page--order-detail .admin-order-layout aside > section:last-of-type {
+    order: 3;
+  }
+
   .admin-customers-page .admin-table-wrap {
     overflow: visible;
     border: 0;

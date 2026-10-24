@@ -49,7 +49,7 @@ export function ReviewForm({ sizes, onSave, onCancel }: ReviewFormProps) {
       onSubmit={submit}
       aria-labelledby="review-form-title"
     >
-      <h3 id="review-form-title">Tu experiencia con este perfume</h3>
+      <h3 id="review-form-title">Tu experiencia con este producto</h3>
       <p id="review-local-note">
         Tu opinión se guarda en este navegador; no se publica para otros
         clientes.
@@ -87,16 +87,18 @@ export function ReviewForm({ sizes, onSave, onCancel }: ReviewFormProps) {
             autoComplete="given-name"
           />
         </label>
-        <label>
-          Presentación
-          <select name="size" required>
-            {sizes.map((size) => (
-              <option key={size} value={size}>
-                {size} ml
-              </option>
-            ))}
-          </select>
-        </label>
+        {sizes.length > 0 && (
+          <label>
+            Presentación
+            <select name="size" required>
+              {sizes.map((size) => (
+                <option key={size} value={size}>
+                  {size} ml
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <label>
         Título

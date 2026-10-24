@@ -190,11 +190,6 @@
     animation: review-opinion-enter 220ms ease-out;
   }
 }
-@media (hover: hover) and (pointer: fine) {
-  .product-review-list li:hover .review-avatar {
-    background: var(--color-cream);
-  }
-}
 @keyframes review-bar-enter {
   from {
     transform: scaleX(0);

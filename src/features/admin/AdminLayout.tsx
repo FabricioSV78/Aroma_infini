@@ -3,6 +3,11 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { Icon, type IconName } from '../../components/ui/Icon'
 import { SeoManager } from '../../seo/SeoManager'
 import { adminService } from '../../services/admin-service'
+import { useAdminSave } from './useAdminSave'
+import { NavigationStatus } from '../../components/ui/NavigationStatus'
+import { AdminSaveFeedback } from './AdminSaveFeedback'
+import { AdminNoticeProvider, useAdminNotice } from './AdminNoticeProvider'
+import { AdminFieldValidation } from './AdminFieldValidation'
 
 const adminGroups = [
   {
@@ -34,7 +39,9 @@ const adminGroups = [
   },
   {
     label: 'Configuración',
-    sections: [{ to: '/admin/envios', label: 'Envíos', icon: 'truck' }],
+    sections: [
+      { to: '/admin/envios', label: 'Tarifas de envío', icon: 'truck' },
+    ],
   },
 ] as const satisfies ReadonlyArray<{
   label: string
@@ -47,6 +54,15 @@ const adminGroups = [
 }>
 
 export function AdminLayout() {
+  return (
+    <AdminNoticeProvider>
+      <AdminLayoutContent />
+    </AdminNoticeProvider>
+  )
+}
+
+function AdminLayoutContent() {
+  const notice = useAdminNotice()
   const location = useLocation()
   const navigate = useNavigate()
   const previousKey = useRef(location.key)
@@ -54,6 +70,7 @@ export function AdminLayout() {
   const menuCloseButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   const [navigationOpen, setNavigationOpen] = useState(false)
+  const resetPersistence = useAdminSave()
   const currentSection = adminGroups
     .reduce<Array<{ to: string; label: string; end?: boolean }>>(
       (sections, group) => {
@@ -85,6 +102,7 @@ export function AdminLayout() {
       menuCloseButtonRef.current?.focus({ preventScroll: true }),
     )
     const handleDrawerKeys = (event: KeyboardEvent) => {
+      if (document.querySelector('.admin-notice-dialog[open]')) return
       if (event.key === 'Escape') {
         setNavigationOpen(false)
         window.requestAnimationFrame(() => menuButtonRef.current?.focus())
@@ -123,21 +141,30 @@ export function AdminLayout() {
     return () => desktop.removeEventListener('change', closeDrawer)
   }, [])
 
-  function resetDemo() {
+  async function resetDemo() {
+    if (resetPersistence.saving || resetPersistence.persistenceFailed) return
     if (
-      window.confirm(
-        'Se borrarán los productos, pedidos, clientes, promociones, contenido del Home y tarifas guardados en este navegador. Esta acción no se puede deshacer. ¿Continuar?',
-      )
+      await notice.confirm({
+        title: '¿Borrar los datos de este navegador?',
+        description:
+          'Se eliminarán los cambios guardados de productos, pedidos, clientes, promociones, Home y envíos. Se recuperarán los datos iniciales. Esta acción no se puede deshacer.',
+        confirmLabel: 'Borrar datos',
+        destructive: true,
+      })
     ) {
-      adminService.reset()
-      void navigate('/admin')
+      await resetPersistence.save(
+        () => adminService.reset(),
+        () => {
+          void navigate('/admin')
+        },
+      )
     }
   }
 
   return (
     <div className="admin-shell">
       <SeoManager />
-      <a className="skip-link" href="#admin-content">
+      <a className="skip-link" href="#admin-content" inert={navigationOpen}>
         Saltar al contenido
       </a>
       <header className="admin-header" inert={navigationOpen}>
@@ -149,9 +176,9 @@ export function AdminLayout() {
           Aroma Infini<span>.</span>
           <small>administración</small>
         </Link>
-        <div className="admin-header-context" aria-label="Ubicación actual">
+        <div className="admin-header-context">
           <span>Panel administrativo</span>
-          <Icon name="chevron" />
+          <Icon name="chevron" aria-hidden="true" />
           <strong>{currentSection?.label ?? 'Resumen'}</strong>
         </div>
         <div className="admin-header-actions">
@@ -174,6 +201,7 @@ export function AdminLayout() {
           </button>
         </div>
       </header>
+      <NavigationStatus />
       <aside
         ref={sidebarRef}
         id="admin-navigation"
@@ -232,9 +260,17 @@ export function AdminLayout() {
           ))}
         </nav>
         <div className="admin-sidebar-footer">
-          <button className="admin-reset" type="button" onClick={resetDemo}>
+          <button
+            className="admin-reset"
+            type="button"
+            disabled={
+              resetPersistence.saving || resetPersistence.persistenceFailed
+            }
+            onClick={() => void resetDemo()}
+          >
             Borrar datos de este navegador
           </button>
+          <AdminSaveFeedback {...resetPersistence} />
           <span className="admin-side-status">
             <span aria-hidden="true" /> Datos locales
           </span>
@@ -259,7 +295,9 @@ export function AdminLayout() {
         <div className="admin-demo-banner">
           Los cambios de este panel se guardan en este navegador.
         </div>
-        <Outlet />
+        <AdminFieldValidation key={location.pathname}>
+          <Outlet />
+        </AdminFieldValidation>
       </main>
     </div>
   )

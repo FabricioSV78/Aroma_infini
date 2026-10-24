@@ -25,6 +25,22 @@ interface PeruDepartmentRecord {
 
 const departments = ubigeoData.departments as PeruDepartmentRecord[]
 
+export const LIMA_DEPARTMENT = 'lima'
+export const LIMA_PROVINCE = '1501'
+export const CALLAO_DEPARTMENT = 'callao'
+export const CALLAO_PROVINCE = '0701'
+
+export const deliveryAreas = [
+  { department: LIMA_DEPARTMENT, province: LIMA_PROVINCE, label: 'Lima' },
+  { department: CALLAO_DEPARTMENT, province: CALLAO_PROVINCE, label: 'Callao' },
+] as const
+
+export function getDeliveryArea(departmentValue: string) {
+  return deliveryAreas.find(
+    (area) => area.department === departmentValue.trim().toLowerCase(),
+  )
+}
+
 export const peruDepartments: PeruLocationOption[] = departments.map(
   ({ value, label }) => ({ value, label }),
 )
@@ -115,5 +131,19 @@ export function isValidPeruLocation(
   )
   return Boolean(
     province?.districts.some((district) => district.code === districtCode),
+  )
+}
+
+/** Solo Lima y Callao admiten pedidos nuevos durante la cobertura temporal. */
+export function isCoveredDeliveryLocation(
+  departmentValue: string,
+  provinceCode: string,
+  districtCode: string,
+) {
+  const area = getDeliveryArea(departmentValue)
+  if (!area) return false
+  return (
+    provinceCode === area.province &&
+    isValidPeruLocation(area.department, area.province, districtCode)
   )
 }

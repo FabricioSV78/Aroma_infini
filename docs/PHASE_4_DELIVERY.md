@@ -18,7 +18,7 @@ Las pestañas siguen el patrón accesible `tablist`/`tab`/`tabpanel`, admiten fl
 
 ## Decisiones del cliente aplicadas
 
-- Marca, nombre, tipo, descripción, presentación y precio permanecen próximos a la galería. “Disponible” se anuncia de forma accesible sin ocupar espacio visual; “Agotado” sí permanece visible por ser una excepción relevante.
+- Marca, nombre, perfil aromático, descripción, presentación y precio permanecen próximos a la galería. La concentración del perfume se retiró por decisión posterior del cliente. “Disponible” se anuncia de forma accesible sin ocupar espacio visual; “Agotado” sí permanece visible por ser una excepción relevante.
 - Cada presentación tiene precio y estado propios. Una opción agotada puede inspeccionarse, pero no se anuncia como comprable.
 - El perfil resume la evolución mediante la primera nota de salida, corazón y fondo; añade familia, medidor de intensidad, ocasión y temporada sin convertir la sección en una ficha técnica extensa.
 - La galería admite cuatro vistas. Los fixtures actuales derivan cuatro encuadres de las dos fotografías temporales disponibles por producto; los cuatro assets definitivos continúan pendientes.

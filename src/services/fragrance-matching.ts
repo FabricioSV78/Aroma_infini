@@ -1,4 +1,5 @@
-import type { ProductVariant } from '../types/catalog'
+import type { Product, ProductVariant } from '../types/catalog'
+import { isPerfume } from '../domain/product-type'
 import type {
   FinderAnswers,
   FinderOption,
@@ -11,6 +12,11 @@ import type {
   StorefrontProductRecord,
 } from './storefront-repository'
 import { formatPEN } from './currency'
+import { getVariantPrice } from './product-discounts'
+import {
+  getOlfactoryAromaLabel,
+  getProductOlfactoryFamilies,
+} from '../domain/olfactory-family'
 
 export const finderWeights = { family: 5, occasion: 3, intensity: 2 } as const
 
@@ -21,6 +27,17 @@ export function normalizeFinderValue(value: string): string {
     .toLocaleLowerCase('es')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** Accept old single-choice answers at runtime while the UI moves to arrays. */
+function selectedValues(value: unknown): Set<string> {
+  const raw = Array.isArray(value) ? value : [value]
+  return new Set(
+    raw
+      .filter((item): item is string => typeof item === 'string')
+      .map(normalizeFinderValue)
+      .filter(Boolean),
+  )
 }
 
 /** Match full labels, never substrings, inferred notes or personality stereotypes. */
@@ -43,7 +60,10 @@ export function profileParts(value: string): FinderOption[] {
 export function availableFinderVariants(
   variants: readonly ProductVariant[],
   budgetCents?: number,
+  product?: Product,
 ): ProductVariant[] {
+  const finalPrice = (variant: ProductVariant) =>
+    product ? getVariantPrice(product, variant).finalCents : variant.priceCents
   return variants
     .filter(
       (variant) =>
@@ -53,12 +73,14 @@ export function availableFinderVariants(
         Number.isSafeInteger(variant.priceCents) &&
         variant.priceCents > 0 &&
         Number.isFinite(variant.ml) &&
-        variant.ml > 0 &&
-        (budgetCents === undefined || variant.priceCents <= budgetCents),
+        (variant.ml ?? 0) > 0 &&
+        (budgetCents === undefined || finalPrice(variant) <= budgetCents),
     )
     .sort(
       (a, b) =>
-        a.priceCents - b.priceCents || a.ml - b.ml || a.id.localeCompare(b.id),
+        finalPrice(a) - finalPrice(b) ||
+        (a.ml ?? 0) - (b.ml ?? 0) ||
+        a.id.localeCompare(b.id),
     )
 }
 
@@ -69,8 +91,13 @@ function availableRecords(
   // Publication is owned by the repository, and availability by variant stock.
   return snapshot.products.filter(
     (record) =>
+      isPerfume(record.product) &&
       brands.has(record.product.brandId) &&
-      availableFinderVariants(record.product.variants).length,
+      availableFinderVariants(
+        record.product.variants,
+        undefined,
+        record.product,
+      ).length,
   )
 }
 
@@ -82,10 +109,12 @@ export function getFinderOptions(snapshot: StorefrontSnapshot): FinderOptions {
     ].sort((a, b) => a.label.localeCompare(b.label, 'es'))
   }
   return {
-    // The leading family is already the editorial category entered in the panel.
     families: unique(
       records.flatMap(({ product }) =>
-        profileParts(product.family).slice(0, 1),
+        getProductOlfactoryFamilies(product).map((family) => ({
+          value: family,
+          label: getOlfactoryAromaLabel(family),
+        })),
       ),
     ),
     occasions: unique(
@@ -106,9 +135,12 @@ export function recommendFragrances(
 ): FinderResult {
   const records = availableRecords(snapshot)
   if (!records.length) return { kind: 'unavailable', matches: [] }
-  const hasPreferences = Boolean(
-    answers.family || answers.occasion || answers.intensity,
-  )
+  const selected = {
+    family: selectedValues(answers.family),
+    occasion: selectedValues(answers.occasion),
+    intensity: selectedValues(answers.intensity),
+  }
+  const hasPreferences = Object.values(selected).some((values) => values.size)
   if (!hasPreferences && !answers.budget)
     return { kind: 'preferences', matches: [] }
   const budget = answers.budget ? Number(answers.budget) : undefined
@@ -117,26 +149,30 @@ export function recommendFragrances(
     return { kind: 'empty', matches: [] }
   const matches: FragranceMatch[] = []
   for (const { product, detail } of records) {
-    const variant = availableFinderVariants(product.variants, budget)[0]
+    const variant = availableFinderVariants(
+      product.variants,
+      budget,
+      product,
+    )[0]
     if (!variant) continue
-    const familyMatch = Boolean(
-      answers.family &&
-      profileParts(product.family).some(
-        (part) => part.value === answers.family,
-      ),
+    const matchedFamily = getProductOlfactoryFamilies(product).find((family) =>
+      selected.family.has(family),
     )
-    // The chosen aroma is the anchor. Never substitute a different family just to fill results.
-    if (answers.family && !familyMatch) continue
+    const familyMatch = Boolean(matchedFamily)
+    // The chosen aromas are the anchor. A product must match at least one of them.
+    if (selected.family.size && !familyMatch) continue
     const reasons: string[] = []
     const differences: string[] = []
     let score = 0
-    if (familyMatch) {
+    if (familyMatch && matchedFamily) {
       score += finderWeights.family
-      reasons.push(`Perfil ${product.family.toLocaleLowerCase('es')}.`)
+      reasons.push(
+        `Perfil ${getOlfactoryAromaLabel(matchedFamily).toLocaleLowerCase('es')}.`,
+      )
     }
-    if (answers.occasion) {
-      const moment = profileParts(detail.occasion).find(
-        (part) => part.value === answers.occasion,
+    if (selected.occasion.size) {
+      const moment = profileParts(detail.occasion).find((part) =>
+        selected.occasion.has(part.value),
       )
       if (moment) {
         score += finderWeights.occasion
@@ -150,21 +186,25 @@ export function recommendFragrances(
             : 'La ficha no indica un momento de uso.',
         )
     }
-    if (answers.intensity) {
-      if (normalizeFinderValue(detail.intensity) === answers.intensity) {
+    if (selected.intensity.size) {
+      if (
+        selected.intensity.has(normalizeFinderValue(detail.intensity ?? ''))
+      ) {
         score += finderWeights.intensity
-        reasons.push(`Intensidad ${detail.intensity.toLocaleLowerCase('es')}.`)
+        reasons.push(
+          `Intensidad ${(detail.intensity ?? '').toLocaleLowerCase('es')}.`,
+        )
       } else
         differences.push(
           detail.intensity
-            ? `Intensidad de la ficha: ${detail.intensity.toLocaleLowerCase('es')}.`
+            ? `Intensidad de la ficha: ${(detail.intensity ?? '').toLocaleLowerCase('es')}.`
             : 'La ficha no indica la intensidad.',
         )
     }
     if (hasPreferences && score === 0) continue
     if (budget !== undefined)
       reasons.push(
-        `${variant.ml} ml por ${formatPEN(variant.priceCents)}, dentro de tu presupuesto.`,
+        `${variant.ml} ml por ${formatPEN(getVariantPrice(product, variant).finalCents)}, dentro de tu presupuesto.`,
       )
     matches.push({
       product,
@@ -180,7 +220,8 @@ export function recommendFragrances(
     (a, b) =>
       Number(b.complete) - Number(a.complete) ||
       b.score - a.score ||
-      a.variant.priceCents - b.variant.priceCents ||
+      getVariantPrice(a.product, a.variant).finalCents -
+        getVariantPrice(b.product, b.variant).finalCents ||
       a.product.name.localeCompare(b.product.name, 'es') ||
       a.product.id.localeCompare(b.product.id),
   )

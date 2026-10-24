@@ -2,6 +2,7 @@ import type { Brand, Product } from '../types/catalog'
 import type { HomeContent, HomeMedia } from '../types/home'
 import type { ShippingSettings } from '../types/shipping'
 import type { FinderOptions } from '../types/fragrance-finder'
+import type { StoreFeatures } from '../domain/store-features'
 import { getFinderOptions } from './fragrance-matching'
 import {
   localStorefrontRepository,
@@ -16,6 +17,7 @@ export interface HomeData {
   media: HomeMedia
   content: HomeContent
   finderOptions: FinderOptions
+  features: StoreFeatures
 }
 
 export interface HomeService {
@@ -63,6 +65,7 @@ export const homeService: HomeService = {
       media: { ...snapshot.media },
       content: snapshot.content,
       finderOptions: getFinderOptions(snapshot),
+      features: snapshot.features,
     }
   },
 }

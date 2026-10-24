@@ -23,7 +23,10 @@ test('Loader de ficha: producto, ruta inexistente y error recuperable', async ()
   expect(ready.kind).toBe('ready')
   if (ready.kind === 'ready') {
     expect(ready.detail.gallery).toHaveLength(4)
-    expect(ready.recommendations).toHaveLength(4)
+    expect(ready.recommendations).toHaveLength(3)
+    expect(ready.recommendations.map((product) => product.id)).not.toContain(
+      'ambre',
+    )
   }
   expect((await productLoader(args('inexistente'))).kind).toBe('missing')
 
@@ -110,22 +113,23 @@ test('Galería, favoritos compartidos y recomendaciones son operables', async ({
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(
     page.locator('.product-recommendations .product-card'),
-  ).toHaveCount(4)
+  ).toHaveCount(3)
+  await expect(page.locator('.product-recommendations')).not.toContainText(
+    'Ambre Lent',
+  )
 })
 
-test('Un perfume agotado conserva precios de referencia y exploración', async ({
+test('Un perfume agotado no permite acceder a una ficha de compra', async ({
   page,
 }) => {
   await page.goto('/producto/ambre-lent')
-  await expect(page.locator('.product-selected-price')).toContainText('Agotado')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Este perfume no está en la selección',
+  )
+  await expect(page.locator('.product-selected-price')).toHaveCount(0)
   await expect(
-    page.getByRole('button', { name: 'Presentación agotada' }),
-  ).toBeDisabled()
-  await page.getByLabel('100 ml').check()
-  await expect(page.locator('.product-selected-price')).toContainText('S/ 650')
-  await expect(
-    page.locator('.product-recommendations .product-card'),
-  ).toHaveCount(4)
+    page.getByRole('link', { name: /Explorar tienda/ }),
+  ).toHaveAttribute('href', '/tienda')
 })
 
 test('Una sola presentación ocupa el ancho completo del selector', async ({
@@ -208,7 +212,7 @@ test('En móvil la acción de compra es visible y mantiene un área táctil cóm
   expect(visibleBox?.height).toBeGreaterThanOrEqual(44)
 })
 
-test('Las ocho fichas conservan la compra en la primera vista móvil', async ({
+test('Las fichas publicadas conservan la compra en la primera vista móvil', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 640 })
@@ -216,7 +220,6 @@ test('Las ocho fichas conservan la compra en la primera vista móvil', async ({
     'bois-clair',
     'petale-nu',
     'vert-silence',
-    'ambre-lent',
     'neroli-matin',
     'iris-velours',
     'figue-douce',
@@ -488,7 +491,7 @@ test('El aviso de producto cabe en móvil y distingue la selección de los más 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/producto/neroli-matin')
+  await page.goto('/producto/iris-velours')
   const notice = page.locator('.product-popularity-preview')
   await scrollPastGallery(page)
   await expect(notice).toBeVisible()

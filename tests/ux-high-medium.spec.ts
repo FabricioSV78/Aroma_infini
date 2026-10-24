@@ -60,12 +60,8 @@ test('Las páginas informativas tienen acciones legibles y muestran la tarifa vi
     expect((await action.boundingBox())?.width).toBeGreaterThanOrEqual(140)
   }
   await page.goto('/envios')
-  await expect(page.locator('.institutional-shipping-summary')).toContainText(
-    'S/ 35',
-  )
-  await expect(page.locator('.institutional-shipping-summary')).toContainText(
-    'S/ 450',
-  )
+  await expect(page.locator('.delivery-rates')).toContainText('S/ 20')
+  await expect(page.locator('.delivery-free')).toContainText('S/ 450')
 })
 
 test('Los editores de Home y Envíos avisan antes de descartar cambios', async ({
@@ -73,20 +69,27 @@ test('Los editores de Home y Envíos avisan antes de descartar cambios', async (
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/admin/home')
-  await page.getByRole('button', { name: 'Destacados', exact: true }).click()
-  await page.getByRole('button', { name: 'Invertir orden' }).click()
-  let accept = false
-  page.on('dialog', (dialog) => {
-    void (accept ? dialog.accept() : dialog.dismiss())
-  })
+  await page
+    .getByRole('textbox', { name: 'Etiqueta superior' })
+    .fill('Campaña temporal')
   await page.getByRole('link', { name: 'Pedidos' }).click()
+  await page
+    .locator('.admin-notice-dialog')
+    .getByRole('button', { name: 'Seguir editando' })
+    .click()
   await expect(page).toHaveURL('/admin/home')
-  accept = true
-  await page.getByRole('link', { name: 'Envíos' }).click()
+  await page.getByRole('link', { name: 'Tarifas de envío' }).click()
+  await page
+    .locator('.admin-notice-dialog')
+    .getByRole('button', { name: 'Salir sin guardar' })
+    .click()
   await expect(page).toHaveURL('/admin/envios')
-  await page.getByLabel('Tarifa base de courier (S/)').fill('36')
-  accept = false
+  await page.getByLabel('Courier en Lima (S/)').fill('36')
   await page.getByRole('link', { name: 'Pedidos' }).click()
+  await page
+    .locator('.admin-notice-dialog')
+    .getByRole('button', { name: 'Seguir editando' })
+    .click()
   await expect(page).toHaveURL('/admin/envios')
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
   await expect(
@@ -128,6 +131,7 @@ test('Un pedido con datos incompletos se puede completar antes de enviarlo', asy
   await page.getByLabel('Dirección exacta').fill('Calle Los Olivos 123')
   await page.getByRole('button', { name: 'Guardar datos de entrega' }).click()
   await expect(page.getByText('Datos de entrega guardados.')).toBeVisible()
+  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
   await page
     .getByRole('combobox', { name: 'Preparación del pedido' })
     .selectOption('shipped')
@@ -135,6 +139,10 @@ test('Un pedido con datos incompletos se puede completar antes de enviarlo', asy
     page.getByRole('button', { name: 'Guardar estado' }),
   ).toBeEnabled()
   await page.getByRole('button', { name: 'Guardar estado' }).click()
+  await page
+    .locator('.admin-notice-dialog')
+    .getByRole('button', { name: 'Confirmar envío' })
+    .click()
   await expect(page.getByText('Estado actualizado.')).toBeVisible()
   await page.reload()
   await expect(
@@ -149,7 +157,9 @@ test('El editor de excepciones se trae a la vista y la lista de productos usa p�
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/admin/envios')
-  await page.getByRole('button', { name: 'Agregar excepción' }).click()
+  await page
+    .getByRole('button', { name: 'Agregar tarifa por distrito' })
+    .click()
   await expect
     .poll(() =>
       page

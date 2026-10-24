@@ -280,6 +280,15 @@
   border-top: 1px solid var(--color-line);
 }
 
+.account-form-note {
+  margin-bottom: 20px;
+  padding-left: 14px;
+  border-left: 2px solid var(--color-brand);
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .account-fields {
   display: grid;
   gap: 20px 18px;
@@ -643,7 +652,9 @@
 }
 
 .store-layout .account-overview-grid > section {
-  transition: border-color 180ms ease, background-color 180ms ease;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 .store-layout .account-overview-grid > section:first-child {
@@ -651,7 +662,7 @@
   background: var(--color-sage);
 }
 
-.store-layout .account-overview-grid > section:is(:hover, :focus-within) {
+.store-layout .account-overview-grid > section:focus-within {
   border-color: #a9bdb3;
 }
 

@@ -1,5 +1,6 @@
 import { OlfactoryProfile } from './OlfactoryProfile'
-import { useState } from 'react'
+import { isPerfume, variantLabel } from '../../domain/product-type'
+import { useState, useSyncExternalStore } from 'react'
 import { Link, useLoaderData, useRevalidator } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { ProductCard } from '../home/ProductCard'
@@ -8,12 +9,26 @@ import { ProductGallery } from './ProductGallery'
 import { productLoader } from './product-loader'
 import { useFavorites } from '../favorites/favorites-context'
 import { useCart } from '../cart/cart-context'
+import {
+  FavoritesContext,
+  type FavoritesContextValue,
+} from '../favorites/favorites-context'
+import { CartContext, type CartContextValue } from '../cart/cart-context'
 import { formatPEN } from '../../services/currency'
+import { getVariantPrice } from '../../services/product-discounts'
+import { getProductRecommendations } from '../../services/product-recommendations'
+import { shippingService } from '../../services/shipping-service'
+import { useOfferPriceRevision } from '../../services/offer-price-clock'
+import { PriceDisplay } from '../../components/ui/PriceDisplay'
+import { OfferBadge } from '../../components/ui/OfferBadge'
 import { ProductReviewsPreview } from './ProductReviewsPreview'
 import { ProductPopularityPreview } from './ProductPopularityPreview'
 import { getBestsellingProducts } from '../../services/home-service'
-import { getOlfactoryImage } from '../../content/olfactory-imagery'
 import { brandStorePath } from '../../utils/brand-store-path'
+import {
+  getOlfactoryAromaLabel,
+  getProductOlfactoryFamilies,
+} from '../../domain/olfactory-family'
 
 interface ProductReadyProps {
   product: Product
@@ -21,6 +36,7 @@ interface ProductReadyProps {
   brand: Brand | undefined
   recommendations: Product[]
   brands: Brand[]
+  preview?: boolean
 }
 
 type ProductInfoPanel = 'family' | 'description' | 'reviews'
@@ -31,7 +47,9 @@ function ProductReady({
   brand,
   recommendations,
   brands,
+  preview = false,
 }: ProductReadyProps) {
+  useOfferPriceRevision()
   const initialVariant =
     product.variants.find(
       (variant) => variant.active !== false && variant.stock > 0,
@@ -41,17 +59,38 @@ function ProductReady({
   )
   const { favoriteIds, toggleFavorite } = useFavorites()
   const { addItem } = useCart()
-  const [openInfoPanel, setOpenInfoPanel] = useState<ProductInfoPanel | null>(
-    null,
+  const shipping = useSyncExternalStore(
+    shippingService.subscribe,
+    shippingService.getSnapshot,
   )
+  const [openInfoPanel, setOpenInfoPanel] = useState<ProductInfoPanel | null>(
+    isPerfume(product) ? null : 'description',
+  )
+  const [previewMessage, setPreviewMessage] = useState('')
   const selectedVariant =
     product.variants.find(
       (variant) => variant.id === selectedVariantId && variant.active !== false,
     ) ?? initialVariant
   const isAvailable = Boolean(selectedVariant && selectedVariant.stock > 0)
   const selectedPrice = selectedVariant
-    ? formatPEN(selectedVariant.priceCents)
-    : 'Precio no disponible'
+    ? getVariantPrice(product, selectedVariant)
+    : null
+  const displayedPrice =
+    selectedPrice && !isAvailable
+      ? {
+          ...selectedPrice,
+          finalCents: selectedPrice.originalCents,
+          discountCents: 0,
+          discountActive: false,
+        }
+      : selectedPrice
+  const hasTimedOffer = Boolean(
+    isAvailable &&
+    displayedPrice?.discountActive &&
+    product.discount?.endsAt.trim(),
+  )
+  const perfume = isPerfume(product)
+  const olfactoryFamilies = perfume ? getProductOlfactoryFamilies(product) : []
 
   function toggleInfoPanel(panel: ProductInfoPanel) {
     setOpenInfoPanel((current) => (current === panel ? null : panel))
@@ -64,15 +103,40 @@ function ProductReady({
         aria-label="Ruta de navegación"
         data-scroll-reveal="fade"
       >
-        <Link to="/">Inicio</Link>
+        <Link
+          to="/"
+          aria-disabled={preview}
+          tabIndex={preview ? -1 : undefined}
+        >
+          Inicio
+        </Link>
         <span aria-hidden="true">/</span>
-        <Link to="/tienda">Perfumes</Link>
+        <Link
+          to={
+            isPerfume(product)
+              ? '/tienda?tipo=perfume'
+              : '/tienda?tipo=complemento'
+          }
+          aria-disabled={preview}
+          tabIndex={preview ? -1 : undefined}
+        >
+          {isPerfume(product) ? 'Perfumes' : 'Complementos'}
+        </Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">{product.name}</span>
       </nav>
 
       <div className="product-intro container" data-scroll-reveal="stagger">
-        <ProductGallery name={product.name} views={detail.gallery} />
+        {detail.gallery.length ? (
+          <ProductGallery name={product.name} views={detail.gallery} />
+        ) : (
+          <section
+            className="product-gallery product-gallery--empty"
+            aria-label="Galería del producto"
+          >
+            <p>Agrega una fotografía para completar la galería.</p>
+          </section>
+        )}
         <section className="product-purchase" aria-labelledby="product-title">
           <div className="product-purchase-heading">
             <div>
@@ -80,19 +144,31 @@ function ProductReady({
                 <Link
                   className="product-brand"
                   to={brandStorePath(brand.slug)}
+                  aria-disabled={preview}
+                  tabIndex={preview ? -1 : undefined}
                 >
                   {brand.name}
                 </Link>
               ) : null}
-              <p className="product-kind">
-                {detail.type} <span aria-hidden="true">·</span> {product.family}
-              </p>
+              {!perfume || olfactoryFamilies.length ? (
+                <p className="product-kind">
+                  {perfume
+                    ? olfactoryFamilies.map(getOlfactoryAromaLabel).join(' · ')
+                    : 'Complemento'}
+                </p>
+              ) : null}
             </div>
             <button
               type="button"
               className="product-save"
               aria-pressed={favoriteIds.has(product.id)}
-              onClick={() => toggleFavorite(product.id)}
+              onClick={() =>
+                preview
+                  ? setPreviewMessage(
+                      'Los favoritos estarán disponibles en la tienda.',
+                    )
+                  : toggleFavorite(product.id)
+              }
             >
               <Icon name="heart" />
               {favoriteIds.has(product.id) ? 'Guardado' : 'Guardar'}
@@ -102,38 +178,85 @@ function ProductReady({
           <div
             className="product-selected-price"
             aria-live="polite"
-            aria-label={`${selectedPrice}. ${isAvailable ? 'Disponible' : 'Agotado'}`}
+            aria-label={`${displayedPrice ? `Precio ${formatPEN(displayedPrice.finalCents)}${displayedPrice.discountActive ? `, antes ${formatPEN(displayedPrice.originalCents)}` : ''}` : 'Precio no disponible'}. ${isAvailable ? 'Disponible' : 'Agotado'}`}
           >
-            <strong>{selectedPrice}</strong>
+            <div className="product-selected-price__amounts">
+              <OfferBadge
+                discount={product.discount}
+                price={displayedPrice}
+                inline
+              />
+              {displayedPrice ? (
+                <PriceDisplay
+                  originalCents={displayedPrice.originalCents}
+                  finalCents={displayedPrice.finalCents}
+                />
+              ) : (
+                <strong>Precio no disponible</strong>
+              )}
+            </div>
             {isAvailable ? null : (
               <span className="is-unavailable">Agotado</span>
             )}
           </div>
           <p className="product-lead">{detail.shortDescription}</p>
+          {hasTimedOffer || shipping.freeThresholdCents > 0 ? (
+            <ul
+              className="product-purchase-notices"
+              aria-label="Condiciones de compra"
+            >
+              {hasTimedOffer ? (
+                <li>
+                  <Icon name="clock" />
+                  <span>Oferta por tiempo limitado</span>
+                </li>
+              ) : null}
+              {shipping.freeThresholdCents > 0 ? (
+                <li>
+                  <Icon name="truck" />
+                  <span>
+                    Envío gratis desde {formatPEN(shipping.freeThresholdCents)}
+                  </span>
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
 
           <fieldset className="product-variants">
             <legend>Presentación</legend>
             {product.variants
               .filter((variant) => variant.active !== false)
-              .map((variant) => (
-                <label
-                  key={variant.id}
-                  className={variant.stock > 0 ? '' : 'is-unavailable'}
-                >
-                  <input
-                    type="radio"
-                    name={`variant-${product.id}`}
-                    value={variant.id}
-                    checked={selectedVariantId === variant.id}
-                    onChange={() => setSelectedVariantId(variant.id)}
-                  />
-                  <span>
-                    <strong>{variant.ml} ml</strong>
-                    <small>{formatPEN(variant.priceCents)}</small>
-                  </span>
-                  {variant.stock === 0 ? <em>Agotado</em> : null}
-                </label>
-              ))}
+              .map((variant) => {
+                const price = getVariantPrice(product, variant)
+                return (
+                  <label
+                    key={variant.id}
+                    className={variant.stock > 0 ? '' : 'is-unavailable'}
+                  >
+                    <input
+                      type="radio"
+                      name={`variant-${product.id}`}
+                      value={variant.id}
+                      checked={selectedVariantId === variant.id}
+                      onChange={() => setSelectedVariantId(variant.id)}
+                    />
+                    <span>
+                      <strong>{variantLabel(variant)}</strong>
+                      <small>
+                        <PriceDisplay
+                          originalCents={price.originalCents}
+                          finalCents={
+                            variant.stock > 0
+                              ? price.finalCents
+                              : price.originalCents
+                          }
+                        />
+                      </small>
+                    </span>
+                    {variant.stock === 0 ? <em>Agotado</em> : null}
+                  </label>
+                )
+              })}
           </fieldset>
 
           <button
@@ -142,8 +265,11 @@ function ProductReady({
             disabled={!isAvailable}
             aria-describedby="product-purchase-note"
             onClick={() => {
-              if (selectedVariant)
+              if (preview) {
+                setPreviewMessage('La compra estará disponible en la tienda.')
+              } else if (selectedVariant) {
                 addItem(selectedVariant.id, selectedVariant.stock, product.name)
+              }
             }}
           >
             <span className="product-cart-button__label">
@@ -153,19 +279,63 @@ function ProductReady({
           <p id="product-purchase-note" className="sr-only">
             {isAvailable
               ? 'La presentación se añadirá a tu carrito.'
-              : 'Puedes explorar otras presentaciones o perfumes relacionados.'}
+              : 'Puedes explorar otras presentaciones o productos relacionados.'}
           </p>
+          {preview ? (
+            <p
+              className="product-preview-status"
+              role="status"
+              aria-live="polite"
+            >
+              {previewMessage}
+            </p>
+          ) : null}
+
+          <ul
+            className={`product-purchase-benefits${perfume ? '' : ' product-purchase-benefits--two'}`}
+            aria-label="Beneficios de compra"
+          >
+            {perfume && (
+              <li>
+                <Icon name="shieldCheck" />
+                <span>
+                  <strong>100% original</strong>
+                  <small>Productos garantizados</small>
+                </span>
+              </li>
+            )}
+            <li>
+              <Icon name="card" />
+              <span>
+                <strong>Pago seguro</strong>
+                <small>Compra protegida</small>
+              </span>
+            </li>
+            <li>
+              <Icon name="truck" />
+              <span>
+                <strong>
+                  {shipping.provinceShippingEnabled
+                    ? 'Envíos a todo el Perú'
+                    : 'Envíos a Lima y Callao'}
+                </strong>
+                <small>Opciones de entrega disponibles</small>
+              </span>
+            </li>
+          </ul>
 
           <nav
             className="product-info-nav"
-            aria-label="Información de este perfume"
+            aria-label="Información de este producto"
           >
-            <a
-              href="#informacion-producto"
-              onClick={() => setOpenInfoPanel('family')}
-            >
-              Familia olfativa <span aria-hidden="true">↓</span>
-            </a>
+            {perfume && (
+              <a
+                href="#informacion-producto"
+                onClick={() => setOpenInfoPanel('family')}
+              >
+                Familia olfativa <span aria-hidden="true">↓</span>
+              </a>
+            )}
             <a
               href="#informacion-producto"
               onClick={() => setOpenInfoPanel('description')}
@@ -185,25 +355,27 @@ function ProductReady({
       <section
         id="informacion-producto"
         className="product-information"
-        aria-label="Información del perfume"
+        aria-label="Información del producto"
         tabIndex={-1}
         data-scroll-reveal="copy"
       >
         <div
           className="product-info-tabs"
           role="group"
-          aria-label="Detalles del perfume"
+          aria-label="Detalles del producto"
         >
-          <button
-            id="product-info-tab-family"
-            type="button"
-            aria-expanded={openInfoPanel === 'family'}
-            aria-controls="product-info-panel-family"
-            onClick={() => toggleInfoPanel('family')}
-          >
-            Familia olfativa
-            <Icon name="chevron" className="product-info-chevron" />
-          </button>
+          {perfume && (
+            <button
+              id="product-info-tab-family"
+              type="button"
+              aria-expanded={openInfoPanel === 'family'}
+              aria-controls="product-info-panel-family"
+              onClick={() => toggleInfoPanel('family')}
+            >
+              Familia olfativa
+              <Icon name="chevron" className="product-info-chevron" />
+            </button>
+          )}
           <button
             id="product-info-tab-description"
             type="button"
@@ -226,19 +398,21 @@ function ProductReady({
           </button>
         </div>
 
-        <div
-          id="product-info-panel-family"
-          className="product-info-panel product-info-panel--family container"
-          role="region"
-          aria-labelledby="product-info-tab-family"
-          hidden={openInfoPanel !== 'family'}
-        >
-          <OlfactoryProfile
-            family={product.family}
-            detail={detail}
-            image={getOlfactoryImage(product.id, detail.notes)}
-          />
-        </div>
+        {perfume && (
+          <div
+            id="product-info-panel-family"
+            className="product-info-panel product-info-panel--family container"
+            role="region"
+            aria-labelledby="product-info-tab-family"
+            hidden={openInfoPanel !== 'family'}
+          >
+            <OlfactoryProfile
+              family={product.family}
+              detail={detail}
+              image={detail.olfactoryImage ?? undefined}
+            />
+          </div>
+        )}
 
         <div
           id="product-info-panel-description"
@@ -259,42 +433,62 @@ function ProductReady({
         >
           <ProductReviewsPreview
             productId={product.id}
-            sizes={[...new Set(product.variants.map((variant) => variant.ml))]}
+            productType={product.productType}
+            sizes={[
+              ...new Set(
+                product.variants
+                  .map((variant) => variant.ml)
+                  .filter((ml): ml is number => ml !== null),
+              ),
+            ]}
+            readOnly={preview}
           />
         </div>
       </section>
-      <ProductPopularityPreview
-        productImage={product.image}
-        productName={product.name}
-        description={detail.shortDescription}
-        bestseller={getBestsellingProducts().some(
-          (item) => item.id === product.id,
-        )}
-      />
+      {product.image ? (
+        <ProductPopularityPreview
+          productImage={product.image}
+          productName={product.name}
+          description={detail.shortDescription}
+          bestseller={getBestsellingProducts().some(
+            (item) => item.id === product.id,
+          )}
+        />
+      ) : null}
 
-      <section
-        className="product-recommendations container"
-        aria-labelledby="recommendations-title"
-      >
-        <header data-scroll-reveal="copy">
-          <div>
-            <p className="eyebrow">Seguir descubriendo</p>
-            <h2 id="recommendations-title">También te puede gustar</h2>
+      {recommendations.length > 0 && (
+        <section
+          className="product-recommendations container"
+          aria-labelledby="recommendations-title"
+        >
+          <header data-scroll-reveal="copy">
+            <div>
+              <p className="eyebrow">Seguir descubriendo</p>
+              <h2 id="recommendations-title">También te puede gustar</h2>
+            </div>
+            <Link
+              className="text-link"
+              to="/tienda"
+              aria-disabled={preview}
+              tabIndex={preview ? -1 : undefined}
+            >
+              Ver tienda <Icon name="arrow" />
+            </Link>
+          </header>
+          <div className="product-grid" data-scroll-reveal="stagger">
+            {recommendations.map((item) => (
+              <ProductCard
+                key={item.id}
+                product={item}
+                brand={brands.find(
+                  (candidate) => candidate.id === item.brandId,
+                )}
+                preview={preview}
+              />
+            ))}
           </div>
-          <Link className="text-link" to="/tienda">
-            Ver tienda <Icon name="arrow" />
-          </Link>
-        </header>
-        <div className="product-grid" data-scroll-reveal="stagger">
-          {recommendations.map((item) => (
-            <ProductCard
-              key={item.id}
-              product={item}
-              brand={brands.find((candidate) => candidate.id === item.brandId)}
-            />
-          ))}
-        </div>
-      </section>
+        </section>
+      )}
     </article>
   )
 }
@@ -321,9 +515,11 @@ export function ProductPage() {
         {data.kind === 'error' ? (
           <button
             className="button button--primary"
+            disabled={revalidator.state !== 'idle'}
+            aria-busy={revalidator.state !== 'idle'}
             onClick={() => revalidator.revalidate()}
           >
-            Reintentar
+            {revalidator.state !== 'idle' ? 'Cargando el producto…' : 'Reintentar'}
           </button>
         ) : null}
         <Link className="text-link" to="/tienda">
@@ -334,4 +530,98 @@ export function ProductPage() {
   }
 
   return <ProductReady key={data.product.id} {...data} />
+}
+
+const ignorePreviewAction = () => {}
+const previewFavorites: FavoritesContextValue = {
+  favoriteIds: new Set<string>(),
+  favoriteCount: 0,
+  persistence: 'session',
+  toggleFavorite: ignorePreviewAction,
+  removeFavorite: ignorePreviewAction,
+}
+const previewCart: CartContextValue = {
+  items: [],
+  itemCount: 0,
+  persistence: 'session',
+  drawerOpen: false,
+  notice: null,
+  addItem: ignorePreviewAction,
+  setQuantity: ignorePreviewAction,
+  removeItem: ignorePreviewAction,
+  clearCart: ignorePreviewAction,
+  openCart: ignorePreviewAction,
+  closeCart: ignorePreviewAction,
+  dismissNotice: ignorePreviewAction,
+}
+
+interface ProductDetailPreviewProps {
+  record: { product: Product; detail: ProductDetail }
+  brands: Brand[]
+  products: Product[]
+}
+
+/** Renders the customer detail from the unsaved form, without accessing the published record. */
+export function ProductDetailPreview({
+  record,
+  brands,
+  products,
+}: ProductDetailPreviewProps) {
+  const { product } = record
+  const detail = {
+    ...record.detail,
+    gallery: record.detail.gallery.filter((view) => view.image.trim()),
+  }
+  if (!detail.gallery.length && product.image.trim()) {
+    detail.gallery = [
+      {
+        image: product.image,
+        alt: `Imagen de ${product.name}`,
+        framing: 'full',
+      },
+    ]
+  }
+  const recommendations = getProductRecommendations(
+    product,
+    detail.recommendationIds,
+    products,
+  )
+
+  return (
+    <FavoritesContext.Provider value={previewFavorites}>
+      <CartContext.Provider value={previewCart}>
+        <div
+          className="store-layout product-detail-preview"
+          onClickCapture={(event) => {
+            const anchor =
+              event.target instanceof Element
+                ? event.target.closest('a[href]')
+                : null
+            if (!anchor) return
+            event.preventDefault()
+            const href = anchor.getAttribute('href')
+            if (href?.startsWith('#')) {
+              event.currentTarget.querySelector(href)?.scrollIntoView({
+                block: 'start',
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)')
+                  .matches
+                  ? 'auto'
+                  : 'smooth',
+              })
+            }
+          }}
+        >
+          <ProductReady
+            key={product.id}
+            product={product}
+            detail={detail}
+            brand={brands.find((item) => item.id === product.brandId)}
+            recommendations={recommendations}
+            brands={brands}
+            preview
+          />
+        </div>
+      </CartContext.Provider>
+    </FavoritesContext.Provider>
+  )
 }

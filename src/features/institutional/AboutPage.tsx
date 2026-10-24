@@ -2,75 +2,76 @@ import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { aboutPageContent as content } from '../../content/institutional'
 import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
+import { assetSource, assetSourceSet } from '../../services/asset-source'
 
 export function AboutPage() {
   return (
     <article className="store-page institutional-page institutional-about">
       <div className="container">
         <InstitutionalBreadcrumb current="Nosotros" />
-        <div className="institutional-about-hero">
-          <header
-            className="institutional-about-opening"
-            data-scroll-reveal="copy"
-          >
-            <h1>{content.title}</h1>
-            <p>{content.introduction}</p>
+
+        <section className="about-hero" aria-labelledby="about-title">
+          <header className="about-hero-copy">
+            <p className="eyebrow">{content.hero.eyebrow}</p>
+            <h1 id="about-title">{content.hero.title}</h1>
+            <p className="about-hero-intro">{content.hero.introduction}</p>
           </header>
-          <figure
-            className="institutional-about-visual"
-            data-scroll-reveal="image"
-          >
-            <picture>
-              <source
-                media="(max-width: 767px)"
-                srcSet={content.image.mobileSet}
-                sizes="(max-width: 767px) calc(100vw - 32px), 50vw"
-              />
-              <img
-                src={content.image.desktop}
-                srcSet={content.image.desktopSet}
-                sizes="(max-width: 767px) calc(100vw - 32px), 50vw"
-                width={1536}
-                height={864}
-                alt={content.image.alt}
-                decoding="async"
-                fetchPriority="high"
-              />
-            </picture>
-            <figcaption>{content.image.caption}</figcaption>
-          </figure>
-        </div>
+          <picture className="about-hero-media">
+            <source
+              media="(max-width: 767px)"
+              srcSet={assetSourceSet(content.hero.image.mobileSet)}
+              sizes="(max-width: 767px) calc(100vw - 32px), 100vw"
+            />
+            <img
+              src={assetSource(content.hero.image.desktop)}
+              srcSet={assetSourceSet(content.hero.image.desktopSet)}
+              sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1680px) calc(100vw - 80px), 1680px"
+              width={1536}
+              height={864}
+              alt={content.hero.image.alt}
+              decoding="async"
+              fetchPriority="high"
+            />
+          </picture>
+        </section>
       </div>
 
-      <section
-        className="container institutional-about-approach"
-        aria-labelledby="about-approach-title"
-      >
-        <div
-          className="institutional-about-approach-copy"
-          data-scroll-reveal="copy"
-        >
-          <p className="eyebrow">{content.approach.eyebrow}</p>
-          <h2 id="about-approach-title">{content.approach.title}</h2>
-          <p>{content.approach.description}</p>
-          <Link className="text-link" to="/tienda">
-            {content.action} <Icon name="arrow" />
-          </Link>
-        </div>
-        <ol
-          className="institutional-about-principles"
-          data-scroll-reveal="stagger"
-        >
-          {content.principles.map((principle) => (
-            <li key={principle.number}>
-              <span aria-hidden="true">{principle.number}</span>
-              <div>
-                <h3>{principle.title}</h3>
-                <p>{principle.description}</p>
-              </div>
-            </li>
+      <section className="container about-story" aria-labelledby="about-story-title">
+        <figure className="about-story-media" data-scroll-reveal="image">
+          <img
+            src={assetSource(content.story.image.src)}
+            width={960}
+            height={1200}
+            alt={content.story.image.alt}
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+        <div className="about-story-copy" data-scroll-reveal="copy">
+          <p className="eyebrow">{content.story.eyebrow}</p>
+          <h2 id="about-story-title">{content.story.title}</h2>
+          {content.story.paragraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
           ))}
-        </ol>
+        </div>
+      </section>
+
+      <section className="container about-proposal" aria-labelledby="about-proposal-title">
+        <div className="about-proposal-heading" data-scroll-reveal="copy">
+          <p className="eyebrow">{content.proposal.eyebrow}</p>
+          <h2 id="about-proposal-title">{content.proposal.title}</h2>
+        </div>
+        <div className="about-proposal-detail" data-scroll-reveal="copy">
+          <p>{content.proposal.description}</p>
+          <div className="about-proposal-actions">
+            <Link className="button button--primary" to="/tienda">
+              {content.proposal.primaryAction} <Icon name="arrow" />
+            </Link>
+            <Link className="text-link" to="/marcas">
+              {content.proposal.secondaryAction} <Icon name="arrow" />
+            </Link>
+          </div>
+        </div>
       </section>
     </article>
   )

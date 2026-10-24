@@ -13,6 +13,7 @@ import { CartPage } from '../features/cart/CartPage'
 import { CheckoutPage } from '../features/checkout/CheckoutPage'
 import { CheckoutConfirmationPage } from '../features/checkout/CheckoutConfirmationPage'
 import { OrderTrackingPage } from '../features/checkout/OrderTrackingPage'
+import { PageLoadingState } from '../components/ui/PageLoadingState'
 import {
   catalogLoader,
   brandsLoader,
@@ -23,9 +24,7 @@ export const router = createBrowserRouter([
     element: <StoreLayout />,
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: (
-      <p className="container" role="status">
-        Preparando la selección…
-      </p>
+      <PageLoadingState pathname={window.location.pathname} />
     ),
     children: [
       {
@@ -39,9 +38,6 @@ export const router = createBrowserRouter([
         index: true,
         loader: () => homeService.getHome(),
         Component: HomePage,
-        hydrateFallbackElement: (
-          <p className="container">Preparando la selección…</p>
-        ),
       },
       { path: 'tienda', loader: catalogLoader, Component: CatalogPage },
       {
@@ -183,9 +179,7 @@ export const router = createBrowserRouter([
     path: 'admin',
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: (
-      <p className="admin-demo-banner" role="status">
-        Cargando el panel…
-      </p>
+      <PageLoadingState pathname={window.location.pathname} />
     ),
     lazy: async () => {
       const module = await import('../features/admin/AdminLayout')

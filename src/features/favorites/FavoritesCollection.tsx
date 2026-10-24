@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { resolveFavoriteProducts } from '../../services/commerce-service'
 import { ProductCard } from '../home/ProductCard'
 import { useFavorites } from './favorites-context'
@@ -25,16 +26,17 @@ export function FavoritesCollection() {
           ))}
         </div>
       ) : favorites.missingIds.length === 0 ? (
-        <div className="commerce-empty" data-scroll-reveal="copy">
-          <p className="eyebrow">Tu selección está vacía</p>
-          <h2>Encuentra un aroma para recordar</h2>
-          <p>
-            Usa el corazón de cualquier perfume para guardarlo en esta página.
-          </p>
+        <EmptyState
+          className="commerce-empty"
+          icon="heart"
+          title="Tu próxima elección empieza aquí"
+          description="Usa el corazón de un producto para guardarlo en tus favoritos."
+          role="status"
+        >
           <Link className="button button--primary" to="/tienda">
-            Explorar perfumes <Icon name="arrow" />
+            Explorar tienda <Icon name="arrow" />
           </Link>
-        </div>
+        </EmptyState>
       ) : null}
       {favorites.missingIds.length ? (
         <div
@@ -52,6 +54,11 @@ export function FavoritesCollection() {
               Retirar selección no disponible
             </button>
           ))}
+          {favorites.found.length === 0 ? (
+            <Link className="text-link" to="/tienda">
+              Explorar tienda <Icon name="arrow" />
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </>

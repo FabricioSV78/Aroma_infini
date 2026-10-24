@@ -1,0 +1,145 @@
+/* Shared type and alignment; each service page has its own content layout. */
+.store-layout .service-page {
+  padding-bottom: clamp(56px, 6vw, 80px);
+}
+
+.store-layout .service-page .institutional-breadcrumb {
+  margin-bottom: clamp(22px, 2.4vw, 34px);
+}
+
+.store-layout .service-page .service-intro h1 {
+  max-width: none;
+  margin: 8px 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: clamp(2.35rem, 1.95rem + 1.7vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: -0.047em;
+  line-height: 1.06;
+  text-wrap: balance;
+}
+
+.store-layout .service-page .service-intro > p:last-child {
+  max-width: 58ch;
+  margin-top: 14px;
+  color: var(--color-muted);
+  font-size: clamp(0.9375rem, 0.88rem + 0.22vw, 1.0625rem);
+  line-height: 1.55;
+}
+
+.store-layout .service-page .eyebrow {
+  color: var(--color-brand);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* Tracking: the explanation and form form one focused task, not two columns. */
+.store-layout .tracking-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(24px, 2.6vw, 36px);
+  width: min(100%, 980px);
+  padding: 0 0 34px;
+  border-top: 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.store-layout .tracking-heading,
+.store-layout .tracking-search {
+  padding: 0;
+  border: 0;
+}
+
+.store-layout .tracking-heading {
+  max-width: none;
+  padding-bottom: clamp(24px, 2.6vw, 36px);
+  border-bottom: 2px solid var(--color-brand);
+}
+
+.store-layout .tracking-heading .eyebrow {
+  margin: 0;
+}
+
+.store-layout .tracking-heading > p:last-child {
+  max-width: 55ch;
+}
+
+.store-layout .tracking-search {
+  width: 100%;
+  max-width: 760px;
+}
+
+.store-layout .tracking-search label {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.store-layout .tracking-search > div {
+  gap: 10px;
+}
+
+.store-layout .tracking-search input {
+  min-height: 52px;
+  border-color: #bfc9c4;
+  border-radius: 0;
+}
+
+.store-layout .tracking-search input:is(:hover, :focus-visible) {
+  border-color: var(--color-brand);
+}
+
+.store-layout .tracking-search .button {
+  min-height: 52px;
+  white-space: nowrap;
+}
+
+.store-layout .tracking-result {
+  max-width: 980px;
+  padding: clamp(28px, 3vw, 42px) 0 0;
+  border: 0;
+}
+
+.store-layout .tracking-result-top h2 {
+  font-size: clamp(1.5rem, 1.1rem + 1vw, 2rem);
+}
+
+.store-layout .tracking-steps {
+  margin-block: clamp(26px, 3vw, 36px) 16px;
+}
+
+.store-layout .tracking-not-found {
+  max-width: 980px;
+  padding: 18px 0 0;
+  border: 0;
+  color: var(--color-ink);
+}
+
+@media (max-width: 650px) {
+  .store-layout .service-page .institutional-breadcrumb {
+    margin-bottom: 18px;
+  }
+
+  .store-layout .service-page .service-intro h1 {
+    font-size: clamp(2.2rem, 9vw, 2.65rem);
+  }
+
+  .store-layout .service-page .service-intro > p:last-child {
+    font-size: 15px;
+  }
+
+  .store-layout .tracking-entry {
+    gap: 24px;
+    padding: 0 0 30px;
+  }
+
+  .store-layout .tracking-search > div {
+    flex-direction: column;
+  }
+
+  .store-layout .tracking-search .button {
+    width: 100%;
+  }
+}

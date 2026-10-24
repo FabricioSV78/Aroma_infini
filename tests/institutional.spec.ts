@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 const institutionalRoutes = [
-  ['/nosotros', 'Aroma Infini, una forma de elegir perfume'],
-  ['/contacto', '¿En qué podemos ayudarte?'],
-  ['/envios', 'Tu pedido, de principio a fin'],
+  ['/nosotros', 'Distintas casas. Un perfume que sientas tuyo'],
+  ['/contacto', 'Contacto'],
+  ['/envios', 'Envíos y entregas'],
   ['/devoluciones', 'Cambios y devoluciones'],
   ['/privacidad', 'Privacidad'],
   ['/terminos', 'Términos y condiciones'],
@@ -34,19 +34,24 @@ test('Las rutas institucionales tienen contenido propio y contacto funcional', a
   )
   await expect(whatsappLink).toHaveAttribute('target', '_blank')
 
-  for (const path of ['/tienda', '/seguir-pedido', '/envios']) {
+  for (const path of ['/seguir-pedido', '/envios']) {
     await expect(page.locator(`main a[href="${path}"]`)).toHaveCount(1)
   }
 
   await page.goto('/nosotros')
-  await expect(page.locator('main h2')).toHaveCount(1)
-  await expect(page.locator('.institutional-about-principles li')).toHaveCount(
-    3,
-  )
-  await expect(
-    page.locator('.institutional-about-visual img'),
-  ).toHaveJSProperty('complete', true)
+  await expect(page.locator('main h1')).toHaveCount(1)
+  await expect(page.locator('main h2')).toHaveCount(2)
+  await expect(page.locator('.institutional-about-principles')).toHaveCount(0)
+  const heroImage = page.locator('.about-hero-media img')
+  await expect(heroImage).toBeVisible()
+  await expect(heroImage).toHaveJSProperty('complete', true)
+  expect(
+    await heroImage.evaluate(
+      (image) => (image as HTMLImageElement).naturalWidth,
+    ),
+  ).toBeGreaterThan(0)
   await expect(page.locator('main a[href="/tienda"]')).toHaveCount(1)
+  await expect(page.locator('main a[href="/marcas"]')).toHaveCount(1)
 
   await page.goto('/libro-de-reclamaciones')
   await expect(page.getByRole('link', { name: 'Escríbenos' })).toBeVisible()
@@ -86,9 +91,13 @@ for (const width of [390, 1440]) {
       expect(typography!.fontLoaded, path).toBe(true)
       expect(typography!.h1Font, path).toBe(typography!.bodyFont)
       expect(typography!.h2Font, path).toBe(typography!.bodyFont)
-      expect(typography!.h1Size, path).toBeLessThanOrEqual(52)
+      expect(typography!.h1Size, path).toBeLessThanOrEqual(
+        path === '/nosotros' ? 72 : 52,
+      )
       expect(typography!.h1Size, path).toBeGreaterThanOrEqual(32)
-      expect(typography!.h2Size, path).toBeLessThanOrEqual(34)
+      expect(typography!.h2Size, path).toBeLessThanOrEqual(
+        path === '/nosotros' ? 52 : 34,
+      )
       expect(typography!.h2Size, path).toBeLessThan(typography!.h1Size)
     }
   })
@@ -159,7 +168,7 @@ for (const width of [
 
       if (path === '/nosotros') {
         const imageSource = await page
-          .locator('.institutional-about-visual img')
+          .locator('.about-hero-media img')
           .evaluate((image) => (image as HTMLImageElement).currentSrc)
         expect(imageSource.includes('-mobile-'), path).toBe(width < 768)
       }

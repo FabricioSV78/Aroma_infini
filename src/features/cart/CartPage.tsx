@@ -1,11 +1,14 @@
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { resolveCart } from '../../services/commerce-service'
+import { useOfferPriceRevision } from '../../services/offer-price-clock'
 import { CartLine } from './CartLine'
 import { useCart } from './cart-context'
 import { CartSummary } from './CartSummary'
 
 export function CartPage() {
+  useOfferPriceRevision()
   const { items, persistence } = useCart()
   const cart = resolveCart(items)
   return (
@@ -34,16 +37,17 @@ export function CartPage() {
           <CartSummary cart={cart} />
         </div>
       ) : (
-        <div className="commerce-empty" data-scroll-reveal="copy">
-          <p className="eyebrow">Aún no elegiste un perfume</p>
-          <h2>Tu próxima fragancia puede empezar aquí</h2>
-          <p>
-            Explora la selección y añade la presentación que quieras comparar.
-          </p>
+        <EmptyState
+          className="commerce-empty"
+          icon="bag"
+          title="Tu carrito está vacío"
+          description="Explora la selección y añade tus favoritos para empezar."
+          role="status"
+        >
           <Link className="button button--primary" to="/tienda">
-            Explorar perfumes <Icon name="arrow" />
+            Explorar tienda <Icon name="arrow" />
           </Link>
-        </div>
+        </EmptyState>
       )}
     </section>
   )

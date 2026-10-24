@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from 'react'
 import { useLocation, useMatches } from 'react-router'
+import { resolveSeoPage, type SeoRouteData } from './seo-config'
+import { useOfferPriceRevision } from '../services/offer-price-clock'
 import {
-  resolveSeoPage,
-  type SeoPageConfig,
-  type SeoRouteData,
-} from './seo-config'
+  absoluteUrl,
+  buildSeoStructuredData,
+  SITE_NAME,
+} from './structured-data'
 
-const SITE_NAME = 'Aroma Infini'
 const DEFAULT_DESCRIPTION =
   'Aroma Infini. Explora perfumes, familias olfativas y propuestas para encontrar tu próxima fragancia.'
 const PRODUCTION_ROBOTS =
@@ -22,10 +23,6 @@ function siteOrigin() {
     }
   }
   return window.location.origin
-}
-
-function absoluteUrl(origin: string, path: string) {
-  return new URL(path, `${origin}/`).toString()
 }
 
 function setNamedMeta(name: string, content: string) {
@@ -66,86 +63,8 @@ function addManagedLink(rel: string, href: string, hreflang?: string) {
   document.head.append(element)
 }
 
-function structuredData(
-  config: SeoPageConfig,
-  origin: string,
-  publishCommercialData: boolean,
-) {
-  const graph: Record<string, unknown>[] = []
-  const productImagePath = config.product?.imagePath
-  if (config.canonicalPath === '/') {
-    graph.push(
-      {
-        '@type': 'Organization',
-        '@id': `${origin}/#organization`,
-        name: SITE_NAME,
-        url: `${origin}/`,
-        logo: absoluteUrl(origin, '/brand/logo-on-light.svg'),
-      },
-      {
-        '@type': 'WebSite',
-        '@id': `${origin}/#website`,
-        name: SITE_NAME,
-        url: `${origin}/`,
-        inLanguage: 'es-PE',
-        publisher: { '@id': `${origin}/#organization` },
-      },
-    )
-  }
-  if (config.breadcrumbs?.length)
-    graph.push({
-      '@type': 'BreadcrumbList',
-      itemListElement: config.breadcrumbs.map((item, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
-        name: item.name,
-        item: absoluteUrl(origin, item.path),
-      })),
-    })
-  if (
-    publishCommercialData &&
-    config.product &&
-    productImagePath &&
-    config.canonicalPath
-  ) {
-    const product = config.product
-    const variants = product.variants.filter(
-      (variant) => variant.active !== false,
-    )
-    const prices = variants.map((variant) => variant.priceCents / 100)
-    const url = absoluteUrl(origin, config.canonicalPath)
-    graph.push({
-      '@type': 'Product',
-      '@id': `${url}#product`,
-      name: product.name,
-      description: product.description,
-      image: absoluteUrl(origin, productImagePath),
-      ...(product.brand
-        ? { brand: { '@type': 'Brand', name: product.brand } }
-        : {}),
-      ...(prices.length
-        ? {
-            offers: {
-              '@type': 'AggregateOffer',
-              url,
-              priceCurrency: 'PEN',
-              lowPrice: Math.min(...prices).toFixed(2),
-              highPrice: Math.max(...prices).toFixed(2),
-              offerCount: prices.length,
-              availability: variants.some((variant) => variant.stock > 0)
-                ? 'https://schema.org/InStock'
-                : 'https://schema.org/OutOfStock',
-            },
-          }
-        : {}),
-    })
-  }
-  return graph.length
-    ? { '@context': 'https://schema.org', '@graph': graph }
-    : null
-}
-
 export function SeoManager() {
+  const offerPriceRevision = useOfferPriceRevision()
   const { pathname, search } = useLocation()
   const matches = useMatches()
   const loaderData = matches.at(-1)?.data
@@ -210,7 +129,12 @@ export function SeoManager() {
       setSocialMeta('name', 'twitter:image', image)
       setSocialMeta('name', 'twitter:image:alt', config.imageAlt ?? SITE_NAME)
     }
-    const schema = structuredData(config, origin, publishCommercialData)
+    const schema = buildSeoStructuredData(
+      config,
+      origin,
+      publishCommercialData,
+      offerPriceRevision,
+    )
     if (schema) {
       const script = document.createElement('script')
       script.type = 'application/ld+json'
@@ -226,7 +150,7 @@ export function SeoManager() {
       setNamedMeta('description', DEFAULT_DESCRIPTION)
       setNamedMeta('robots', 'noindex,nofollow')
     }
-  }, [config])
+  }, [config, offerPriceRevision])
 
   return null
 }

@@ -1,0 +1,221 @@
+/* Shared interaction states. Resting composition stays in each component's sheet. */
+.button:where(:not(:disabled, [aria-disabled='true'])):focus-visible,
+.icon-button:where(:not(:disabled, [aria-disabled='true'])):focus-visible {
+  outline-width: 2px;
+  outline-style: solid;
+}
+
+.button--primary:where(:not(:disabled, [aria-disabled='true'])):focus-visible {
+  background: #404040;
+}
+
+.button--secondary:where(:not(:disabled, [aria-disabled='true'])):focus-visible,
+.icon-button:where(:not(:disabled, [aria-disabled='true'])):focus-visible {
+  background: var(--color-surface);
+}
+
+.store-layout
+  .button--primary:where(
+    :not(:disabled, [aria-disabled='true'])
+  ):focus-visible {
+  background: var(--color-brand-hover);
+}
+
+.store-layout
+  .button--secondary:where(
+    :not(:disabled, [aria-disabled='true'])
+  ):focus-visible {
+  background: var(--color-sage);
+}
+
+.admin-shell :focus-visible {
+  outline-color: var(--admin-accent);
+}
+
+.admin-shell
+  .button--primary:where(
+    :not(:disabled, [aria-disabled='true'])
+  ):focus-visible {
+  border-color: var(--admin-accent-hover);
+  background: var(--admin-accent-hover);
+}
+
+.admin-shell
+  .button--secondary:where(
+    :not(:disabled, [aria-disabled='true'])
+  ):focus-visible {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+}
+
+.button:where(:not(:disabled, [aria-disabled='true'])):active {
+  filter: brightness(0.94);
+}
+
+.text-link:where(:not(:disabled, [aria-disabled='true'])):focus-visible {
+  text-decoration: underline;
+}
+
+.store-layout :is(.catalog-chips button, .catalog-pagination a),
+.admin-shell
+  :is(
+    .admin-row-actions a,
+    .admin-row-actions button,
+    .admin-home-file-button,
+    .admin-home-tabs button,
+    .admin-home-finder-tabs button,
+    .admin-home-slide-picker button,
+    .admin-home-preview-switch button
+  ) {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    text-decoration-thickness 160ms ease;
+}
+
+.store-layout .catalog-chips button:where(:not(:disabled)):focus-visible {
+  border-color: var(--color-brand);
+}
+
+.store-layout
+  .catalog-pagination
+  a:not([aria-current]):is(:focus-visible, :active) {
+  border-color: var(--color-brand);
+  background: var(--color-sage);
+  color: var(--color-brand);
+}
+
+.store-layout
+  .product-gallery-mobile-controls
+  button:where(:not(:disabled)):is(:focus-visible, :active)::after {
+  background: var(--color-brand);
+}
+
+.admin-shell
+  .admin-row-actions
+  :is(a[href], button:not(:disabled)):is(:focus-visible, :active),
+.admin-shell :is(.admin-back, .admin-module-links a[href]):focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.admin-shell .admin-home-file-button:has(input:focus-visible) {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+}
+
+.admin-shell .admin-home-file-button:has(input:disabled),
+.admin-shell .admin-home-file-button input:disabled {
+  cursor: not-allowed;
+}
+
+.admin-shell .admin-home-file-button:has(input:disabled) {
+  opacity: 0.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .button--primary:where(:not(:disabled, [aria-disabled='true'])):hover {
+    background: #404040;
+  }
+
+  .button--secondary:where(:not(:disabled, [aria-disabled='true'])):hover,
+  .icon-button:where(:not(:disabled, [aria-disabled='true'])):hover {
+    background: var(--color-surface);
+  }
+
+  .text-link:where(:not(:disabled, [aria-disabled='true'])):hover {
+    text-decoration: underline;
+  }
+
+  .store-layout
+    .button--primary:where(:not(:disabled, [aria-disabled='true'])):hover {
+    background: var(--color-brand-hover);
+  }
+
+  .store-layout
+    .button--secondary:where(:not(:disabled, [aria-disabled='true'])):hover {
+    background: var(--color-sage);
+  }
+
+  .store-layout
+    :is(
+      .catalog-chips button:not(:disabled),
+      .catalog-pagination a:not([aria-current])
+    ):hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+  }
+
+  .store-layout .catalog-pagination a:not([aria-current]):hover {
+    background: var(--color-sage);
+  }
+
+  .store-layout
+    .product-gallery-mobile-controls
+    button:where(:not(:disabled)):hover::after {
+    background: var(--color-brand);
+  }
+
+  .admin-shell
+    .button--primary:where(:not(:disabled, [aria-disabled='true'])):hover {
+    border-color: var(--admin-accent-hover);
+    background: var(--admin-accent-hover);
+  }
+
+  .admin-shell
+    .button--secondary:where(:not(:disabled, [aria-disabled='true'])):hover {
+    border-color: var(--admin-accent);
+    background: var(--admin-accent-soft);
+  }
+
+  .admin-shell .admin-row-actions :is(a[href], button:not(:disabled)):hover,
+  .admin-shell :is(.admin-back, .admin-module-links a[href]):hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  .admin-shell
+    .admin-row-actions
+    :is(a[href], button:not(:disabled)):not(.admin-action-danger):hover {
+    color: var(--admin-accent);
+  }
+
+  .admin-shell
+    :is(
+      .admin-home-tabs,
+      .admin-home-finder-tabs,
+      .admin-home-slide-picker,
+      .admin-home-preview-switch
+    )
+    button:not(:disabled, [aria-pressed='true']):hover,
+  .admin-shell .admin-home-file-button:has(input:not(:disabled)):hover {
+    background: var(--admin-accent-soft);
+    color: var(--admin-accent);
+  }
+
+  .admin-shell .admin-home-file-button:has(input:not(:disabled)):hover,
+  .admin-editor-page .admin-product-photo-order button:not(:disabled):hover,
+  .admin-editor-page
+    .admin-olfactory-family-options
+    label:has(input:not(:disabled)):hover {
+    border-color: var(--admin-accent);
+  }
+
+  .admin-shell
+    .admin-product-import__row-filters
+    button:not(:disabled, [aria-pressed='true']):hover {
+    color: var(--admin-accent);
+  }
+
+  /* These cards contain full-card links; static table rows keep their surface. */
+  .admin-metric-card:has(a[href]):hover {
+    border-color: var(--admin-border-strong);
+  }
+
+  .admin-order-overview dl > div:has(a[href]):hover {
+    background: var(--admin-surface-muted);
+  }
+}

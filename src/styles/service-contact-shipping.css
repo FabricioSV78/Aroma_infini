@@ -1,0 +1,467 @@
+/* Local service layouts. Tracking keeps its approved styles in service-pages.css. */
+.contact-layout,
+.delivery-sheet {
+  width: 100%;
+}
+
+.contact-heading,
+.delivery-heading {
+  padding-bottom: clamp(25px, 3vw, 38px);
+}
+
+.contact-services {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
+  align-items: center;
+  gap: clamp(32px, 5vw, 80px);
+  padding: clamp(28px, 3.2vw, 48px);
+  background: var(--color-surface);
+  border-top: 2px solid var(--color-brand);
+}
+
+.contact-conversation {
+  min-width: 0;
+}
+
+.contact-message {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(18px, 2.5vw, 36px);
+  min-width: 0;
+}
+
+.contact-channel-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: var(--color-brand);
+  border: 1px solid #c5d0c9;
+  border-radius: 50%;
+}
+
+.contact-channel-icon svg {
+  width: 29px;
+  height: 29px;
+}
+
+.contact-copy h2 {
+  margin: 9px 0 12px;
+  color: var(--color-ink);
+  font-size: clamp(1.6rem, 1.3rem + 1vw, 2.125rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.contact-copy > p:not(.eyebrow) {
+  max-width: 49ch;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.contact-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 0 0 auto;
+  gap: 14px;
+  margin: 22px 0 0 calc(58px + clamp(18px, 2.5vw, 36px));
+}
+
+.contact-actions .button {
+  min-height: 52px;
+  white-space: nowrap;
+}
+
+.contact-help {
+  padding: 5px 0 5px clamp(24px, 3vw, 48px);
+  border-left: 1px solid #d9dbd2;
+}
+
+.contact-help h2 {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.contact-help ul {
+  display: block;
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.contact-help a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  color: var(--color-brand);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.contact-help li + li {
+  border-top: 1px solid var(--color-line);
+}
+.contact-help a > svg:last-child {
+  margin-left: auto;
+}
+
+.contact-help svg,
+.delivery-help-link > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.contact-help a > svg:last-child,
+.delivery-help-link > svg:last-child {
+  width: 17px;
+  height: 17px;
+  transition: transform 180ms ease;
+}
+
+.contact-help a:hover > svg:last-child,
+.delivery-help-link:hover > svg:last-child {
+  transform: translateX(3px);
+}
+
+.delivery-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+  border-top: 2px solid var(--color-brand);
+  background: var(--color-surface);
+}
+
+.delivery-coverage {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.delivery-coverage > svg {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+
+.delivery-coverage h2 {
+  margin: 5px 0 0;
+  color: var(--color-ink);
+  font-size: clamp(1.45rem, 1.2rem + 0.8vw, 1.875rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.delivery-free {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  justify-content: start;
+  gap: 5px 12px;
+}
+
+.delivery-free > span {
+  color: var(--color-brand);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.delivery-free strong {
+  color: var(--color-brand);
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.delivery-free p {
+  grid-column: 1 / -1;
+  max-width: 49ch;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.delivery-rate-group {
+  margin-top: 22px;
+}
+
+.delivery-rate-group h3:not(.sr-only) {
+  margin: 24px 0 10px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.delivery-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.delivery-table th,
+.delivery-table td {
+  text-align: left;
+  vertical-align: middle;
+}
+
+.delivery-table thead th {
+  padding: 0 24px 13px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.delivery-table thead th:first-child {
+  width: 43%;
+}
+
+.delivery-table thead th:nth-child(2) {
+  width: 25%;
+}
+
+.delivery-table tbody th,
+.delivery-table tbody td {
+  height: 84px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.delivery-table tbody th {
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.delivery-price {
+  color: var(--color-brand);
+  font-size: clamp(1.5rem, 1.25rem + 0.6vw, 1.875rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.delivery-estimate > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-ink);
+  font-size: clamp(1rem, 0.85rem + 0.4vw, 1.2rem);
+  line-height: 1.4;
+}
+
+.delivery-estimate svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+
+.delivery-note {
+  margin-top: 14px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.delivery-help {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 48px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-line);
+}
+
+.delivery-help-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  color: var(--color-brand);
+}
+
+.delivery-help-link > span {
+  display: grid;
+  gap: 3px;
+}
+
+.delivery-help-link strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.delivery-help-link span span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .contact-services {
+    gap: 24px;
+    padding: 30px 24px;
+  }
+
+  .contact-channel-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .contact-message {
+    gap: 16px;
+  }
+
+  .contact-actions {
+    margin-left: 60px;
+  }
+
+  .contact-actions .button {
+    padding-inline: 18px;
+  }
+
+  .delivery-summary {
+    padding: 24px;
+  }
+
+  .delivery-free p {
+    max-width: 35ch;
+  }
+}
+
+@media (max-width: 700px) {
+  .contact-services {
+    display: block;
+    padding: 26px 20px;
+  }
+
+  .contact-message {
+    display: block;
+  }
+
+  .contact-channel-icon {
+    margin-bottom: 22px;
+  }
+
+  .contact-actions {
+    margin: 22px 0 0;
+  }
+
+  .contact-help {
+    display: block;
+    margin-top: 26px;
+    padding: 22px 0 0;
+    border-top: 1px solid #d9dbd2;
+    border-left: 0;
+  }
+
+  .contact-help ul {
+    display: block;
+    margin-top: 10px;
+  }
+
+  .contact-help li {
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .contact-help a {
+    display: flex;
+    min-height: 55px;
+  }
+
+  .contact-help a > svg:last-child {
+    margin-left: auto;
+  }
+
+  .delivery-summary {
+    display: block;
+    padding: 22px 20px;
+  }
+
+  .delivery-free {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #d9dbd2;
+    gap: 4px 10px;
+  }
+
+  .delivery-free strong {
+    font-size: 26px;
+  }
+
+  .delivery-free p {
+    max-width: none;
+  }
+
+  .delivery-table thead th {
+    padding: 0 8px 12px;
+    font-size: 11px;
+  }
+
+  .delivery-table thead th:first-child {
+    width: 34%;
+  }
+
+  .delivery-table thead th:nth-child(2) {
+    width: 27%;
+  }
+
+  .delivery-table tbody th,
+  .delivery-table tbody td {
+    height: 76px;
+    padding: 16px 8px;
+  }
+
+  .delivery-table tbody th {
+    font-size: 15px;
+  }
+
+  .delivery-price {
+    font-size: 24px;
+  }
+
+  .delivery-estimate > span {
+    gap: 7px;
+    font-size: 14px;
+  }
+
+  .delivery-estimate svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .delivery-help {
+    display: grid;
+    gap: 8px;
+    margin-top: 23px;
+    padding-top: 12px;
+  }
+
+  .delivery-help-link {
+    min-height: 64px;
+  }
+
+  .delivery-help-link > svg:last-child {
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-help a > svg:last-child,
+  .delivery-help-link > svg:last-child {
+    transition: none;
+  }
+}

@@ -1,6 +1,10 @@
 # Aroma Infini
 
-Propuesta frontend de **fases 1 a 9**: base React + TypeScript + Vite + Tailwind CSS, Home editorial, catálogo, filtros, marcas, búsqueda, ficha de perfume, favoritos, carrito, checkout, cuenta, institucionales y panel administrativo simulados sobre datos de muestra. Base de diseño aprobada; decisiones visuales todavía temporales.
+Frontend de Aroma Infini con React, TypeScript, Vite y Tailwind CSS: tienda pública, catálogo, fichas, carrito, favoritos, checkout de demostración y panel administrativo. El catálogo y el contenido editado se comparten en este navegador mediante servicios e IndexedDB; todavía no hay autenticación administrativa, pasarela de pago, Supabase ni R2 conectados. El diseño aprobado se conserva. Las fixtures y los recursos provisionales no representan datos comerciales reales.
+
+La referencia técnica vigente es [Auditoría técnica](docs/TECHNICAL_AUDIT.md), junto con [Preparación para Supabase](docs/SUPABASE_READINESS.md), [Preparación de medios y R2](docs/MEDIA_READINESS.md) y [Auditoría de imágenes](docs/ASSET_AUDIT.md). Los informes de fases anteriores se conservan como historial y pueden describir funciones o composiciones ya retiradas.
+
+El sistema de mensajes del panel, sus criterios de modal/toast/validación, recuperación de guardados y capturas se documentan en [Mensajes administrativos](docs/ADMIN_MESSAGES.md).
 
 ## Ejecutar en Windows / PowerShell
 
@@ -34,24 +38,24 @@ La última iteración visual está en [HOME_GALLERY_REVIEW.md](docs/HOME_GALLERY
 - Secciones independientes: `src/features/home/HomeSections.tsx`; `BrandGallery.tsx` contiene la galería de firmas. Hero y tarjeta de producto tienen archivos propios.
 - Hero y categorías: `src/content/home.ts`. El resto del copy editorial temporal está junto a su sección, sin crear un CMS anticipado.
 - Navegación y footer: `src/content/navigation.ts`.
-- Productos, variantes y marcas de muestra: `src/mocks/home.ts`.
-- Servicios de datos de muestra: `src/services/home-service.ts` y `src/services/catalog-service.ts`.
+- Productos, variantes y marcas iniciales: `src/mocks/home.ts`; altas adicionales en `src/content/catalog-products.ts`. La Tienda normal comienza con 15 productos publicables (12 + 3), además de Ambre Lent agotado y desactivado. La actualización del catálogo retira las muestras de paginación anteriores y se registra una sola vez en IndexedDB; conserva las ediciones, desactivaciones y productos propios del panel.
+- Lectura pública: `home-service.ts` y `catalog-service.ts` consumen `StorefrontRepository`; el adaptador local obtiene el mismo catálogo publicable que edita el panel.
 - Catálogo, marcas y búsqueda: `src/features/catalog/`; estilos en `src/styles/catalog.css`.
 - Ficha, galería y perfil olfativo: `src/features/product/`; contenido temporal en `src/mocks/product-details.ts` y estilos en `src/styles/product-detail.css`.
 - Favoritos y carrito: `src/features/favorites/` y `src/features/cart/`; resolución de variantes y totales en `src/services/commerce-service.ts`, estilos en `src/styles/commerce.css`.
 - Checkout y seguimiento de demostración: `src/features/checkout/`, escenarios y cálculos en `src/services/checkout-service.ts`, registro mínimo sin datos personales en `src/services/order-tracking-service.ts` y estilos en `src/styles/checkout.css`.
 - Cuenta de demostración: `src/features/account/`, entidades y transformación de pedidos en `src/services/account-service.ts`, y estilos en `src/styles/account.css`. El estado es efímero y no almacena datos personales.
 - Institucionales: `src/features/institutional/` y `src/styles/institutional.css`. El copy pendiente se identifica en cada vista y no inventa condiciones, datos legales ni canales.
-- Panel administrativo: `src/features/admin/`, fuente compartida en memoria en `src/services/admin-service.ts` y estilos en `src/styles/admin.css`. No autentica ni persiste; sus cambios alimentan la demo durante la sesión.
+- Panel administrativo: `src/features/admin/`, reglas y estado compartido en `src/services/admin-service.ts`; persistencia local transaccional en `admin-persistence.ts` (IndexedDB). Los cambios sobreviven a la recarga en ese navegador; no se comparten entre dispositivos y no existe autenticación todavía.
 - SEO por ruta: `src/seo/`, generación de robots/sitemap en `scripts/generate-seo-files.mjs` y criterios de activación en [SEO_FOUNDATION.md](docs/SEO_FOUNDATION.md). El prototipo continúa con `noindex` hasta confirmar dominio y contenido comercial.
 - Comparación completa entre el sistema y las respuestas del cliente: [CLIENT_REQUIREMENTS_COMPARISON.md](docs/CLIENT_REQUIREMENTS_COMPARISON.md). Distingue capacidades de demo, requisitos cumplidos, contenido pendiente y decisiones que no deben inventarse.
 - Paleta, espaciado y tipografía: `src/styles/tokens.css`. La jerarquía se documenta en [TYPOGRAPHY_REVIEW.md](docs/TYPOGRAPHY_REVIEW.md) y se aplica desde `src/styles/typography.css`. `global.css` importa los estilos por responsabilidad.
-- Imágenes locales y procedencia: [ASSETS.md](docs/ASSETS.md).
+- Imágenes locales y procedencia: [ASSETS.md](docs/ASSETS.md). `asset-source.ts` resuelve URLs públicas y `image-source.ts` las variantes; el origen de medios sigue siendo local. Las miniaturas del recomendador se generan con `node scripts/prepare-finder-thumbnails.mjs`.
 - Revisión visual del header/hero: [PHASE_2_VISUAL_REVIEW.md](docs/PHASE_2_VISUAL_REVIEW.md). Nuevas fotografías y prompts: [HERO_V2_ASSETS.md](docs/HERO_V2_ASSETS.md).
 - Segunda revisión del Home, capturas y fotografías de categorías: [HOME_EDITORIAL_REVIEW.md](docs/HOME_EDITORIAL_REVIEW.md). Con Vite activo, `node scripts/capture-home-review.mjs` genera las capturas a 390 y 1440 px.
 - Navbar completo y accesos a los apartados públicos: [NAVIGATION_REVIEW.md](docs/NAVIGATION_REVIEW.md). Capturas: `node scripts/capture-navigation-review.mjs` con Vite activo.
 - Revisión previa de precios, favoritos locales, CSS y carga del hero: [HOME_FRONTEND_AUDIT.md](docs/HOME_FRONTEND_AUDIT.md).
-- Revisión vigente de Home: [HOME_REFINEMENT_REVIEW.md](docs/HOME_REFINEMENT_REVIEW.md). Hero con tres campañas cada tres segundos y sin controles habituales visibles; marcas uniformes, marca destacada y cierre integrado. Con Vite activo, `node scripts/capture-home-audit.mjs refinement` y `node scripts/capture-navigation-review.mjs refinement` reproducen las capturas actuales.
+- Revisión histórica de Home: [HOME_REFINEMENT_REVIEW.md](docs/HOME_REFINEMENT_REVIEW.md). La implementación vigente tiene cinco campañas y un intervalo de 3800 ms en `useHeroRotation.ts`; los controles, las categorías y la marca destacada del menú se administran según las interfaces actuales. Los scripts de esa fase se conservan como evidencia histórica.
 
 Con Vite activo, `node scripts/capture-hero-review.mjs` genera capturas de las tres campañas a 1440 y 390 px, revisa contraste sobre la fotografía y captura la transición hacia marcas. Añadir `--all` extiende la revisión a los ocho anchos. Los archivos se guardan en `artifacts/home-refinement/hero/`. `node scripts/capture-home-closing.mjs` captura el cierre hasta 1920 px.
 

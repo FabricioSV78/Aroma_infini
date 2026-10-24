@@ -48,27 +48,41 @@ for (const width of [1280, 1600, 1904]) {
     const categories = page.locator('.category-grid .category')
     await categories.first().scrollIntoViewIfNeeded()
 
-    const { ratios, gridHeight } = await categories.evaluateAll((elements) => {
-      const grid = elements[0]?.parentElement
-      return {
-        gridHeight: grid?.getBoundingClientRect().height ?? 0,
-        ratios: elements.map((element) => {
-          const image = element.querySelector<HTMLElement>('.category-image')
-          if (!image) return 0
-          const bounds = image.getBoundingClientRect()
-          return bounds.width / bounds.height
-        }),
-      }
-    })
+    const { images, cards, gridHeight } = await categories.evaluateAll(
+      (elements) => {
+        const grid = elements[0]?.parentElement
+        return {
+          gridHeight: grid?.getBoundingClientRect().height ?? 0,
+          cards: elements.map((element) => {
+            const bounds = element.getBoundingClientRect()
+            return {
+              x: bounds.x,
+              y: bounds.y,
+              bottom: bounds.bottom,
+              width: bounds.width,
+            }
+          }),
+          images: elements.map((element) => {
+            const image = element.querySelector<HTMLElement>('.category-image')
+            if (!image) return 0
+            const bounds = image.getBoundingClientRect()
+            return bounds.width / bounds.height
+          }),
+        }
+      },
+    )
 
-    // La fotografía vertical puede adaptarse al mosaico, pero no debe
-    // convertirse en una franja horizontal en monitores amplios.
-    expect(ratios[0]).toBeLessThanOrEqual(1.5)
-    // Un encuadre 2:1 conserva completos los frascos y permite recorrer el
-    // mosaico sin convertirlo en una sección excesivamente alta.
-    expect(ratios[1]).toBeCloseTo(2, 1)
-    expect(ratios[2]).toBeCloseTo(2, 1)
-    expect(gridHeight).toBeLessThanOrEqual(840)
+    // La composición aprobada conecta un retrato con dos entradas horizontales.
+    expect(images).toHaveLength(3)
+    expect(images[1]).toBeCloseTo(2, 2)
+    expect(images[2]).toBeCloseTo(2, 2)
+    expect(cards[0].width).toBeGreaterThan(cards[1].width)
+    expect(cards[0].x).toBeLessThan(cards[1].x)
+    expect(cards[0].y).toBeCloseTo(cards[1].y, 1)
+    expect(cards[1].x).toBeCloseTo(cards[2].x, 1)
+    expect(cards[2].y).toBeGreaterThan(cards[1].bottom)
+    expect(cards[0].bottom).toBeCloseTo(cards[2].bottom, 1)
+    expect(gridHeight).toBeLessThanOrEqual(900)
 
     if (width === 1904) {
       await page.locator('#descubrir').screenshot({

@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { adminService } from '../src/services/admin-service'
-import { localStorefrontRepository } from '../src/services/storefront-repository'
+import { products as originalProducts } from '../src/mocks/home'
+import {
+  localStorefrontRepository,
+  type StorefrontSnapshot,
+} from '../src/services/storefront-repository'
 import { createFragranceFinderService } from '../src/services/fragrance-finder-service'
 import {
   availableFinderVariants,
@@ -10,13 +14,47 @@ import {
 } from '../src/services/fragrance-matching'
 
 test.afterEach(() => adminService.reset())
-const snapshot = () => localStorefrontRepository.peekSnapshot()
+// Keep the algorithm's established cases on an explicit, known catalog fixture.
+const originalIds = new Set(originalProducts.map((product) => product.id))
+function originalSnapshot(current: StorefrontSnapshot): StorefrontSnapshot {
+  return {
+    ...current,
+    products: current.products.filter(({ product }) =>
+      originalIds.has(product.id),
+    ),
+  }
+}
+const snapshot = () =>
+  originalSnapshot(localStorefrontRepository.peekSnapshot())
+
+test('Registered products participate in the real finder with their saved profiles and stock', () => {
+  const current = localStorefrontRepository.peekSnapshot()
+  expect(getFinderOptions(current).availableCount).toBe(15)
+  const result = recommendFragrances(current, {
+    family: ['amaderado'],
+    occasion: ['diario'],
+    intensity: ['moderada'],
+    budget: '40000',
+  })
+  expect(result.kind).toBe('matches')
+  expect(result.matches.map(({ product }) => product.name)).toEqual([
+    'Bois Clair',
+    'Bois de Brume',
+    'Cèdre Lumière',
+  ])
+  for (const match of result.matches) {
+    expect(match.complete).toBe(true)
+    expect(match.score).toBe(10)
+    expect(match.variant.stock).toBeGreaterThan(0)
+    expect(match.variant.priceCents).toBe(39000)
+  }
+})
 
 test('Real catalog preferences produce an available presentation and grounded reasons', () => {
   const result = recommendFragrances(snapshot(), {
-    family: 'amaderado',
-    occasion: 'diario',
-    intensity: 'moderada',
+    family: ['amaderado'],
+    occasion: ['diario'],
+    intensity: ['moderada'],
     budget: '40000',
   })
   expect(result.kind).toBe('matches')
@@ -31,14 +69,53 @@ test('Real catalog preferences produce an available presentation and grounded re
   ).not.toContain('ambar')
 })
 
+test('Multiple choices match any value within a question without inflating its score', () => {
+  const result = recommendFragrances(snapshot(), {
+    family: ['amaderado', 'floral', 'floral'],
+    occasion: ['diario', 'encuentros'],
+    intensity: ['suave', 'moderada'],
+    budget: '50000',
+  })
+  expect(result.kind).toBe('matches')
+  expect(result.matches.map((match) => match.product.name)).toEqual([
+    'Bois Clair',
+    'Pétale Nu',
+    'Iris Velours',
+  ])
+  for (const match of result.matches) {
+    expect(match.complete).toBe(true)
+    expect(match.score).toBe(10)
+    expect(match.differences).toEqual([])
+    expect(match.reasons).toHaveLength(4)
+    expect(match.variant.priceCents).toBeLessThanOrEqual(50000)
+  }
+})
+
+test('A selected family may match one of several aromas but never an unrelated product', () => {
+  const result = recommendFragrances(snapshot(), {
+    family: ['floral', 'inexistente'],
+    occasion: ['noche', 'encuentros'],
+  })
+  expect(result.kind).toBe('matches')
+  expect(result.matches.map((match) => match.product.name)).toEqual([
+    'Pétale Nu',
+    'Iris Velours',
+  ])
+  for (const match of result.matches) {
+    expect(match.score).toBe(8)
+    expect(match.reasons).toHaveLength(2)
+  }
+})
+
 test('Aroma and budget are hard limits; partial matches explain their differences', () => {
   expect(
-    recommendFragrances(snapshot(), { family: 'floral', budget: '40000' }).kind,
+    recommendFragrances(snapshot(), { family: ['floral'], budget: '40000' })
+      .kind,
   ).toBe('empty')
   const partial = recommendFragrances(snapshot(), {
-    family: 'floral',
-    intensity: 'intensa',
-    occasion: 'noche',
+    family: ['floral'],
+    intensity: ['intensa'],
+    occasion: ['noche'],
     budget: '50000',
   })
   expect(partial.kind).toBe('partial')
@@ -50,16 +127,16 @@ test('Aroma and budget are hard limits; partial matches explain their difference
     expect(match.complete).toBe(false)
   }
   expect(
-    recommendFragrances(snapshot(), { family: 'inexistente' }).matches,
+    recommendFragrances(snapshot(), { family: ['inexistente'] }).matches,
   ).toEqual([])
 })
 
 test('No invented recommendations for no preferences, no stock or invalid budgets', () => {
   expect(
     recommendFragrances(snapshot(), {
-      family: '',
-      occasion: '',
-      intensity: '',
+      family: [],
+      occasion: [],
+      intensity: [],
       budget: '',
     }).kind,
   ).toBe('preferences')
@@ -70,7 +147,7 @@ test('No invented recommendations for no preferences, no stock or invalid budget
     'empty',
   )
   expect(
-    recommendFragrances({ ...snapshot(), products: [] }, { family: 'floral' })
+    recommendFragrances({ ...snapshot(), products: [] }, { family: ['floral'] })
       .kind,
   ).toBe('unavailable')
   const variant = snapshot().products[0].product.variants[0]
@@ -92,20 +169,24 @@ test('Matching uses whole normalized labels and stable ties', () => {
       (part) => part.value,
     ),
   ).toEqual(['citrico', 'fresco', 'diario', 'oficina'])
-  const first = recommendFragrances(snapshot(), { occasion: 'diario' })
+  const first = recommendFragrances(snapshot(), { occasion: ['diario'] })
   expect(
     recommendFragrances(
       { ...snapshot(), products: [...snapshot().products].reverse() },
-      { occasion: 'diario' },
+      { occasion: ['diario'] },
     ),
   ).toEqual(first)
-  expect(recommendFragrances(snapshot(), { occasion: 'dia' }).matches).toEqual(
-    [],
-  )
+  expect(
+    recommendFragrances(snapshot(), { occasion: ['dia'] }).matches,
+  ).toEqual([])
 })
 
 test('The service rereads admin edits, publication and variant availability at submission', async () => {
-  const service = createFragranceFinderService(localStorefrontRepository)
+  const service = createFragranceFinderService({
+    async readSnapshot() {
+      return originalSnapshot(await localStorefrontRepository.readSnapshot())
+    },
+  })
   await service.getOptions()
   const record = adminService
     .getSnapshot()
@@ -126,8 +207,8 @@ test('The service rereads admin edits, publication and variant availability at s
   expect(
     (
       await service.recommend({
-        family: 'amaderado',
-        occasion: 'diario',
+        family: ['amaderado'],
+        occasion: ['diario'],
         budget: '40000',
       })
     ).matches,
@@ -149,7 +230,7 @@ test('Repositories can be replaced and errors propagate to the interface', async
     },
   })
   await service.getOptions()
-  await service.recommend({ family: 'floral' })
+  await service.recommend({ family: ['floral'] })
   expect(reads).toBe(2)
   const broken = createFragranceFinderService({
     async readSnapshot() {
@@ -157,7 +238,7 @@ test('Repositories can be replaced and errors propagate to the interface', async
     },
   })
   await expect(broken.getOptions()).rejects.toThrow('offline')
-  await expect(broken.recommend({ family: 'floral' })).rejects.toThrow(
+  await expect(broken.recommend({ family: ['floral'] })).rejects.toThrow(
     'offline',
   )
 })

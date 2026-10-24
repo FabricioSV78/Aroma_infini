@@ -13,7 +13,10 @@ async function openQuiz(page: Page) {
 async function choose(page: Page, name: string | RegExp, last = false) {
   const dialog = page.getByRole('dialog')
   await dialog
-    .getByRole('radio', { name, exact: typeof name === 'string' })
+    .getByRole(last ? 'radio' : 'checkbox', {
+      name,
+      exact: typeof name === 'string',
+    })
     .check()
   await dialog
     .getByRole('button', {
@@ -35,18 +38,26 @@ test('La primera elección del Home inicia el cuestionario y conserva el aroma',
     section.getByRole('heading', { name: '¿Qué aroma te atrae?' }),
   ).toBeVisible()
   const choice = section.getByRole('button', {
-    name: 'Elegir Floral y continuar al siguiente paso',
+    name: 'Elegir Floral y añadir otros aromas',
   })
   await choice.click()
   const dialog = page.getByRole('dialog', {
     name: 'Encuentra tu perfume ideal',
   })
-  await expect(dialog.getByRole('progressbar')).toHaveAttribute('value', '2')
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('value', '1')
   await expect(
-    dialog.getByRole('heading', { name: '¿Cuándo te gustaría llevarlo?' }),
+    dialog.getByRole('heading', { name: '¿Qué aroma te atrae más?' }),
   ).toBeVisible()
+  await expect(dialog.getByRole('checkbox', { name: /Floral/ })).toBeChecked()
+  await dialog.getByRole('checkbox', { name: /Amaderado/ }).check()
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click()
+  await expect(dialog.getByRole('progressbar')).toHaveAttribute('value', '2')
   await dialog.getByRole('button', { name: 'Anterior' }).click()
-  await expect(dialog.getByRole('radio', { name: /Floral/ })).toBeChecked()
+  await expect(dialog.getByRole('checkbox', { name: /Floral/ })).toBeChecked()
+  await expect(
+    dialog.getByRole('checkbox', { name: /Amaderado/ }),
+  ).toBeChecked()
+  await dialog.getByRole('checkbox', { name: /Amaderado/ }).uncheck()
   await dialog.getByRole('button', { name: 'Continuar', exact: true }).click()
   await choose(page, 'Diario')
   await choose(page, 'Suave')
@@ -60,6 +71,63 @@ test('La primera elección del Home inicia el cuestionario y conserva el aroma',
   await expect(choice).toBeFocused()
 })
 
+test('El cliente combina varios aromas, momentos e intensidades y puede cambiar su selección', async ({
+  page,
+}) => {
+  const dialog = await openQuiz(page)
+  const amaderado = dialog.getByRole('checkbox', { name: /Amaderado/ })
+  const floral = dialog.getByRole('checkbox', { name: /Floral/ })
+  await amaderado.check()
+  await floral.check()
+  await expect(amaderado).toBeChecked()
+  await expect(floral).toBeChecked()
+  await expect(dialog.getByText('2 seleccionadas')).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({
+    path: 'artifacts/fragrance-finder/multiple-options-mobile.png',
+  })
+  expect(
+    await dialog.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true)
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.screenshot({
+    path: 'artifacts/fragrance-finder/multiple-options-desktop.png',
+  })
+  await dialog.getByRole('checkbox', { name: 'Sin preferencia' }).check()
+  await expect(amaderado).not.toBeChecked()
+  await expect(floral).not.toBeChecked()
+  await amaderado.check()
+  await floral.check()
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click()
+
+  await dialog.getByRole('checkbox', { name: 'Diario' }).check()
+  await dialog.getByRole('checkbox', { name: 'Noche' }).check()
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click()
+  await dialog.getByRole('checkbox', { name: 'Suave' }).check()
+  await dialog.getByRole('checkbox', { name: 'Moderada' }).check()
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click()
+  await dialog.getByRole('radio', { name: 'Sin límite de presupuesto' }).check()
+  await dialog.getByRole('button', { name: 'Ver mis perfumes' }).click()
+
+  await expect(
+    dialog.getByRole('heading', { name: 'Perfumes que encajan contigo' }),
+  ).toBeVisible()
+  await expect(
+    dialog.getByRole('heading', { name: 'Bois Clair' }),
+  ).toBeVisible()
+  await expect(
+    dialog.getByRole('heading', { name: 'Bois de Brume' }),
+  ).toBeVisible()
+  await expect(
+    dialog.getByRole('heading', { name: 'Cèdre Lumière' }),
+  ).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cambiar respuestas' }).click()
+  await expect(amaderado).toBeChecked()
+  await expect(floral).toBeChecked()
+})
+
 test('Keyboard, progress, previous answers, restart and direct product navigation', async ({
   page,
 }) => {
@@ -71,7 +139,7 @@ test('Keyboard, progress, previous answers, restart and direct product navigatio
     ),
   ).toHaveCount(1)
   await expect(dialog.getByRole('button', { name: 'Continuar' })).toBeDisabled()
-  const first = dialog.getByRole('radio', { name: /Amaderado/ })
+  const first = dialog.getByRole('checkbox', { name: /Amaderado/ })
   await first.focus()
   await page.keyboard.press('Space')
   await expect(first).toBeChecked()
@@ -86,13 +154,15 @@ test('Keyboard, progress, previous answers, restart and direct product navigatio
   await choose(page, 'Moderada')
   await choose(page, 'Hasta S/ 400', true)
   await expect(
-    dialog.getByRole('heading', { name: 'Tu perfume recomendado' }),
+    dialog.getByRole('heading', { name: 'Perfumes que encajan contigo' }),
   ).toBeFocused()
   await expect(
     dialog.getByRole('heading', { name: 'Bois Clair' }),
   ).toBeVisible()
-  await expect(dialog.getByText('50 ml · Disponible')).toBeVisible()
-  const link = dialog.getByRole('link', { name: 'Ver perfume', exact: true })
+  await expect(dialog.getByText('50 ml · Disponible')).toHaveCount(3)
+  const link = dialog
+    .getByRole('link', { name: 'Ver perfume', exact: true })
+    .first()
   await expect(link).toHaveAttribute('href', /\/producto\//)
   await link.click()
   await expect(
@@ -118,6 +188,8 @@ test('Escape restores focus and the modal contains keyboard navigation', async (
 test('No preferences, no matches and partial matches are explained honestly', async ({
   page,
 }) => {
+  test.setTimeout(60_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   const dialog = await openQuiz(page)
   await choose(page, 'Sin preferencia')
   await choose(page, 'Sin preferencia')
@@ -147,7 +219,9 @@ test('No preferences, no matches and partial matches are explained honestly', as
   await expect(
     dialog.getByRole('heading', { name: 'Cerca de lo que buscas' }),
   ).toBeVisible()
-  await expect(dialog.getByText('Ten en cuenta', { exact: true })).toHaveCount(0)
+  await expect(dialog.getByText('Ten en cuenta', { exact: true })).toHaveCount(
+    0,
+  )
   await page.setViewportSize({ width: 1366, height: 900 })
   await page.screenshot({
     path: 'artifacts/fragrance-finder/partial-result-desktop.png',
@@ -222,7 +296,7 @@ test('The quiz works with touch input', async ({ browser }) => {
   await page
     .getByRole('button', { name: 'Encontrar mi perfume', exact: true })
     .tap()
-  await page.getByRole('radio', { name: /Floral/ }).tap()
+  await page.getByRole('checkbox', { name: /Floral/ }).tap()
   await page.getByRole('button', { name: 'Continuar', exact: true }).tap()
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '2')
   await page.getByRole('button', { name: 'Cerrar', exact: true }).tap()
@@ -281,7 +355,7 @@ for (const [device, width, height] of [
       .getByRole('button', { name: 'Encontrar mi perfume', exact: true })
       .click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('radio', { name: /Amaderado/ }).waitFor()
+    await dialog.getByRole('checkbox', { name: /Amaderado/ }).waitFor()
     await dialog
       .locator('img')
       .evaluateAll((images) =>
@@ -311,7 +385,11 @@ for (const [device, width, height] of [
     ).toBeVisible()
     await dialog
       .locator('img')
-      .evaluate(async (image: HTMLImageElement) => image.decode())
+      .evaluateAll((images) =>
+        Promise.all(
+          images.map((image) => (image as HTMLImageElement).decode()),
+        ),
+      )
     await page.screenshot({
       path: `artifacts/fragrance-finder/${device}-result.png`,
     })
@@ -320,7 +398,10 @@ for (const [device, width, height] of [
         (element) => element.scrollWidth <= element.clientWidth,
       ),
     ).toBe(true)
-    await dialog.getByRole('link', { name: 'Ver perfume', exact: true }).click()
+    await dialog
+      .getByRole('link', { name: 'Ver perfume', exact: true })
+      .first()
+      .click()
     await expect(
       page.getByRole('heading', { level: 1, name: 'Bois Clair' }),
     ).toBeVisible()

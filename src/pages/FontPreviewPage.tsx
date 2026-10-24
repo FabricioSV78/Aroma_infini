@@ -100,7 +100,7 @@ export function FontPreviewPage() {
           </p>
         </div>
         <div className="font-preview__details">
-          <span>Eau de parfum · 50 ml</span>
+          <span>50 ml</span>
           <strong>S/ 390</strong>
           <Link className="font-preview__primary" to="/tienda">
             Explorar la tienda

@@ -24,6 +24,11 @@ export function CartSummary({ cart }: { cart: ResolvedCart }) {
           </dd>
         </div>
       </dl>
+      {cart.productDiscountCents > 0 ? (
+        <p className="cart-product-savings">
+          Ahorras {formatPEN(cart.productDiscountCents)} en productos
+        </p>
+      ) : null}
       <p className="cart-shipping-note">
         Las opciones de entrega se muestran al elegir tu ubicación.
       </p>

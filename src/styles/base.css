@@ -105,14 +105,8 @@ section[tabindex]:focus {
   background: var(--color-ink);
   color: white;
 }
-.button--primary:hover {
-  background: #404040;
-}
 .button--secondary {
   background: transparent;
-}
-.button--secondary:hover {
-  background: var(--color-surface);
 }
 .icon-button {
   width: 44px;
@@ -124,9 +118,6 @@ section[tabindex]:focus {
   justify-content: center;
   align-items: center;
 }
-.icon-button:hover {
-  background: var(--color-surface);
-}
 .text-link {
   min-height: 44px;
   display: inline-flex;
@@ -135,9 +126,6 @@ section[tabindex]:focus {
   font-size: 14px;
   font-weight: 500;
   text-underline-offset: 5px;
-}
-.text-link:hover {
-  text-decoration: underline;
 }
 .skip-link {
   position: fixed;

@@ -4,27 +4,64 @@ import {
 } from '../mocks/home'
 import { getProductDetail } from '../mocks/product-details'
 import {
+  createRegisteredCatalogProducts,
+  registeredCatalogIds,
+} from '../content/catalog-products'
+import {
   createDefaultHomeContent,
   normalizeHomeContent,
   validateHomeContent,
 } from '../content/home-editor'
 import { localAdminStateRepository } from './admin-persistence'
+import { getVariantPrice, validateProductDiscount } from './product-discounts'
+import { productImageAlt, withGeneratedGalleryAlts } from './product-image-alt'
 import {
   isValidAlternateRecipient,
   type AlternateRecipient,
 } from './shipping-recipient'
 import { formatBrandName } from '../utils/brand-name'
+import { validateProductOlfactoryClassification } from '../domain/olfactory-family'
+import { normalizeSku, isValidSku } from '../domain/product-identity'
+import {
+  hasProductMainImage,
+  hasProductStock,
+} from '../domain/product-publication'
+import {
+  getOrderTransitionError,
+  ORDER_STATUSES,
+} from '../domain/order-workflow'
+export { hasCompleteOrderDelivery } from '../domain/order-workflow'
+import {
+  normalizeStoreFeatures,
+  validateStoreFeatures,
+  type StoreFeatures,
+} from '../domain/store-features'
+import {
+  isPerfume,
+  isProductType,
+  validPresentation,
+  variantKey,
+} from '../domain/product-type'
 import {
   getPeruDepartmentLabel,
   getPeruDistrictLabel,
   getPeruProvinceOptions,
   getPeruProvinceLabel,
+  isCoveredDeliveryLocation,
   isValidPeruLocation,
+  getDeliveryArea,
+  CALLAO_DEPARTMENT,
+  CALLAO_PROVINCE,
   peruDepartments,
 } from '../content/peru'
+import {
+  getAreaBaseShipping,
+  isShippingDestinationEnabled,
+} from './shipping-rates'
 import type {
   Brand,
   Product,
+  ProductDiscount,
   ProductAudience,
   ProductDetail,
   ProductVariant,
@@ -46,6 +83,14 @@ import type {
   HomeMediaKey as SharedHomeMediaKey,
 } from '../types/home'
 import type { ShippingSettings, ShippingZone } from '../types/shipping'
+import type {
+  BulkOrderStatusResult,
+  CreateOrderBatchResult,
+  OrderBatch,
+  OrderBatchUpdate,
+  OrderHistoryEntry,
+  OrderOperator,
+} from '../types/order-workflow'
 
 export type AdminGender = ProductAudience
 export type HomeMediaKey = SharedHomeMediaKey
@@ -62,11 +107,63 @@ export interface AdminProduct {
   product: Product
   detail: ProductDetail
   active: boolean
-  featured: boolean
-  gender: AdminGender
+  gender: AdminGender | null
   popularity: number
   newest: number
   lowStockThreshold: number
+}
+
+function withStockVisibility(record: AdminProduct): AdminProduct {
+  return record.active && !hasProductStock(record.product)
+    ? { ...record, active: false }
+    : record
+}
+
+function deactivateSoldOutProducts(records: AdminProduct[]): AdminProduct[] {
+  let changed = false
+  const products = records.map((record) => {
+    const next = withStockVisibility(record)
+    if (next !== record) changed = true
+    return next
+  })
+  return changed ? products : records
+}
+
+function normalizeProductType(record: AdminProduct): AdminProduct {
+  record = withoutRetiredSelection(record)
+  record = {
+    ...record,
+    detail: withoutRetiredConcentration(record.detail),
+    product: {
+      ...record.product,
+      variants: record.product.variants.map((variant) =>
+        variant.sku === undefined
+          ? variant
+          : { ...variant, sku: normalizeSku(variant.sku) || undefined },
+      ),
+    },
+  }
+  if (isPerfume(record.product))
+    return { ...record, product: { ...record.product, productType: 'perfume' } }
+  return {
+    ...record,
+    gender: null,
+    product: {
+      ...record.product,
+      family: '',
+      olfactoryFamily: null,
+      olfactoryFamilies: [],
+    },
+    detail: {
+      ...record.detail,
+      olfactoryImage: null,
+      notes: { top: [], heart: [], base: [] },
+      intensity: null,
+      intensityLevel: null,
+      occasion: '',
+      season: '',
+    },
+  }
 }
 
 export type AdminOrderLine = PurchasedLine
@@ -86,25 +183,6 @@ export interface AdminOrder extends OrderTotals {
   paymentProvider: PaymentProvider
   deliveryMethod: DeliveryMethod
   address: DeliveryAddress
-}
-
-export function hasCompleteOrderDelivery(
-  order: AdminOrder,
-  legacyPhone?: string,
-) {
-  const phone = (order.contactPhone?.trim() || legacyPhone || '').trim()
-  const address = order.address
-  return Boolean(
-    order.customerName.trim().length >= 2 &&
-    !/^Cliente \d+$/i.test(order.customerName.trim()) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.customerEmail.trim()) &&
-    /^[+\d\s()-]{9,20}$/.test(phone) &&
-    address.street?.trim().length >= 5 &&
-    address.street.trim() !== 'Dirección registrada' &&
-    address.department?.trim() &&
-    address.province?.trim() &&
-    address.district?.trim(),
-  )
 }
 
 export interface ApprovedCheckoutOrderInput extends OrderTotals {
@@ -138,15 +216,19 @@ export type AdminShippingZone = ShippingZone
 export type AdminShippingSettings = ShippingSettings
 
 export interface AdminState {
+  /** One-time catalog registration, independent of later merchant edits. */
+  catalogVersion?: number
   products: AdminProduct[]
   brands: AdminBrand[]
   orders: AdminOrder[]
+  orderBatches: OrderBatch[]
+  orderHistory: OrderHistoryEntry[]
   customers: AdminCustomer[]
   promotions: AdminPromotion[]
   shipping: AdminShippingSettings
-  featuredOrder: string[]
   homeMedia: HomeMedia
   homeContent: HomeContent
+  features: StoreFeatures
   revision: number
 }
 
@@ -155,33 +237,29 @@ export type AdminSaveResult =
 
 const metadata: Record<
   string,
-  Pick<AdminProduct, 'gender' | 'featured' | 'popularity' | 'newest'>
+  Pick<AdminProduct, 'gender' | 'popularity' | 'newest'>
 > = {
-  neroli: { gender: 'unisex', featured: false, popularity: 5, newest: 8 },
-  iris: { gender: 'unisex', featured: false, popularity: 6, newest: 7 },
-  figue: { gender: 'unisex', featured: false, popularity: 7, newest: 6 },
-  santal: { gender: 'unisex', featured: false, popularity: 8, newest: 5 },
+  neroli: { gender: 'unisex', popularity: 5, newest: 8 },
+  iris: { gender: 'unisex', popularity: 6, newest: 7 },
+  figue: { gender: 'unisex', popularity: 7, newest: 6 },
+  santal: { gender: 'unisex', popularity: 8, newest: 5 },
   cedre: {
     gender: 'hombre',
-    featured: true,
     popularity: 1,
     newest: 3,
   },
   petale: {
     gender: 'mujer',
-    featured: false,
     popularity: 2,
     newest: 4,
   },
   sillage: {
     gender: 'unisex',
-    featured: true,
     popularity: 3,
     newest: 2,
   },
   ambre: {
     gender: 'unisex',
-    featured: false,
     popularity: 4,
     newest: 1,
   },
@@ -192,12 +270,26 @@ function cloneVariant(variant: ProductVariant): ProductVariant {
 }
 
 function cloneProduct(product: Product): Product {
-  return { ...product, variants: product.variants.map(cloneVariant) }
+  return {
+    ...product,
+    olfactoryFamilies: product.olfactoryFamilies
+      ? [...product.olfactoryFamilies]
+      : product.olfactoryFamilies,
+    variants: product.variants.map(cloneVariant),
+    discount: product.discount ? { ...product.discount } : product.discount,
+  }
+}
+
+/** Remove the retired concentration without changing the product classification. */
+function withoutRetiredConcentration(detail: ProductDetail): ProductDetail {
+  const current = { ...detail }
+  Reflect.deleteProperty(current, 'type')
+  return current
 }
 
 function cloneDetail(detail: ProductDetail): ProductDetail {
   return {
-    ...detail,
+    ...withoutRetiredConcentration(detail),
     notes: {
       top: [...detail.notes.top],
       heart: [...detail.notes.heart],
@@ -208,30 +300,46 @@ function cloneDetail(detail: ProductDetail): ProductDetail {
   }
 }
 
+function hasUnchangedDemoNotes(
+  detail: ProductDetail,
+  original?: ProductDetail,
+): boolean {
+  if (!original) return false
+  return (['top', 'heart', 'base'] as const).every(
+    (stage) =>
+      detail.notes[stage].length === original.notes[stage].length &&
+      detail.notes[stage].every(
+        (note, index) => note === original.notes[stage][index],
+      ),
+  )
+}
+
 export function createAdminProductDetail(
   product: Product,
-  description = 'Descubre el carácter de esta fragancia y sus notas principales.',
+  description = isPerfume(product)
+    ? 'Descubre el carácter de esta fragancia y sus notas principales.'
+    : '',
 ): ProductDetail {
   return {
-    type: 'Eau de Parfum',
     shortDescription: description,
     description,
+    olfactoryImage: null,
     notes: { top: [], heart: [], base: [] },
-    intensity: 'Moderada',
-    intensityLevel: 2,
-    occasion: 'Por definir',
-    season: 'Todo el año',
+    intensity: isPerfume(product) ? 'Moderada' : null,
+    intensityLevel: isPerfume(product) ? 2 : null,
+    occasion: isPerfume(product) ? 'Por definir' : '',
+    season: isPerfume(product) ? 'Todo el año' : '',
     gallery: [
       {
         image: product.image,
-        alt: `Frasco de ${product.name}`,
+        alt: product.image ? productImageAlt(product.name, '', 0) : '',
         framing: 'full',
       },
       ...(product.image
         ? [
             {
               image: `${product.image}-alternate`,
-              alt: `Vista alternativa de ${product.name}`,
+              alt: productImageAlt(product.name, '', 1),
               framing: 'full' as const,
             },
           ]
@@ -249,8 +357,7 @@ function createInitialState(): AdminState {
     return {
       product: cloneProduct(product),
       detail: cloneDetail(detail),
-      active: true,
-      featured: productMetadata.featured,
+      active: hasProductStock(product),
       gender: productMetadata.gender,
       popularity: productMetadata.popularity,
       newest: productMetadata.newest,
@@ -258,7 +365,11 @@ function createInitialState(): AdminState {
     }
   })
   return {
-    products: productRecords,
+    catalogVersion: 1,
+    products: [
+      ...productRecords,
+      ...createRegisteredCatalogProducts(productRecords),
+    ],
     brands: fixtureBrands.map((brand) => ({ ...brand, active: true })),
     orders: [
       {
@@ -413,6 +524,7 @@ function createInitialState(): AdminState {
     promotions: [],
     shipping: {
       freeThresholdCents: 45000,
+      provinceShippingEnabled: false,
       nationalCourierFeeCents: 3500,
       nationalEstimate: 'Hasta 5 días',
       zones: [
@@ -430,30 +542,26 @@ function createInitialState(): AdminState {
         {
           id: 'zone-callao',
           name: 'Callao',
-          department: 'callao',
-          province: '0701',
+          department: CALLAO_DEPARTMENT,
+          province: CALLAO_PROVINCE,
           district: null,
           courierFeeCents: 2000,
           motorizadoFeeCents: 1500,
           estimate: 'Hasta 48 horas',
           active: true,
         },
-        {
-          id: 'zone-arequipa',
-          name: 'Arequipa',
-          department: 'arequipa',
-          province: null,
-          district: null,
-          courierFeeCents: 3500,
-          motorizadoFeeCents: null,
-          estimate: 'Hasta 5 días',
-          active: true,
-        },
       ],
     },
-    featuredOrder: ['sillage', 'cedre'],
-    homeMedia: { hombre: null, mujer: null, unisex: null, featured: null },
+    homeMedia: {
+      hombre: null,
+      mujer: null,
+      unisex: null,
+      complementos: null,
+    },
     homeContent: createDefaultHomeContent(),
+    features: normalizeStoreFeatures(),
+    orderBatches: [],
+    orderHistory: [],
     revision: 0,
   }
 }
@@ -463,20 +571,34 @@ const listeners = new Set<() => void>()
 let persistenceQueue: Promise<void> = Promise.resolve()
 let hydrationPromise: Promise<void> | undefined
 
+/** Drop the retired selection without resetting saved catalog or Home edits. */
+function withoutRetiredSelection<T extends object>(value: T): T {
+  const copy = { ...value }
+  Reflect.deleteProperty(copy, 'featured')
+  Reflect.deleteProperty(copy, 'featuredOrder')
+  return copy
+}
+
 export function hydrateAdminStore() {
   hydrationPromise ??= (async () => {
     try {
       const saved = await localAdminStateRepository.read()
-      if (
-        !saved ||
-        !Array.isArray(saved.products) ||
-        !Array.isArray(saved.featuredOrder)
-      )
+      if (!saved || !Array.isArray(saved.products)) {
+        persist(state)
+        await persistenceQueue
         return
+      }
       const initial = createInitialState()
       state = {
         ...initial,
-        ...saved,
+        ...withoutRetiredSelection(saved),
+        catalogVersion: saved.catalogVersion ?? 0,
+        orderBatches: Array.isArray(saved.orderBatches)
+          ? saved.orderBatches
+          : [],
+        orderHistory: Array.isArray(saved.orderHistory)
+          ? saved.orderHistory
+          : [],
         products: saved.products.map((record) => {
           const legacyImages: Record<string, string> = {
             neroli: 'cedre',
@@ -522,7 +644,23 @@ export function hydrateAdminStore() {
                       ? { ...view, image: product.image }
                       : view,
                   )
-          return { ...record, product, detail: { ...record.detail, gallery } }
+          return {
+            ...withoutRetiredSelection(record),
+            active: record.active && hasProductStock(product),
+            product,
+            detail: {
+              ...withoutRetiredConcentration(record.detail),
+              // Old records displayed a demo photo only while notes matched.
+              // Preserve that exact visual before making the image editable.
+              olfactoryImage:
+                record.detail.olfactoryImage === undefined
+                  ? hasUnchangedDemoNotes(record.detail, defaultRecord?.detail)
+                    ? (defaultRecord?.detail.olfactoryImage ?? null)
+                    : null
+                  : record.detail.olfactoryImage,
+              gallery,
+            },
+          }
         }),
         brands: (saved.brands ?? initial.brands).map((brand) => ({
           ...brand,
@@ -531,24 +669,122 @@ export function hydrateAdminStore() {
         shipping: {
           ...initial.shipping,
           ...saved.shipping,
-          zones: Array.isArray(saved.shipping?.zones)
-            ? saved.shipping.zones
-            : initial.shipping.zones,
+          provinceShippingEnabled:
+            saved.shipping?.provinceShippingEnabled === true,
+          zones: (() => {
+            const previous = Array.isArray(saved.shipping?.zones)
+              ? saved.shipping.zones
+              : initial.shipping.zones
+            if (
+              previous.some(
+                (zone) =>
+                  normalizeKey(zone.department) === CALLAO_DEPARTMENT &&
+                  zone.province === CALLAO_PROVINCE &&
+                  !zone.district,
+              )
+            )
+              return previous
+            const rate = getAreaBaseShipping(
+              { ...initial.shipping, ...saved.shipping, zones: previous },
+              CALLAO_DEPARTMENT,
+            )
+            return [
+              ...previous,
+              {
+                id: 'zone-callao',
+                name: 'Callao',
+                department: CALLAO_DEPARTMENT,
+                province: CALLAO_PROVINCE,
+                district: null,
+                ...rate,
+                active: true,
+              },
+            ]
+          })(),
         },
         homeMedia: {
           hombre: saved.homeMedia?.hombre ?? null,
           mujer: saved.homeMedia?.mujer ?? null,
           unisex: saved.homeMedia?.unisex ?? null,
-          featured: saved.homeMedia?.featured ?? null,
+          complementos: saved.homeMedia?.complementos ?? null,
         },
         homeContent: normalizeHomeContent(saved.homeContent),
+        features: normalizeStoreFeatures(saved.features),
+      }
+      if (
+        saved.products.some(
+          (record) =>
+            Object.hasOwn(record.detail, 'type') ||
+            (record.active && !hasProductStock(record.product)),
+        )
+      ) {
+        persist(state)
+        await persistenceQueue.catch(() => undefined)
       }
       listeners.forEach((listener) => listener())
     } catch {
       // The storefront remains available when browser storage is unavailable.
     }
-  })()
+  })().then(completeCatalogRegistration)
   return hydrationPromise
+}
+
+async function completeCatalogRegistration() {
+  if ((state.catalogVersion ?? 0) >= 1) return
+  const existing = state.products.filter(
+    ({ product }) => !/^pagination-sample-\d+$/.test(product.id),
+  )
+  const activeBrands = new Set(
+    state.brands.filter((brand) => brand.active).map((brand) => brand.id),
+  )
+  const visibleCount = existing.filter(
+    (record) =>
+      record.active &&
+      hasProductStock(record.product) &&
+      hasProductMainImage(record) &&
+      (isPerfume(record.product) || state.features.complementsEnabled) &&
+      (activeBrands.has(record.product.brandId) ||
+        (!isPerfume(record.product) && !record.product.brandId)),
+  ).length
+  const additions = createInitialState()
+    .products.filter(
+      ({ product }) =>
+        registeredCatalogIds.has(product.id) &&
+        activeBrands.has(product.brandId) &&
+        !product.variants.some((variant) =>
+          state.products.some((record) =>
+            record.product.variants.some(
+              (current) =>
+                current.id === variant.id ||
+                (variant.sku &&
+                  current.sku &&
+                  normalizeSku(current.sku) === normalizeSku(variant.sku)),
+            ),
+          ),
+        ) &&
+        !existing.some(
+          (record) =>
+            record.product.id === product.id ||
+            record.product.slug.toLowerCase() === product.slug ||
+            (record.product.brandId === product.brandId &&
+              normalizeKey(record.product.name) === normalizeKey(product.name)),
+        ),
+    )
+    .slice(0, Math.max(0, 15 - visibleCount))
+  if (additions.length) {
+    const result = adminService.saveProductsBatch(additions, state.revision)
+    if (result.kind !== 'saved') throw new Error(result.message)
+  }
+  commit((current) => ({
+    ...current,
+    catalogVersion: 1,
+    products: current.products.filter(
+      ({ product }) => !/^pagination-sample-\d+$/.test(product.id),
+    ),
+  }))
+  // A storage failure must not block the storefront. The rejected queue stays
+  // available to flush/retryPersistence so a later save can report the error.
+  await persistenceQueue.catch(() => undefined)
 }
 
 function persist(snapshot: AdminState) {
@@ -558,7 +794,12 @@ function persist(snapshot: AdminState) {
 }
 
 function commit(update: (current: AdminState) => AdminState) {
-  state = { ...update(state), revision: state.revision + 1 }
+  const next = update(state)
+  state = {
+    ...next,
+    products: deactivateSoldOutProducts(next.products),
+    revision: state.revision + 1,
+  }
   persist(state)
   listeners.forEach((listener) => listener())
 }
@@ -594,13 +835,29 @@ function resolveShippingZone(
   district = '',
 ) {
   const normalizedDepartment = normalizeKey(department)
+  if (
+    !isShippingDestinationEnabled(
+      shipping,
+      normalizedDepartment,
+      province,
+      district,
+    )
+  )
+    return undefined
+  const isCapital = isCoveredDeliveryLocation(
+    normalizedDepartment,
+    province,
+    district,
+  )
   const override = shipping.zones
     .filter(
       (zone) =>
         zone.active &&
         normalizeKey(zone.department) === normalizedDepartment &&
         (!zone.province || zone.province === province) &&
-        (!zone.district || zone.district === district),
+        (!zone.district || zone.district === district) &&
+        // Una tarifa departamental futura de Lima no reemplaza su tarifa local.
+        (!isCapital || Boolean(zone.province || zone.district)),
     )
     .sort(
       (left, right) =>
@@ -608,17 +865,26 @@ function resolveShippingZone(
         Number(Boolean(right.province)) - Number(Boolean(left.province)),
     )[0]
   if (override) return override
-  if (!peruDepartments.some((item) => item.value === normalizedDepartment))
-    return undefined
+  const area = getDeliveryArea(normalizedDepartment)
+  if (!isCapital)
+    return {
+      id: 'province-base',
+      name: 'Provincias',
+      department: normalizedDepartment,
+      province: null,
+      district: null,
+      courierFeeCents: shipping.nationalCourierFeeCents,
+      motorizadoFeeCents: null,
+      estimate: shipping.nationalEstimate,
+      active: true,
+    } satisfies AdminShippingZone
   return {
-    id: 'national',
-    name: 'Todo el Perú',
-    department: normalizedDepartment,
-    province: null,
+    id: `${area!.department}-base`,
+    name: area!.label,
+    department: area!.department,
+    province: area!.province,
     district: null,
-    courierFeeCents: shipping.nationalCourierFeeCents,
-    motorizadoFeeCents: null,
-    estimate: shipping.nationalEstimate,
+    ...getAreaBaseShipping(shipping, area!.department),
     active: true,
   } satisfies AdminShippingZone
 }
@@ -627,6 +893,72 @@ function promotionDiscount(promotion: AdminPromotion, subtotalCents: number) {
   return promotion.type === 'percent'
     ? Math.round((subtotalCents * promotion.value) / 100)
     : Math.min(subtotalCents, Math.round(promotion.value * 100))
+}
+
+function normalizeOrderOperator(
+  operator: OrderOperator | undefined,
+): OrderOperator | null {
+  const name = typeof operator?.name === 'string' ? operator.name.trim() : ''
+  if (name.length < 2 || name.length > 80 || /[\r\n\t]/.test(name)) return null
+  return { name, verified: false, id: null }
+}
+
+function normalizeOrderReferences(references: string[]): string[] {
+  return Array.isArray(references)
+    ? [
+        ...new Set(
+          references
+            .filter((reference) => typeof reference === 'string')
+            .map((reference) => reference.trim())
+            .filter(Boolean),
+        ),
+      ]
+    : []
+}
+
+function validateBatchReferences(
+  references: string[],
+  archived: boolean,
+  excludedBatchId?: string,
+): string | null {
+  if (!references.length) return 'Selecciona al menos un pedido para el lote.'
+  const orderReferences = new Set(state.orders.map((order) => order.reference))
+  const missing = references.filter(
+    (reference) => !orderReferences.has(reference),
+  )
+  if (missing.length)
+    return `Estos pedidos ya no existen: ${missing.join(', ')}.`
+  if (archived) return null
+  const requested = new Set(references)
+  const conflicts = state.orderBatches.filter(
+    (batch) =>
+      batch.id !== excludedBatchId &&
+      !batch.archived &&
+      batch.orderReferences.some((reference) => requested.has(reference)),
+  )
+  if (conflicts.length)
+    return `Hay pedidos asignados a otro lote activo (${conflicts.map((batch) => batch.name).join(', ')}). Selecciona pedidos sin lote para crear una agrupación nueva.`
+  return null
+}
+
+function createOrderHistory(
+  order: AdminOrder,
+  toStatus: OrderStatus,
+  operator: OrderOperator,
+  operationId: string,
+  source: OrderHistoryEntry['source'],
+  changedAt: string,
+): OrderHistoryEntry {
+  return {
+    id: crypto.randomUUID(),
+    reference: order.reference,
+    fromStatus: order.status,
+    toStatus,
+    changedAt,
+    operator: { ...operator },
+    operationId,
+    source,
+  }
 }
 
 export const adminService = {
@@ -645,27 +977,47 @@ export const adminService = {
   flush() {
     return persistenceQueue
   },
+  retryPersistence(): Promise<void> {
+    persist(state)
+    return persistenceQueue
+  },
   saveProduct(record: AdminProduct): AdminSaveResult {
+    record = withStockVisibility(normalizeProductType(record))
     const product = record.product
-    if (!product.image || !record.detail.gallery[0]?.image)
+    const perfume = isPerfume(product)
+    if (!isProductType(product.productType))
+      return {
+        kind: 'validation',
+        message: 'Selecciona un tipo de producto válido.',
+      }
+    const discountError = validateProductDiscount(
+      product.discount,
+      product.variants,
+    )
+    if (discountError) return { kind: 'validation', message: discountError }
+    const olfactoryError = validateProductOlfactoryClassification(product)
+    if (olfactoryError)
+      return {
+        kind: 'validation',
+        message: olfactoryError,
+      }
+    if (record.active && !hasProductMainImage(record))
       return {
         kind: 'validation',
         message: 'Selecciona o sube una fotografía principal.',
-      }
-    if (record.detail.gallery.some((view) => !view.alt.trim()))
-      return {
-        kind: 'validation',
-        message: 'Describe cada fotografía de la galería.',
       }
     if (!product.name.trim() || !validSlug(product.slug))
       return {
         kind: 'validation',
         message: 'Completa el nombre y usa un slug válido.',
       }
-    if (!record.detail.description.trim())
+    if (
+      !record.detail.shortDescription.trim() ||
+      !record.detail.description.trim()
+    )
       return {
         kind: 'validation',
-        message: 'La descripción es obligatoria.',
+        message: 'Completa las descripciones del producto.',
       }
     const duplicateSlug = state.products.some(
       (item) =>
@@ -673,14 +1025,75 @@ export const adminService = {
     )
     if (duplicateSlug)
       return { kind: 'validation', message: 'Ese slug ya está en uso.' }
+    const previousRecord = state.products.find(
+      (item) => item.product.id === product.id,
+    )
+    const recommendationIds = record.detail.recommendationIds
+    if (
+      !Array.isArray(recommendationIds) ||
+      recommendationIds.length > 4 ||
+      new Set(recommendationIds).size !== recommendationIds.length ||
+      recommendationIds.includes(product.id) ||
+      recommendationIds.some((id) => {
+        const recommendation = state.products.find(
+          (item) => item.product.id === id,
+        )
+        if (!recommendation) return true
+        // An exhausted recommendation is hidden publicly, but its saved link
+        // must not prevent editing this product or be lost during replenishment.
+        if (previousRecord?.detail.recommendationIds.includes(id)) return false
+        return (
+          !recommendation.active ||
+          ((isPerfume(recommendation.product) ||
+            recommendation.product.brandId) &&
+            !state.brands.some(
+              (brand) =>
+                brand.id === recommendation.product.brandId && brand.active,
+            ))
+        )
+      })
+    )
+      return {
+        kind: 'validation',
+        message:
+          'Elige hasta cuatro productos disponibles, sin repetir ni incluir este producto.',
+      }
     const brand = state.brands.find((item) => item.id === product.brandId)
-    if (!brand || (record.active && !brand.active))
+    if (
+      (!brand && (perfume || product.brandId)) ||
+      (record.active && brand && !brand.active)
+    )
       return {
         kind: 'validation',
         message: 'Selecciona una marca disponible antes de publicar.',
       }
-    const presentations = product.variants.map((variant) => variant.ml)
+    const presentations = product.variants.map(variantKey)
     const variantIds = product.variants.map((variant) => variant.id)
+    const otherVariantIds = new Set(
+      state.products
+        .filter((item) => item.product.id !== product.id)
+        .flatMap((item) => item.product.variants.map((variant) => variant.id)),
+    )
+    const skus = new Set<string>()
+    const otherSkus = new Set(
+      state.products
+        .filter((item) => item.product.id !== product.id)
+        .flatMap((item) =>
+          item.product.variants
+            .map((variant) => normalizeSku(variant.sku ?? ''))
+            .filter(Boolean),
+        ),
+    )
+    for (const variant of product.variants) {
+      const sku = normalizeSku(variant.sku ?? '')
+      if (!sku) continue
+      if (!isValidSku(sku) || skus.has(sku) || otherSkus.has(sku))
+        return {
+          kind: 'validation',
+          message: `SKU ${sku}: usa un código único de hasta 64 letras, números, puntos, guiones o guiones bajos.`,
+        }
+      skus.add(sku)
+    }
     const activeVariants = product.variants.filter(
       (variant) => variant.active !== false,
     )
@@ -688,14 +1101,14 @@ export const adminService = {
       !product.variants.length ||
       new Set(presentations).size !== presentations.length ||
       new Set(variantIds).size !== variantIds.length ||
+      variantIds.some((id) => otherVariantIds.has(id)) ||
       !Number.isInteger(record.lowStockThreshold) ||
       record.lowStockThreshold < 0 ||
       product.variants.some(
         (variant) =>
-          !Number.isInteger(variant.ml) ||
+          !validPresentation(product, variant) ||
           !Number.isInteger(variant.priceCents) ||
           !Number.isInteger(variant.stock) ||
-          variant.ml <= 0 ||
           variant.priceCents < 0 ||
           variant.stock < 0,
       )
@@ -717,14 +1130,28 @@ export const adminService = {
       }
     const saved: AdminProduct = {
       ...record,
-      featured: record.active && record.featured,
       product: cloneProduct({
         ...product,
         name: product.name.trim(),
         slug: product.slug.trim(),
         family: product.family.trim(),
       }),
-      detail: cloneDetail(record.detail),
+      detail: cloneDetail({
+        ...record.detail,
+        gallery: withGeneratedGalleryAlts(
+          record.detail.gallery,
+          product.name,
+          brand?.name ?? '',
+          previousRecord && {
+            gallery: previousRecord.detail.gallery,
+            productName: previousRecord.product.name,
+            brandName:
+              state.brands.find(
+                (item) => item.id === previousRecord.product.brandId,
+              )?.name ?? '',
+          },
+        ),
+      }),
     }
     commit((current) => {
       const exists = current.products.some(
@@ -737,19 +1164,42 @@ export const adminService = {
               item.product.id === product.id ? saved : item,
             )
           : [...current.products, saved],
-        featuredOrder: saved.featured
-          ? current.featuredOrder.includes(product.id)
-            ? current.featuredOrder
-            : [...current.featuredOrder, product.id]
-          : current.featuredOrder.filter((id) => id !== product.id),
       }
     })
+    return { kind: 'saved' }
+  },
+  saveProductDiscount(
+    productId: string,
+    discount: ProductDiscount | null,
+  ): AdminSaveResult {
+    const record = state.products.find((item) => item.product.id === productId)
+    if (!record)
+      return { kind: 'validation', message: 'No encontramos ese producto.' }
+    const error = validateProductDiscount(discount, record.product.variants)
+    if (error) return { kind: 'validation', message: error }
+    commit((current) => ({
+      ...current,
+      products: current.products.map((item) =>
+        item.product.id === productId
+          ? {
+              ...item,
+              product: {
+                ...item.product,
+                discount: discount ? { ...discount } : null,
+              },
+            }
+          : item,
+      ),
+    }))
     return { kind: 'saved' }
   },
   saveProductsBatch(
     records: readonly AdminProduct[],
     expectedRevision: number,
   ): AdminSaveResult {
+    records = records.map((record) =>
+      withStockVisibility(normalizeProductType(record)),
+    )
     if (state.revision !== expectedRevision)
       return {
         kind: 'validation',
@@ -778,20 +1228,46 @@ export const adminService = {
         item.product.variants.map((variant) => variant.id),
       ),
     )
+    const skus = new Set(
+      state.products.flatMap((item) =>
+        item.product.variants
+          .map((variant) => normalizeSku(variant.sku ?? ''))
+          .filter(Boolean),
+      ),
+    )
     for (const record of records) {
       const product = record.product
+      if (!isProductType(product.productType))
+        return {
+          kind: 'validation',
+          message: 'Selecciona un tipo de producto válido.',
+        }
+      const discountError = validateProductDiscount(
+        product.discount,
+        product.variants,
+      )
+      if (discountError)
+        return {
+          kind: 'validation',
+          message: `${product.name || product.slug}: ${discountError}`,
+        }
       const slug = product.slug.toLowerCase()
       const nameKey = `${product.brandId}:${normalizeKey(product.name)}`
       const brand = state.brands.find((item) => item.id === product.brandId)
       if (
         !validSlug(product.slug) ||
         !product.name.trim() ||
-        !product.family.trim() ||
+        (isPerfume(product) && !product.family.trim()) ||
         !record.detail.description.trim()
       )
         return {
           kind: 'validation',
           message: `Revisa nombre, slug, familia y descripción de ${product.name || product.slug}.`,
+        }
+      if (validateProductOlfactoryClassification(product))
+        return {
+          kind: 'validation',
+          message: `Revisa la familia olfativa y el perfil aromático breve de ${product.name || product.slug}.`,
         }
       if (
         existingSlugs.has(slug) ||
@@ -805,25 +1281,26 @@ export const adminService = {
           kind: 'validation',
           message: `El producto ${product.name} ya existe o está duplicado en el archivo.`,
         }
-      if (!brand || (record.active && !brand.active))
+      if (
+        (!brand && (isPerfume(product) || product.brandId)) ||
+        (record.active && brand && !brand.active)
+      )
         return {
           kind: 'validation',
           message: `La marca de ${product.name} no está disponible.`,
         }
-      if (!['hombre', 'mujer', 'unisex'].includes(record.gender))
+      if (
+        isPerfume(product) &&
+        !['hombre', 'mujer', 'unisex'].includes(record.gender ?? '')
+      )
         return {
           kind: 'validation',
           message: `El género de ${product.name} no es válido.`,
         }
-      if (record.active && (!product.image || !record.detail.gallery[0]?.image))
+      if (record.active && !hasProductMainImage(record))
         return {
           kind: 'validation',
           message: `${product.name} necesita una imagen antes de publicarse.`,
-        }
-      if (record.detail.gallery.some((view) => !view.alt.trim()))
-        return {
-          kind: 'validation',
-          message: `Describe cada imagen de ${product.name}.`,
         }
       if (
         !isNonNegativeInteger(record.lowStockThreshold) ||
@@ -833,21 +1310,28 @@ export const adminService = {
           kind: 'validation',
           message: `Revisa el umbral y las presentaciones de ${product.name}.`,
         }
-      const sizes = new Set<number>()
+      const sizes = new Set<string>()
       for (const variant of product.variants) {
+        const sku = normalizeSku(variant.sku ?? '')
+        if (sku && (!isValidSku(sku) || skus.has(sku)))
+          return {
+            kind: 'validation',
+            message: `SKU ${sku} de ${product.name}: el código no es válido o ya está registrado.`,
+          }
         if (
-          !isPositiveInteger(variant.ml) ||
+          !validPresentation(product, variant) ||
           !isPositiveInteger(variant.priceCents) ||
           !isNonNegativeInteger(variant.stock) ||
-          sizes.has(variant.ml) ||
+          sizes.has(variantKey(variant)) ||
           variantIds.has(variant.id)
         )
           return {
             kind: 'validation',
             message: `Revisa precios, tamaños y stock de ${product.name}.`,
           }
-        sizes.add(variant.ml)
+        sizes.add(variantKey(variant))
         variantIds.add(variant.id)
+        if (sku) skus.add(sku)
       }
       batchSlugs.add(slug)
       batchIds.add(product.id)
@@ -855,19 +1339,20 @@ export const adminService = {
     }
     const saved = records.map((record) => ({
       ...record,
-      featured: record.active && record.featured,
       product: cloneProduct(record.product),
-      detail: cloneDetail(record.detail),
+      detail: cloneDetail({
+        ...record.detail,
+        gallery: withGeneratedGalleryAlts(
+          record.detail.gallery,
+          record.product.name,
+          state.brands.find((brand) => brand.id === record.product.brandId)
+            ?.name ?? '',
+        ),
+      }),
     }))
     commit((current) => ({
       ...current,
       products: [...current.products, ...saved],
-      featuredOrder: [
-        ...current.featuredOrder,
-        ...saved
-          .filter((record) => record.featured)
-          .map((record) => record.product.id),
-      ],
     }))
     return { kind: 'saved' }
   },
@@ -875,84 +1360,55 @@ export const adminService = {
     const record = state.products.find((item) => item.product.id === id)
     if (!record)
       return { kind: 'validation', message: 'El producto ya no existe.' }
-    const brand = state.brands.find(
-      (item) => item.id === record.product.brandId,
-    )
-    const activeVariants = record.product.variants.filter(
-      (variant) => variant.active !== false,
-    )
-    if (
-      active &&
-      (!brand?.active ||
-        !activeVariants.length ||
-        activeVariants.some((variant) => variant.priceCents <= 0))
-    )
+    if (active && !hasProductStock(record.product))
       return {
         kind: 'validation',
         message:
-          'Revisa la marca y los precios de las presentaciones antes de activar.',
+          'Añade stock a una presentación activa antes de publicar el producto.',
       }
+    return adminService.saveProduct({ ...record, active })
+  },
+  saveStoreFeatures(features: StoreFeatures): AdminSaveResult {
+    const error = validateStoreFeatures(features)
+    if (error) return { kind: 'validation', message: error }
     commit((current) => ({
       ...current,
-      products: current.products.map((item) =>
-        item.product.id === id
-          ? { ...item, active, featured: active ? item.featured : false }
-          : item,
-      ),
-      featuredOrder: active
-        ? current.featuredOrder
-        : current.featuredOrder.filter((item) => item !== id),
+      features: normalizeStoreFeatures(features),
     }))
     return { kind: 'saved' }
   },
-  setFeaturedOrder(ids: string[]) {
-    const unique = [...new Set(ids)].filter((id) =>
-      state.products.some((item) => item.product.id === id && item.active),
-    )
-    commit((current) => ({
-      ...current,
-      featuredOrder: unique,
-      products: current.products.map((item) => ({
-        ...item,
-        featured: unique.includes(item.product.id),
-      })),
-    }))
-  },
   saveHome(
-    featuredOrder: string[],
     homeMedia: HomeMedia,
     homeContent: HomeContent,
+    features?: StoreFeatures,
   ): AdminSaveResult {
-    const unique = [...new Set(featuredOrder)]
-    if (
-      unique.length !== 2 ||
-      !unique.every((id) =>
-        state.products.some(
-          (item) =>
-            item.product.id === id &&
-            item.active &&
-            state.brands.some(
-              (brand) => brand.id === item.product.brandId && brand.active,
-            ),
-        ),
-      )
-    ) {
-      return {
-        kind: 'validation',
-        message: 'Selecciona dos productos activos diferentes para destacados.',
-      }
-    }
     const contentError = validateHomeContent(homeContent)
     if (contentError) return { kind: 'validation', message: contentError }
+    const normalizedContent = normalizeHomeContent(homeContent)
+    if (
+      normalizedContent.featuredBrandId !== null &&
+      normalizedContent.featuredBrandId !== state.homeContent.featuredBrandId &&
+      !state.brands.some(
+        (brand) =>
+          brand.id === normalizedContent.featuredBrandId && brand.active,
+      )
+    )
+      return {
+        kind: 'validation',
+        message: 'Selecciona una marca activa para destacarla.',
+      }
+    if (features !== undefined) {
+      const featureError = validateStoreFeatures(features)
+      if (featureError) return { kind: 'validation', message: featureError }
+    }
     commit((current) => ({
       ...current,
-      featuredOrder: unique,
-      homeMedia: { ...homeMedia },
-      homeContent: normalizeHomeContent(homeContent),
-      products: current.products.map((item) => ({
-        ...item,
-        featured: unique.includes(item.product.id),
-      })),
+      homeMedia: withoutRetiredSelection(homeMedia),
+      homeContent: normalizedContent,
+      features:
+        features === undefined
+          ? current.features
+          : normalizeStoreFeatures(features),
     }))
     return { kind: 'saved' }
   },
@@ -1023,7 +1479,8 @@ export const adminService = {
       !order.address.department.trim() ||
       !order.address.province.trim() ||
       !order.address.district.trim() ||
-      !isValidPeruLocation(
+      !isShippingDestinationEnabled(
+        state.shipping,
         order.address.department,
         order.address.province,
         order.address.district,
@@ -1044,6 +1501,7 @@ export const adminService = {
     const activeBrandIds = new Set(
       state.brands.filter((brand) => brand.active).map((brand) => brand.id),
     )
+    const now = Date.now()
     const resolvedLines = order.lines.map((line) => {
       const record = state.products.find((item) =>
         item.product.variants.some((variant) => variant.id === line.variantId),
@@ -1054,24 +1512,36 @@ export const adminService = {
       const brand = record
         ? state.brands.find((item) => item.id === record.product.brandId)
         : undefined
-      return { line, record, variant, brand }
+      const price =
+        record && variant
+          ? getVariantPrice(record.product, variant, now)
+          : undefined
+      return { line, record, variant, brand, price }
     })
     if (
       new Set(order.lines.map((line) => line.variantId)).size !==
         order.lines.length ||
       resolvedLines.some(
-        ({ line, record, variant, brand }) =>
+        ({ line, record, variant, brand, price }) =>
           !record ||
           !record.active ||
-          !activeBrandIds.has(record.product.brandId) ||
+          (!isPerfume(record.product) && !state.features.complementsEnabled) ||
+          ((isPerfume(record.product) || record.product.brandId) &&
+            !activeBrandIds.has(record.product.brandId)) ||
           !variant ||
           variant.active === false ||
           !isPositiveInteger(line.quantity) ||
           variant.stock < line.quantity ||
-          variant.priceCents !== line.unitPriceCents ||
+          !price ||
+          price.finalCents !== line.unitPriceCents ||
+          (price.discountActive
+            ? line.originalUnitPriceCents !== price.originalCents
+            : line.originalUnitPriceCents !== undefined &&
+              line.originalUnitPriceCents !== price.originalCents) ||
           variant.ml !== line.ml ||
+          (variant.label ?? '') !== (line.variantLabel ?? '') ||
           record.product.name !== line.name ||
-          brand?.name !== line.brand,
+          (brand?.name ?? '') !== line.brand,
       )
     )
       return {
@@ -1119,9 +1589,12 @@ export const adminService = {
           (item) => item.code === order.promotionCode?.trim().toUpperCase(),
         )
       : null
-    const now = Date.now()
+    const hasProductDiscounts = resolvedLines.some(
+      ({ price }) => price?.discountActive,
+    )
     const invalidPromotion = promotion
-      ? !promotion.active ||
+      ? hasProductDiscounts ||
+        !promotion.active ||
         order.subtotalCents < promotion.minimumCents ||
         (promotion.startsAt && new Date(promotion.startsAt).getTime() > now) ||
         (promotion.endsAt && new Date(promotion.endsAt).getTime() < now) ||
@@ -1219,44 +1692,219 @@ export const adminService = {
     }))
     return { kind: 'saved' }
   },
-  setOrderStatus(reference: string, status: AdminOrderStatus): AdminSaveResult {
+  setOrderStatus(
+    reference: string,
+    status: AdminOrderStatus,
+    operator?: OrderOperator,
+  ): AdminSaveResult {
     const order = state.orders.find((item) => item.reference === reference)
     if (!order)
       return { kind: 'validation', message: 'El pedido ya no existe.' }
-    if (order.paymentStatus !== 'approved')
+    const actor =
+      operator === undefined
+        ? {
+            name: 'Administrador local (sin identificar)',
+            verified: false as const,
+            id: null,
+          }
+        : normalizeOrderOperator(operator)
+    if (!actor)
       return {
         kind: 'validation',
-        message: 'El pago debe estar aprobado antes de preparar el pedido.',
+        message: 'Indica el nombre del responsable (de 2 a 80 caracteres).',
       }
-    if (status === 'shipped') {
-      const customer = state.customers.find(
-        (item) => item.id === order.customerId,
-      )
-      if (!hasCompleteOrderDelivery(order, customer?.phone))
-        return {
-          kind: 'validation',
-          message:
-            'Completa el nombre, contacto y ubicación de entrega antes de marcar el pedido como enviado.',
-        }
-    }
-    const statuses: AdminOrderStatus[] = [
-      'received',
-      'preparing',
-      'shipped',
-      'delivered',
-    ]
-    const currentIndex = statuses.indexOf(order.status)
-    const nextIndex = statuses.indexOf(status)
-    if (Math.abs(currentIndex - nextIndex) > 1)
-      return {
-        kind: 'validation',
-        message: 'Actualiza el pedido un paso a la vez.',
-      }
+    const customer = state.customers.find(
+      (item) => item.id === order.customerId,
+    )
+    const error = getOrderTransitionError(order, status, customer?.phone)
+    if (error) return { kind: 'validation', message: error }
+    if (order.status === status) return { kind: 'saved' }
+    const history = createOrderHistory(
+      order,
+      status,
+      actor,
+      crypto.randomUUID(),
+      'individual',
+      new Date().toISOString(),
+    )
     commit((current) => ({
       ...current,
-      orders: current.orders.map((order) =>
-        order.reference === reference ? { ...order, status } : order,
+      orders: current.orders.map((item) =>
+        item.reference === reference ? { ...item, status } : item,
       ),
+      orderHistory: [...current.orderHistory, history],
+    }))
+    return { kind: 'saved' }
+  },
+  bulkSetOrderStatus(
+    references: string[],
+    status: AdminOrderStatus,
+    operator: OrderOperator,
+    expectedStatuses?: Record<string, OrderStatus>,
+  ): BulkOrderStatusResult {
+    const actor = normalizeOrderOperator(operator)
+    if (!actor)
+      return {
+        kind: 'validation',
+        message: 'Indica el nombre del responsable (de 2 a 80 caracteres).',
+      }
+    if (!ORDER_STATUSES.includes(status))
+      return { kind: 'validation', message: 'Selecciona un estado válido.' }
+    const selectedReferences = normalizeOrderReferences(references)
+    if (!selectedReferences.length)
+      return { kind: 'validation', message: 'Selecciona al menos un pedido.' }
+    const operationId = crypto.randomUUID()
+    const result: Extract<BulkOrderStatusResult, { kind: 'updated' }> = {
+      kind: 'updated',
+      operationId,
+      updated: [],
+      skipped: [],
+      errors: [],
+    }
+    const orders = new Map(
+      state.orders.map((order) => [order.reference, order]),
+    )
+    const customerPhones = new Map(
+      state.customers.map((customer) => [customer.id, customer.phone]),
+    )
+    const history: OrderHistoryEntry[] = []
+    const changedAt = new Date().toISOString()
+    for (const reference of selectedReferences) {
+      const order = orders.get(reference)
+      if (!order) {
+        result.errors.push({ reference, message: 'El pedido ya no existe.' })
+        continue
+      }
+      if (
+        expectedStatuses &&
+        (!Object.hasOwn(expectedStatuses, reference) ||
+          expectedStatuses[reference] !== order.status)
+      ) {
+        result.errors.push({
+          reference,
+          message:
+            'El estado cambió desde la selección. Revisa el pedido y vuelve a intentarlo.',
+        })
+        continue
+      }
+      if (order.status === status) {
+        result.skipped.push({
+          reference,
+          message: 'El pedido ya está en ese estado.',
+        })
+        continue
+      }
+      const error = getOrderTransitionError(
+        order,
+        status,
+        customerPhones.get(order.customerId),
+      )
+      if (error) {
+        result.errors.push({ reference, message: error })
+        continue
+      }
+      result.updated.push(reference)
+      history.push(
+        createOrderHistory(
+          order,
+          status,
+          actor,
+          operationId,
+          'bulk',
+          changedAt,
+        ),
+      )
+    }
+    if (result.updated.length) {
+      const updated = new Set(result.updated)
+      commit((current) => ({
+        ...current,
+        orders: current.orders.map((order) =>
+          updated.has(order.reference) ? { ...order, status } : order,
+        ),
+        orderHistory: [...current.orderHistory, ...history],
+      }))
+    }
+    return result
+  },
+  createOrderBatch(
+    name: string,
+    references: string[],
+    operator: OrderOperator,
+  ): CreateOrderBatchResult {
+    const actor = normalizeOrderOperator(operator)
+    if (!actor)
+      return {
+        kind: 'validation',
+        message: 'Indica el nombre del responsable (de 2 a 80 caracteres).',
+      }
+    const batchName = name.trim()
+    if (batchName.length < 2 || batchName.length > 80)
+      return {
+        kind: 'validation',
+        message: 'El nombre del lote debe tener de 2 a 80 caracteres.',
+      }
+    const orderReferences = normalizeOrderReferences(references)
+    const error = validateBatchReferences(orderReferences, false)
+    if (error) return { kind: 'validation', message: error }
+    const id = crypto.randomUUID()
+    const createdAt = new Date().toISOString()
+    const batch: OrderBatch = {
+      id,
+      code: `LOT-${createdAt.slice(0, 10).replaceAll('-', '')}-${id.slice(0, 8).toUpperCase()}`,
+      name: batchName,
+      orderReferences,
+      createdAt,
+      operator: actor,
+      archived: false,
+    }
+    commit((current) => ({
+      ...current,
+      orderBatches: [...current.orderBatches, batch],
+    }))
+    return { kind: 'saved', batch }
+  },
+  updateOrderBatch(id: string, update: OrderBatchUpdate): AdminSaveResult {
+    const batch = state.orderBatches.find((item) => item.id === id)
+    if (!batch) return { kind: 'validation', message: 'El lote ya no existe.' }
+    const name = update.name === undefined ? batch.name : update.name.trim()
+    if (name.length < 2 || name.length > 80)
+      return {
+        kind: 'validation',
+        message: 'El nombre del lote debe tener de 2 a 80 caracteres.',
+      }
+    if (update.archived !== undefined && typeof update.archived !== 'boolean')
+      return { kind: 'validation', message: 'El estado del lote no es válido.' }
+    const orderReferences =
+      update.orderReferences === undefined
+        ? batch.orderReferences
+        : normalizeOrderReferences(update.orderReferences)
+    const archived = update.archived ?? batch.archived
+    const error = validateBatchReferences(orderReferences, archived, id)
+    if (error) return { kind: 'validation', message: error }
+    if (
+      name === batch.name &&
+      archived === batch.archived &&
+      orderReferences.length === batch.orderReferences.length &&
+      orderReferences.every(
+        (reference, index) => reference === batch.orderReferences[index],
+      )
+    )
+      return { kind: 'saved' }
+    commit((current) => ({
+      ...current,
+      orderBatches: current.orderBatches.map((item) =>
+        item.id === id ? { ...item, name, orderReferences, archived } : item,
+      ),
+    }))
+    return { kind: 'saved' }
+  },
+  deleteOrderBatch(id: string): AdminSaveResult {
+    if (!state.orderBatches.some((batch) => batch.id === id))
+      return { kind: 'validation', message: 'El lote ya no existe.' }
+    commit((current) => ({
+      ...current,
+      orderBatches: current.orderBatches.filter((batch) => batch.id !== id),
     }))
     return { kind: 'saved' }
   },
@@ -1300,12 +1948,19 @@ export const adminService = {
         message: 'Revisa el nombre, correo, teléfono y dirección exacta.',
       }
     if (
-      !isValidPeruLocation(department, province, district) &&
+      !isShippingDestinationEnabled(
+        state.shipping,
+        department,
+        province,
+        district,
+      ) &&
       !unchangedLegacyLocation
     )
       return {
         kind: 'validation',
-        message: 'Selecciona un departamento, provincia y distrito válidos.',
+        message: state.shipping.provinceShippingEnabled
+          ? 'Selecciona un departamento, provincia y distrito válidos.'
+          : 'Selecciona una zona y un distrito de Lima o Callao válidos.',
       }
     commit((current) => ({
       ...current,
@@ -1413,6 +2068,7 @@ export const adminService = {
     const zoneIds = shipping.zones.map((zone) => zone.id.trim())
     if (
       !isNonNegativeInteger(shipping.freeThresholdCents) ||
+      typeof shipping.provinceShippingEnabled !== 'boolean' ||
       !isNonNegativeInteger(shipping.nationalCourierFeeCents) ||
       !shipping.nationalEstimate?.trim() ||
       new Set(zoneIds).size !== zoneIds.length ||
@@ -1451,6 +2107,7 @@ export const adminService = {
       ...current,
       shipping: {
         freeThresholdCents: shipping.freeThresholdCents,
+        provinceShippingEnabled: shipping.provinceShippingEnabled,
         nationalCourierFeeCents: shipping.nationalCourierFeeCents,
         nationalEstimate: shipping.nationalEstimate.trim(),
         zones: shipping.zones.map((zone) => ({
@@ -1473,7 +2130,13 @@ export function getStoreBrands() {
 export function getStoreProductRecords() {
   const activeBrands = new Set(getStoreBrands().map((brand) => brand.id))
   return state.products.filter(
-    (record) => record.active && activeBrands.has(record.product.brandId),
+    (record) =>
+      record.active &&
+      hasProductStock(record.product) &&
+      (isPerfume(record.product) || state.features.complementsEnabled) &&
+      hasProductMainImage(record) &&
+      (activeBrands.has(record.product.brandId) ||
+        (!isPerfume(record.product) && !record.product.brandId)),
   )
 }
 
@@ -1481,24 +2144,12 @@ export function getStoreProducts() {
   return getStoreProductRecords().map((record) => record.product)
 }
 
-export function getAdminProduct(id: string) {
-  return state.products.find((record) => record.product.id === id)
-}
-
-export function getAdminOrder(reference: string) {
-  return state.orders.find((order) => order.reference === reference)
+export function getStoreFeatures() {
+  return state.features
 }
 
 export function getStoreProductBySlug(slug: string) {
   return getStoreProductRecords().find((record) => record.product.slug === slug)
-}
-
-export function getFeaturedProducts() {
-  const records = getStoreProductRecords()
-  return state.featuredOrder.flatMap((id) => {
-    const record = records.find((item) => item.product.id === id)
-    return record ? [record.product] : []
-  })
 }
 
 export function getPromotionByCode(code: string) {

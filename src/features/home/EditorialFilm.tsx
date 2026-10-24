@@ -4,6 +4,7 @@ import { editorialFilm } from '../../content/editorial-film'
 import type { HomeFilmContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 import { headingText } from '../../utils/heading-text'
+import { assetSource } from '../../services/asset-source'
 
 function subscribeViewport(onChange: () => void) {
   const query = matchMedia('(min-width: 768px)')
@@ -18,10 +19,12 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
     wideViewport,
     () => false,
   )
-  const source =
-    content.video ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc)
-  const poster =
-    content.poster ?? (wide ? editorialFilm.poster : editorialFilm.mobilePoster)
+  const source = assetSource(
+    content.video ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc),
+  )
+  const poster = assetSource(
+    content.poster ?? (wide ? editorialFilm.poster : editorialFilm.mobilePoster),
+  )
   const frame = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [failedSource, setFailedSource] = useState<string | null>(null)

@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
+import { InlineStatus } from '../../components/ui/InlineStatus'
 import {
-  familyVisuals,
-  resultCopy,
+  familyVisualFor,
   finderSteps,
   optionsForStep,
+  visibleCatalogOptions,
 } from '../../content/fragrance-finder'
+import type { HomeFinderContent } from '../../types/home'
 import {
   fragranceFinderService,
   type FragranceFinderService,
@@ -16,23 +18,34 @@ import type {
   FinderAnswers,
   FinderOptions,
   FinderResult,
+  FinderStep,
 } from '../../types/fragrance-finder'
 import { FragranceResults } from './FragranceResults'
+import { imageSourceSet } from '../../services/image-source'
+import { assetSource } from '../../services/asset-source'
+
+function stepIsAnswered(answers: FinderAnswers, step: FinderStep) {
+  return step === 'budget'
+    ? answers.budget !== undefined
+    : answers[step] !== undefined
+}
 
 export function FragranceQuiz({
   onClose,
   service = fragranceFinderService,
   initialFamily,
+  content,
 }: {
   onClose: () => void
   service?: FragranceFinderService
   initialFamily?: string
+  content: HomeFinderContent
 }) {
   const [options, setOptions] = useState<FinderOptions | null>(null)
   const [answers, setAnswers] = useState<FinderAnswers>(
-    initialFamily === undefined ? {} : { family: initialFamily },
+    initialFamily === undefined ? {} : { family: [initialFamily] },
   )
-  const [step, setStep] = useState(initialFamily === undefined ? 0 : 1)
+  const [step, setStep] = useState(0)
   const [result, setResult] = useState<FinderResult | null>(null)
   const [error, setError] = useState(false)
   const [busy, setBusy] = useState(true)
@@ -42,6 +55,13 @@ export function FragranceQuiz({
   const heading = useRef<HTMLHeadingElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const current = finderSteps[step]
+  const currentContent = content.steps[current.id]
+  const selectedCount =
+    current.id === 'budget' ? 0 : (answers[current.id]?.length ?? 0)
+  const visibleOptionCount =
+    options && current.id !== 'budget'
+      ? visibleCatalogOptions(current.id, options, content).length
+      : 0
 
   useEffect(() => {
     mounted.current = true
@@ -60,7 +80,9 @@ export function FragranceQuiz({
         setOptions(data)
         if (
           initialFamily &&
-          !data.families.some((family) => family.value === initialFamily)
+          !visibleCatalogOptions('family', data, content).some(
+            (family) => family.value === initialFamily,
+          )
         ) {
           setAnswers({})
           setStep(0)
@@ -78,7 +100,7 @@ export function FragranceQuiz({
     return () => {
       cancelled = true
     }
-  }, [service, attempt, initialFamily])
+  }, [service, attempt, initialFamily, content])
 
   useEffect(() => {
     if (!busy) {
@@ -123,23 +145,42 @@ export function FragranceQuiz({
     setBusy(true)
     setAttempt((value) => value + 1)
   }
+  function toggleOption(step: Exclude<FinderStep, 'budget'>, value: string) {
+    setAnswers((previous) => {
+      const selected = previous[step]
+      if (value === '') {
+        if (selected?.length === 0) {
+          const updated = { ...previous }
+          delete updated[step]
+          return updated
+        }
+        return { ...previous, [step]: [] }
+      }
+      const next = selected?.includes(value)
+        ? selected.filter((item) => item !== value)
+        : [...(selected ?? []), value]
+      const updated = { ...previous }
+      if (next.length) updated[step] = next
+      else delete updated[step]
+      return updated
+    })
+  }
   return (
     <Dialog
       open
       onClose={onClose}
-      title="Encuentra tu perfume ideal"
+      title={content.modalTitle}
       id="fragrance-quiz"
       className={`finder-dialog${result?.matches.length === 1 ? ' finder-dialog--single-result' : ''}`}
     >
       <div ref={body} className="finder-workspace" aria-busy={busy}>
         {busy ? (
-          <div className="finder-status" role="status">
-            <Icon name="botanical" />
-            <p>
+          <div className="finder-status">
+            <InlineStatus busy>
               {options
                 ? 'Buscando coincidencias en el catálogo…'
                 : 'Preparando tu recorrido…'}
-            </p>
+            </InlineStatus>
           </div>
         ) : error ? (
           <div className="finder-status">
@@ -156,10 +197,14 @@ export function FragranceQuiz({
             <p className="eyebrow">Tu selección</p>
             <h3 ref={heading} tabIndex={-1}>
               {result.kind === 'matches' && result.matches.length === 1
-                ? 'Tu perfume recomendado'
-                : resultCopy[result.kind].title}
+                ? content.singleResultTitle
+                : content.resultCopy[result.kind].title}
             </h3>
-            <FragranceResults result={result} onClose={onClose} />
+            <FragranceResults
+              result={result}
+              onClose={onClose}
+              content={content}
+            />
             <div className="finder-result-actions">
               <div className="finder-result-restart">
                 {result.kind !== 'unavailable' && (
@@ -196,7 +241,7 @@ export function FragranceQuiz({
                       aria-current={index === step ? 'step' : undefined}
                       className={index < step ? 'is-complete' : ''}
                     >
-                      {item.label}
+                      {content.steps[item.id].label}
                     </li>
                   ))}
                 </ol>
@@ -208,65 +253,107 @@ export function FragranceQuiz({
               </div>
               <div className="finder-question" key={current.id}>
                 <h3 ref={heading} tabIndex={-1} id="finder-question-title">
-                  {current.question}
+                  {currentContent.question}
                 </h3>
                 <p id="finder-question-help" className="finder-explanation">
-                  {current.description}
+                  {currentContent.description}
                 </p>
+                {current.id !== 'budget' && (
+                  <p
+                    id="finder-multiple-help"
+                    className="finder-multiple-help"
+                    aria-live="polite"
+                  >
+                    Puedes elegir varias opciones
+                    {selectedCount
+                      ? ` · ${selectedCount} ${selectedCount === 1 ? 'seleccionada' : 'seleccionadas'}`
+                      : ''}
+                  </p>
+                )}
+                {current.id !== 'budget' && visibleOptionCount === 0 && (
+                  <p className="finder-explanation" role="status">
+                    Por ahora no hay opciones disponibles para este paso. Puedes
+                    continuar sin preferencia.
+                  </p>
+                )}
                 <fieldset
                   className={`finder-options finder-options--${current.id}`}
                   aria-labelledby="finder-question-title"
-                  aria-describedby="finder-question-help"
+                  aria-describedby={
+                    current.id === 'budget'
+                      ? 'finder-question-help'
+                      : 'finder-question-help finder-multiple-help'
+                  }
                 >
-                  {optionsForStep(current.id, options).map((option) => {
-                    const visual =
-                      current.id === 'family'
-                        ? familyVisuals[option.value]
-                        : undefined
-                    return (
-                      <label
-                        className={`finder-option ${visual ? 'finder-option--photo' : ''} ${option.value === '' ? 'finder-option--any' : ''}`}
-                        key={option.value}
-                      >
-                        <input
-                          type="radio"
-                          name={`finder-${current.id}`}
-                          value={option.value}
-                          checked={answers[current.id] === option.value}
-                          onChange={() =>
-                            setAnswers((previous) => ({
-                              ...previous,
-                              [current.id]: option.value,
-                            }))
-                          }
-                        />
-                        {visual && (
-                          <img
-                            src={visual.image}
-                            width="240"
-                            height="220"
-                            alt=""
-                            decoding="async"
+                  {optionsForStep(current.id, options, content).map(
+                    (option) => {
+                      const visual =
+                        current.id === 'family'
+                          ? familyVisualFor(option.value, content)
+                          : undefined
+                      const selected =
+                        current.id === 'budget'
+                          ? answers.budget === option.value
+                          : option.value === ''
+                            ? answers[current.id]?.length === 0
+                            : (answers[current.id]?.includes(option.value) ??
+                              false)
+                      return (
+                        <label
+                          className={`finder-option ${current.id === 'budget' ? '' : 'finder-option--multiple'} ${visual?.image ? 'finder-option--photo' : ''} ${option.value === '' ? 'finder-option--any' : ''}`}
+                          key={option.value}
+                        >
+                          <input
+                            type={
+                              current.id === 'budget' ? 'radio' : 'checkbox'
+                            }
+                            name={`finder-${current.id}`}
+                            value={option.value}
+                            checked={selected}
+                            onChange={() => {
+                              if (current.id === 'budget')
+                                setAnswers((previous) => ({
+                                  ...previous,
+                                  budget: option.value,
+                                }))
+                              else toggleOption(current.id, option.value)
+                            }}
                           />
-                        )}
-                        <span className="finder-option-content">
-                          {!visual && option.value !== '' && (
-                            <Icon name={current.icon} />
+                          {visual?.image && (
+                            <img
+                              src={assetSource(visual.image)}
+                              srcSet={imageSourceSet(
+                                visual.image,
+                                [160, 320, 960],
+                              )}
+                              sizes="(max-width: 600px) calc(50vw - 27px), (max-width: 900px) calc(50vw - 57px), (max-width: 1108px) calc(25vw - 44.5px), 233px"
+                              width="240"
+                              height="220"
+                              alt=""
+                              decoding="async"
+                            />
                           )}
-                          <span>
-                            <strong>{option.label}</strong>
-                            {visual && <small>{visual.description}</small>}
+                          <span className="finder-option-content">
+                            {!visual?.image && option.value !== '' && (
+                              <Icon name={current.icon} />
+                            )}
+                            <span>
+                              <strong>{option.label}</strong>
+                              {visual?.description && (
+                                <small>{visual.description}</small>
+                              )}
+                            </span>
+                            <span
+                              className="finder-option-check"
+                              aria-hidden="true"
+                            >
+                              <Icon name="check" />
+                            </span>
                           </span>
-                          <span
-                            className="finder-option-check"
-                            aria-hidden="true"
-                          >
-                            <Icon name="check" />
-                          </span>
-                        </span>
-                      </label>
-                    )
-                  })}
+                        </label>
+                      )
+                    },
+                  )}
                 </fieldset>
               </div>
               <div className="finder-navigation">
@@ -285,7 +372,7 @@ export function FragranceQuiz({
                 </button>
                 <button
                   className="button button--primary"
-                  disabled={answers[current.id] === undefined}
+                  disabled={!stepIsAnswered(answers, current.id)}
                   onClick={() =>
                     step === finderSteps.length - 1
                       ? void submit()

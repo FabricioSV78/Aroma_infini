@@ -24,11 +24,16 @@ export function HomePage() {
     brands: data.brands.length ? (
       <BrandGallery brands={data.brands} brandProfiles={data.brandProfiles} />
     ) : null,
-    categories: <Categories media={data.media} />,
+    categories: <Categories media={data.media} features={data.features} />,
     bestsellers: data.bestsellers.length ? (
       <Bestsellers brands={data.brands} bestsellers={data.bestsellers} />
     ) : null,
-    'perfume-finder': <PerfumeFinder options={data.finderOptions} />,
+    'perfume-finder': (
+      <PerfumeFinder
+        options={data.finderOptions}
+        content={data.content.finder}
+      />
+    ),
     editorial: <EditorialFilm content={data.content.film} />,
     trust: <TrustInformation />,
   }

@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { InstitutionalBreadcrumb } from '../institutional/InstitutionalBreadcrumb'
 import {
   getTrackingRecord,
   type TrackingRecord,
@@ -67,43 +68,43 @@ export function OrderTrackingPage() {
   }
 
   return (
-    <article className="store-page tracking-page container">
-      <nav
-        className="checkout-breadcrumb"
-        aria-label="Ruta de navegación"
-        data-scroll-reveal="fade"
-      >
-        <Link to="/">Inicio</Link>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">Seguir pedido</span>
-      </nav>
-      <header className="tracking-heading" data-scroll-reveal="copy">
-        <h1>Tu pedido, a la vista</h1>
-        <p>Consulta el estado con el código que aparece en la confirmación.</p>
-      </header>
-      <form
-        className="tracking-search"
-        onSubmit={submit}
-        data-scroll-reveal="copy"
-      >
-        <label htmlFor="tracking-code">Código de pedido</label>
-        <div>
-          <input
-            id="tracking-code"
-            name="codigo"
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={32}
-            defaultValue={code}
-            placeholder="AI-…"
-            required
-          />
-          <button className="button button--primary" type="submit">
-            Consultar <Icon name="arrow" />
-          </button>
-        </div>
-      </form>
+    <article className="store-page tracking-page service-page container">
+      <InstitutionalBreadcrumb current="Seguir pedido" />
+      <div className="tracking-entry">
+        <header
+          className="tracking-heading service-intro"
+          data-scroll-reveal="copy"
+        >
+          <p className="eyebrow">Consulta de pedido</p>
+          <h1>Seguir pedido</h1>
+          <p>
+            Consulta el estado con el código que aparece en la confirmación.
+          </p>
+        </header>
+        <form
+          className="tracking-search"
+          onSubmit={submit}
+          data-scroll-reveal="copy"
+        >
+          <label htmlFor="tracking-code">Código de pedido</label>
+          <div>
+            <input
+              id="tracking-code"
+              name="codigo"
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={32}
+              defaultValue={code}
+              placeholder="AI-…"
+              required
+            />
+            <button className="button button--primary" type="submit">
+              Consultar <Icon name="arrow" />
+            </button>
+          </div>
+        </form>
+      </div>
       <p className="sr-only" role="status">
         {record
           ? `Pedido encontrado. Estado: ${accountStatusLabels[record.status]}.`

@@ -1,4 +1,4 @@
-import type { Product, ProductDetail } from '../types/catalog'
+﻿import type { Product, ProductDetail } from '../types/catalog'
 
 interface ProductDetailContent extends Omit<ProductDetail, 'gallery'> {
   galleryLabels: [string, string, string, string]
@@ -6,7 +6,6 @@ interface ProductDetailContent extends Omit<ProductDetail, 'gallery'> {
 
 const content: Record<string, ProductDetailContent> = {
   neroli: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Néroli y cítricos sobre un fondo suave de maderas claras.',
     description:
@@ -29,7 +28,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['cedre', 'figue', 'petale', 'ambre'],
   },
   iris: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Iris y violeta con una textura empolvada y un fondo de sándalo.',
     description:
@@ -52,7 +50,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['petale', 'santal', 'cedre', 'sillage'],
   },
   figue: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Hojas de higuera, té verde y maderas suaves en equilibrio.',
     description:
@@ -75,7 +72,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['sillage', 'neroli', 'iris', 'ambre'],
   },
   santal: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Sándalo, cardamomo y ámbar para una estela cálida y pausada.',
     description:
@@ -98,7 +94,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['ambre', 'iris', 'cedre', 'sillage'],
   },
   cedre: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Maderas claras y una frescura serena, pensadas para acompañar sin imponerse.',
     description:
@@ -121,7 +116,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['sillage', 'ambre', 'petale', 'neroli'],
   },
   petale: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Pétalos transparentes, iris y almizcles suaves en una lectura contemporánea.',
     description:
@@ -144,7 +138,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['cedre', 'sillage', 'ambre', 'iris'],
   },
   sillage: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Verde, aromático y preciso: una estela fresca con profundidad de bosque.',
     description:
@@ -167,7 +160,6 @@ const content: Record<string, ProductDetailContent> = {
     recommendationIds: ['cedre', 'petale', 'ambre', 'figue'],
   },
   ambre: {
-    type: 'Eau de Parfum',
     shortDescription:
       'Ámbar, resinas y especias suaves en una composición de ritmo pausado.',
     description:
@@ -191,12 +183,28 @@ const content: Record<string, ProductDetailContent> = {
   },
 }
 
+const demoOlfactoryImages: Record<string, string> = {
+  neroli: '/images/olfactory-neroli.webp',
+  iris: '/images/olfactory-iris.webp',
+  figue: '/images/olfactory-figue.webp',
+  santal: '/images/olfactory-santal.webp',
+  cedre: '/images/olfactory-cedre.webp',
+  petale: '/images/olfactory-petale.webp',
+  sillage: '/images/olfactory-sillage.webp',
+  ambre: '/images/olfactory-ambre.webp',
+}
+
+function getDemoOlfactoryImage(productId: string): string | undefined {
+  return demoOlfactoryImages[productId]
+}
+
 export function getProductDetail(product: Product): ProductDetail | undefined {
   const detail = content[product.id]
   if (!detail) return undefined
   const [front, alternate] = detail.galleryLabels
   return {
     ...detail,
+    olfactoryImage: getDemoOlfactoryImage(product.id) ?? null,
     gallery: [
       { image: product.image, alt: front, framing: 'full' },
       { image: `${product.image}-alternate`, alt: alternate, framing: 'full' },
@@ -212,18 +220,4 @@ export function getProductDetail(product: Product): ProductDetail | undefined {
       },
     ],
   }
-}
-
-export function matchesDemoOlfactoryNotes(
-  productId: string,
-  notes: ProductDetail['notes'],
-): boolean {
-  const original = content[productId]?.notes
-  if (!original) return false
-
-  return (['top', 'heart', 'base'] as const).every(
-    (stage) =>
-      original[stage].length === notes[stage].length &&
-      original[stage].every((note, index) => note === notes[stage][index]),
-  )
 }

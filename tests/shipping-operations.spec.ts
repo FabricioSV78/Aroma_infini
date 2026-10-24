@@ -8,6 +8,56 @@ import { adminService } from '../src/services/admin-service'
 
 test.afterEach(() => adminService.reset())
 
+test('Las tarifas de Lima y Callao editadas en el panel llegan a envíos y checkout', async ({
+  page,
+}) => {
+  await page.goto('/admin/envios')
+  await page.getByLabel('Courier en Lima (S/)').fill('27')
+  await page.getByLabel('Plazo estimado en Lima').fill('De 24 a 48 horas')
+  await page.getByLabel('Courier en Callao (S/)').fill('29')
+  await page.getByLabel('Plazo estimado en Callao').fill('Hasta 48 horas')
+  await page.getByRole('button', { name: 'Guardar configuración' }).click()
+  await expect(
+    page.getByText('Configuración aplicada a la tienda.'),
+  ).toBeVisible()
+
+  await page.goto('/envios')
+  await expect(page.locator('.delivery-rate-group')).toHaveCount(2)
+  await expect(page.locator('.delivery-rate-group').first()).toContainText(
+    'Lima',
+  )
+  await expect(page.locator('.delivery-rate-group').last()).toContainText(
+    'Callao',
+  )
+  await expect(page.locator('.delivery-rates')).toContainText('S/ 27')
+  await expect(page.locator('.delivery-rates')).toContainText(
+    'De 24 a 48 horas',
+  )
+  await expect(page.locator('.delivery-rates')).toContainText('S/ 29')
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'aroma-infini:cart:v1',
+      JSON.stringify({
+        version: 1,
+        items: [{ variantId: 'cedre-50', quantity: 1 }],
+      }),
+    )
+  })
+  await page.goto('/checkout')
+  await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+  await page.getByLabel('Apellido').fill('Prueba')
+  await page.getByLabel('Correo electrónico').fill('ana@ejemplo.invalid')
+  await page.getByLabel('Celular').fill('912345678')
+  await page.getByRole('button', { name: 'Continuar a entrega' }).click()
+  await page.getByLabel('Zona de entrega').selectOption('lima')
+  await page.getByLabel('Distrito de entrega').selectOption('150122')
+  await expect(page.locator('.checkout-delivery-quote')).toContainText('S/ 27')
+  await page.getByLabel('Zona de entrega').selectOption('callao')
+  await page.getByLabel('Distrito de entrega').selectOption('070101')
+  await expect(page.locator('.checkout-delivery-quote')).toContainText('S/ 29')
+})
+
 test('El pedido conserva el contacto y la dirección históricos aunque el cliente vuelva a comprar', () => {
   const cart = resolveCart([{ variantId: 'cedre-50', quantity: 1 }])
   const draft = createCheckoutDraft()
@@ -40,11 +90,27 @@ test('El pedido conserva el contacto y la dirección históricos aunque el clien
     },
   })
 
+  const outsideLima = {
+    ...first,
+    reference: 'AI-0000000000000001',
+    address: {
+      ...first.address,
+      department: 'arequipa',
+      province: '0401',
+      district: '040103',
+    },
+  }
+  expect(adminService.recordApprovedCheckout(outsideLima).kind).toBe(
+    'validation',
+  )
+  draft.address = outsideLima.address
+  expect(createMockOrder(cart, draft)).toBeNull()
+
   draft.contact.phone = '923456789'
   draft.address = {
-    department: 'arequipa',
-    province: '0401',
-    district: '040103',
+    department: 'lima',
+    province: '1501',
+    district: '150131',
     street: 'Calle Nueva 456',
     reference: '',
   }
@@ -65,8 +131,11 @@ test('El pedido conserva el contacto y la dirección históricos aunque el clien
   ).toMatchObject({
     contactPhone: '923456789',
     alternateRecipient: null,
-    address: { province: 'Arequipa' },
+    address: { province: 'Lima', district: 'San Isidro' },
   })
+  expect(
+    state.orders.find((item) => item.reference === 'AI-150926-01'),
+  ).toMatchObject({ address: { province: 'Arequipa', district: 'Cayma' } })
   expect(
     state.customers.find((item) => item.email === draft.contact.email)?.phone,
   ).toBe('923456789')
@@ -96,8 +165,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   })
   await expect(receiverToggle).not.toBeChecked()
   await expect(page.getByLabel('DNI de quien recibe')).toHaveCount(0)
-  await page.getByLabel('Departamento').selectOption('lima')
-  await page.getByLabel('Provincia').selectOption('1501')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
   await page.getByLabel('Distrito').selectOption('150122')
   await page.getByLabel('Dirección', { exact: true }).fill('Av. Central 123')
   await page.getByLabel('Referencia').fill('Frente al parque')
@@ -168,9 +236,8 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   await page.getByLabel('Correo electrónico').fill('ana@ejemplo.invalid')
   await page.getByLabel('Celular').fill('923456789')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await page.getByLabel('Departamento').selectOption('arequipa')
-  await page.getByLabel('Provincia').selectOption('0401')
-  await page.getByLabel('Distrito').selectOption('040103')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
+  await page.getByLabel('Distrito').selectOption('150131')
   const longStreet = 'W'.repeat(150)
   const longReference = 'W'.repeat(120)
   await page.getByLabel('Dirección', { exact: true }).fill(longStreet)
@@ -196,8 +263,8 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   const updatedCustomer = page.locator('tr', {
     hasText: 'ana@ejemplo.invalid',
   })
-  await expect(updatedCustomer).toContainText('Arequipa')
-  await expect(updatedCustomer).toContainText('Cayma')
+  await expect(updatedCustomer).toContainText('Lima')
+  await expect(updatedCustomer).toContainText('San Isidro')
 
   await page.goto(`/admin/pedidos/${reference}`)
   await page.getByText('Resumen de envío', { exact: true }).click()

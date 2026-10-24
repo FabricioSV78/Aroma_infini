@@ -1,7 +1,9 @@
+import { variantLabel } from '../../domain/product-type'
 import { Link } from 'react-router'
 import type { ResolvedCartLine } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
 import { imageSource } from '../../services/image-source'
+import { PriceDisplay } from '../../components/ui/PriceDisplay'
 import { useCart } from './cart-context'
 
 interface CartLineProps {
@@ -29,7 +31,15 @@ export function CartLine({ line, compact = false }: CartLineProps) {
       </article>
     )
 
-  const { item, product, variant, brand, subtotalCents } = line
+  const {
+    item,
+    product,
+    variant,
+    brand,
+    subtotalCents,
+    unitPriceCents,
+    originalUnitPriceCents,
+  } = line
   const soldOut = variant.stock === 0
   const exceedsStock = item.quantity > variant.stock
   const issue = soldOut
@@ -62,8 +72,11 @@ export function CartLine({ line, compact = false }: CartLineProps) {
           <Link to={`/producto/${product.slug}`}>{product.name}</Link>
         </h3>
         <p className="cart-line-variant">
-          {variant.ml} ml <span aria-hidden="true">·</span>{' '}
-          {formatPEN(variant.priceCents)}
+          {variantLabel(variant)} <span aria-hidden="true">·</span>{' '}
+          <PriceDisplay
+            originalCents={originalUnitPriceCents}
+            finalCents={unitPriceCents}
+          />
         </p>
         <div className="cart-line-actions">
           <div
@@ -73,7 +86,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
           >
             <button
               type="button"
-              aria-label={`Reducir cantidad de ${product.name}, ${variant.ml} ml`}
+              aria-label={`Reducir cantidad de ${product.name}, ${variantLabel(variant)}`}
               disabled={item.quantity <= 1 || soldOut}
               onClick={() =>
                 setQuantity(item.variantId, item.quantity - 1, variant.stock)
@@ -86,7 +99,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
             </output>
             <button
               type="button"
-              aria-label={`Aumentar cantidad de ${product.name}, ${variant.ml} ml`}
+              aria-label={`Aumentar cantidad de ${product.name}, ${variantLabel(variant)}`}
               disabled={soldOut || item.quantity >= variant.stock}
               onClick={() =>
                 setQuantity(item.variantId, item.quantity + 1, variant.stock)

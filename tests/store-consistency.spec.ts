@@ -5,7 +5,7 @@ const breadcrumbRoutes = [
   ['/marcas', '.catalog-breadcrumb'],
   ['/producto/petale-nu', '.product-breadcrumb'],
   ['/cuenta', '.account-breadcrumb'],
-  ['/seguir-pedido', '.checkout-breadcrumb'],
+  ['/seguir-pedido', '.institutional-breadcrumb'],
   ['/nosotros', '.institutional-breadcrumb'],
   ['/contacto', '.institutional-breadcrumb'],
 ] as const
@@ -58,6 +58,7 @@ test('La tienda y el panel usan una sola familia tipográfica', async ({
 }) => {
   for (const route of ['/', '/tienda', '/producto/petale-nu', '/admin']) {
     await page.goto(route)
+    await expect(page.locator('main')).toContainText(/\S/)
     const families = await page.evaluate(() => {
       const visibleTextElements = [
         ...document.querySelectorAll<HTMLElement>('body *'),

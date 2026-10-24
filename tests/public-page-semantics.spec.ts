@@ -11,7 +11,6 @@ const indexablePaths = [
   '/producto/bois-clair',
   '/producto/petale-nu',
   '/producto/vert-silence',
-  '/producto/ambre-lent',
   '/producto/neroli-matin',
   '/producto/iris-velours',
   '/producto/figue-douce',

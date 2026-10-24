@@ -23,3 +23,19 @@ test('Los errores del editor usan el número visible de la campaña', () => {
   content.hero[3].eyebrow = ''
   expect(validateHomeContent(content)).toContain('Etiqueta de campaña 3')
 })
+
+test('La franja conserva un texto local al recuperar datos antiguos y valida su contenido', () => {
+  const content = createDefaultHomeContent()
+  const previous = normalizeHomeContent({
+    hero: content.hero,
+    film: content.film,
+    finder: content.finder,
+  })
+  expect(previous.announcement).toEqual({
+    deliveryText: 'Envíos en Lima y Callao',
+    freeShippingLabel: 'Gratis desde',
+  })
+  expect(validateHomeContent(previous)).toBeNull()
+  previous.announcement.deliveryText = ' '
+  expect(validateHomeContent(previous)).toContain('Mensaje de entrega')
+})

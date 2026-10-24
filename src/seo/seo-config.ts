@@ -1,4 +1,5 @@
 import type { Brand, Product, ProductDetail } from '../types/catalog'
+import { isPerfume } from '../domain/product-type'
 
 export interface SeoBreadcrumb {
   name: string
@@ -16,17 +17,13 @@ export interface SeoPageConfig {
   type?: 'website' | 'product'
   breadcrumbs?: SeoBreadcrumb[]
   product?: {
+    source: Product
     id: string
     name: string
     brand: string | null
     description: string
     imagePath?: string
-    variants: {
-      id: string
-      priceCents: number
-      stock: number
-      active?: boolean
-    }[]
+    variants: Product['variants']
   }
 }
 
@@ -180,6 +177,7 @@ export function resolveSeoPage(
         imagePath,
         imageAlt: `${product.name}${brand ? ` de ${brand.name}` : ''}`,
         product: {
+          source: product,
           id: product.id,
           name: product.name,
           brand: brand?.name ?? null,
@@ -189,7 +187,12 @@ export function resolveSeoPage(
         },
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
-          { name: 'Perfumes', path: '/tienda' },
+          {
+            name: isPerfume(product) ? 'Perfumes' : 'Complementos',
+            path: isPerfume(product)
+              ? '/tienda?tipo=perfume'
+              : '/tienda?tipo=complemento',
+          },
           { name: product.name, path: `/producto/${product.slug}` },
         ],
       }
@@ -261,7 +264,7 @@ export function resolveSeoPage(
   const institutionalPages: Record<string, [string, string]> = {
     '/nosotros': [
       'Nosotros | Aroma Infini',
-      'Descubre la propuesta de Aroma Infini para explorar, comparar y elegir perfumes a tu ritmo.',
+      'Conoce Aroma Infini, una perfumería multimarca donde descubrir distintas firmas y elegir un perfume a tu manera.',
     ],
     '/contacto': [
       'Contacto | Aroma Infini',
@@ -269,7 +272,7 @@ export function resolveSeoPage(
     ],
     '/envios': [
       'Envíos y entregas | Aroma Infini',
-      'Consulta la información disponible sobre entregas de Aroma Infini en Perú.',
+      'Consulta las tarifas y plazos de entrega disponibles en Aroma Infini.',
     ],
     '/devoluciones': [
       'Cambios y devoluciones | Aroma Infini',

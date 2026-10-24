@@ -11,6 +11,11 @@ import type { HomeHeroContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 import { useHeroRotation } from './useHeroRotation'
 import { headingText } from '../../utils/heading-text'
+import { assetSource } from '../../services/asset-source'
+import {
+  heroImageSource,
+  heroImageSourceSet,
+} from '../../services/hero-image-source'
 
 export function Hero({ content }: { content: HomeHeroContent[] }) {
   const slides = heroDisplayOrder.map((sourceIndex) => {
@@ -191,6 +196,7 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
         {slides.map((slide, index) => {
           const isActive = index === active
           const Heading = isActive ? 'h1' : 'h2'
+          const mobileImage = slide.mobileImage ?? slide.desktopImage
           return (
             <div
               key={slide.image}
@@ -210,9 +216,11 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
                   <source
                     media="(max-width: 599px), (max-width: 1023px) and (min-height: 501px)"
                     srcSet={
-                      slide.mobileImage ??
-                      slide.desktopImage ??
-                      `/images/${slide.image}-mobile-480.webp 480w, /images/${slide.image}-mobile-780.webp 780w, /images/${slide.image}-mobile-1024.webp 1024w`
+                      mobileImage === null || mobileImage === undefined
+                        ? heroImageSourceSet(slide.image, 'mobile', [
+                            480, 780, 1024,
+                          ])
+                        : assetSource(mobileImage)
                     }
                     sizes="100vw"
                     width={1024}
@@ -244,14 +252,16 @@ export function Hero({ content }: { content: HomeHeroContent[] }) {
                         )
                       }
                     }}
-                    src={
+                    src={assetSource(
                       slide.desktopImage ??
-                      `/images/${slide.image}-desktop-1536.webp`
-                    }
+                        heroImageSource(slide.image, 'desktop', 1536),
+                    )}
                     srcSet={
                       slide.desktopImage
                         ? undefined
-                        : `/images/${slide.image}-desktop-960.webp 960w, /images/${slide.image}-desktop-1536.webp 1536w, /images/${slide.image}-desktop-2048.webp 2048w`
+                        : heroImageSourceSet(slide.image, 'desktop', [
+                            960, 1536, 2048,
+                          ])
                     }
                     sizes="100vw"
                     width={2048}

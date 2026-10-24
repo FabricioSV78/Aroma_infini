@@ -1,3 +1,4 @@
+import { variantLabel } from '../../domain/product-type'
 import { formatBrandName } from '../../utils/brand-name'
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
@@ -87,7 +88,7 @@ export function CheckoutConfirmationPage() {
                   <small>{formatBrandName(line.brand)}</small>
                   <strong>{line.name}</strong>
                   <span>
-                    {line.ml} ml · Cant. {line.quantity}
+                    {variantLabel(line)} · Cant. {line.quantity}
                   </span>
                 </div>
                 <span>{formatPEN(line.unitPriceCents * line.quantity)}</span>

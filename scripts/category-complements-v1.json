@@ -1,0 +1,12 @@
+{
+  "asset": "discovery-complements-v1",
+  "status": "provisional concept photo; not a product listing",
+  "tool": "built-in image_gen",
+  "source": "C:/Users/USUARIO/.codex/generated_images/01a097a9-5d43-72c3-9e56-29e1fb6b1905/exec-600318e9-49aa-471a-be52-31305ef89166.png",
+  "prompt": "Use case: product-mockup. Asset type: a single full-bleed editorial category photograph for Aroma Infini, an elegant premium fragrance boutique; represents perfume accessories, not a specific product sold by the store. Photorealistic professional still-life photography, portrait 4:5 composition, target 1536x1920. Scene: two genuinely realistic refillable perfume travel atomizers on a pale warm limestone surface against ivory plaster, softly illuminated by a large side window. One matte deep forest-green slim cylindrical travel atomizer stands upright, its matching cap placed neatly beside it, revealing a precise brushed champagne-metal spray nozzle; a second smaller brushed champagne-metal travel spray rests diagonally on the stone in front. Travel atomizers must clearly read as small refillable perfume accessories, not full-size perfume bottles, lipsticks or electronic devices. Subtle seams, refined tactile finishes, believable fine machining, natural contact shadows and delicate reflections. A small ivory linen fold in one corner can softly connect to fragrance editorial photography; no other props, flowers, packaging or ingredients. Both full atomizers and their nozzle/cap remain in the central 65% of the frame, occupy roughly 65-75% of frame height, fully visible with comfortable edge margins. Balanced visual density, luminous ivory and warm stone tones, quiet rich green accent, realistic soft directional shadows, restrained luxury, sharp product detail, subtle background texture. No text, labels, logos, watermarks, collage, borders, decorative graphics, illustration, fake bokeh, gradients or CGI appearance. This is a provisional concept image, not a product claim.",
+  "outputs": [
+    "public/images/discovery-complements-v1-480.webp",
+    "public/images/discovery-complements-v1-960.webp",
+    "public/images/discovery-complements-v1-1122.webp"
+  ]
+}

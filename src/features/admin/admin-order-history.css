@@ -1,0 +1,76 @@
+.admin-order-history ol {
+  display: grid;
+  gap: 0;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-order-layout .admin-order-history li {
+  display: block;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-order-history li > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.admin-order-history strong {
+  font-size: 13px;
+}
+
+.admin-order-history time,
+.admin-order-history small,
+.admin-order-history p span {
+  color: var(--admin-muted);
+  font-size: 11px;
+}
+
+.admin-order-layout .admin-order-history p {
+  margin-top: 5px;
+}
+
+.admin-order-batch-membership {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.admin-order-batch-membership h3 {
+  font-size: 14px;
+}
+
+.admin-order-batch-membership a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 44px;
+  color: var(--admin-accent);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-order-batch-membership a span {
+  color: var(--admin-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 1199px) {
+  .admin-page--order-detail
+    .admin-order-primary
+    > .admin-order-delivery-section {
+    order: 2;
+  }
+
+  .admin-page--order-detail .admin-order-primary > .admin-order-history {
+    order: 4;
+  }
+}

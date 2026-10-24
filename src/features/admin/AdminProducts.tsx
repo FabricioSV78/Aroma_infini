@@ -1,5 +1,22 @@
 import { OlfactoryProfile } from '../product/OlfactoryProfile'
-import { getOlfactoryImage } from '../../content/olfactory-imagery'
+import { productSlug, normalizeSku } from '../../domain/product-identity'
+import {
+  hasProductMainImage,
+  hasProductStock,
+} from '../../domain/product-publication'
+import {
+  getProductType,
+  isPerfume,
+  PRODUCT_TYPES,
+  variantLabel,
+} from '../../domain/product-type'
+import { ProductDetailPreview } from '../product/ProductPage'
+import {
+  getEditorialPrimaryFamily,
+  getProductOlfactoryFamilies,
+  OLFACTORY_FAMILIES,
+  type OlfactoryFamily,
+} from '../../domain/olfactory-family'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Link,
@@ -10,23 +27,23 @@ import {
   useSearchParams,
 } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { Dialog } from '../../components/ui/Dialog'
 import { NoteBottleIcon } from '../../components/ui/NoteBottleIcon'
 import {
   adminService,
   createAdminProductDetail,
+  getStoreProducts,
   type AdminGender,
   type AdminProduct,
 } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
-import { imageSource, isUploadedImage } from '../../services/image-source'
+import { getVariantPrice } from '../../services/product-discounts'
+import { imageSource } from '../../services/image-source'
+import { assetSource } from '../../services/asset-source'
+import { UserFacingError } from '../../services/admin-messages'
 import type { ProductVariant } from '../../types/catalog'
 import { AdminPagination } from './AdminPagination'
-import {
-  AdminBadge,
-  AdminNotice,
-  AdminPageHeader,
-  AdminStatus,
-} from './AdminShared'
+import { AdminBadge, AdminPageHeader, AdminStatus } from './AdminShared'
 import {
   getInventoryAlerts,
   getProductInventory,
@@ -36,18 +53,32 @@ import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
 import { prepareImageFile, productImagePreset } from './prepareImageFile'
 import { AdminProductImport } from './AdminProductImport'
+import { useAdminSave } from './useAdminSave'
+import { AdminSaveFeedback } from './AdminSaveFeedback'
+import { useAdminNotice } from './AdminNoticeProvider'
 
 function productPrice(record: AdminProduct) {
   const active = record.product.variants.filter(
     (variant) => variant.active !== false,
   )
-  return active.length
-    ? formatPEN(Math.min(...active.map((variant) => variant.priceCents)))
-    : 'Sin precio'
+  if (!active.length) return 'Sin precio'
+  const lowest = active
+    .map((variant) => getVariantPrice(record.product, variant))
+    .sort((a, b) => a.finalCents - b.finalCents)[0]
+  return lowest.discountActive ? (
+    <span className="admin-product-offer-price">
+      <s>{formatPEN(lowest.originalCents)}</s>
+      <strong>{formatPEN(lowest.finalCents)}</strong>
+      <AdminBadge tone="success">Oferta</AdminBadge>
+    </span>
+  ) : (
+    formatPEN(lowest.finalCents)
+  )
 }
 
 export function AdminProductsPage() {
   const state = useAdminStore()
+  const notice = useAdminNotice()
   const [pageSize, setPageSize] = useState(() =>
     window.matchMedia('(max-width: 767px)').matches ? 4 : 12,
   )
@@ -59,32 +90,33 @@ export function AdminProductsPage() {
   }, [])
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const [actionMessage, setActionMessage] = useState('')
-  const [actionError, setActionError] = useState(false)
+  const confirmingVisibility = useRef(false)
+  const visibilityPersistence = useAdminSave()
   const search = params.get('q') ?? ''
   const stockFilter = ['alert', 'out', 'healthy'].includes(
     params.get('stock') ?? '',
   )
     ? (params.get('stock') as 'alert' | 'out' | 'healthy')
     : 'all'
-  const visibilityFilter = ['active', 'inactive'].includes(
+  const visibilityFilter = ['active', 'inactive', 'pending-images'].includes(
     params.get('visibilidad') ?? '',
   )
-    ? (params.get('visibilidad') as 'active' | 'inactive')
+    ? (params.get('visibilidad') as 'active' | 'inactive' | 'pending-images')
     : 'all'
   const saved = params.get('guardado') === '1'
   const normalizedSearch = search.trim().toLocaleLowerCase('es')
-  const activeBrandIds = new Set(
-    state.brands.filter((brand) => brand.active).map((brand) => brand.id),
-  )
-  const visibleProducts = state.products.filter(
-    (record) => record.active && activeBrandIds.has(record.product.brandId),
-  )
-  const inventoryAlerts = getInventoryAlerts(visibleProducts)
-  const totalStock = visibleProducts.reduce(
-    (total, record) => total + getProductInventory(record).totalStock,
+  const activeProducts = state.products.filter((record) => record.active)
+  const activeInventory = activeProducts.map(getProductInventory)
+  const totalStock = activeInventory.reduce(
+    (total, inventory) => total + inventory.totalStock,
     0,
   )
+  const productsWithAlerts = new Set(
+    getInventoryAlerts(state.products).map((item) => item.productId),
+  ).size
+  const soldOutProducts = state.products.filter(
+    (record) => getProductInventory(record).fullyOutOfStock,
+  ).length
   const productRows = state.products.map((record) => ({
     record,
     brand: state.brands.find((item) => item.id === record.product.brandId),
@@ -92,9 +124,10 @@ export function AdminProductsPage() {
   }))
   const products = productRows
     .filter(({ record, brand, inventory }) => {
-      const matchesSearch = `${record.product.name} ${brand?.name ?? ''}`
-        .toLocaleLowerCase('es')
-        .includes(normalizedSearch)
+      const matchesSearch =
+        `${record.product.name} ${brand?.name ?? ''} ${record.product.variants.map((variant) => variant.sku ?? '').join(' ')}`
+          .toLocaleLowerCase('es')
+          .includes(normalizedSearch)
       const matchesStock =
         stockFilter === 'all' ||
         (stockFilter === 'alert' && inventory.alerts.length > 0) ||
@@ -105,7 +138,8 @@ export function AdminProductsPage() {
       const matchesVisibility =
         visibilityFilter === 'all' ||
         (visibilityFilter === 'active' && record.active) ||
-        (visibilityFilter === 'inactive' && !record.active)
+        (visibilityFilter === 'inactive' && !record.active) ||
+        (visibilityFilter === 'pending-images' && !hasProductMainImage(record))
       return matchesSearch && matchesStock && matchesVisibility
     })
     .sort((first, second) => {
@@ -124,8 +158,69 @@ export function AdminProductsPage() {
     Boolean(search) || stockFilter !== 'all' || visibilityFilter !== 'all'
 
   function clearFilters() {
-    setActionMessage('')
     setParams({})
+  }
+
+  async function changeProductVisibility(record: AdminProduct) {
+    if (
+      confirmingVisibility.current ||
+      visibilityPersistence.saving ||
+      visibilityPersistence.persistenceFailed
+    )
+      return
+    if (record.active) {
+      confirmingVisibility.current = true
+      try {
+        const confirmed = await notice.confirm({
+          title: `¿Desactivar ${record.product.name}?`,
+          description:
+            'Dejará de aparecer en la tienda hasta que lo actives de nuevo.',
+          confirmLabel: 'Desactivar producto',
+          cancelLabel: 'Mantener activo',
+        })
+        if (!confirmed) return
+      } finally {
+        confirmingVisibility.current = false
+      }
+    }
+    if (saved) {
+      const next = new URLSearchParams(params)
+      next.delete('guardado')
+      setParams(next, { replace: true })
+    }
+    const result = await visibilityPersistence.save(
+      () => adminService.setProductActive(record.product.id, !record.active),
+      () => {
+        const updatedRecord = adminService
+          .getSnapshot()
+          .products.find((item) => item.product.id === record.product.id)
+        if (
+          updatedRecord?.active &&
+          !state.features.complementsEnabled &&
+          !isPerfume(record.product)
+        ) {
+          notice.show({
+            kind: 'info',
+            title: 'Complemento preparado',
+            description:
+              'Se mostrará en la tienda cuando habilites Complementos desde el contenido del Home.',
+            primary: { label: 'Entendido' },
+          })
+        } else {
+          notice.toast(
+            `${record.product.name} ${updatedRecord?.active ? 'activado' : 'desactivado'}.`,
+          )
+        }
+      },
+    )
+    if (result?.kind === 'validation') {
+      notice.show({
+        kind: 'warning',
+        title: 'No se pudo cambiar la visibilidad',
+        description: result.message,
+        primary: { label: 'Revisar producto' },
+      })
+    }
   }
 
   return (
@@ -136,43 +231,37 @@ export function AdminProductsPage() {
         description="Controla la tienda, las presentaciones y el inventario desde un solo lugar."
         action={{ label: 'Nuevo producto', to: '/admin/productos/nuevo' }}
       />
-      {saved ? <AdminNotice>Producto guardado.</AdminNotice> : null}
-      {actionMessage ? (
-        actionError ? (
-          <p className="admin-error" role="alert">
-            {actionMessage}
-          </p>
-        ) : (
-          <AdminNotice>{actionMessage}</AdminNotice>
-        )
-      ) : null}
-
       <AdminProductImport />
+      <AdminSaveFeedback {...visibilityPersistence} />
 
       <section
         className="admin-inventory-summary"
         aria-label="Resumen de inventario"
       >
         <div>
-          <span>Productos totales</span>
+          <span>Productos registrados</span>
           <strong>{state.products.length}</strong>
         </div>
         <div>
-          <span>Unidades activas</span>
+          <span>Unidades en productos activos</span>
           <strong>{totalStock}</strong>
         </div>
-        <div className="is-warning">
-          <span>Stock bajo</span>
-          <strong>
-            {inventoryAlerts.filter((item) => item.tone === 'warning').length}
-          </strong>
-        </div>
-        <div className="is-danger">
-          <span>Agotadas</span>
-          <strong>
-            {inventoryAlerts.filter((item) => item.tone === 'danger').length}
-          </strong>
-        </div>
+        <Link
+          className="is-warning"
+          to="/admin/productos?stock=alert"
+          aria-label={`Ver ${productsWithAlerts} ${productsWithAlerts === 1 ? 'producto con alerta de inventario' : 'productos con alertas de inventario'}`}
+        >
+          <span>Con alertas</span>
+          <strong>{productsWithAlerts}</strong>
+        </Link>
+        <Link
+          className="is-danger"
+          to="/admin/productos?stock=out"
+          aria-label={`Ver ${soldOutProducts} ${soldOutProducts === 1 ? 'producto agotado' : 'productos agotados'}`}
+        >
+          <span>Agotados</span>
+          <strong>{soldOutProducts}</strong>
+        </Link>
       </section>
 
       <form
@@ -180,7 +269,6 @@ export function AdminProductsPage() {
         role="search"
         onSubmit={(event) => {
           event.preventDefault()
-          setActionMessage('')
           const data = new FormData(event.currentTarget)
           const next = new URLSearchParams()
           const query = data.get('q')?.toString().trim()
@@ -224,6 +312,7 @@ export function AdminProductsPage() {
               <option value="all">Todos</option>
               <option value="active">Activos</option>
               <option value="inactive">Inactivos</option>
+              <option value="pending-images">Pendientes de fotos</option>
             </select>
           </label>
           <button className="button button--primary" type="submit">
@@ -251,7 +340,6 @@ export function AdminProductsPage() {
                 <th scope="col">Inventario</th>
                 <th scope="col">Precio desde</th>
                 <th scope="col">Visibilidad</th>
-                <th scope="col">Destacado</th>
                 <th scope="col">Acciones</th>
               </tr>
             </thead>
@@ -289,7 +377,7 @@ export function AdminProductsPage() {
                       <ul className="admin-stock-list">
                         {inventory.variants.map((variant) => (
                           <li key={variant.variantId}>
-                            <span>{variant.ml} ml</span>
+                            <span>{variantLabel(variant)}</span>
                             <AdminBadge tone={variant.tone}>
                               {variant.stock} u. · {variant.label}
                             </AdminBadge>
@@ -310,24 +398,29 @@ export function AdminProductsPage() {
                     </td>
                     <td>
                       <span className="admin-cell-label">Estado</span>
-                      <AdminStatus active={record.active} />
-                    </td>
-                    <td>
-                      <span className="admin-cell-label">Destacado</span>
-                      <AdminBadge tone={record.featured ? 'info' : 'neutral'}>
-                        {record.featured ? 'Sí' : 'No'}
-                      </AdminBadge>
+                      {!hasProductMainImage(record) ? (
+                        <AdminBadge tone="warning">
+                          Pendiente de fotos
+                        </AdminBadge>
+                      ) : !state.features.complementsEnabled &&
+                        !isPerfume(record.product) ? (
+                        <AdminBadge tone="neutral">Categoría oculta</AdminBadge>
+                      ) : (
+                        <AdminStatus active={record.active} />
+                      )}
                     </td>
                     <td>
                       <span className="admin-cell-label">Acciones</span>
                       <div className="admin-row-actions">
                         <Link
-                          to={`/admin/productos/${record.product.id}`}
+                          to={`/admin/productos/${record.product.id}${hasProductMainImage(record) ? '' : '#product-photos-title'}`}
                           state={{
                             returnTo: `${location.pathname}${location.search}`,
                           }}
                         >
-                          Editar{' '}
+                          {hasProductMainImage(record)
+                            ? 'Editar'
+                            : 'Subir fotos'}{' '}
                           <span className="sr-only">{record.product.name}</span>
                         </Link>
                         <button
@@ -335,23 +428,11 @@ export function AdminProductsPage() {
                           className={
                             record.active ? 'is-deactivate' : 'is-activate'
                           }
-                          onClick={() => {
-                            const result = adminService.setProductActive(
-                              record.product.id,
-                              !record.active,
-                            )
-                            if (saved) {
-                              const next = new URLSearchParams(params)
-                              next.delete('guardado')
-                              setParams(next, { replace: true })
-                            }
-                            setActionError(result.kind !== 'saved')
-                            setActionMessage(
-                              result.kind === 'saved'
-                                ? `${record.product.name} ${record.active ? 'desactivado' : 'activado'}.`
-                                : result.message,
-                            )
-                          }}
+                          disabled={
+                            visibilityPersistence.saving ||
+                            visibilityPersistence.persistenceFailed
+                          }
+                          onClick={() => void changeProductVisibility(record)}
                         >
                           {record.active ? 'Desactivar' : 'Activar'}{' '}
                           <span className="sr-only">{record.product.name}</span>
@@ -405,12 +486,11 @@ export function AdminProductsPage() {
   )
 }
 
-const imageOptions = [
-  { value: 'cedre', label: 'Bois Clair · frasco claro' },
-  { value: 'petale', label: 'Pétale Nu · frasco rosado' },
-  { value: 'sillage', label: 'Vert Silence · frasco verde' },
-  { value: 'ambre', label: 'Ambre Lent · frasco ámbar' },
-] as const
+const olfactoryImagePreset = {
+  width: 960,
+  height: 1200,
+  label: '4:5 · mínimo 960 × 1200 px',
+} as const
 
 const noteFields = ['top', 'heart', 'base'] as const
 type NoteField = (typeof noteFields)[number]
@@ -443,6 +523,9 @@ function cloneRecord(record: AdminProduct): AdminProduct {
     ...record,
     product: {
       ...record.product,
+      olfactoryFamilies: record.product.olfactoryFamilies
+        ? [...record.product.olfactoryFamilies]
+        : record.product.olfactoryFamilies,
       variants: record.product.variants.map((variant) => ({ ...variant })),
     },
     detail: {
@@ -452,25 +535,31 @@ function cloneRecord(record: AdminProduct): AdminProduct {
         heart: [...record.detail.notes.heart],
         base: [...record.detail.notes.base],
       },
-      gallery: record.detail.gallery.map((image) => ({ ...image })),
+      gallery: record.detail.gallery.length
+        ? record.detail.gallery.map((image) => ({ ...image }))
+        : [{ image: '', alt: '', framing: 'full' }],
       recommendationIds: [...record.detail.recommendationIds],
     },
   }
 }
 
-function createProductDraft(brandId: string): AdminProduct {
+function createProductDraft(brandId: string, complement = false): AdminProduct {
   const id = `product-${crypto.randomUUID().slice(0, 8)}`
   const product = {
     id,
     slug: '',
     name: '',
-    brandId,
+    productType: complement ? ('complemento' as const) : ('perfume' as const),
+    brandId: complement ? '' : brandId,
     image: '',
     family: '',
+    olfactoryFamily: null,
+    olfactoryFamilies: [],
     variants: [
       {
         id: `${id}-50`,
-        ml: 50,
+        ml: complement ? null : 50,
+        label: complement ? 'Unidad' : undefined,
         priceCents: 0,
         stock: 0,
         active: true,
@@ -481,26 +570,17 @@ function createProductDraft(brandId: string): AdminProduct {
     product,
     detail: createAdminProductDetail(product),
     active: false,
-    featured: false,
-    gender: 'unisex',
+    gender: complement ? null : 'unisex',
     popularity: 999,
     newest: Date.now(),
     lowStockThreshold: 2,
   }
 }
 
-function slugFromName(name: string) {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
 export function AdminProductFormPage() {
   const { id } = useParams()
   const state = useAdminStore()
+  const notice = useAdminNotice()
   const location = useLocation()
   const navigate = useNavigate()
   const returnTo =
@@ -517,7 +597,12 @@ export function AdminProductFormPage() {
       state.brands.find((brand) => brand.active)?.id ??
       state.brands[0]?.id ??
       ''
-    return stored ? cloneRecord(stored) : createProductDraft(defaultBrandId)
+    return stored
+      ? cloneRecord(stored)
+      : createProductDraft(
+          defaultBrandId,
+          new URLSearchParams(location.search).get('tipo') === 'complemento',
+        )
   })
   const [noteDraft, setNoteDraft] = useState<NoteDraft>(() =>
     createNoteDraft(form.detail.notes),
@@ -526,20 +611,57 @@ export function AdminProductFormPage() {
   const [initialNoteDraft] = useState(noteDraft)
   const [message, setMessage] = useState('')
   const [mediaMessage, setMediaMessage] = useState('')
-  const [mediaError, setMediaError] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState<number | null>(null)
-  const [previewImageIndex, setPreviewImageIndex] = useState(0)
-  const [showPreview, setShowPreview] = useState(
-    () => window.matchMedia('(min-width: 768px)').matches,
+  const [uploadingImage, setUploadingImage] = useState<number | 'batch' | null>(
+    null,
   )
-  const [saving, setSaving] = useState(false)
+  const [uploadingOlfactoryImage, setUploadingOlfactoryImage] = useState(false)
+  const mediaUploadRef = useRef(false)
+  const bulkImageInputRef = useRef<HTMLInputElement>(null)
+  const [olfactoryImageMessage, setOlfactoryImageMessage] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
+  const persistence = useAdminSave()
+  const saving = persistence.saving
+  const mediaBusy = uploadingImage !== null || uploadingOlfactoryImage
+  const galleryPhotoCount = form.detail.gallery.filter((view) =>
+    view.image.trim(),
+  ).length
+  const remainingPhotoCount = Math.max(0, 4 - galleryPhotoCount)
+  const perfume = isPerfume(form.product)
+  const editorialPrimaryFamily = getEditorialPrimaryFamily(form.product.family)
+  const selectedFamilies = getProductOlfactoryFamilies(form.product)
+  const relatedProducts = state.products.filter(
+    (record) =>
+      record.product.id !== form.product.id &&
+      (record.active ||
+        form.detail.recommendationIds.includes(record.product.id)),
+  )
+  const familyConflict = Boolean(
+    selectedFamilies.length &&
+    editorialPrimaryFamily &&
+    !selectedFamilies.includes(editorialPrimaryFamily),
+  )
   const editing = Boolean(id)
+  useEffect(() => {
+    if (location.hash !== '#product-photos-title') return
+    const frame = requestAnimationFrame(() => {
+      const heading = document.getElementById('product-photos-title')
+      heading?.scrollIntoView({ block: 'start' })
+      heading?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [location.hash])
   const autoSlug = useRef(!editing)
   const hasUnsavedChanges =
-    form !== initialForm || noteDraft !== initialNoteDraft
+    form !== initialForm ||
+    noteDraft !== initialNoteDraft ||
+    mediaBusy ||
+    saving ||
+    persistence.persistenceFailed
   const allowNavigation = useRef(false)
+  const confirmingNavigation = useRef(false)
   const blocker = useBlocker(
-    () => hasUnsavedChanges && !allowNavigation.current,
+    () =>
+      (hasUnsavedChanges || mediaUploadRef.current) && !allowNavigation.current,
   )
 
   useEffect(() => {
@@ -553,13 +675,24 @@ export function AdminProductFormPage() {
   }, [hasUnsavedChanges])
 
   useEffect(() => {
-    if (blocker.state !== 'blocked') return
-    if (
-      window.confirm('Hay cambios sin guardar. ¿Quieres salir y descartarlos?')
-    )
-      blocker.proceed()
-    else blocker.reset()
-  }, [blocker])
+    if (blocker.state !== 'blocked' || confirmingNavigation.current) return
+    confirmingNavigation.current = true
+    void notice
+      .confirm({
+        title: '¿Salir sin guardar?',
+        description: 'Los cambios de este producto se perderán si sales ahora.',
+        confirmLabel: 'Salir sin guardar',
+        cancelLabel: 'Seguir editando',
+        destructive: true,
+      })
+      .then((confirmed) => {
+        if (confirmed) blocker.proceed()
+        else blocker.reset()
+      })
+      .finally(() => {
+        confirmingNavigation.current = false
+      })
+  }, [blocker, notice])
 
   useEffect(() => {
     if (location.hash !== '#product-variants-title') return
@@ -583,7 +716,7 @@ export function AdminProductFormPage() {
     )
 
   function updateProduct(
-    field: 'name' | 'slug' | 'brandId' | 'image' | 'family',
+    field: 'name' | 'slug' | 'brandId' | 'family',
     value: string,
   ) {
     setMessage('')
@@ -592,53 +725,44 @@ export function AdminProductFormPage() {
         ...current.product,
         [field]: value,
         ...(field === 'name' && autoSlug.current
-          ? { slug: slugFromName(value) }
+          ? { slug: productSlug(value) }
           : {}),
       }
-      const shouldUpdateGallery = field === 'image' || field === 'name'
       return {
         ...current,
         product,
-        detail: shouldUpdateGallery
-          ? {
-              ...current.detail,
-              gallery: current.detail.gallery.map((view, index) => {
-                const previousDefault =
-                  index === 0
-                    ? `Frasco de ${current.product.name}`
-                    : `Vista alternativa de ${current.product.name}`
-                const nextDefault =
-                  index === 0
-                    ? `Frasco de ${product.name}`
-                    : `Vista alternativa de ${product.name}`
-                return {
-                  ...view,
-                  image:
-                    field === 'image'
-                      ? index === 0
-                        ? product.image
-                        : view.image === `${current.product.image}-alternate`
-                          ? `${product.image}-alternate`
-                          : view.image
-                      : view.image,
-                  alt:
-                    field === 'name' &&
-                    view.alt.trim() &&
-                    view.alt !== previousDefault
-                      ? view.alt
-                      : nextDefault,
-                }
-              }),
-            }
-          : current.detail,
+        detail:
+          field === 'name'
+            ? {
+                ...current.detail,
+                gallery: current.detail.gallery.map((view, index) => {
+                  const previousDefault =
+                    index === 0
+                      ? `Frasco de ${current.product.name}`
+                      : `Vista alternativa de ${current.product.name}`
+                  const nextDefault =
+                    index === 0
+                      ? `Frasco de ${product.name}`
+                      : `Vista alternativa de ${product.name}`
+                  return {
+                    ...view,
+                    alt:
+                      view.alt.trim() && view.alt !== previousDefault
+                        ? view.alt
+                        : nextDefault,
+                  }
+                }),
+              }
+            : current.detail,
       }
     })
   }
 
   async function uploadGalleryImage(file: File, index: number) {
+    if (mediaUploadRef.current || saving) return
+    mediaUploadRef.current = true
     setUploadingImage(index)
     setMediaMessage('')
-    setMediaError(false)
     try {
       const image = await prepareImageFile(file, productImagePreset)
       setForm((current) => ({
@@ -647,27 +771,144 @@ export function AdminProductFormPage() {
         detail: {
           ...current.detail,
           gallery: current.detail.gallery.map((view, viewIndex) =>
-            viewIndex === index ? { ...view, image } : view,
+            viewIndex === index ? { ...view, image, framing: 'full' } : view,
           ),
         },
       }))
-      setPreviewImageIndex(index)
-      setMediaMessage(
-        `${file.name} preparado. Revisa la vista previa y guarda el producto.`,
-      )
+      notice.toast('Foto preparada. Guarda el producto para aplicar el cambio.')
     } catch (error) {
-      setMediaError(true)
-      setMediaMessage(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo preparar la imagen.',
-      )
+      notice.error(error, 'image')
     } finally {
+      mediaUploadRef.current = false
       setUploadingImage(null)
     }
   }
 
+  async function uploadGalleryImages(files: File[]) {
+    if (!files.length || mediaUploadRef.current || saving) return
+    if (files.length > remainingPhotoCount) {
+      notice.error(
+        new UserFacingError(
+          'image-gallery-limit',
+          remainingPhotoCount > 0
+            ? `Puedes añadir ${remainingPhotoCount} ${remainingPhotoCount === 1 ? 'foto más' : 'fotos más'}. Selecciona hasta esa cantidad.`
+            : 'La galería ya tiene 4 fotos. Quita una para añadir otra.',
+        ),
+        'image',
+      )
+      return
+    }
+    mediaUploadRef.current = true
+    setUploadingImage('batch')
+    setMediaMessage(
+      `Preparando ${files.length} ${files.length === 1 ? 'foto' : 'fotos'}…`,
+    )
+    try {
+      const images: string[] = []
+      for (const file of files) {
+        try {
+          images.push(await prepareImageFile(file, productImagePreset))
+        } catch (error) {
+          if (error instanceof UserFacingError)
+            throw new UserFacingError(
+              error.code,
+              `${file.name}: ${error.message} No se añadió ninguna foto.`,
+            )
+          throw error
+        }
+      }
+      setForm((current) => {
+        const gallery = current.detail.gallery.map((view) => ({ ...view }))
+        let nextImage = 0
+        for (
+          let index = 0;
+          index < gallery.length && nextImage < images.length;
+          index += 1
+        ) {
+          if (!gallery[index].image.trim()) {
+            gallery[index] = {
+              ...gallery[index],
+              image: images[nextImage++],
+              framing: 'full',
+            }
+          }
+        }
+        while (nextImage < images.length) {
+          gallery.push({ image: images[nextImage++], alt: '', framing: 'full' })
+        }
+        return {
+          ...current,
+          product: { ...current.product, image: gallery[0].image },
+          detail: { ...current.detail, gallery },
+        }
+      })
+      notice.toast(
+        `${files.length} ${files.length === 1 ? 'foto preparada' : 'fotos preparadas'}. Revisa la vista previa y guarda el producto.`,
+      )
+    } catch (error) {
+      notice.error(error, 'image')
+    } finally {
+      mediaUploadRef.current = false
+      setUploadingImage(null)
+      setMediaMessage('')
+    }
+  }
+
+  async function uploadOlfactoryImage(file: File) {
+    if (mediaUploadRef.current || saving) return
+    mediaUploadRef.current = true
+    setUploadingOlfactoryImage(true)
+    setOlfactoryImageMessage('Preparando imagen…')
+    try {
+      const image = await prepareImageFile(file, olfactoryImagePreset)
+      setForm((current) => ({
+        ...current,
+        detail: { ...current.detail, olfactoryImage: image },
+      }))
+      notice.toast('Imagen preparada. Guárdala con el producto.')
+    } catch (error) {
+      notice.error(error, 'image')
+    } finally {
+      mediaUploadRef.current = false
+      setUploadingOlfactoryImage(false)
+      setOlfactoryImageMessage('')
+    }
+  }
+
+  function moveGalleryView(index: number, direction: -1 | 1) {
+    if (mediaUploadRef.current || saving) return
+    const target = index + direction
+    setForm((current) => {
+      if (target < 0 || target >= current.detail.gallery.length) return current
+      const gallery = [...current.detail.gallery]
+      ;[gallery[index], gallery[target]] = [gallery[target], gallery[index]]
+      return {
+        ...current,
+        product: { ...current.product, image: gallery[0].image },
+        detail: { ...current.detail, gallery },
+      }
+    })
+  }
+
+  function removeGalleryView(index: number) {
+    if (mediaUploadRef.current || saving) return
+    setForm((current) => {
+      const gallery = current.detail.gallery.filter(
+        (_, galleryIndex) => galleryIndex !== index,
+      )
+      if (gallery.length === 0) {
+        gallery.push({ image: '', alt: '', framing: 'full' })
+      }
+      return {
+        ...current,
+        product: { ...current.product, image: gallery[0].image },
+        detail: { ...current.detail, gallery },
+      }
+    })
+  }
+
   function addGalleryView() {
+    if (mediaUploadRef.current || saving) return
     setForm((current) => {
       if (current.detail.gallery.length >= 4) return current
       return {
@@ -689,8 +930,11 @@ export function AdminProductFormPage() {
 
   function updateVariant(
     variantId: string,
-    field: keyof Pick<ProductVariant, 'ml' | 'priceCents' | 'stock' | 'active'>,
-    value: number | boolean,
+    field: keyof Pick<
+      ProductVariant,
+      'ml' | 'label' | 'sku' | 'priceCents' | 'stock' | 'active'
+    >,
+    value: number | boolean | string,
   ) {
     setMessage('')
     setForm((current) => ({
@@ -711,7 +955,7 @@ export function AdminProductFormPage() {
       )
       const nextSize =
         [100, 150, 200, 30, 50, 75, 125].find((size) => !usedSizes.has(size)) ??
-        Math.max(...usedSizes, 0) + 25
+        Math.max(...[...usedSizes].map((size) => size ?? 0), 0) + 25
       return {
         ...current,
         product: {
@@ -720,7 +964,10 @@ export function AdminProductFormPage() {
             ...current.product.variants,
             {
               id: `${current.product.id}-${crypto.randomUUID().slice(0, 6)}`,
-              ml: nextSize,
+              ml: isPerfume(current.product) ? nextSize : null,
+              label: isPerfume(current.product)
+                ? undefined
+                : `Presentación ${current.product.variants.length + 1}`,
               priceCents: 0,
               stock: 0,
               active: true,
@@ -755,7 +1002,13 @@ export function AdminProductFormPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (uploadingImage !== null || saving) return
+    if (
+      mediaUploadRef.current ||
+      mediaBusy ||
+      saving ||
+      persistence.persistenceFailed
+    )
+      return
     const productToSave = {
       ...form,
       detail: {
@@ -763,32 +1016,35 @@ export function AdminProductFormPage() {
         notes: parseNoteDraft(noteDraft),
       },
     }
-    if (productToSave.detail.gallery.some((view) => !view.image)) {
+    if (productToSave.detail.gallery.slice(1).some((view) => !view.image)) {
       showSaveError(
         'Sube una foto para cada vista añadida o quita la vista vacía.',
       )
       return
     }
+    if (productToSave.active && !productToSave.detail.gallery[0]?.image) {
+      showSaveError('Sube una fotografía principal antes de publicar.')
+      return
+    }
     setForm(productToSave)
-    const result = adminService.saveProduct(productToSave)
-    if (result.kind === 'validation') {
-      showSaveError(result.message)
-      return
-    }
-    setSaving(true)
-    try {
-      await adminService.flush()
-    } catch {
-      showSaveError(
-        'El producto se ve en esta sesión, pero no se pudo guardar en el navegador. Inténtalo de nuevo.',
-      )
-      setSaving(false)
-      return
-    }
-    allowNavigation.current = true
-    const destination = new URL(returnTo, window.location.origin)
-    destination.searchParams.set('guardado', '1')
-    navigate(`${destination.pathname}${destination.search}`)
+    setMessage('')
+    const result = await persistence.save(
+      () => adminService.saveProduct(productToSave),
+      () => {
+        notice.toast('Producto guardado.')
+        allowNavigation.current = true
+        const destination = new URL(returnTo, window.location.origin)
+        destination.searchParams.set('guardado', '1')
+        navigate(`${destination.pathname}${destination.search}`)
+      },
+    )
+    if (result?.kind === 'validation')
+      notice.show({
+        kind: 'warning',
+        title: 'Revisa el producto',
+        description: result.message,
+        primary: { label: 'Volver a editar' },
+      })
   }
 
   return (
@@ -799,28 +1055,99 @@ export function AdminProductFormPage() {
       <AdminPageHeader
         eyebrow={editing ? 'Editar producto' : 'Nuevo producto'}
         title={editing ? form.product.name : 'Crear producto'}
-        description="Actualiza información, inventario y visibilidad."
+        description="Completa la ficha y guarda los cambios."
       />
       <nav
         className="admin-editor-section-nav"
         aria-label="Secciones del producto"
       >
         <a href="#product-general-title">General</a>
-        <a href="#product-preview-title">Vista previa</a>
-        <a href="#product-content-title">Aroma</a>
+        <a href="#product-photos-title">Fotografías</a>
+        <a href="#product-content-title">{perfume ? 'Aroma' : 'Descripción'}</a>
         <a href="#product-variants-title">Presentaciones</a>
         <a href="#product-visibility-title">Visibilidad</a>
       </nav>
-      <form className="admin-editor" onSubmit={submit}>
+      <form
+        className="admin-editor"
+        onSubmit={submit}
+        aria-busy={saving}
+        inert={saving || persistence.persistenceFailed}
+      >
         <section aria-labelledby="product-general-title">
           <header>
             <span>01</span>
             <div>
               <h2 id="product-general-title">Información general</h2>
-              <p>Identidad y clasificación principal.</p>
             </div>
           </header>
-          <div className="admin-fields">
+          <div className="admin-fields admin-product-general-fields">
+            <label>
+              Tipo de producto
+              <select
+                value={getProductType(form.product)}
+                aria-label="Tipo de producto"
+                disabled={mediaBusy || saving}
+                onChange={(event) => {
+                  const nextType =
+                    event.target.value === 'complemento'
+                      ? 'complemento'
+                      : 'perfume'
+                  if (nextType === getProductType(form.product)) return
+                  setForm((current) => ({
+                    ...current,
+                    gender: nextType === 'perfume' ? 'unisex' : null,
+                    product: {
+                      ...current.product,
+                      productType: nextType,
+                      family: '',
+                      olfactoryFamilies: [],
+                      olfactoryFamily: null,
+                      variants: current.product.variants.map(
+                        (variant, index) => ({
+                          ...variant,
+                          ml: nextType === 'perfume' ? 50 + index * 50 : null,
+                          label:
+                            nextType === 'perfume'
+                              ? undefined
+                              : index === 0
+                                ? 'Unidad'
+                                : `Presentación ${index + 1}`,
+                        }),
+                      ),
+                    },
+                    detail: {
+                      ...current.detail,
+                      shortDescription:
+                        nextType === 'complemento' &&
+                        current.detail.shortDescription ===
+                          createAdminProductDetail(current.product)
+                            .shortDescription
+                          ? ''
+                          : current.detail.shortDescription,
+                      description:
+                        nextType === 'complemento' &&
+                        current.detail.description ===
+                          createAdminProductDetail(current.product).description
+                          ? ''
+                          : current.detail.description,
+                      olfactoryImage: null,
+                      notes: { top: [], heart: [], base: [] },
+                      intensity: nextType === 'perfume' ? 'Moderada' : null,
+                      intensityLevel: nextType === 'perfume' ? 2 : null,
+                      occasion: '',
+                      season: '',
+                    },
+                  }))
+                  setNoteDraft({ top: '', heart: '', base: '' })
+                }}
+              >
+                {PRODUCT_TYPES.map((type) => (
+                  <option value={type.value} key={type.value}>
+                    {type.singular}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Nombre
               <input
@@ -844,20 +1171,24 @@ export function AdminProductFormPage() {
               />
               <small id="admin-product-slug-help">
                 {editing
-                  ? 'Cambiarla también cambia el enlace público del producto.'
-                  : 'Se genera desde el nombre. Puedes cambiarla si lo necesitas.'}{' '}
-                Usa letras minúsculas, números y guiones.
+                  ? 'Cambiarla modifica el enlace público.'
+                  : 'Se genera desde el nombre.'}{' '}
+                Usa minúsculas, números y guiones.
               </small>
             </label>
             <label>
               Marca
               <select
                 value={form.product.brandId}
+                aria-label="Marca"
                 onChange={(event) =>
                   updateProduct('brandId', event.target.value)
                 }
-                required
+                required={perfume}
               >
+                <option value="">
+                  {perfume ? 'Selecciona una marca' : 'Sin marca'}
+                </option>
                 {state.brands
                   .filter(
                     (brand) =>
@@ -870,67 +1201,77 @@ export function AdminProductFormPage() {
                   ))}
               </select>
             </label>
-            <label>
-              Categoría
-              <select
-                value={form.gender}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    gender: event.target.value as AdminGender,
-                  }))
-                }
-              >
-                <option value="hombre">Para él</option>
-                <option value="mujer">Para ella</option>
-                <option value="unisex">Unisex</option>
-              </select>
-            </label>
-            <label>
-              Foto predefinida (opcional)
-              <select
-                value={
-                  isUploadedImage(form.product.image)
-                    ? '__uploaded__'
-                    : form.product.image.startsWith('https://')
-                      ? '__remote__'
-                      : form.product.image
-                }
-                onChange={(event) => updateProduct('image', event.target.value)}
-              >
-                <option value="">Selecciona una imagen disponible</option>
-                {isUploadedImage(form.product.image) ? (
-                  <option value="__uploaded__" disabled>
-                    Imagen subida
-                  </option>
-                ) : null}
-                {form.product.image.startsWith('https://') ? (
-                  <option value="__remote__" disabled>
-                    Imagen externa del Excel
-                  </option>
-                ) : null}
-                {imageOptions.map((image) => (
-                  <option key={image.value} value={image.value}>
-                    {image.label}
-                  </option>
-                ))}
-              </select>
-              <small>
-                Para usar tu propia foto, súbela en Fotografías del producto.
-              </small>
-            </label>
+            {perfume && (
+              <label>
+                Género
+                <select
+                  value={form.gender ?? 'unisex'}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      gender: event.target.value as AdminGender,
+                    }))
+                  }
+                >
+                  <option value="hombre">Para él</option>
+                  <option value="mujer">Para ella</option>
+                  <option value="unisex">Unisex</option>
+                </select>
+              </label>
+            )}
           </div>
+        </section>
+
+        <section aria-labelledby="product-photos-title">
+          <header className="admin-product-photos-header">
+            <span>02</span>
+            <div>
+              <h2 id="product-photos-title" tabIndex={-1}>
+                Fotografías
+              </h2>
+              <p>
+                Sube hasta 4 fotos juntas. La primera de la galería es la
+                principal.
+              </p>
+            </div>
+          </header>
           <div className="admin-product-upload-area">
-            <h3>Fotografías del producto</h3>
-            <p>
-              {productImagePreset.label}. JPG, PNG, WebP o AVIF. La imagen se
-              recorta al centro y puedes revisar el resultado antes de guardar.
+            <div className="admin-product-upload-toolbar">
+              <button
+                type="button"
+                className="button button--primary"
+                disabled={mediaBusy || saving || remainingPhotoCount === 0}
+                aria-describedby="product-photo-help product-photo-count"
+                onClick={() => bulkImageInputRef.current?.click()}
+              >
+                {uploadingImage === 'batch'
+                  ? 'Preparando fotos…'
+                  : 'Subir fotos'}
+              </button>
+              <input
+                ref={bulkImageInputRef}
+                type="file"
+                hidden
+                multiple
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                aria-label="Subir varias fotos del producto"
+                disabled={mediaBusy || saving || remainingPhotoCount === 0}
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? [])
+                  event.currentTarget.value = ''
+                  void uploadGalleryImages(files)
+                }}
+              />
+              <span id="product-photo-count">
+                {galleryPhotoCount} de 4 fotos
+              </span>
+            </div>
+            <p id="product-photo-help">
+              {productImagePreset.label}. JPG, PNG, WebP o AVIF. Hasta 20 MB por
+              foto.
             </p>
             {mediaMessage ? (
-              <p
-                className={`admin-product-upload-feedback${mediaError ? ' is-error' : ''}`}
-                role={mediaError ? 'alert' : 'status'}
-              >
+              <p className="admin-product-upload-feedback" role="status">
                 {mediaMessage}
               </p>
             ) : null}
@@ -948,64 +1289,62 @@ export function AdminProductFormPage() {
                     <strong>
                       {index === 0 ? 'Foto principal' : `Vista ${index + 1}`}
                     </strong>
-                    <label className="admin-home-file-button">
-                      {uploadingImage === index
-                        ? 'Preparando…'
-                        : 'Subir archivo'}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/avif"
-                        aria-label={`Subir ${index === 0 ? 'foto principal' : `vista ${index + 1}`} del producto`}
-                        disabled={uploadingImage !== null}
-                        onChange={(event) => {
-                          const file = event.currentTarget.files?.[0]
-                          event.currentTarget.value = ''
-                          if (file) void uploadGalleryImage(file, index)
-                        }}
-                      />
-                    </label>
-                    {index > 0 ? (
+                    <div className="admin-product-photo-controls">
+                      <label className="admin-home-file-button">
+                        {uploadingImage === index
+                          ? 'Preparando…'
+                          : view.image
+                            ? 'Reemplazar'
+                            : 'Subir archivo'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/avif"
+                          aria-label={`${view.image ? 'Reemplazar' : 'Subir'} ${index === 0 ? 'foto principal' : `vista ${index + 1}`} del producto`}
+                          disabled={mediaBusy || saving}
+                          onChange={(event) => {
+                            const file = event.currentTarget.files?.[0]
+                            event.currentTarget.value = ''
+                            if (file) void uploadGalleryImage(file, index)
+                          }}
+                        />
+                      </label>
+                      {view.image || index > 0 ? (
+                        <button
+                          type="button"
+                          className="admin-remove"
+                          disabled={mediaBusy || saving}
+                          onClick={() => removeGalleryView(index)}
+                        >
+                          Quitar
+                        </button>
+                      ) : null}
+                    </div>
+                    <div
+                      className="admin-product-photo-order"
+                      aria-label={`Orden de foto ${index + 1}`}
+                    >
                       <button
                         type="button"
-                        className="admin-remove"
-                        onClick={() => {
-                          setForm((current) => ({
-                            ...current,
-                            detail: {
-                              ...current.detail,
-                              gallery: current.detail.gallery.filter(
-                                (_, galleryIndex) => galleryIndex !== index,
-                              ),
-                            },
-                          }))
-                          setPreviewImageIndex(0)
-                        }}
+                        disabled={index === 0 || mediaBusy || saving}
+                        aria-label={`Mover foto ${index + 1} antes`}
+                        onClick={() => moveGalleryView(index, -1)}
                       >
-                        Quitar foto {index + 1}
+                        ↑ <span aria-hidden="true">Subir</span>
                       </button>
-                    ) : null}
+                      <button
+                        type="button"
+                        disabled={
+                          index === form.detail.gallery.length - 1 ||
+                          mediaBusy ||
+                          saving
+                        }
+                        aria-label={`Mover foto ${index + 1} después`}
+                        onClick={() => moveGalleryView(index, 1)}
+                      >
+                        ↓ <span aria-hidden="true">Bajar</span>
+                      </button>
+                    </div>
                   </div>
-                  <label className="admin-product-alt-label">
-                    Descripción de la imagen
-                    <input
-                      value={view.alt}
-                      maxLength={120}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          detail: {
-                            ...current.detail,
-                            gallery: current.detail.gallery.map(
-                              (item, galleryIndex) =>
-                                galleryIndex === index
-                                  ? { ...item, alt: event.target.value }
-                                  : item,
-                            ),
-                          },
-                        }))
-                      }
-                    />
-                  </label>
                 </div>
               ))}
             </div>
@@ -1013,6 +1352,7 @@ export function AdminProductFormPage() {
               <button
                 type="button"
                 className="button button--secondary"
+                disabled={mediaBusy || saving}
                 onClick={addGalleryView}
               >
                 Añadir otra foto
@@ -1021,238 +1361,265 @@ export function AdminProductFormPage() {
           </div>
         </section>
 
-        <section aria-labelledby="product-preview-title">
-          <header>
-            <div>
-              <h2 id="product-preview-title">Así se verá tu producto</h2>
-              <p>Vista previa del borrador, antes de guardar.</p>
-            </div>
-            <button
-              type="button"
-              className="admin-preview-toggle"
-              aria-expanded={showPreview}
-              aria-controls="admin-product-preview-content"
-              onClick={() => setShowPreview((open) => !open)}
-            >
-              {showPreview ? 'Ocultar vista previa' : 'Mostrar vista previa'}
-            </button>
-          </header>
-          {showPreview ? (
-            <div
-              id="admin-product-preview-content"
-              className="admin-product-live-preview"
-            >
-              <div className="admin-product-preview-photos">
-                <div className="admin-product-preview-main">
-                  {form.detail.gallery[previewImageIndex]?.image ? (
-                    <img
-                      src={imageSource(
-                        form.detail.gallery[previewImageIndex].image,
-                      )}
-                      alt={`Vista previa ${previewImageIndex + 1} de ${form.product.name || 'este producto'}`}
-                      width={480}
-                      height={600}
-                    />
-                  ) : (
-                    <p>
-                      Sube una fotografía para ver cómo quedará el producto.
-                    </p>
-                  )}
-                </div>
-                <div
-                  className="admin-product-preview-thumbnails"
-                  aria-label="Elegir imagen de la vista previa"
-                >
-                  {form.detail.gallery.map((view, index) => (
-                    <button
-                      type="button"
-                      key={index}
-                      aria-label={`Ver vista ${index + 1} del borrador`}
-                      aria-pressed={previewImageIndex === index}
-                      onClick={() => setPreviewImageIndex(index)}
-                    >
-                      {view.image ? (
-                        <img src={imageSource(view.image)} alt="" />
-                      ) : (
-                        <span aria-hidden="true">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="eyebrow brand-label">
-                  {
-                    state.brands.find(
-                      (brand) => brand.id === form.product.brandId,
-                    )?.name
-                  }
-                </p>
-                <h3>{form.product.name || 'Nombre del perfume'}</h3>
-                <p>{form.detail.shortDescription}</p>
-                <ul>
-                  {form.product.variants
-                    .filter((variant) => variant.active !== false)
-                    .map((variant) => (
-                      <li key={variant.id}>
-                        <strong>
-                          {variant.ml} ml · {formatPEN(variant.priceCents)}
-                        </strong>
-                        <span>
-                          {variant.stock > 0 ? 'Disponible' : 'Agotado'}
-                        </span>
-                      </li>
-                    ))}
-                </ul>
-                <p className="admin-data-note">
-                  {form.active
-                    ? 'Visible en la tienda al guardar.'
-                    : 'Borrador oculto en la tienda.'}
-                </p>
-              </div>
-            </div>
-          ) : null}
-        </section>
-
         <section aria-labelledby="product-content-title">
           <header>
-            <span>02</span>
+            <span>03</span>
             <div>
-              <h2 id="product-content-title">Contenido olfativo</h2>
-              <p>
-                Edita la familia, notas e intensidad tal como las verá el
-                cliente. La foto editorial es de demostración.
-              </p>
-              <p id="finder-catalog-help">
-                El recomendador utiliza estos datos. Escribe primero la familia
-                principal (por ejemplo, Amaderado · fresco) y separa los momentos
-                de uso con · (Diario · oficina). Incluye solo información verificada.
-              </p>
+              <h2 id="product-content-title">
+                {perfume ? 'Contenido olfativo' : 'Descripción del producto'}
+              </h2>
+              {perfume && (
+                <p>Familia, notas y descripción visibles para el cliente.</p>
+              )}
+              {perfume && (
+                <p id="finder-catalog-help">
+                  El recomendador usa familias, intensidad y ocasión. Inicia el
+                  perfil breve con una familia seleccionada y separa valores con
+                  ·.
+                </p>
+              )}
             </div>
           </header>
-          <div className="admin-olfactory-editor">
-            <OlfactoryProfile
-              family={form.product.family}
-              detail={form.detail}
-              image={getOlfactoryImage(
-                form.product.id,
-                parseNoteDraft(noteDraft),
-              )}
-              editor={{
-                family: (
-                  <input
-                    aria-label="Familia olfativa"
-                    aria-describedby="finder-catalog-help"
-                    value={form.product.family}
-                    onChange={(event) =>
-                      updateProduct('family', event.target.value)
-                    }
-                    required
-                  />
-                ),
-                intensity: (
-                  <select
-                    aria-label="Intensidad"
-                    value={form.detail.intensityLevel}
-                    onChange={(event) => {
-                      const level = Number(event.target.value)
-                      if (level !== 1 && level !== 2 && level !== 3) return
-                      setForm((current) => ({
-                        ...current,
-                        detail: {
-                          ...current.detail,
-                          intensityLevel: level,
-                          intensity:
-                            level === 1
-                              ? 'Suave'
-                              : level === 2
-                                ? 'Moderada'
-                                : 'Intensa',
-                        },
-                      }))
-                    }}
-                  >
-                    <option value={1}>Suave</option>
-                    <option value={2}>Moderada</option>
-                    <option value={3}>Intensa</option>
-                  </select>
-                ),
-                season: (
-                  <input
-                    aria-label="Temporada"
-                    value={form.detail.season}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        detail: {
-                          ...current.detail,
-                          season: event.target.value,
-                        },
-                      }))
-                    }
-                  />
-                ),
-                occasion: (
-                  <input
-                    aria-label="Ocasión"
-                    aria-describedby="finder-catalog-help"
-                    value={form.detail.occasion}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        detail: {
-                          ...current.detail,
-                          occasion: event.target.value,
-                        },
-                      }))
-                    }
-                  />
-                ),
-                notes: (
-                  <div className="admin-profile-notes">
-                    {noteFields.map((note) => (
-                      <label key={note}>
-                        <span className="admin-profile-notes-heading">
-                          <NoteBottleIcon stage={note} />
-                          <span>
-                            Notas de{' '}
-                            {note === 'top'
-                              ? 'salida'
-                              : note === 'heart'
-                                ? 'corazón'
-                                : 'fondo'}
-                          </span>
-                        </span>
+          {perfume && (
+            <>
+              <div className="admin-olfactory-classification">
+                <fieldset aria-describedby="admin-olfactory-family-help">
+                  <legend>Familias olfativas</legend>
+                  <div className="admin-olfactory-family-options">
+                    {OLFACTORY_FAMILIES.map((family) => (
+                      <label
+                        key={family.value}
+                        className={
+                          selectedFamilies.includes(family.value)
+                            ? 'is-selected'
+                            : ''
+                        }
+                      >
                         <input
-                          value={noteDraft[note]}
-                          onChange={(event) =>
-                            setNoteDraft((current) => ({
-                              ...current,
-                              [note]: event.target.value,
-                            }))
-                          }
-                          onBlur={() => syncNoteDraft(note)}
+                          type="checkbox"
+                          value={family.value}
+                          checked={selectedFamilies.includes(family.value)}
+                          aria-invalid={familyConflict || undefined}
+                          onChange={(event) => {
+                            const checked = event.target.checked
+                            setMessage('')
+                            setForm((current) => {
+                              const existing = getProductOlfactoryFamilies(
+                                current.product,
+                              )
+                              const next: OlfactoryFamily[] = checked
+                                ? [...existing, family.value]
+                                : existing.filter(
+                                    (value) => value !== family.value,
+                                  )
+                              return {
+                                ...current,
+                                product: {
+                                  ...current.product,
+                                  olfactoryFamilies: next,
+                                  olfactoryFamily: next[0] ?? null,
+                                },
+                              }
+                            })
+                          }}
                         />
+                        <span>{family.label}</span>
                       </label>
                     ))}
-                    <small>
-                      Separa las notas con comas. La primera de cada grupo
-                      aparece en la evolución.
-                    </small>
-                    <p className="admin-evolution-preview">
-                      {Object.values(parseNoteDraft(noteDraft))
-                        .map((notes) => notes[0])
-                        .filter(Boolean)
-                        .join(' · ') ||
-                        'Añade las notas para ver la evolución.'}
-                    </p>
                   </div>
-                ),
-              }}
-            />
-          </div>
+                </fieldset>
+                <p id="admin-olfactory-family-help">
+                  Puedes elegir varias. Solo marca familias verificadas para
+                  este perfume.
+                </p>
+                {familyConflict ? (
+                  <p
+                    className="admin-olfactory-classification__warning"
+                    role="alert"
+                  >
+                    Las familias seleccionadas no coinciden con el inicio del
+                    perfil aromático breve. Revisa ambos antes de guardar.
+                  </p>
+                ) : null}
+              </div>
+              <div className="admin-olfactory-image-control">
+                <div className="admin-olfactory-image-control__copy">
+                  <h3>Fotografía del perfil olfativo</h3>
+                  <p>
+                    Imagen propia de este perfume en «Familia olfativa».{' '}
+                    {olfactoryImagePreset.label}.
+                  </p>
+                  <div className="admin-olfactory-image-control__actions">
+                    <label className="admin-home-file-button">
+                      {uploadingOlfactoryImage
+                        ? 'Preparando…'
+                        : form.detail.olfactoryImage
+                          ? 'Reemplazar imagen'
+                          : 'Subir imagen'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        aria-label="Subir imagen del perfil olfativo"
+                        disabled={mediaBusy || saving}
+                        onChange={(event) => {
+                          const file = event.currentTarget.files?.[0]
+                          event.currentTarget.value = ''
+                          if (file) void uploadOlfactoryImage(file)
+                        }}
+                      />
+                    </label>
+                    {form.detail.olfactoryImage ? (
+                      <button
+                        type="button"
+                        className="admin-remove"
+                        disabled={mediaBusy || saving}
+                        onClick={() => {
+                          setForm((current) => ({
+                            ...current,
+                            detail: { ...current.detail, olfactoryImage: null },
+                          }))
+                          notice.toast('La imagen se quitará al guardar.')
+                        }}
+                      >
+                        Quitar imagen
+                      </button>
+                    ) : null}
+                  </div>
+                  {olfactoryImageMessage ? (
+                    <p role="status">{olfactoryImageMessage}</p>
+                  ) : null}
+                </div>
+                {form.detail.olfactoryImage ? (
+                  <img
+                    src={assetSource(form.detail.olfactoryImage)}
+                    alt="Vista previa de la imagen del perfil olfativo"
+                  />
+                ) : (
+                  <span className="admin-olfactory-image-control__empty">
+                    Sin imagen
+                  </span>
+                )}
+              </div>
+              <div className="admin-olfactory-editor">
+                <OlfactoryProfile
+                  family={form.product.family}
+                  detail={form.detail}
+                  image={form.detail.olfactoryImage ?? undefined}
+                  editor={{
+                    family: (
+                      <input
+                        aria-label="Perfil aromático breve"
+                        aria-describedby="finder-catalog-help"
+                        value={form.product.family}
+                        onChange={(event) =>
+                          updateProduct('family', event.target.value)
+                        }
+                        required
+                      />
+                    ),
+                    intensity: (
+                      <select
+                        aria-label="Intensidad"
+                        value={form.detail.intensityLevel ?? 2}
+                        onChange={(event) => {
+                          const level = Number(event.target.value)
+                          if (level !== 1 && level !== 2 && level !== 3) return
+                          setForm((current) => ({
+                            ...current,
+                            detail: {
+                              ...current.detail,
+                              intensityLevel: level,
+                              intensity:
+                                level === 1
+                                  ? 'Suave'
+                                  : level === 2
+                                    ? 'Moderada'
+                                    : 'Intensa',
+                            },
+                          }))
+                        }}
+                      >
+                        <option value={1}>Suave</option>
+                        <option value={2}>Moderada</option>
+                        <option value={3}>Intensa</option>
+                      </select>
+                    ),
+                    season: (
+                      <input
+                        aria-label="Temporada"
+                        value={form.detail.season}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            detail: {
+                              ...current.detail,
+                              season: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    ),
+                    occasion: (
+                      <input
+                        aria-label="Ocasión"
+                        aria-describedby="finder-catalog-help"
+                        value={form.detail.occasion}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            detail: {
+                              ...current.detail,
+                              occasion: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    ),
+                    notes: (
+                      <div className="admin-profile-notes">
+                        {noteFields.map((note) => (
+                          <label key={note}>
+                            <span className="admin-profile-notes-heading">
+                              <NoteBottleIcon stage={note} />
+                              <span>
+                                Notas de{' '}
+                                {note === 'top'
+                                  ? 'salida'
+                                  : note === 'heart'
+                                    ? 'corazón'
+                                    : 'fondo'}
+                              </span>
+                            </span>
+                            <input
+                              value={noteDraft[note]}
+                              onChange={(event) =>
+                                setNoteDraft((current) => ({
+                                  ...current,
+                                  [note]: event.target.value,
+                                }))
+                              }
+                              onBlur={() => syncNoteDraft(note)}
+                            />
+                          </label>
+                        ))}
+                        <small>
+                          Separa las notas con comas. La primera de cada grupo
+                          aparece en la evolución.
+                        </small>
+                        <p className="admin-evolution-preview">
+                          {Object.values(parseNoteDraft(noteDraft))
+                            .map((notes) => notes[0])
+                            .filter(Boolean)
+                            .join(' · ') ||
+                            'Añade las notas para ver la evolución.'}
+                        </p>
+                      </div>
+                    ),
+                  }}
+                />
+              </div>
+            </>
+          )}
           <div className="admin-fields">
             <label className="admin-field-wide">
               Resumen de la ficha
@@ -1270,7 +1637,6 @@ export function AdminProductFormPage() {
                 }
                 required
               />
-              <small>Texto breve junto al precio y las presentaciones.</small>
             </label>
             <label className="admin-field-wide">
               Descripción
@@ -1290,11 +1656,78 @@ export function AdminProductFormPage() {
               />
             </label>
           </div>
+          <details className="admin-related-products">
+            <summary>
+              <span>También te puede gustar</span>
+              <small>
+                {form.detail.recommendationIds.length
+                  ? `${form.detail.recommendationIds.length} de 4 seleccionados`
+                  : 'Selección automática'}
+              </small>
+            </summary>
+            <fieldset>
+              <legend>
+                Elige hasta 4 productos o deja la selección automática.
+              </legend>
+              <div className="admin-related-products__options">
+                {relatedProducts.map((record) => {
+                  const checked = form.detail.recommendationIds.includes(
+                    record.product.id,
+                  )
+                  const brandName = state.brands.find(
+                    (brand) => brand.id === record.product.brandId,
+                  )?.name
+                  return (
+                    <label key={record.product.id}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={
+                          !checked && form.detail.recommendationIds.length >= 4
+                        }
+                        onChange={(event) => {
+                          const isChecked = event.target.checked
+                          setForm((current) => ({
+                            ...current,
+                            detail: {
+                              ...current.detail,
+                              recommendationIds: isChecked
+                                ? [
+                                    ...current.detail.recommendationIds,
+                                    record.product.id,
+                                  ]
+                                : current.detail.recommendationIds.filter(
+                                    (id) => id !== record.product.id,
+                                  ),
+                            },
+                          }))
+                        }}
+                      />
+                      <span>
+                        <strong>{record.product.name}</strong>
+                        <small>
+                          {brandName}
+                          {record.active &&
+                          (state.features.complementsEnabled ||
+                            isPerfume(record.product))
+                            ? ''
+                            : ' · Oculto en tienda'}
+                        </small>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              {!relatedProducts.length ? (
+                <p>No hay otros productos disponibles para relacionar.</p>
+              ) : null}
+            </fieldset>
+          </details>
         </section>
 
         <section aria-labelledby="product-variants-title">
           <header>
-            <span>03</span>
+            <span>04</span>
             <div>
               <h2 id="product-variants-title" tabIndex={-1}>
                 Presentaciones
@@ -1321,8 +1754,8 @@ export function AdminProductFormPage() {
               />
             </label>
             <p id="admin-low-stock-help">
-              Se mostrará una alerta cuando cualquier presentación tenga estas
-              unidades o menos.
+              Avisa cuando cualquier presentación llega a estas unidades o
+              menos.
             </p>
           </div>
           <div className="admin-variant-list">
@@ -1332,7 +1765,7 @@ export function AdminProductFormPage() {
                 <fieldset key={variant.id}>
                   <legend>Presentación {index + 1}</legend>
                   <div className="admin-variant-status">
-                    <strong>{variant.ml} ml</strong>
+                    <strong>{variantLabel(variant)}</strong>
                     <AdminBadge
                       tone={
                         variant.active === false ? 'neutral' : inventory.tone
@@ -1343,20 +1776,55 @@ export function AdminProductFormPage() {
                         : `${inventory.stock} u. · ${inventory.label}`}
                     </AdminBadge>
                   </div>
+                  {perfume ? (
+                    <label>
+                      Mililitros
+                      <input
+                        type="number"
+                        min="1"
+                        value={variant.ml ?? ''}
+                        onChange={(event) =>
+                          updateVariant(
+                            variant.id,
+                            'ml',
+                            Number(event.target.value),
+                          )
+                        }
+                        required
+                      />
+                    </label>
+                  ) : (
+                    <label>
+                      Presentación
+                      <input
+                        value={variant.label ?? ''}
+                        maxLength={80}
+                        required
+                        onChange={(event) =>
+                          updateVariant(variant.id, 'label', event.target.value)
+                        }
+                        placeholder="Unidad, negro, estuche…"
+                      />
+                    </label>
+                  )}
                   <label>
-                    Mililitros
+                    SKU (opcional)
                     <input
-                      type="number"
-                      min="1"
-                      value={variant.ml}
+                      aria-label={`SKU de presentación ${variantLabel(variant)}`}
+                      value={variant.sku ?? ''}
+                      maxLength={64}
+                      pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}"
                       onChange={(event) =>
+                        updateVariant(variant.id, 'sku', event.target.value)
+                      }
+                      onBlur={(event) =>
                         updateVariant(
                           variant.id,
-                          'ml',
-                          Number(event.target.value),
+                          'sku',
+                          normalizeSku(event.target.value),
                         )
                       }
-                      required
+                      placeholder="Código único"
                     />
                   </label>
                   <label>
@@ -1379,7 +1847,7 @@ export function AdminProductFormPage() {
                   <label>
                     Stock
                     <input
-                      aria-label={`Stock de presentación ${variant.ml} ml`}
+                      aria-label={`Stock de presentación ${variantLabel(variant)}`}
                       type="number"
                       min="0"
                       step="1"
@@ -1424,7 +1892,7 @@ export function AdminProductFormPage() {
                         }))
                       }
                     >
-                      Quitar presentación de {variant.ml} ml
+                      Quitar presentación de {variantLabel(variant)}
                     </button>
                   ) : null}
                 </fieldset>
@@ -1442,10 +1910,9 @@ export function AdminProductFormPage() {
 
         <section aria-labelledby="product-visibility-title">
           <header>
-            <span>04</span>
+            <span>05</span>
             <div>
               <h2 id="product-visibility-title">Visibilidad</h2>
-              <p>Control de publicación en la tienda.</p>
             </div>
           </header>
           <div className="admin-checks">
@@ -1462,19 +1929,25 @@ export function AdminProductFormPage() {
               />
               Producto activo en tienda
             </label>
-            {form.active &&
-            !form.product.variants.some(
-              (variant) => variant.active !== false && variant.stock > 0,
-            ) ? (
+            {!state.features.complementsEnabled && !perfume ? (
               <p className="admin-inline-warning" role="status">
-                Este producto quedará visible, pero ninguna presentación podrá
-                comprarse.
+                Complementos está desactivado. Puedes preparar este producto;
+                permanecerá oculto hasta habilitar la categoría en{' '}
+                <Link to="/admin/home">Contenido del Home → Categorías</Link>.
               </p>
             ) : null}
-            <p className="admin-data-note">
-              La selección y el orden de destacados se administran en el módulo{' '}
-              <Link to="/admin/home">Home</Link>.
-            </p>
+            {!hasProductMainImage(form) && (
+              <p className="admin-inline-warning" role="status">
+                Borrador pendiente de fotos. Sube una imagen principal antes de
+                publicar.
+              </p>
+            )}
+            {!hasProductStock(form.product) ? (
+              <p className="admin-inline-warning" role="status">
+                Sin stock disponible: se guardará desactivado. Para volver a
+                mostrarlo, repón stock y activa el producto.
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -1494,18 +1967,52 @@ export function AdminProductFormPage() {
               Cambios sin guardar
             </span>
           ) : null}
-          <button
-            className="button button--primary"
-            type="submit"
-            disabled={uploadingImage !== null || saving}
-          >
-            {saving ? 'Guardando…' : 'Guardar producto'}
-          </button>
           <Link className="button button--secondary" to={returnTo}>
             Cancelar
           </Link>
+          <button
+            type="button"
+            className="button button--secondary admin-product-preview-open"
+            onClick={() => {
+              if (!mediaUploadRef.current) setShowPreview(true)
+            }}
+            disabled={mediaBusy || saving}
+          >
+            Vista previa
+          </button>
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={mediaBusy || saving}
+          >
+            {saving ? 'Guardando…' : 'Guardar producto'}
+          </button>
         </div>
       </form>
+      <AdminSaveFeedback {...persistence} />
+      <Dialog
+        id="admin-product-preview"
+        className="admin-product-preview-dialog"
+        title="Vista previa del producto"
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+      >
+        {showPreview ? (
+          <ProductDetailPreview
+            record={{
+              product: form.product,
+              detail: {
+                ...form.detail,
+                notes: parseNoteDraft(noteDraft),
+              },
+            }}
+            brands={state.brands.filter(
+              (brand) => brand.active || brand.id === form.product.brandId,
+            )}
+            products={getStoreProducts()}
+          />
+        ) : null}
+      </Dialog>
     </div>
   )
 }

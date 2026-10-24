@@ -1,6 +1,7 @@
 import type { Brand, Product, ProductVariant } from './catalog'
 
 export type FinderStep = 'family' | 'occasion' | 'intensity' | 'budget'
+export type FinderPreferenceStep = Exclude<FinderStep, 'budget'>
 export interface FinderOption {
   value: string
   label: string
@@ -12,8 +13,14 @@ export interface FinderOptions {
   availableCount: number
 }
 
-/** Empty string is an explicit "no preference", undefined means unanswered. */
-export type FinderAnswers = Partial<Record<FinderStep, string>>
+/** Empty arrays mean "no preference"; undefined means the step is unanswered. */
+export interface FinderAnswers {
+  family?: string[]
+  occasion?: string[]
+  intensity?: string[]
+  /** The budget remains a single amount in cents, or an empty string for no limit. */
+  budget?: string
+}
 
 export interface FragranceMatch {
   product: Product

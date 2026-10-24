@@ -29,7 +29,7 @@ export function readLocalReviews(productId: string): ProductReview[] {
         review.rating >= 1 &&
         review.rating <= 5 &&
         Number.isFinite(review.sizeMl) &&
-        review.sizeMl > 0,
+        review.sizeMl >= 0,
     )
   } catch {
     return []

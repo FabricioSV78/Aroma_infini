@@ -10,6 +10,9 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     if (width < 1024)
       await page.getByRole('button', { name: /^Filtros/ }).click()
     const form = page.locator('.catalog-filter-form:visible')
+    const price = form.locator('[data-filter-group="price"]')
+    if (!(await price.getAttribute('open')))
+      await price.locator('summary').click()
     const minimum = form.getByRole('spinbutton', { name: 'Mínimo' })
     const maximum = form.getByRole('spinbutton', { name: 'Máximo' })
     await minimum.fill('600')
@@ -19,15 +22,17 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     })
     await form.getByRole('button', { name: 'Aplicar filtros' }).click()
     await expect(page).toHaveURL(/min=600&max=630/)
-    await expect(page.locator('.product-card')).toHaveCount(1)
+    await expect(page.locator('.product-card')).toHaveCount(2)
     if (width < 1024)
       await page.getByRole('button', { name: /^Filtros/ }).click()
+    if (!(await price.getAttribute('open')))
+      await price.locator('summary').click()
     await form.getByRole('button', { name: 'Limpiar selección' }).click()
     await expect(minimum).toHaveValue('')
     await expect(maximum).toHaveValue('')
     await form.getByRole('button', { name: 'Aplicar filtros' }).click()
     await expect(page).toHaveURL('/tienda')
-    await expect(page.locator('.product-card')).toHaveCount(8)
+    await expect(page.locator('.product-card')).toHaveCount(12)
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -39,6 +44,7 @@ for (const width of [320, 390, 768, 1024, 1440]) {
 test('Precio máximo debe ser mayor o igual al mínimo', async ({ page }) => {
   await page.goto('/tienda')
   const form = page.locator('.catalog-sidebar .catalog-filter-form')
+  await form.locator('[data-filter-group="price"] summary').click()
   await form.getByRole('spinbutton', { name: 'Mínimo' }).fill('650')
   const maximum = form.getByRole('spinbutton', { name: 'Máximo' })
   await maximum.fill('600')
@@ -50,7 +56,9 @@ test('Precio máximo debe ser mayor o igual al mínimo', async ({ page }) => {
   await expect(page).toHaveURL('/tienda')
 })
 
-test('El botón se llena y se vacía de izquierda a derecha', async ({ page }) => {
+test('El botón se llena y se vacía de izquierda a derecha', async ({
+  page,
+}) => {
   await page.goto('/producto/bois-clair')
   const button = page.locator('.product-cart-button')
   await button.screenshot({ path: 'artifacts/cart-button-light.png' })

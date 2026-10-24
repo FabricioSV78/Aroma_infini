@@ -1,0 +1,476 @@
+.admin-order-operator {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-bottom: 18px;
+}
+
+.admin-order-operator label,
+.admin-order-action-form > label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--admin-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.admin-order-operator label {
+  width: min(100%, 310px);
+}
+
+.admin-order-operator small {
+  padding-bottom: 13px;
+  color: var(--admin-muted);
+  font-size: 0.6875rem;
+}
+
+.admin-order-action-form > .admin-order-operator {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.admin-order-action-form > .admin-order-operator label {
+  width: 100%;
+}
+
+.admin-order-action-form > .admin-order-operator small {
+  padding: 0;
+}
+
+.admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-order-filter-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.admin-order-workspace .admin-order-filter-actions > button {
+  min-height: 44px;
+}
+
+.admin-order-workspace .admin-order-delete-batch {
+  color: var(--admin-muted);
+  text-decoration: none;
+}
+
+.admin-order-workspace .admin-order-delete-batch:hover {
+  color: var(--admin-danger);
+  text-decoration: underline;
+}
+
+.admin-order-action-dialog .admin-order-delete-confirm {
+  background: var(--admin-danger);
+  border-color: var(--admin-danger);
+  color: #fff;
+}
+
+.admin-order-action-dialog .admin-order-delete-confirm:hover {
+  background: var(--admin-danger);
+  border-color: var(--admin-danger);
+  filter: brightness(0.92);
+}
+
+.admin-order-check-label,
+.admin-order-action-form > .admin-order-check-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.admin-order-workspace input[type='checkbox'],
+.admin-order-action-dialog input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  accent-color: var(--admin-accent);
+}
+
+.admin-order-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 15px 16px;
+  margin: 0 0 14px;
+  border: 1px solid var(--admin-accent);
+  border-radius: var(--admin-radius);
+  background: var(--admin-accent-soft);
+}
+
+.admin-order-selection-bar > div:first-child {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  font-size: 0.8125rem;
+}
+
+.admin-order-selection-bar > div:first-child > span {
+  color: var(--admin-muted);
+  font-size: 0.6875rem;
+}
+
+.admin-order-select-all,
+.admin-order-text-button {
+  min-height: 36px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-accent);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-order-selection-actions,
+.admin-order-dialog-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.admin-order-selection-actions .button {
+  min-height: 44px;
+  padding: 9px 14px;
+  white-space: nowrap;
+}
+
+.admin-order-checkbox-target {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  min-width: 36px;
+  cursor: pointer;
+}
+
+.admin-work-order-table th:first-child,
+.admin-work-order-table td:first-child {
+  width: 44px;
+  padding: 4px 6px;
+}
+
+.admin-work-order-table .is-selected {
+  background: var(--admin-accent-soft);
+}
+
+.admin-work-order-table .admin-work-order-identity {
+  min-width: 130px;
+}
+
+.admin-order-date {
+  display: block;
+  margin-top: 5px;
+  color: var(--admin-muted);
+  font-size: 0.6875rem;
+}
+
+.admin-work-order-table .admin-row-actions {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.admin-work-order-table .admin-row-actions > a {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.admin-order-bulk-report,
+.admin-order-persistence {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  font-size: 0.8125rem;
+}
+
+.admin-order-bulk-report > p,
+.admin-order-persistence p {
+  margin: 0;
+}
+
+.admin-order-bulk-report details {
+  margin-top: 8px;
+}
+
+.admin-order-bulk-report summary {
+  min-height: 36px;
+  display: list-item;
+  align-content: center;
+  cursor: pointer;
+  color: var(--admin-accent);
+}
+
+.admin-order-bulk-report ul {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-order-bulk-report li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+}
+
+.admin-order-bulk-report li a {
+  color: var(--admin-accent);
+  font-weight: 600;
+}
+
+.admin-order-bulk-report li span {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+.admin-order-persistence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-color: var(--admin-warning);
+  background: var(--admin-warning-soft);
+}
+
+.admin-order-action-dialog {
+  width: min(560px, calc(100% - 28px));
+  max-width: 560px;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+}
+
+.admin-order-action-dialog .dialog-inner {
+  padding: 24px;
+}
+
+.admin-order-action-dialog .dialog-heading {
+  margin-bottom: 20px;
+}
+
+.admin-order-action-dialog .dialog-heading h2 {
+  font-size: 1.125rem;
+  line-height: 1.35;
+}
+
+.admin-order-action-form {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-order-action-form input:not([type='checkbox']),
+.admin-order-action-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.admin-order-dialog-intro,
+.admin-order-eligibility {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.admin-order-confirm-delivery {
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface-muted);
+  line-height: 1.5;
+}
+
+.admin-order-dialog-actions {
+  padding-top: 6px;
+}
+
+.admin-order-dialog-actions .button {
+  min-height: 44px;
+  padding: 10px 16px;
+}
+
+.admin-order-workspace :is(a, button, input, select):focus-visible,
+.admin-order-action-dialog :is(a, button, input, select):focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 3px;
+}
+
+@media (min-width: 1500px) {
+  .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
+    grid-template-columns:
+      minmax(230px, 1.5fr) 1fr 1fr minmax(130px, 0.8fr)
+      minmax(130px, 0.8fr) auto;
+  }
+}
+
+@media (max-width: 1000px) {
+  .admin-work-order-table th,
+  .admin-work-order-table td {
+    padding: 12px 10px;
+  }
+  .admin-work-order-table .admin-row-actions .admin-order-next-action {
+    padding: 0 8px;
+    font-size: 0.6875rem;
+  }
+}
+
+@media (max-width: 1199px) {
+  .admin-order-workspace .admin-work-order-table tr {
+    position: relative;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-order-selection-cell {
+    position: absolute;
+    top: 9px;
+    right: 8px;
+    width: 44px;
+    padding: 0;
+    border: 0;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-work-order-identity {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-column: 1 / -1;
+    justify-content: start;
+    align-content: start;
+    gap: 5px;
+    min-width: 0;
+    padding-right: 44px;
+    text-align: left;
+  }
+
+  .admin-order-workspace
+    .admin-work-order-table
+    .admin-work-order-identity
+    > .admin-cell-label {
+    display: none;
+  }
+
+  .admin-order-workspace
+    .admin-work-order-table
+    .admin-work-order-identity
+    > :is(strong, small) {
+    display: block;
+    grid-area: auto;
+    margin: 0;
+    max-width: none;
+    text-align: left;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-order-reference {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .admin-order-workspace
+    .admin-work-order-table
+    .admin-work-order-identity
+    > .admin-order-contents {
+    display: -webkit-box;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-work-order-customer {
+    grid-column: 1 / -1;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-work-order-actions {
+    grid-column: 1 / -1;
+  }
+
+  .admin-order-workspace
+    .admin-work-order-table
+    .admin-work-order-actions
+    .admin-row-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-order-workspace .admin-filter-result {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .admin-order-filter-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-order-workspace .admin-order-filter-bar .admin-order-search-field,
+  .admin-order-workspace .admin-order-filter-bar .admin-filter-fields .button {
+    grid-column: 1 / -1;
+  }
+  .admin-order-workspace .admin-work-order-table th,
+  .admin-order-workspace .admin-work-order-table td {
+    width: 100%;
+  }
+  .admin-order-workspace .admin-work-order-table td:nth-child(2) {
+    grid-column: auto;
+  }
+  .admin-order-selection-bar {
+    align-items: stretch;
+  }
+  .admin-order-selection-actions {
+    width: 100%;
+  }
+  .admin-order-selection-actions .button {
+    flex: 1;
+  }
+  .admin-order-selection-actions > .admin-order-text-button {
+    width: 100%;
+  }
+  .admin-order-operator small {
+    padding: 0;
+  }
+}
+
+@media (max-width: 479px) {
+  .admin-order-workspace .admin-work-order-table tbody {
+    grid-template-columns: 1fr;
+  }
+  .admin-order-operator label {
+    width: 100%;
+  }
+  .admin-order-action-dialog .dialog-inner {
+    padding: 20px;
+  }
+  .admin-order-dialog-actions > .button {
+    flex: 1;
+  }
+}

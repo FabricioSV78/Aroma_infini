@@ -1,47 +1,47 @@
 // Textos y datos editables de Nosotros y Contacto.
+// El relato de origen de Nosotros es provisional, autorizado por el cliente
+// mientras se confirma la historia real de la marca. Sustituirlo antes de publicar.
 export const aboutPageContent = {
-  title: 'Aroma Infini, una forma de elegir perfume',
-  introduction:
-    'Reunimos perfumes de distintas casas para que conozcas sus notas, perfiles y presentaciones con calma.',
-  image: {
-    desktop: '/images/editorial-essential-v3-1536.webp',
-    desktopSet:
-      '/images/editorial-essential-v3-480.webp 480w, /images/editorial-essential-v3-960.webp 960w, /images/editorial-essential-v3-1536.webp 1536w',
-    mobileSet:
-      '/images/editorial-essential-v3-mobile-480.webp 480w, /images/editorial-essential-v3-mobile-780.webp 780w',
-    alt: 'Frasco de perfume sobre una superficie de piedra junto a una pieza de madera.',
-    caption: 'Aroma Infini',
+  hero: {
+    eyebrow: 'Aroma Infini · Perfumería multimarca',
+    title: 'Distintas casas. Un perfume que sientas tuyo',
+    introduction:
+      'Un lugar donde mirar más allá del frasco y reconocer lo que te gusta.',
+    image: {
+      desktop: '/images/editorial-essential-v3-1536.webp',
+      desktopSet:
+        '/images/editorial-essential-v3-480.webp 480w, /images/editorial-essential-v3-960.webp 960w, /images/editorial-essential-v3-1536.webp 1536w',
+      mobileSet:
+        '/images/editorial-essential-v3-mobile-480.webp 480w, /images/editorial-essential-v3-mobile-780.webp 780w',
+      alt: 'Frasco de perfume sobre piedra clara, junto a una pieza de madera.',
+    },
   },
-  approach: {
+  story: {
+    eyebrow: 'Nuestra historia',
+    title: 'La curiosidad como punto de partida',
+    paragraphs: [
+      'Aroma Infini nace de una idea sencilla: elegir un perfume puede ser tan personal como llevarlo. Queríamos que la búsqueda comenzara por la curiosidad, no por una respuesta predeterminada.',
+      'Por eso reunimos distintas firmas en un mismo lugar y dejamos espacio para explorar sus matices con calma. Cada persona reconoce algo diferente en un aroma; esa diferencia es parte del encanto.',
+    ],
+    image: {
+      src: '/images/olfactory-santal.webp',
+      alt: 'Virutas de madera y vainas de cardamomo sobre una superficie de piedra.',
+    },
+  },
+  proposal: {
     eyebrow: 'Nuestra propuesta',
-    title: 'Información para decidir',
+    title: 'Un espacio para elegir con criterio',
     description:
-      'Cada ficha explica cómo se siente el perfume y muestra sus opciones de compra.',
+      'Cada ficha reúne el perfil del perfume, sus presentaciones, precio y disponibilidad. Puedes recorrer el catálogo a tu ritmo y volver a las opciones que más te interesen.',
+    primaryAction: 'Explorar perfumes',
+    secondaryAction: 'Conocer las marcas',
   },
-  principles: [
-    {
-      number: '01',
-      title: 'Explora',
-      description: 'Conoce las casas y sus colecciones.',
-    },
-    {
-      number: '02',
-      title: 'Compara',
-      description: 'Compara notas, intensidad, tamaños y precios.',
-    },
-    {
-      number: '03',
-      title: 'Elige a tu ritmo',
-      description: 'Guarda tus favoritos y vuelve cuando quieras.',
-    },
-  ],
-  action: 'Explorar perfumes',
 } as const
 
 export const contactPageContent = {
-  title: '¿En qué podemos ayudarte?',
+  title: 'Contacto',
   introduction:
-    'Consulta información de pedidos, envíos o productos, o escríbenos por WhatsApp.',
+    'Estamos para ayudarte con tu pedido, una entrega o un perfume.',
   direct: {
     eyebrow: 'Atención directa',
     title: 'Hablemos por WhatsApp',
@@ -49,12 +49,10 @@ export const contactPageContent = {
     action: 'Escribir por WhatsApp',
   },
   guide: {
-    eyebrow: 'Enlaces útiles',
-    title: 'Ve directo a la información',
+    title: 'Accesos rápidos',
   },
   topics: [
-    { title: 'Elegir un perfume', to: '/tienda' },
-    { title: 'Seguir un pedido', to: '/seguir-pedido' },
+    { title: 'Seguir pedido', to: '/seguir-pedido' },
     { title: 'Envíos y entregas', to: '/envios' },
   ],
 } as const

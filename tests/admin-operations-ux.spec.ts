@@ -1,4 +1,53 @@
 import { expect, test } from '@playwright/test'
+import { answerAdminNotice } from './admin-notice-fixtures'
+
+test('El resumen permite abrir un estado de pedidos desde todo el indicador', async ({
+  page,
+}) => {
+  await page.goto('/admin')
+  const indicator = page
+    .locator('.admin-order-overview dl > div')
+    .filter({ hasText: 'Nuevos' })
+  await indicator.click({ position: { x: 8, y: 8 } })
+  await expect(page).toHaveURL(/\/admin\/pedidos\?preparacion=received$/)
+})
+
+for (const width of [768, 1024]) {
+  test(`La edición de entrega conserva campos legibles a ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1024 })
+    await page.goto('/admin/pedidos/AI-210926-01')
+    await page
+      .getByRole('button', { name: 'Completar datos de entrega' })
+      .click()
+    const geometry = await page.evaluate(() => {
+      const layout = document.querySelector('.admin-order-layout')
+      const primary = document.querySelector('.admin-order-primary')
+      const delivery = document.querySelector(
+        '.admin-order-primary > section:last-child',
+      )
+      const editor = document.querySelector('.admin-delivery-editor')
+      const input = document.querySelector<HTMLInputElement>(
+        '.admin-delivery-editor input',
+      )
+      return {
+        layout: layout ? getComputedStyle(layout).display : '',
+        primary: primary ? getComputedStyle(primary).display : '',
+        layoutWidth: layout?.getBoundingClientRect().width ?? 0,
+        deliveryWidth: delivery?.getBoundingClientRect().width ?? 0,
+        editorWidth: editor?.getBoundingClientRect().width ?? 0,
+        editorColumns: editor
+          ? getComputedStyle(editor).gridTemplateColumns
+          : '',
+        nameWidth: input?.getBoundingClientRect().width ?? 0,
+      }
+    })
+    expect(geometry.nameWidth, JSON.stringify(geometry)).toBeGreaterThanOrEqual(
+      220,
+    )
+  })
+}
 
 test('Clientes permite buscar y abrir solo los pedidos de ese cliente', async ({
   page,
@@ -22,8 +71,8 @@ test('Un pedido heredado conserva ubicación al completar la entrega y se puede 
   await page.getByRole('button', { name: 'Completar datos de entrega' }).click()
 
   const editor = page.locator('.admin-delivery-editor')
-  await expect(editor.getByLabel('Departamento')).toHaveValue('lima')
-  await expect(editor.getByLabel('Provincia')).toHaveValue('1501')
+  await expect(editor.getByLabel('Zona de entrega')).toHaveValue('lima')
+  await expect(editor.getByLabel('Provincia')).toHaveCount(0)
   await expect(
     editor.getByLabel('Distrito').locator('option:checked'),
   ).toHaveText('San Isidro')
@@ -45,12 +94,33 @@ test('Un pedido heredado conserva ubicación al completar la entrega y se puede 
   )
 
   const status = page.getByRole('combobox', { name: 'Preparación del pedido' })
+  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
   await status.selectOption('preparing')
   await page.getByRole('button', { name: 'Guardar estado' }).click()
   await expect(page.getByText('Estado actualizado.')).toBeVisible()
   await status.selectOption('shipped')
   await page.getByRole('button', { name: 'Guardar estado' }).click()
+  await answerAdminNotice(page, 'accept')
   await expect(page.getByText('Enviado', { exact: true }).first()).toBeVisible()
+})
+
+test('Un pedido histórico fuera de cobertura conserva su destino al corregir el contacto', async ({
+  page,
+}) => {
+  await page.goto('/admin/pedidos/AI-150926-01')
+  await page.getByRole('button', { name: 'Completar datos de entrega' }).click()
+  const editor = page.locator('.admin-delivery-editor')
+  await expect(editor).toContainText(
+    'destino histórico fuera de la cobertura actual',
+  )
+  await expect(editor.getByLabel('Zona de entrega')).toHaveCount(0)
+  await editor.getByLabel('Nombre del cliente').fill('Ana Valdez')
+  await editor.getByLabel('Correo electrónico').fill('ana@ejemplo.com')
+  await editor.getByLabel('Teléfono').fill('999888777')
+  await editor.getByLabel('Dirección exacta').fill('Av. Los Cedros 123')
+  await editor.getByRole('button', { name: 'Guardar datos de entrega' }).click()
+  await expect(page.getByText('Datos de entrega guardados.')).toBeVisible()
+  await expect(page.locator('.admin-page--order-detail')).toContainText('Cayma')
 })
 
 test('Marcas genera una URL entendible desde el nombre', async ({ page }) => {

@@ -75,9 +75,15 @@
     color 180ms ease,
     transform 220ms var(--ease-editorial);
 }
-.product-favorite:is(:hover, :focus-visible) {
+.product-favorite:not(:disabled):focus-visible {
   background: transparent;
-  transform: scale(1.08);
+  color: var(--color-brand);
+}
+@media (hover: hover) and (pointer: fine) {
+  .product-favorite:not(:disabled):hover {
+    background: transparent;
+    color: var(--color-brand);
+  }
 }
 .product-favorite svg {
   width: 19px;

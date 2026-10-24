@@ -1,3 +1,4 @@
+import { variantLabel } from '../../domain/product-type'
 import type {
   AdminOrderPaymentStatus,
   AdminOrderStatus,
@@ -31,7 +32,8 @@ export interface AdminInventoryVariant {
   productId: string
   productName: string
   variantId: string
-  ml: number
+  ml: number | null
+  variantLabel?: string
   stock: number
   threshold: number
   tone: Extract<AdminTone, 'success' | 'warning' | 'danger'>
@@ -49,6 +51,7 @@ export function getVariantInventory(
     productName: record.product.name,
     variantId: variant.id,
     ml: variant.ml,
+    variantLabel: variantLabel(variant),
     stock: variant.stock,
     threshold: record.lowStockThreshold,
     tone: outOfStock ? 'danger' : lowStock ? 'warning' : 'success',
@@ -72,13 +75,12 @@ export function getProductInventory(record: AdminProduct) {
 
 export function getInventoryAlerts(records: readonly AdminProduct[]) {
   return records
-    .filter((record) => record.active)
     .flatMap((record) => getProductInventory(record).alerts)
     .sort(
       (first, second) =>
         first.stock - second.stock ||
         first.productName.localeCompare(second.productName, 'es') ||
-        first.ml - second.ml,
+        (first.ml ?? 0) - (second.ml ?? 0),
     )
 }
 

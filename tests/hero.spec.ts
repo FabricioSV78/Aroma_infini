@@ -1,5 +1,38 @@
 import { expect, test } from '@playwright/test'
 
+test('El hero cambia automáticamente cada 3,8 segundos cuando está visible', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.addInitScript(() => {
+    const originalSetInterval = window.setInterval.bind(window)
+    const timing = window as Window & { heroRotationDelay?: number }
+    window.setInterval = ((
+      handler: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout && timeout >= 3000 && timeout <= 5000)
+        timing.heroRotationDelay = timeout
+      return originalSetInterval(handler, timeout, ...args)
+    }) as typeof window.setInterval
+  })
+  await page.goto('/')
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { heroRotationDelay?: number }).heroRotationDelay,
+      ),
+    )
+    .toBe(3800)
+  await expect(page.locator('.hero-slide.is-active')).toHaveAttribute(
+    'data-campaign',
+    'hero-v5-silence',
+    { timeout: 5000 },
+  )
+})
+
 test('La segunda campaña espera a la imagen prioritaria y se revela solo cuando está preparada', async ({
   page,
 }) => {

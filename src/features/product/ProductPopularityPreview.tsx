@@ -28,14 +28,19 @@ export function ProductPopularityPreview({
   useEffect(() => {
     const gallery = document.querySelector('.product-gallery')
     if (!gallery) return
+    const scrollTarget = gallery.closest('.dialog-inner') ?? window
     const updatePosition = () => {
-      setGalleryPassed(gallery.getBoundingClientRect().bottom <= 80)
+      const top =
+        scrollTarget instanceof HTMLElement
+          ? scrollTarget.getBoundingClientRect().top
+          : 0
+      setGalleryPassed(gallery.getBoundingClientRect().bottom <= top + 80)
     }
     updatePosition()
-    window.addEventListener('scroll', updatePosition, { passive: true })
+    scrollTarget.addEventListener('scroll', updatePosition, { passive: true })
     window.addEventListener('resize', updatePosition)
     return () => {
-      window.removeEventListener('scroll', updatePosition)
+      scrollTarget.removeEventListener('scroll', updatePosition)
       window.removeEventListener('resize', updatePosition)
     }
   }, [])
@@ -55,14 +60,15 @@ export function ProductPopularityPreview({
           return
       }
       dismissTimer.current = window.setTimeout(() => setDismissed(true), 7000)
-      window.removeEventListener('scroll', startWhenVisible)
+      scrollTarget.removeEventListener('scroll', startWhenVisible)
       window.removeEventListener('resize', startWhenVisible)
     }
-    window.addEventListener('scroll', startWhenVisible, { passive: true })
+    const scrollTarget = noticeRef.current?.closest('.dialog-inner') ?? window
+    scrollTarget.addEventListener('scroll', startWhenVisible, { passive: true })
     window.addEventListener('resize', startWhenVisible)
     startWhenVisible()
     return () => {
-      window.removeEventListener('scroll', startWhenVisible)
+      scrollTarget.removeEventListener('scroll', startWhenVisible)
       window.removeEventListener('resize', startWhenVisible)
     }
   }, [ready, galleryPassed, dismissed])

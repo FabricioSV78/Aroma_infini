@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Icon } from '../../components/ui/Icon'
 import { NoteBottleIcon } from '../../components/ui/NoteBottleIcon'
 import type { ProductDetail } from '../../types/catalog'
+import { assetSource } from '../../services/asset-source'
 
 interface OlfactoryProfileProps {
   family: string
@@ -35,7 +36,7 @@ export function OlfactoryProfile({
       {image ? (
         <figure className="olfactory-profile-visual">
           <img
-            src={image}
+            src={assetSource(image)}
             alt=""
             width={960}
             height={1200}
@@ -47,9 +48,7 @@ export function OlfactoryProfile({
 
       <div className="olfactory-profile-content">
         <header className="olfactory-profile-heading">
-          <p className="olfactory-profile-kicker">
-            Perfil olfativo <span aria-hidden="true">·</span> {detail.type}
-          </p>
+          <p className="olfactory-profile-kicker">Perfil olfativo</p>
           <h2 className="olfactory-profile-family">
             {editor?.family ?? family}
           </h2>

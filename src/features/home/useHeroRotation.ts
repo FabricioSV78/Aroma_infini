@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useState, type RefObject } from 'react'
 
+export const HERO_SLIDE_INTERVAL_MS = 3800
+
 interface HeroRotationOptions {
   element: RefObject<HTMLElement | null>
   ready: boolean
@@ -52,7 +54,7 @@ export function useHeroRotation({
   useEffect(
     function scheduleRotation() {
       if (!playing) return
-      const timer = window.setInterval(() => advance(), 3000)
+      const timer = window.setInterval(() => advance(), HERO_SLIDE_INTERVAL_MS)
       return function cancelRotation() {
         window.clearInterval(timer)
       }

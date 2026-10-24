@@ -1,15 +1,18 @@
+import { variantLabel } from '../../domain/product-type'
 import { formatBrandName } from '../../utils/brand-name'
-import { useState, type FormEvent } from 'react'
+import { useState, useSyncExternalStore, type FormEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
+import { EmptyState } from '../../components/ui/EmptyState'
 import {
   getPeruDepartmentLabel,
   getPeruDistrictLabel,
   getPeruDistrictOptions,
-  getPeruProvinceLabel,
   getPeruProvinceOptions,
-  isValidPeruLocation,
+  getPeruProvinceLabel,
   peruDepartments,
+  getDeliveryArea,
+  deliveryAreas,
 } from '../../content/peru'
 import {
   accountStatusLabels,
@@ -19,6 +22,8 @@ import {
 } from '../../services/account-service'
 import { formatPEN } from '../../services/currency'
 import { imageSource, imageSourceSet } from '../../services/image-source'
+import { isShippingDestinationEnabled } from '../../services/shipping-rates'
+import { shippingService } from '../../services/shipping-service'
 import { useFavorites } from '../favorites/favorites-context'
 import { FavoritesCollection } from '../favorites/FavoritesCollection'
 import { AccountOrderTimeline } from './AccountOrderTimeline'
@@ -134,6 +139,10 @@ export function AccountDataPage() {
       <form
         className="account-form"
         onSubmit={submit}
+        onInput={(event) => {
+          if (event.target instanceof HTMLInputElement)
+            event.target.setCustomValidity('')
+        }}
         data-scroll-reveal="copy"
       >
         <div className="account-fields">
@@ -195,50 +204,106 @@ export function AccountDataPage() {
 
 export function AccountAddressesPage() {
   const { address, saveAddress, removeAddress } = useAccount()
+  const shipping = useSyncExternalStore(
+    shippingService.subscribe,
+    shippingService.getSnapshot,
+  )
+  const provincesEnabled = shipping.provinceShippingEnabled
   const [form, setForm] = useState<AccountAddress>(
     address ?? createDemoAddress(),
   )
   const [message, setMessage] = useState('')
-  const provinceOptions = getPeruProvinceOptions(form.department)
-  const districtOptions = getPeruDistrictOptions(form.province)
+  const [addressError, setAddressError] = useState(false)
+  const savedArea = getDeliveryArea(form.department)
+  const area = savedArea?.province === form.province ? savedArea : undefined
+  const departmentValue = provincesEnabled
+    ? peruDepartments.some((department) => department.value === form.department)
+      ? form.department
+      : ''
+    : (area?.department ?? '')
+  const provinceOptions = provincesEnabled
+    ? getPeruProvinceOptions(departmentValue)
+    : []
+  const provinceValue = provincesEnabled
+    ? provinceOptions.some((province) => province.value === form.province)
+      ? form.province
+      : ''
+    : (area?.province ?? '')
+  const districtOptions = provinceValue
+    ? getPeruDistrictOptions(provinceValue)
+    : []
+  const districtValue = districtOptions.some(
+    (district) => district.value === form.district,
+  )
+    ? form.district
+    : ''
 
-  function update(field: keyof AccountAddress, value: string) {
+  function update(
+    field: Exclude<keyof AccountAddress, 'department' | 'province'>,
+    value: string,
+  ) {
     setMessage('')
-    setForm((current) =>
-      field === 'department'
-        ? { ...current, department: value, province: '', district: '' }
-        : field === 'province'
-          ? { ...current, province: value, district: '' }
-          : { ...current, [field]: value },
-    )
+    setAddressError(false)
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+  function updateArea(department: string) {
+    const selected = provincesEnabled ? undefined : getDeliveryArea(department)
+    setForm((current) => ({
+      ...current,
+      department: provincesEnabled ? department : (selected?.department ?? ''),
+      province: selected?.province ?? '',
+      district: '',
+    }))
+    setMessage('')
+    setAddressError(false)
+  }
+  function updateProvince(province: string) {
+    setForm((current) => ({ ...current, province, district: '' }))
+    setMessage('')
+    setAddressError(false)
   }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!reportTrimmedValidity(event.currentTarget)) return
-    if (!isValidPeruLocation(form.department, form.province, form.district)) {
-      setMessage('Selecciona un departamento, provincia y distrito válidos.')
+    if (
+      !isShippingDestinationEnabled(
+        shipping,
+        form.department,
+        form.province,
+        form.district,
+      )
+    ) {
+      setAddressError(true)
+      setMessage(
+        provincesEnabled
+          ? 'Selecciona un departamento, provincia y distrito válidos.'
+          : 'Selecciona una zona y un distrito de Lima o Callao válidos.',
+      )
       return
     }
     saveAddress({
       id: form.id,
       label: form.label.trim(),
       recipient: form.recipient.trim(),
-      department: form.department.trim(),
-      province: form.province.trim(),
+      department: form.department,
+      province: form.province,
       district: form.district.trim(),
       street: form.street.trim(),
       reference: form.reference.trim(),
     })
+    setAddressError(false)
     setMessage('Dirección guardada durante esta sesión.')
   }
   function remove() {
     removeAddress()
+    setAddressError(false)
     setMessage('Dirección eliminada.')
   }
   function restore() {
     const restored = createDemoAddress()
     setForm(restored)
     saveAddress(restored)
+    setAddressError(false)
     setMessage('Dirección restaurada.')
   }
 
@@ -250,12 +315,19 @@ export function AccountAddressesPage() {
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Entrega</p>
         <h1 id="account-address-title">Direcciones</h1>
-        <p>Revisa y actualiza tus datos de entrega.</p>
+        <p>
+          {provincesEnabled
+            ? 'Revisa y actualiza tus datos de entrega.'
+            : 'Revisa y actualiza tus datos de entrega en Lima o Callao.'}
+        </p>
       </header>
       {!address ? (
-        <div className="account-empty" data-scroll-reveal="copy">
-          <h2>No hay una dirección guardada</h2>
-          <p>Puedes volver a añadir una dirección cuando la necesites.</p>
+        <EmptyState
+          className="account-empty"
+          title="No hay una dirección guardada"
+          description="Puedes volver a añadir una dirección cuando la necesites."
+          icon="truck"
+        >
           <button
             className="button button--secondary"
             type="button"
@@ -263,13 +335,29 @@ export function AccountAddressesPage() {
           >
             Añadir dirección
           </button>
-        </div>
+        </EmptyState>
       ) : (
         <form
           className="account-form"
           onSubmit={submit}
+          onInput={(event) => {
+            if (event.target instanceof HTMLInputElement)
+              event.target.setCustomValidity('')
+          }}
           data-scroll-reveal="copy"
         >
+          {!isShippingDestinationEnabled(
+            shipping,
+            address.department,
+            address.province,
+            address.district,
+          ) ? (
+            <p className="account-form-note" role="status">
+              {provincesEnabled
+                ? 'La dirección guardada necesita una ubicación válida. Confirma el departamento, provincia, distrito, calle y referencia antes de guardar.'
+                : 'La dirección guardada está fuera de la cobertura actual. Elige Lima o Callao y confirma la calle y referencia antes de guardar.'}
+            </p>
+          ) : null}
           <div className="account-fields">
             <div className="account-field">
               <label htmlFor="account-address-label">
@@ -294,46 +382,60 @@ export function AccountAddressesPage() {
               />
             </div>
             <div className="account-field">
-              <label htmlFor="account-department">Departamento</label>
+              <label htmlFor="account-zone">
+                {provincesEnabled ? 'Departamento' : 'Zona de entrega'}
+              </label>
               <select
-                id="account-department"
-                value={form.department}
-                onChange={(event) => update('department', event.target.value)}
+                id="account-zone"
+                value={departmentValue}
+                onChange={(event) => updateArea(event.target.value)}
                 required
               >
-                <option value="">Selecciona un departamento</option>
-                {peruDepartments.map((department) => (
-                  <option key={department.value} value={department.value}>
-                    {department.label}
+                <option value="">
+                  {provincesEnabled
+                    ? 'Selecciona un departamento'
+                    : 'Selecciona una zona'}
+                </option>
+                {(provincesEnabled
+                  ? peruDepartments.map((option) => ({
+                      department: option.value,
+                      label: option.label,
+                    }))
+                  : deliveryAreas
+                ).map((option) => (
+                  <option key={option.department} value={option.department}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="account-field">
-              <label htmlFor="account-province">Provincia</label>
-              <select
-                id="account-province"
-                value={form.province}
-                onChange={(event) => update('province', event.target.value)}
-                required
-                disabled={!form.department}
-              >
-                <option value="">Selecciona una provincia</option>
-                {provinceOptions.map((province) => (
-                  <option key={province.value} value={province.value}>
-                    {province.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {provincesEnabled ? (
+              <div className="account-field">
+                <label htmlFor="account-province">Provincia</label>
+                <select
+                  id="account-province"
+                  value={provinceValue}
+                  onChange={(event) => updateProvince(event.target.value)}
+                  required
+                  disabled={!departmentValue}
+                >
+                  <option value="">Selecciona una provincia</option>
+                  {provinceOptions.map((province) => (
+                    <option key={province.value} value={province.value}>
+                      {province.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="account-field">
               <label htmlFor="account-district">Distrito</label>
               <select
                 id="account-district"
-                value={form.district}
+                value={districtValue}
                 onChange={(event) => update('district', event.target.value)}
                 required
-                disabled={!form.province}
+                disabled={!provinceValue}
               >
                 <option value="">Selecciona un distrito</option>
                 {districtOptions.map((district) => (
@@ -374,7 +476,11 @@ export function AccountAddressesPage() {
           </div>
         </form>
       )}
-      <p className="account-form-message" role="status" aria-live="polite">
+      <p
+        className="account-form-message"
+        role={addressError ? 'alert' : 'status'}
+        aria-live={addressError ? 'assertive' : 'polite'}
+      >
         {message}
       </p>
     </section>
@@ -420,13 +526,16 @@ export function AccountOrdersPage() {
           ))}
         </ul>
       ) : (
-        <div className="account-empty" data-scroll-reveal="copy">
-          <h2>Aún no hay pedidos</h2>
-          <p>Cuando completes el checkout con esta cuenta aparecerán aquí.</p>
+        <EmptyState
+          className="account-empty"
+          title="Aún no hay pedidos"
+          description="Cuando completes el checkout con esta cuenta aparecerán aquí."
+          icon="orders"
+        >
           <Link className="text-link" to="/tienda">
             Explorar perfumes <Icon name="arrow" />
           </Link>
-        </div>
+        </EmptyState>
       )}
     </section>
   )
@@ -501,7 +610,7 @@ export function AccountOrderDetailPage() {
                       </Link>
                     </strong>
                     <small>
-                      {line.ml} ml · Cant. {line.quantity}
+                      {variantLabel(line)} · Cant. {line.quantity}
                     </small>
                   </div>
                 </div>
@@ -597,7 +706,11 @@ export function AccountPaymentsPage() {
             ))}
           </ul>
         ) : (
-          <p>No hay pagos registrados.</p>
+          <EmptyState title="No hay pagos registrados" headingLevel="h3">
+            <Link className="text-link" to="/cuenta/pedidos">
+              Ver mis pedidos <Icon name="arrow" />
+            </Link>
+          </EmptyState>
         )}
       </section>
     </section>

@@ -59,7 +59,7 @@ test('Favoritos conserva el formato de cuenta activa y la vista independiente qu
     page.locator('.account-sidebar').getByRole('link', { name: 'Favoritos' }),
   ).toHaveAttribute('aria-current', 'page')
 
-  await page.getByRole('link', { name: 'Explorar perfumes' }).click()
+  await page.getByRole('link', { name: 'Explorar tienda' }).click()
   await page.getByRole('link', { name: 'Ver Bois Clair' }).first().click()
   await page.getByRole('button', { name: 'Guardar', exact: true }).click()
   await page.getByRole('link', { name: 'Favoritos, 1 guardado' }).click()

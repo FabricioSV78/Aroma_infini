@@ -1,6 +1,7 @@
 import { adminService } from './admin-service'
 import type { ShippingSettings } from '../types/shipping'
 import { localStorefrontRepository } from './storefront-repository'
+export { getAreaBaseShipping } from './shipping-rates'
 
 /** Public read model for shipping pages; the admin store is an implementation detail. */
 export interface ShippingReadService {

@@ -74,6 +74,7 @@ test('Menú móvil: teclado, foco contenido y retorno con Escape', async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await page.keyboard.press('Tab')
   await expect(page.getByText('Saltar al contenido')).toBeFocused()
   await page.keyboard.press('Enter')
@@ -105,7 +106,7 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
 }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
-  await page.getByLabel('Perfume o marca').fill('Bois Clair & Forme')
+  await page.getByLabel('Producto o marca').fill('Bois Clair & Forme')
   await page.getByRole('button', { name: 'Buscar', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: 'No encontramos coincidencias' }),
@@ -129,9 +130,13 @@ test('Buscador, enlaces informativos y navegación del hero', async ({
   const cartDialog = page.getByRole('dialog', { name: 'Tu carrito' })
   await expect(cartDialog).toBeVisible()
   await cartDialog.getByRole('link', { name: /Ver carrito/ }).click()
-  await expect(page.getByRole('heading', { name: 'Tu carrito' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Tu carrito', exact: true }),
+  ).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Tu carrito' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Tu carrito', exact: true }),
+  ).toBeVisible()
 })
 
 test('Movimiento reducido y ayuda accesible', async ({ page }) => {

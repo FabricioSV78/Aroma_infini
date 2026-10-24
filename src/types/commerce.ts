@@ -26,9 +26,12 @@ export interface PurchasedLine {
   variantId: string
   brand: string
   name: string
-  ml: number
+  ml: number | null
+  variantLabel?: string
   quantity: number
   unitPriceCents: number
+  /** Price before a product offer; saved only when that offer reduced this line. */
+  originalUnitPriceCents?: number
 }
 
 export interface OrderTotals {

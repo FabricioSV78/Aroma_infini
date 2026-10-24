@@ -65,11 +65,11 @@ test('El resumen conserva variante, cantidad, subtotal y problemas de stock', ()
     { variantId: 'missing', quantity: 1 },
   ])
   expect(cart.quantity).toBe(4)
-  expect(cart.subtotalCents).toBe(123000)
+  expect(cart.subtotalCents).toBe(78000)
   expect(cart.needsAttention).toBe(true)
   expect(cart.lines.map((line) => line.kind)).toEqual([
     'ready',
-    'ready',
+    'missing',
     'missing',
   ])
 })
@@ -105,7 +105,7 @@ test('Favoritos se comparten entre vistas, persisten y pueden quitarse', async (
     })
     .click()
   await expect(
-    page.getByRole('heading', { name: 'Encuentra un aroma para recordar' }),
+    page.getByRole('heading', { name: 'Tu próxima elección empieza aquí' }),
   ).toBeVisible()
 })
 

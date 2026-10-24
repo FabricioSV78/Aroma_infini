@@ -135,7 +135,7 @@ test('El navbar da acceso a las páginas públicas y las anclas existentes', asy
     '/tienda',
     '/marcas',
     '/tienda?marca=atelier-01',
-    '/tienda?seleccion=destacados',
+    '/#encuentra-tu-perfume',
     '/nosotros',
     '/contacto',
     '/seguir-pedido',
@@ -242,11 +242,14 @@ test('Móvil: todos los grupos, foco y anclas desde otra página', async ({
     if ((await trigger.getAttribute('aria-expanded')) === 'false')
       await trigger.click()
     for (const link of group.columns.flatMap((column) => column.links)) {
-      await expect(
-        page
-          .locator(`#mobile-group-${group.id}`)
-          .getByRole('link', { name: link.label, exact: true }),
-      ).toBeVisible()
+      const menuLink = page
+        .locator(`#mobile-group-${group.id}`)
+        .getByRole('link', { name: link.label, exact: true })
+      if (link.to === '/tienda?tipo=complemento') {
+        await expect(menuLink).toHaveCount(0)
+      } else {
+        await expect(menuLink).toBeVisible()
+      }
     }
   }
   const aromaTrigger = dialog.getByRole('button', {

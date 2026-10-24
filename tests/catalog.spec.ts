@@ -15,7 +15,7 @@ test('Los enlaces anteriores conservan filtros al abrir la tienda', async ({
 }) => {
   await page.goto('/catalogo?marca=forme&orden=precio-asc')
   await expect(page).toHaveURL('/tienda?marca=forme&orden=precio-asc')
-  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(page.locator('.product-card')).toHaveCount(4)
 })
 
 test('Los cuatro perfumes añadidos tienen ficha y se pueden añadir al carrito', async ({
@@ -49,22 +49,52 @@ test('Los cuatro perfumes añadidos tienen ficha y se pueden añadir al carrito'
 test('Consulta: facetas, acentos, stock, precios y paginación', () => {
   const run = (query: string) =>
     queryCatalog(readCatalogQuery(new URLSearchParams(query)))
+  expect(readCatalogQuery(new URLSearchParams()).order).toBe('mas-vendidos')
+  expect(readCatalogQuery(new URLSearchParams('orden=novedades')).order).toBe(
+    'mas-vendidos',
+  )
+  expect(
+    run('')
+      .items.slice(0, 4)
+      .map((product) => product.id),
+  ).toEqual(['cedre', 'petale', 'sillage', 'neroli'])
   expect(run('q=petale').items[0].name).toBe('Pétale Nu')
   expect(
     run('marca=atelier-01&marca=forme&genero=mujer').items.map((p) => p.id),
   ).toEqual(['petale'])
-  expect(run('min=600&max=630').items.map((p) => p.id)).toEqual(['petale'])
+  expect(run('min=600&max=630').items.map((p) => p.id)).toEqual([
+    'petale',
+    'rose-satin',
+  ])
   expect(run('orden=precio-asc').items.map((p) => p.id)).toEqual([
     'cedre',
+    'cedre-lumiere',
+    'bois-de-brume',
     'neroli',
+    'bergamote-soleil',
     'petale',
-    'ambre',
+    'rose-satin',
     'iris',
+    'fleur-de-soie',
     'sillage',
+    'the-sauvage',
     'figue',
-    'santal',
   ])
-  expect(run('marca=invalid&pagina=-8&min=bad&orden=bad').total).toBe(8)
+  expect(run('orden=precio-desc').items.map((p) => p.id)).toEqual([
+    'santal',
+    'santal-epure',
+    'figue',
+    'figue-blanche',
+    'sillage',
+    'the-sauvage',
+    'iris',
+    'fleur-de-soie',
+    'petale',
+    'rose-satin',
+    'neroli',
+    'bergamote-soleil',
+  ])
+  expect(run('marca=invalid&pagina=-8&min=bad&orden=bad').total).toBe(15)
   const fixture = {
     ...products[0],
     variants: [
@@ -132,14 +162,24 @@ test('La ruta limpia de marca abre su catálogo con la marca aplicada', async ()
   if (result.kind !== 'ready') return
   expect(result.brand?.slug).toBe('forme')
   expect(result.query.brands).toEqual(['forme'])
-  expect(result.items).toHaveLength(2)
+  expect(result.items).toHaveLength(4)
 })
 
 test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
   page,
 }) => {
   await page.goto('/tienda')
-  await expect(page.locator('.product-card')).toHaveCount(8)
+  await expect(page.locator('.product-card')).toHaveCount(12)
+  const sort = page.getByLabel('Ordenar', { exact: true })
+  await expect(sort).toHaveValue('mas-vendidos')
+  await expect(sort.locator('option')).toHaveText([
+    'Más vendidos',
+    'Precio: menor a mayor',
+    'Precio: mayor a menor',
+  ])
+  await expect(page.locator('.product-card').first()).toContainText(
+    'Bois Clair',
+  )
   await page.setViewportSize({ width: 1440, height: 900 })
   const dialog = page.getByRole('complementary', {
     name: 'Filtros de la tienda',
@@ -147,7 +187,9 @@ test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
   await expect(dialog).toBeVisible()
   await expect(page.getByRole('button', { name: /^Filtros/ })).toBeHidden()
   await dialog.getByLabel('Forme', { exact: true }).check()
+  await dialog.locator('[data-filter-group="gender"] summary').click()
   await dialog.getByLabel('Para ella', { exact: true }).check()
+  await dialog.locator('[data-filter-group="price"] summary').click()
   await dialog.getByLabel('Mínimo').fill('400')
   await dialog.getByLabel('Máximo').fill('630')
   await dialog.getByRole('button', { name: 'Aplicar filtros' }).click()
@@ -158,14 +200,14 @@ test('Filtros combinados, URL, recarga, orden y volver atrás', async ({
   await page
     .getByRole('button', { name: 'Limpiar filtros', exact: true })
     .click()
-  await expect(page.locator('.product-card')).toHaveCount(8)
+  await expect(page.locator('.product-card')).toHaveCount(12)
   await page.getByLabel('Ordenar', { exact: true }).selectOption('precio-asc')
   await expect(page.locator('.product-card').first()).toContainText(
     'Bois Clair',
   )
   await page.goBack()
   await expect(page.getByLabel('Ordenar', { exact: true })).toHaveValue(
-    'novedades',
+    'mas-vendidos',
   )
 })
 
@@ -176,17 +218,28 @@ test('Móvil: cancelar borrador, Escape, retorno de foco y aplicación', async (
   await page.goto('/tienda')
   const trigger = page.getByRole('button', { name: /^Filtros/ })
   await trigger.click()
+  await page
+    .getByRole('dialog')
+    .locator('[data-filter-group="gender"] summary')
+    .click()
   await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
   await expect(page).toHaveURL(/\/tienda$/)
   await trigger.click()
+  await page
+    .getByRole('dialog')
+    .locator('[data-filter-group="gender"] summary')
+    .click()
   await expect(
     page.getByRole('dialog').getByLabel('Unisex', { exact: true }),
   ).not.toBeChecked()
   await page.getByRole('dialog').getByLabel('Unisex', { exact: true }).check()
   await page.getByRole('button', { name: 'Aplicar filtros' }).click()
-  await expect(page.locator('.product-card')).toHaveCount(6)
+  await expect(page.locator('.product-card')).toHaveCount(12)
+  await expect(page.locator('.catalog-toolbar [role="status"]')).toHaveText(
+    '13 productos',
+  )
   await expect(trigger).toBeFocused()
 })
 
@@ -203,6 +256,16 @@ test('El diálogo de filtros mantiene Aplicar filtros visible al abrir en un mó
   const apply = actions.getByRole('button', { name: 'Aplicar filtros' })
   await expect(dialog).toBeVisible()
   await expect(apply).toBeInViewport({ ratio: 1 })
+  const opening = await fields.evaluate((element) => ({
+    scrollTop: element.scrollTop,
+    scrollable: element.scrollHeight > element.clientHeight,
+  }))
+  expect(opening.scrollTop).toBe(0)
+  expect(opening.scrollable).toBe(false)
+  await dialog.locator('[data-filter-group="brand"] summary').click()
+  await dialog.locator('[data-filter-group="gender"] summary').click()
+  await dialog.locator('[data-filter-group="family"] summary').click()
+  await dialog.locator('[data-filter-group="price"] summary').click()
   expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0)
   const initial = await fields.evaluate((element) => ({
     scrollTop: element.scrollTop,
@@ -210,7 +273,6 @@ test('El diálogo de filtros mantiene Aplicar filtros visible al abrir en un mó
     bottom: element.getBoundingClientRect().bottom,
   }))
   const initialFooter = await actions.boundingBox()
-  expect(initial.scrollTop).toBe(0)
   expect(initial.scrollable).toBe(true)
   expect(initial.bottom).toBeLessThanOrEqual(initialFooter!.y + 1)
 
@@ -275,7 +337,9 @@ test('Aplicar filtros desde el final del panel devuelve los resultados a la vist
     name: 'Filtros de la tienda',
   })
   await sidebar.getByLabel('Forme', { exact: true }).check()
+  await sidebar.locator('[data-filter-group="gender"] summary').click()
   await sidebar.getByLabel('Para ella', { exact: true }).check()
+  await sidebar.locator('[data-filter-group="price"] summary').click()
   await sidebar.getByLabel('Mínimo').fill('400')
   await sidebar.getByLabel('Máximo').fill('630')
   await sidebar.locator('.catalog-filter-actions').scrollIntoViewIfNeeded()
@@ -311,7 +375,7 @@ test('Una búsqueda con un resultado conserva filtros accesibles sin alargar el 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/buscar?q=petale')
   const disclosure = page.locator('.catalog-filter-disclosure')
-  const summary = disclosure.locator('summary')
+  const summary = disclosure.locator(':scope > summary')
   await expect(summary).toBeVisible()
   await expect(disclosure.getByRole('checkbox', { name: 'Forme' })).toBeHidden()
 
@@ -348,18 +412,20 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).toBeChecked()
   const brandChip = page.getByRole('button', { name: 'Quitar Forme' })
   await expect(brandChip).toBeVisible()
-  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(page.locator('.product-card')).toHaveCount(4)
   await page.reload()
   await expect(page).toHaveURL('/tienda?marca=forme')
   await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).toBeChecked()
   await expect(brandChip).toBeVisible()
-  await expect(page.locator('.product-card')).toHaveCount(2)
+  await expect(page.locator('.product-card')).toHaveCount(4)
   await brandChip.click()
   await expect(page).toHaveURL('/tienda')
-  await expect(page.locator('.product-card')).toHaveCount(8)
-  await expect(sidebar.getByRole('checkbox', { name: 'Forme' })).not.toBeChecked()
+  await expect(page.locator('.product-card')).toHaveCount(12)
+  await expect(
+    sidebar.getByRole('checkbox', { name: 'Forme' }),
+  ).not.toBeChecked()
   await page.getByRole('button', { name: 'Buscar perfumes' }).click()
-  await page.getByRole('dialog').getByLabel('Perfume o marca').fill('petale')
+  await page.getByRole('dialog').getByLabel('Producto o marca').fill('petale')
   await expect(page.locator('.search-suggestions')).toContainText('Pétale Nu')
   await page
     .getByRole('dialog')
@@ -373,7 +439,7 @@ test('Marcas y búsqueda con sugerencias y estados vacíos', async ({ page }) =>
   ).toBeVisible()
   await page.goto('/buscar')
   await expect(
-    page.getByRole('heading', { name: '¿Qué perfume tienes en mente?' }),
+    page.getByRole('heading', { name: '¿Qué producto tienes en mente?' }),
   ).toBeVisible()
   await page.goto('/marcas/inexistente')
   await expect(page.locator('.product-card')).toHaveCount(0)
@@ -396,7 +462,7 @@ for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
     })
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/tienda')
-    await expect(page.locator('.product-card')).toHaveCount(8)
+    await expect(page.locator('.product-card')).toHaveCount(12)
     await page.locator('footer').scrollIntoViewIfNeeded()
     await page.waitForFunction(() =>
       [...document.images].every((img) => img.complete && img.naturalWidth > 0),

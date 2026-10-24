@@ -1,49 +1,88 @@
-# Auditoría técnica del frontend — 16 de septiembre de 2026
+# Auditoría técnica de Aroma Infini
 
-Alcance: React, TypeScript, Vite, Tailwind CSS 4, rutas, servicios con datos ilustrativos, estado local, CSS, imágenes y pruebas. Se conservaron el diseño y las funcionalidades actuales. No se evaluó una infraestructura de producción porque todavía no hay backend ni configuración de despliegue.
+Fecha: 23 de octubre de 2026. Alcance: limpieza, mantenimiento, carga de medios y preparación de integración. No se modificaron textos comerciales, rutas, reglas de precios, descuentos, stock, estados de pedidos, filtros, recomendaciones ni diseño aprobado. No se conectaron Supabase, R2, autenticación o pagos.
 
-## Hallazgos y resolución
+## Respaldo y referencia inicial
 
-| Prioridad | Hallazgo | Estado |
-| --- | --- | --- |
-| Crítica | Ninguna vulnerabilidad explotable identificada en el prototipo actual; la compra está deshabilitada. | Sin corrección necesaria ahora. |
-| Alta | El carrito comprobaba el stock con un cierre de React potencialmente desactualizado. Varias adiciones en un mismo ciclo podían anunciar una adición incorrecta. | Corregido: el límite y el aviso se calculan con el estado funcional más reciente. Prueba de siete clics rápidos con stock de cinco. |
-| Alta | El servicio de catálogo importaba lógica desde una carpeta de UI de la Home. | Corregido: la presentación comercial del producto reside en `services`, sin dependencia inversa. |
-| Alta | Un error inesperado de ruta no tenía una recuperación controlada. | Corregido: página de error con reintento e inicio; solo aparece ante fallos no previstos. |
-| Media | La lectura de `localStorage` aceptaba listas e identificadores sin límite y no atendía al evento de borrado global. | Corregido: validación de longitud, límite de 500 entradas, cantidades de 1 a 99 y sincronización de `clear()` entre pestañas. |
-| Media | Las escrituras de favoritos y carrito estaban dentro de actualizaciones de estado de React. | Corregido: actualizaciones puras; escritura sincronizada con un efecto y aviso de conservación durante la sesión si falla el almacenamiento. |
-| Media | El formato de precios PEN estaba duplicado en seis componentes, incluso con una instancia nueva por sugerencia de búsqueda. | Corregido: formateador único basado en céntimos. |
-| Media | Una herramienta de reportes (`repomix`) figuraba como dependencia de producción. | Corregido: pasa a desarrollo; la instalación de producción contiene únicamente React y fuentes. |
-| Media | Los contadores visibles de carrito y favoritos estaban ocultos al lector de pantalla; algunos disparadores de diálogo carecían de estado y relación con su panel. | Corregido: nombres accesibles con cantidad, `aria-expanded`, `aria-controls` e identificadores de diálogo. |
-| Baja | La ficha de un producto inexistente rompía el espaciado inicial común. | Corregido solo en ese estado de error. |
-| Baja | Una imagen de sugerencia carecía de carga diferida; había un componente `Button` sin uso y un artefacto generado no ignorado. | Corregido; `repomix-output.*` se ignora sin borrar el archivo existente. |
-| Baja | La SPA respondía HTML a `/robots.txt`, que Lighthouse señalaba como inválido. | Corregido: archivo válido que mantiene el bloqueo deliberado de indexación del prototipo. |
+Se copió el estado completo de los archivos versionados y nuevos no ignorados a un repositorio Git independiente, antes de limpiar: **665 archivos**, commit `cc6dcdb7313165fe1ff55d8ab534c848110f9e9b`. La rama y el historial del repositorio de trabajo no se modificaron. No se incluyeron `node_modules`, compilados ni variables de entorno ignoradas.
 
-También se tiparon los valores válidos de género y orden del catálogo, se eliminó una aserción no nula en la lectura de la URL y el loader de marca dejó de mutar su consulta original. No se detectaron usos de `any`, `eval` ni HTML inyectado, ni secretos de servidor en el cliente. Las imágenes principales tienen dimensiones explícitas y variantes WebP; las rutas, los diálogos, el teclado y los estados de movimiento reducido están cubiertos por pruebas.
+El respaldo está en `artifacts/technical-audit/2026-10-23/baseline-git/`; su copia portable `before-cleanup.bundle` se verificó con `git bundle verify`. `backup.json`, `baseline.patch` y `baseline-status.txt` documentan el punto de partida. El bundle corresponde al estado anterior a esta auditoría, incluidos los cambios que ya estaban pendientes en la rama.
 
-## Archivos modificados
+Se ejecutaron typecheck, lint, build y las 615 pruebas iniciales sobre la referencia aislada. Resultado: **608 pasaron, 4 fallaron y 3 capturas manuales estaban desactivadas**. Los cuatro fallos procedían de dos selectores de pruebas obsoletos: «Explorar perfumes» en Favoritos ya era «Explorar tienda», y Seguir pedido ya utilizaba `.institutional-breadcrumb`. Se actualizaron los tests conservando sus comprobaciones y tolerancias; no se cambió la aplicación para hacerlos pasar.
 
-- Configuración y contenido estático: `.gitignore`, `package.json`, `package-lock.json`, `public/robots.txt`.
-- Servicios: `src/services/catalog-service.ts`, `currency.ts`, `product-presentation.ts`. Se retiró `src/features/home/product-presentation.ts` al trasladar su contenido.
-- Carrito y favoritos: `src/features/cart/CartProvider.tsx`, `cart-storage.ts`, `CartLine.tsx`, `CartSummary.tsx`, `CartDrawer.tsx`, `src/features/favorites/FavoritesProvider.tsx` y `favorites-storage.ts`.
-- Interfaz y rutas: `src/app/router.tsx`, `src/pages/RouteErrorPage.tsx`, `src/components/layout/Header.tsx`, `StoreLayout.tsx`, `src/components/ui/Dialog.tsx`, `src/features/home/ProductCard.tsx`, `src/features/catalog/SearchPanel.tsx`, `catalog-loaders.ts`, `src/features/product/ProductPage.tsx` y `src/styles/product-detail.css`. Se eliminó `src/components/ui/Button.tsx` porque no se utilizaba.
-- Pruebas: `tests/commerce.spec.ts`, `product-card.spec.ts` y `page-spacing.spec.ts`.
-- Informe: `docs/TECHNICAL_AUDIT.md`.
+## Eliminaciones comprobadas
 
-## Pendiente antes de producción o de fases futuras
+| Archivo/código | Evidencia y actuación |
+| --- | --- |
+| `src/content/brand-photography.ts` | Único módulo TypeScript de contenido sin alcance desde la aplicación; sin consumidores en componentes, rutas dinámicas, pruebas, scripts o documentación. Eliminado. Sus fotografías no se eliminaron. |
+| `getAdminProduct` y `getAdminOrder` | Solo aparecían en sus declaraciones, sin consumidores internos ni accesos por nombre. Eliminados de `admin-service.ts`. |
+| `src/styles/shipping-editorial.css` | Pertenecía al markup antiguo de Envíos, sustituido por `delivery-*`. Eliminado junto con su import. |
+| CSS antiguo de Nosotros/Contacto/Envíos y aviso comercial | Retirados únicamente selectores obsoletos en `institutional-editorial.css`, `service-pages.css` y `previews.css`. Conservados encabezados compartidos, Tracking aprobado, popularidad, reseñas y keyframes utilizados. |
 
-- **Crítica antes de habilitar compras:** precios, stock, importes y disponibilidad nunca deben aceptarse del navegador. Supabase debe aplicar RLS; pedidos y pagos necesitan validación de servidor y confirmación por webhook. Las claves de servicio y secretos de pago no deben entrar en Vite. No se implementa ahora porque la compra sigue deshabilitada.
-- **Alta antes de publicar:** configurar en el proveedor de hosting HTTPS/HSTS, CSP con dominios reales de Supabase, R2 y pagos, `frame-ancestors`, `nosniff`, política de referencia y caché adecuada. No se fijaron cabeceras especulativas sin conocer esos dominios ni la plataforma de despliegue.
-- **Media al integrar backend y R2:** sustituir los datos de muestra por servicios con contratos y validación de respuestas, tratamiento de errores de red y URLs de imágenes controladas. Mantener la identidad visual actual. No se añadió una abstracción de backend vacía.
-- **Media si crece el catálogo o se despliegan más fases:** dividir rutas en chunks. Hoy el JS compilado es ~111 kB gzip; hacerlo ya añadiría complejidad sin beneficio medido. El LCP de la SPA descubre la imagen después del JS; una precarga global cargaría el hero incluso en rutas interiores. Revisar precarga por ruta o prerender cuando se decida el hosting.
-- **Baja:** añadir CI y un navegador Chrome instalado en el entorno de pruebas. Mantener `noindex` y `robots.txt` bloqueante hasta que existan catálogo, políticas y contenido reales; el SEO de Lighthouse resulta deliberadamente bajo por este motivo. No se creó `llms.txt`, que no aporta al prototipo.
+La limpieza retiró **193 ramas de selector, aproximadamente 22 kB de CSS fuente y 1102 líneas**. Una comparación AST con el respaldo verificó que las reglas preservadas conservan selector, declaraciones, orden, contexto de media queries/keyframes y `!important`.
 
-## Validación
+No se eliminó ninguna dependencia ni se instaló otra: las librerías tienen consumidores reales o un uso de desarrollo documentado. `package.json` y el lockfile se conservaron. Tampoco se borraron mocks activos, migraciones de snapshots, recursos ocultos de Complementos, scripts históricos documentados, licencias, fotografías antiguas con referencias o fuentes alternativas seleccionables. No se encontraron duplicados de imágenes por contenido.
 
-- `npm run typecheck`: aprobado.
-- `npm run lint`: aprobado, cero advertencias.
-- `npm run build`: aprobado. JS 360.53 kB / 110.98 kB gzip; CSS 73.76 kB / 15.33 kB gzip.
-- `npm run test:e2e -- --workers=2`: **83/83** aprobadas. Incluye 360–1440 px, imágenes, desbordamiento, consola, navegación por teclado, foco, movimiento reducido, carrito y favoritos.
-- `npm audit`: **0 vulnerabilidades**.
-- Lighthouse sobre build de producción: **100/100 en accesibilidad y buenas prácticas** en Home móvil, catálogo desktop y ficha móvil. Tras añadir `robots.txt` válido, Home obtuvo SEO 66; la puntuación restante responde al bloqueo intencional de indexación.
-- Trazas locales sin limitación de CPU o red: Home LCP 153 ms y CLS 0; ficha LCP 128 ms y CLS 0. Son datos de laboratorio local, no predicciones de usuarios reales. La batería de scroll móvil observó CLS inferior a 0.1 en todos los anchos.
+## Arquitectura y rendimiento
+
+- **Carrito y favoritos:** `commerce-service.ts` prepara índices temporales por producto, presentación y marca en lugar de recorrer el catálogo por cada línea. Conserva orden, referencias faltantes, primera coincidencia de IDs antiguos duplicados, presentación activa, stock, descuento y totales. Para listas vacías evita preparar índices. No mantiene una caché que pueda dejar precios desactualizados.
+- **IndexedDB:** `admin-persistence.ts` cierra la conexión y limpia su promesa cacheada ante `versionchange`. Una actualización externa puede avanzar sin que una pestaña retenga la conexión antigua. No se borra ni reinicia el snapshot; una prueba real verifica que se conserva.
+- **Medios:** `asset-source.ts`, `image-source.ts` y `hero-image-source.ts` concentran la resolución de URLs y variantes. Hero y panel comparten nombres por campaña/orientación/ancho. Las imágenes subidas y las URLs externas conservan su identidad.
+- **Documentación:** README distingue el prototipo local de un backend compartido; Supabase/R2 tienen instrucciones vigentes y los informes anteriores se identifican como historia.
+
+El CSS principal compilado pasó de **308,17 a 290,38 kB** (−17,79 kB, aproximadamente 5,8 %); comprimido por gzip, de **52,53 a 49,95 kB**. El pequeño resolvedor añade código compartido: no se afirma una reducción de JavaScript inicial. ExcelJS conserva su chunk bajo demanda de unos 930 kB brutos; el aviso de tamaño del build sigue visible y no implica que Excel se cargue al abrir el Home.
+
+Las mediciones de desarrollo en Chrome, sin limitación de CPU/red, observaron LCP de 812 ms antes y 654 ms después, con CLS 0 en ambas. Son observaciones locales aisladas, con cachés de servidor y ruido distintos, no una prueba causal ni una medición de producción o usuarios reales. La mejora se cuantifica con bytes, integridad de recursos y regresiones, sin prometer una puntuación Lighthouse o una reducción de tiempos sostenida.
+
+## Imágenes
+
+Los **140 originales auditados mantienen su SHA-256**. No se recortaron, ampliaron ni recomprimieron fotografías aprobadas.
+
+Se generaron 10 miniaturas WebP de 160/320 px para las cinco fotografías de familias utilizadas por el recomendador. Conservan la composición y utilizan calidad 92. Un manifiesto de variantes evita inventar archivos para fotografías administrativas desconocidas; el cuestionario mantiene la opción original de 960 px para tarjetas grandes o pantallas densas.
+
+Las cinco fotografías originales suman 803 602 B; sus derivados de 160 px suman 71 676 B (−91,1 %). No equivale al ahorro total del Home: su escena editorial reutiliza una de esas fotos. Para los cuatro círculos y esa escena, el ahorro estático conservador calculado es **360 004 B**, antes de caché y selección por densidad de pantalla. Las prioridades del Hero, dimensiones, encuadres, vídeo diferido y movimiento reducido se conservaron.
+
+Inventario, hashes, variantes y decisiones de conservación: [Auditoría de imágenes](ASSET_AUDIT.md). Regeneración: `node scripts/prepare-finder-thumbnails.mjs`.
+
+## Preparación de integración
+
+[Supabase](SUPABASE_READINESS.md) documenta los contratos públicos asíncronos, el adaptador local, los modelos compartidos y las mutaciones que requerirán transacciones y permisos en servidor. No se creó un SDK, esquema SQL, API falsa ni autenticación. Cambiar la persistencia local por un volcado remoto del snapshot no es una estrategia multiusuario válida.
+
+[Medios y R2](MEDIA_READINESS.md) describe claves estables y el origen público futuro `VITE_MEDIA_BASE_URL`, comentado y desactivado en `.env.example`. Sin configurarlo, todas las URLs actuales siguen siendo locales. Las subidas reales requieren un endpoint autenticado, validación y referencias de activos en lugar de base64; esa integración no está implementada.
+
+## Validación final
+
+- `npm.cmd run typecheck`: correcto.
+- `npm.cmd run lint`: correcto, sin advertencias ESLint.
+- `npm.cmd run build`: correcto; conserva `noindex` y el aviso conocido del chunk ExcelJS.
+- Suite posterior: **622 pruebas pasaron**, sin fallos; las tres capturas optativas se activaron aparte con `ADMIN_AUDIT_STAGE=after` y **las tres pasaron**. Total: **625 escenarios distintos validados**.
+- Se añadieron 10 pruebas sobre resolución de medios, variantes existentes, conservación de rutas locales/HTTPS/data, selección real de miniaturas, carrito/favoritos y cambio de versión IndexedDB.
+- La captura administrativa optativa se actualizó para utilizar controles actuales y nombres semánticos, incluyendo formularios, pestañas de Home, importación, entrega, menús y vista previa completa de producto en 1920×1080, 1440×900, 1366×768, 768×1024 y 390×844.
+- Comparación general: **126 pares de capturas** de tienda y panel en 1920×1080, 1366×768, 768×1024 y 390×844. Incluye Home, catálogo/filtros, marca, ficha, favoritos, carrito, checkout, institucionales, cuenta y pantallas administrativas, más recomendador, importación, vistas previas y gestión del Home. No se detectaron errores de JavaScript, imágenes rotas ni desbordamiento horizontal.
+
+Las capturas y resultados originales están en `artifacts/technical-audit/2026-10-23/`: `before/`, `after/`, `before.json`, `after.json`, `visual-comparison.json`, `layout-comparison.json`, logs y reportes de Playwright. **112 de los 126 pares son idénticos píxel a píxel**; ninguno cambió dimensiones o títulos. La captura automatizada aísla las páginas y espera fuentes, imágenes y estados de foco/scroll; los modales se capturan dentro del viewport. Las diferencias restantes corresponden al remuestreo de miniaturas y pequeñas variaciones de renderizado inspeccionadas visualmente; no se presentan como una comparación binaria idéntica de todas las fotografías.
+
+Reproducción:
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run build
+npm.cmd run test:e2e -- --workers=3
+$env:ADMIN_AUDIT_STAGE = 'after'
+npx.cmd playwright test tests/admin-audit-capture.spec.ts --workers=1
+```
+
+Con el servidor de cada versión activo, `node scripts/capture-technical-audit.mjs before|after` captura la matriz. `AUDIT_CAPTURE_URL` permite indicar el origen de la copia aislada; un tercer argumento de ruta repite solo esa pantalla y conserva el resto del registro. `compare` compara las capturas guardadas. Los artefactos y el respaldo son locales y están excluidos del repositorio principal.
+
+## Pendientes antes de Supabase y datos reales
+
+1. Definir roles/autenticación y políticas de acceso. El nombre de responsable de pedidos actual es autodeclarado, sin identidad verificada.
+2. Versionar/validar el snapshot y preparar una migración con respaldo y diagnóstico recuperable. La hidratación actual no valida exhaustivamente todas las estructuras antiguas.
+3. Resolver concurrencia entre pestañas/equipos y trasladar stock, precios, cupones, pedidos e idempotencia a operaciones atómicas del servidor; el contador de revisión local no sustituye esa protección.
+4. La posterior [auditoría de estados de UI](UI_STATES_AUDIT.md) unificó marcas, cupones, ofertas, publicación y datos de entrega para confirmar después de `flush()` y reintentar sin repetir la mutación. Sigue pendiente trasladar estas garantías a transacciones e idempotencia en servidor.
+5. Definir pasarela real y evento de pago verificado; los pagos actuales se simulan. No importar fixtures, reseñas o clientes ficticios como datos reales.
+6. Acordar subida de medios, migración de fotos base64, permisos, dominio y caché de R2. Nunca incluir secretos en variables `VITE_`.
+7. Vincular publicación del catálogo y Home con regeneración SEO/sitemap, y confirmar datos comerciales, privacidad y consentimiento antes de indexar contenido real.
+
+Estos puntos son decisiones de la fase siguiente. La auditoría no afirma que el prototipo local ya sea un sistema de producción o una base de datos compartida.

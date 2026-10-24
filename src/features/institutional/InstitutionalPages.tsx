@@ -1,8 +1,13 @@
 import { Link } from 'react-router'
 import { useSyncExternalStore } from 'react'
 import { Icon } from '../../components/ui/Icon'
-import { shippingService } from '../../services/shipping-service'
+import {
+  getAreaBaseShipping,
+  shippingService,
+} from '../../services/shipping-service'
+import { deliveryAreas } from '../../content/peru'
 import { formatPEN } from '../../services/currency'
+import type { ShippingSettings } from '../../types/shipping'
 import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
 
 interface InstitutionalIntroProps {
@@ -27,91 +32,160 @@ function ContactAction({ label = 'Escríbenos' }: { label?: string }) {
   )
 }
 
+interface PublicShippingRate {
+  label: string
+  courierFeeCents: number
+  motorizadoFeeCents: number | null
+  estimate: string
+}
+
+function getPublicShippingRates(
+  shipping: ShippingSettings,
+): PublicShippingRate[] {
+  const localRates = deliveryAreas.map((area) => ({
+    label: area.label,
+    ...getAreaBaseShipping(shipping, area.department),
+  }))
+  const [lima, callao] = localRates
+  const sameLocalRates =
+    lima &&
+    callao &&
+    lima.courierFeeCents === callao.courierFeeCents &&
+    lima.motorizadoFeeCents === callao.motorizadoFeeCents &&
+    lima.estimate === callao.estimate
+  const rates = sameLocalRates
+    ? [{ ...lima, label: localRates.map((rate) => rate.label).join(' y ') }]
+    : localRates
+
+  return shipping.provinceShippingEnabled
+    ? [
+        ...rates,
+        {
+          label: 'Otras provincias',
+          courierFeeCents: shipping.nationalCourierFeeCents,
+          motorizadoFeeCents: null,
+          estimate: shipping.nationalEstimate,
+        },
+      ]
+    : rates
+}
+
 export function ShippingPage() {
   const shipping = useSyncExternalStore(
     shippingService.subscribe,
     shippingService.getSnapshot,
   )
+  const rates = getPublicShippingRates(shipping)
+  const coverage = shipping.provinceShippingEnabled
+    ? 'Todo el Perú'
+    : deliveryAreas.map((area) => area.label).join(' y ')
+
   return (
-    <article className="store-page institutional-page institutional-shipping container">
+    <article className="store-page institutional-page institutional-shipping service-page container">
       <InstitutionalBreadcrumb current="Envíos y entregas" />
-      <InstitutionalIntro
-        title="Tu pedido, de principio a fin"
-        description="Enviamos a todo el Perú."
-      />
-      <div className="shipping-editorial-layout">
+      <header
+        className="delivery-heading service-intro"
+        data-scroll-reveal="copy"
+      >
+        <h1>Envíos y entregas</h1>
+        <p>
+          Conoce dónde entregamos, cuánto cuesta y cuándo recibirás tu pedido.
+        </p>
+      </header>
+
+      <div className="delivery-sheet">
         <section
-          className="shipping-rate-card"
+          className="delivery-options"
           aria-labelledby="shipping-rates-title"
-          data-scroll-reveal="copy"
         >
-          <div className="shipping-card-heading">
-            <Icon name="truck" />
-            <h2 id="shipping-rates-title">Tarifas y plazos</h2>
-          </div>
-          <dl className="institutional-shipping-summary">
-            <div>
-              <dt>Tarifa base</dt>
-              <dd>{formatPEN(shipping.nationalCourierFeeCents)}</dd>
+          <div className="delivery-summary">
+            <div className="delivery-coverage">
+              <Icon name="truck" />
+              <div>
+                <p className="eyebrow">Entregamos en</p>
+                <h2 id="shipping-rates-title">{coverage}</h2>
+              </div>
             </div>
             {shipping.freeThresholdCents > 0 ? (
-              <div>
-                <dt>Envío gratis desde</dt>
-                <dd>{formatPEN(shipping.freeThresholdCents)}</dd>
+              <div className="delivery-free">
+                <span>Envío gratis desde</span>
+                <strong>{formatPEN(shipping.freeThresholdCents)}</strong>
+                <p>Aplica al subtotal del pedido, dentro de la cobertura.</p>
               </div>
             ) : null}
-            <div>
-              <dt>Plazo estimado</dt>
-              <dd>{shipping.nationalEstimate}</dd>
-            </div>
-          </dl>
-          <p className="shipping-rate-note">
-            Confirma el costo y el plazo para tu dirección antes de pagar.
+          </div>
+          <div className="delivery-rates">
+            {rates.map((rate) => (
+              <section className="delivery-rate-group" key={rate.label}>
+                <h3 className={rates.length === 1 ? 'sr-only' : undefined}>
+                  {rate.label}
+                </h3>
+                <table className="delivery-table">
+                  <caption className="sr-only">
+                    Modalidades, tarifas y plazo de entrega para {rate.label}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Modalidad</th>
+                      <th scope="col">Tarifa</th>
+                      <th scope="col">Plazo estimado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Courier</th>
+                      <td className="delivery-price">
+                        {formatPEN(rate.courierFeeCents)}
+                      </td>
+                      <td
+                        className="delivery-estimate"
+                        rowSpan={rate.motorizadoFeeCents === null ? 1 : 2}
+                      >
+                        <span>
+                          <Icon name="clock" />
+                          <strong>{rate.estimate}</strong>
+                        </span>
+                      </td>
+                    </tr>
+                    {rate.motorizadoFeeCents !== null ? (
+                      <tr>
+                        <th scope="row">Motorizado</th>
+                        <td className="delivery-price">
+                          {formatPEN(rate.motorizadoFeeCents)}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </section>
+            ))}
+          </div>
+          <p className="delivery-note">
+            {shipping.provinceShippingEnabled
+              ? 'El costo y el plazo para tu dirección se confirman antes de pagar.'
+              : 'El costo y el plazo para tu distrito se confirman antes de pagar.'}
           </p>
         </section>
-        <section
-          className="shipping-journey"
-          aria-labelledby="shipping-journey-title"
-          data-scroll-reveal="copy"
-        >
-          <h2 id="shipping-journey-title">Así llega tu pedido</h2>
-          <ol>
-            <li>
-              <span aria-hidden="true">01</span>
-              <div>
-                <h3>Indica tu destino</h3>
-                <p>Elige dónde recibirlo.</p>
-              </div>
-            </li>
-            <li>
-              <span aria-hidden="true">02</span>
-              <div>
-                <h3>Revisa tu entrega</h3>
-                <p>Consulta el costo y el plazo.</p>
-              </div>
-            </li>
-            <li>
-              <span aria-hidden="true">03</span>
-              <div>
-                <h3>Sigue tu pedido</h3>
-                <p>Revisa su estado con tu código.</p>
-                <Link className="text-link" to="/seguir-pedido">
-                  Seguir mi pedido <Icon name="arrow" />
-                </Link>
-              </div>
-            </li>
-          </ol>
-        </section>
+
+        <nav className="delivery-help" aria-label="Seguimiento y ayuda">
+          <Link className="delivery-help-link" to="/seguir-pedido">
+            <Icon name="package" />
+            <span>
+              <strong>Seguir pedido</strong>
+              <span>Consulta el estado con tu código</span>
+            </span>
+            <Icon name="arrow" />
+          </Link>
+          <Link className="delivery-help-link" to="/contacto">
+            <Icon name="chat" />
+            <span>
+              <strong>Consultar entrega</strong>
+              <span>Escríbenos si tienes una duda</span>
+            </span>
+            <Icon name="arrow" />
+          </Link>
+        </nav>
       </div>
-      <aside className="shipping-help" data-scroll-reveal="copy">
-        <div>
-          <Icon name="chat" />
-          <p>¿Dudas sobre tu entrega?</p>
-        </div>
-        <Link className="text-link" to="/contacto">
-          Consultar entrega <Icon name="arrow" />
-        </Link>
-      </aside>
     </article>
   )
 }

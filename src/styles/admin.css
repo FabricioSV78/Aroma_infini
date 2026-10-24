@@ -50,20 +50,12 @@
   color: #fff;
 }
 
-.admin-shell .button--primary:hover {
-  border-color: var(--admin-accent-hover);
-  background: var(--admin-accent-hover);
-}
 
 .admin-shell .button--secondary {
   border-color: var(--admin-border-strong);
   background: var(--admin-surface);
 }
 
-.admin-shell .button--secondary:hover {
-  border-color: var(--admin-accent);
-  background: var(--admin-accent-soft);
-}
 
 .admin-header {
   position: sticky;
@@ -393,15 +385,10 @@
 
 .admin-demo-banner {
   width: min(calc(100% - (var(--gutter) * 2)), 1220px);
-  margin: 14px auto 0;
-  padding: 8px 15px;
-  border: 1px solid #d6dcd2;
-  border-radius: 11px;
-  background: var(--admin-accent-soft);
-  color: var(--admin-accent);
+  margin: 12px auto 0;
+  color: var(--admin-muted);
   font-size: 0.6875rem;
-  letter-spacing: 0.04em;
-  text-align: center;
+  line-height: 1.4;
 }
 
 .admin-page {
@@ -533,8 +520,8 @@
 .admin-metric-card {
   position: relative;
   min-width: 0;
-  min-height: 154px;
-  padding: 18px;
+  min-height: 144px;
+  padding: 16px;
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
   background: var(--admin-surface);
@@ -548,11 +535,6 @@
     transform 150ms ease;
 }
 
-.admin-metric-card:hover {
-  border-color: var(--admin-border-strong);
-  box-shadow: 0 10px 26px rgb(37 39 36 / 10%);
-  transform: translateY(-1px);
-}
 
 .admin-metric-card:has(a:focus-visible) {
   border-color: var(--admin-accent);
@@ -639,6 +621,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.admin-metric-card:is(:hover, :focus-within) > a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .admin-metric-card > a::after {
@@ -804,11 +791,20 @@
 }
 
 .admin-order-overview dl > div {
+  position: relative;
   min-width: 0;
-  padding: 13px;
-  border: 1px solid var(--admin-border);
-  border-radius: 10px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--admin-border);
+  transition: background-color 150ms ease;
+}
+
+.admin-order-overview dl > div:has(a:focus-visible) {
   background: var(--admin-surface-muted);
+}
+
+.admin-order-overview dl > div:has(a:focus-visible) {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
 }
 
 .admin-order-overview dt,
@@ -828,13 +824,27 @@
 }
 
 .admin-order-overview dd a {
-  display: inline-grid;
+  display: inline-flex;
   min-width: 44px;
   min-height: 44px;
-  place-items: center;
+  align-items: center;
+  gap: 8px;
   margin: -8px 0 -8px -8px;
+  padding-left: 8px;
   color: inherit;
   text-decoration: none;
+}
+
+.admin-order-overview dd a::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+
+.admin-order-overview dd a svg {
+  width: 15px;
+  height: 15px;
+  color: var(--admin-accent);
 }
 
 .admin-recent-orders {
@@ -901,7 +911,7 @@
 }
 
 .admin-quick-links {
-  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 .admin-quick-links > div {
@@ -951,7 +961,6 @@
 .admin-task-list,
 .admin-module-links,
 .admin-promotion-list,
-.admin-featured-list,
 .admin-edit-list {
   margin: 0;
   padding: 0;
@@ -1225,9 +1234,6 @@
   transition: background-color 120ms ease;
 }
 
-.admin-table tbody tr:hover {
-  background: var(--admin-surface-muted);
-}
 
 .admin-table tbody tr:last-child > * {
   border-bottom: 0;
@@ -1244,8 +1250,7 @@
   gap: 12px;
 }
 
-.admin-product-identity img,
-.admin-featured-list img {
+.admin-product-identity img {
   background: #efefec;
   object-fit: cover;
 }
@@ -1279,16 +1284,30 @@
 }
 
 .admin-product-identity strong,
-.admin-product-identity small,
-.admin-featured-list strong,
-.admin-featured-list small {
+.admin-product-identity small {
   display: block;
 }
 
-.admin-product-identity small,
-.admin-featured-list small {
+.admin-product-identity small {
   margin-top: 3px;
   color: var(--color-muted);
+}
+
+.admin-product-offer-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px 8px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-product-offer-price s {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+.admin-product-offer-price strong {
+  color: var(--admin-accent);
 }
 
 .admin-row-actions {
@@ -1345,11 +1364,52 @@
   gap: 20px;
 }
 
-.admin-data-gap { display: block; margin-top: 4px; color: var(--admin-warning); font-size: 11px; font-weight: 600; }
+.admin-data-gap {
+  display: block;
+  margin-top: 4px;
+  color: var(--admin-warning);
+  font-size: 11px;
+  font-weight: 600;
+}
 
-.admin-delivery-edit-button { min-height: 44px; align-self: start; padding: 8px 0; border: 0; background: transparent; color: var(--admin-accent); font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-.admin-delivery-editor { display: grid; gap: 12px; margin-top: 10px; padding-top: 16px; border-top: 1px solid var(--admin-border); }
-.admin-delivery-editor .button { justify-self: start; }
+.admin-delivery-edit-button {
+  min-height: 44px;
+  align-self: start;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--admin-accent);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.admin-delivery-edit-button.is-required {
+  padding-inline: 16px;
+  border: 1px solid var(--admin-accent);
+  border-radius: 8px;
+  background: var(--admin-accent-soft);
+  font-weight: 650;
+  text-decoration: none;
+}
+.admin-delivery-edit-button.is-required:hover {
+  background: #dbece3;
+}
+.admin-delivery-edit-button:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+.admin-delivery-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--admin-border);
+}
+.admin-delivery-editor .button {
+  justify-self: start;
+}
 
 .admin-editor-section-nav {
   display: flex;
@@ -1373,9 +1433,26 @@
   text-decoration: none;
 }
 
-.admin-editor h2[id] { scroll-margin-top: 90px; }
-.admin-preview-toggle { min-height: 44px; padding: 6px 10px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface); color: var(--admin-accent); font-size: 12px; }
-.admin-editor-actions { position: sticky; bottom: 0; z-index: 10; padding: 12px; border-top: 1px solid var(--admin-border); background: var(--admin-bg); }
+.admin-editor h2[id] {
+  scroll-margin-top: 90px;
+}
+.admin-preview-toggle {
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  color: var(--admin-accent);
+  font-size: 12px;
+}
+.admin-editor-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  padding: 12px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}
 
 .admin-editor > section,
 .admin-order-layout section,
@@ -1570,8 +1647,7 @@
 
 .admin-quick-create,
 .admin-edit-list,
-.admin-promotion-list,
-.admin-featured-list {
+.admin-promotion-list {
   margin-top: 34px;
 }
 
@@ -1701,8 +1777,7 @@
 }
 
 .admin-edit-list > li,
-.admin-promotion-list > li,
-.admin-featured-list > li {
+.admin-promotion-list > li {
   padding: 18px 0;
   border-top: 1px solid var(--color-line);
   display: grid;
@@ -1711,8 +1786,7 @@
 }
 
 .admin-edit-list > li:last-child,
-.admin-promotion-list > li:last-child,
-.admin-featured-list > li:last-child {
+.admin-promotion-list > li:last-child {
   border-bottom: 1px solid var(--color-line);
 }
 
@@ -1816,6 +1890,7 @@
 }
 
 .admin-promotion-form {
+  max-width: 760px;
   margin-bottom: 20px;
 }
 
@@ -1840,23 +1915,6 @@
   margin: -8px 0 22px;
   color: var(--color-muted);
   font-size: var(--type-small);
-}
-
-.admin-featured-list > li {
-  grid-template-columns: 30px 52px minmax(0, 1fr) auto;
-}
-
-.admin-featured-list > li.is-selected {
-  background: var(--admin-accent-soft);
-}
-
-.admin-featured-list img {
-  width: 52px;
-  height: 66px;
-}
-
-.admin-featured-list .admin-check {
-  grid-column: 2 / 4;
 }
 
 .admin-order-controls {
@@ -2015,6 +2073,38 @@
     justify-content: flex-end;
   }
 
+  .admin-products-page .admin-table--products tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 8px;
+    padding: 12px 14px;
+  }
+
+  .admin-products-page .admin-table--products th,
+  .admin-products-page .admin-table--products td {
+    padding-block: 8px;
+  }
+
+  .admin-products-page
+    .admin-table--products
+    td:nth-child(n + 3):nth-child(-n + 5) {
+    gap: 5px;
+    border-bottom: 0;
+  }
+
+  .admin-products-page .admin-table--products td:last-child {
+    padding-top: 7px;
+    border-top: 1px solid var(--admin-border);
+  }
+
+  .admin-products-page .admin-table--products td:last-child .admin-cell-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   .admin-stock-list {
     width: 100%;
   }
@@ -2073,6 +2163,26 @@
   .admin-brand small {
     display: none;
   }
+
+  .admin-metric-card {
+    min-height: 136px;
+    padding: 13px;
+    gap: 3px 8px;
+  }
+
+  .admin-metric-card > strong {
+    margin-top: 2px;
+    font-size: 1.75rem;
+  }
+
+  .admin-metric-card > small {
+    display: none;
+  }
+
+  .admin-metric-card > a {
+    min-height: 36px;
+    margin-top: 4px;
+  }
 }
 
 @media (min-width: 560px) {
@@ -2099,14 +2209,6 @@
   }
 
   .admin-promotion-list .admin-row-actions {
-    grid-column: auto;
-  }
-
-  .admin-featured-list > li {
-    grid-template-columns: 32px 60px minmax(0, 1fr) auto auto;
-  }
-
-  .admin-featured-list .admin-check {
     grid-column: auto;
   }
 
@@ -2149,8 +2251,8 @@
 
   .admin-recent-orders li {
     grid-template-columns:
-      minmax(150px, 1.4fr) 76px minmax(96px, auto) minmax(104px, auto)
-      76px 44px;
+      minmax(120px, 1.4fr) 86px minmax(98px, auto) minmax(103px, auto)
+      72px 78px;
     grid-template-areas: none;
     gap: 12px;
   }
@@ -2172,7 +2274,7 @@
   }
 
   .admin-quick-links > div {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-module-links > a:not(:nth-child(3n)) {
@@ -2193,7 +2295,9 @@
     align-items: start;
   }
 
-  .admin-editor-actions { justify-content: flex-end; }
+  .admin-editor-actions {
+    justify-content: flex-end;
+  }
 }
 
 @media (min-width: 900px) {
@@ -2320,7 +2424,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .admin-sidebar a svg,
-  .admin-module-links a {
+  .admin-module-links a,
+  .admin-metric-card,
+  .admin-quick-links a,
+  .admin-order-overview dl > div {
     transition: none;
+  }
+
+  .admin-metric-card:hover {
+    transform: none;
   }
 }

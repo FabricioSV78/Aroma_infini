@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { assetSource } from '../../services/asset-source'
 import { footerGroups } from '../../content/navigation'
 import { footerSocialProfiles } from '../../content/social'
 import { Icon } from '../ui/Icon'
@@ -13,7 +14,7 @@ export function Footer() {
             <Link to="/" className="wordmark" aria-label="Aroma Infini, inicio">
               <img
                 className="brand-logo"
-                src="/brand/logo-on-light.svg"
+                src={assetSource('/brand/logo-on-light.svg')}
                 alt=""
                 width="774"
                 height="374"

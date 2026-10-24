@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router'
+import { assetSource } from '../../services/asset-source'
 import {
-  navigationGroups,
+  getNavigationGroups,
   type NavigationGroup,
 } from '../../content/navigation'
 import { SearchPanel } from '../../features/catalog/SearchPanel'
@@ -14,6 +15,7 @@ import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { getFreeShippingThresholdCents } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
+import { localStorefrontRepository } from '../../services/storefront-repository'
 
 interface NavigationColumnsProps {
   group: NavigationGroup
@@ -73,6 +75,33 @@ export function Header() {
   const [scrolled, setScrolled] = useState(() => window.scrollY > 26)
   const isTransparent = pathname === '/' && !scrolled && !openGroup
   const freeShippingThresholdCents = getFreeShippingThresholdCents()
+  const storefrontSnapshot = useSyncExternalStore(
+    localStorefrontRepository.subscribe,
+    localStorefrontRepository.peekSnapshot,
+    localStorefrontRepository.peekSnapshot,
+  )
+  const announcement = storefrontSnapshot.content.announcement
+  const featuredBrand = storefrontSnapshot.brands.find(
+    (brand) => brand.id === storefrontSnapshot.content.featuredBrandId,
+  )
+  const visibleNavigationGroups = getNavigationGroups(featuredBrand).map(
+    (group) => ({
+      ...group,
+      columns: group.columns.map((column) => ({
+        ...column,
+        links: column.links.filter(
+          (link) =>
+            storefrontSnapshot.features.complementsEnabled ||
+            link.to !== '/tienda?tipo=complemento',
+        ),
+      })),
+    }),
+  )
+  const deliveryAnnouncement =
+    storefrontSnapshot.shipping.provinceShippingEnabled &&
+    announcement.deliveryText === 'Envíos en Lima y Callao'
+      ? 'Envíos a todo el Perú'
+      : announcement.deliveryText
 
   function cancelHover() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
@@ -138,12 +167,13 @@ export function Header() {
       </a>
       {pathname === '/' ? (
         <div className="announcement">
-          <span>Envíos a todo el Perú</span>
+          <span>{deliveryAnnouncement}</span>
           {freeShippingThresholdCents > 0 ? (
             <>
               <span aria-hidden="true">·</span>
               <span>
-                Gratis desde {formatPEN(freeShippingThresholdCents)}
+                {announcement.freeShippingLabel}{' '}
+                {formatPEN(freeShippingThresholdCents)}
               </span>
             </>
           ) : null}
@@ -183,7 +213,7 @@ export function Header() {
           >
             <img
               className="brand-logo"
-              src="/brand/logo-on-light.svg"
+              src={assetSource('/brand/logo-on-light.svg')}
               alt=""
               width="774"
               height="374"
@@ -211,7 +241,7 @@ export function Header() {
               }
             }}
           >
-            {navigationGroups.map((group) => (
+            {visibleNavigationGroups.map((group) => (
               <div className="desktop-menu-item" key={group.id}>
                 <button
                   id={`nav-trigger-${group.id}`}
@@ -339,7 +369,7 @@ export function Header() {
             Inicio
             <Icon name="arrow" />
           </Link>
-          {navigationGroups.map((group) => (
+          {visibleNavigationGroups.map((group) => (
             <div className="mobile-nav-group" key={group.id}>
               <button
                 type="button"

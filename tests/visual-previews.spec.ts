@@ -89,13 +89,15 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
 
     await page.goto('/admin/envios')
     await expect(
-      page.getByRole('heading', { name: 'Todo el Perú' }),
+      page.getByRole('heading', { name: 'Lima', exact: true }),
     ).toBeVisible()
     await page.screenshot({
       path: `artifacts/review-admin-shipping-${width}.png`,
       fullPage: true,
     })
-    await page.locator('.admin-shipping-row').first().click()
+    await page
+      .getByRole('button', { name: 'Agregar tarifa por distrito' })
+      .click()
     await expect(page.locator('.admin-shipping-editor')).toBeVisible()
     await page.screenshot({
       path: `artifacts/review-admin-shipping-editor-${width}.png`,

@@ -26,12 +26,18 @@ test('El ubigeo completo mantiene la jerarquía oficial del Perú', () => {
     value: '1501',
     label: 'Lima',
   })
+  expect(getPeruProvinceOptions('callao')).toContainEqual({
+    value: '0701',
+    label: 'Callao',
+  })
   expect(getPeruDistrictOptions('1501')).toContainEqual({
     value: '150122',
     label: 'Miraflores',
   })
   expect(isValidPeruLocation('lima', '1501', '150122')).toBe(true)
+  expect(isValidPeruLocation('callao', '0701', '070101')).toBe(true)
   expect(isValidPeruLocation('arequipa', '1501', '150122')).toBe(false)
+  expect(isValidPeruLocation('lima', '0701', '070101')).toBe(false)
 })
 
 test('Cotización y promociones de muestra mantienen importes y estados explícitos', () => {
@@ -47,39 +53,41 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
     quoteShipping('callao', 'motorizado', 39000, '0701', '070101'),
   ).toMatchObject({
     kind: 'quoted',
+    region: 'capital',
     feeCents: 1500,
+  })
+  expect(
+    quoteShipping('callao', 'courier', 39000, '0701', '070101'),
+  ).toMatchObject({
+    kind: 'quoted',
+    region: 'capital',
+    feeCents: 2000,
   })
   expect(
     quoteShipping('arequipa', 'motorizado', 39000, '0401', '040103').kind,
   ).toBe('unavailable')
   expect(
     quoteShipping('arequipa', 'courier', 39000, '0401', '040103'),
-  ).toMatchObject({
-    kind: 'quoted',
-    feeCents: 3500,
-    estimate: 'Hasta 5 días',
-  })
+  ).toMatchObject({ kind: 'unavailable' })
   expect(
     quoteShipping('arequipa', 'courier', 45000, '0401', '040103'),
-  ).toMatchObject({
-    kind: 'quoted',
-    feeCents: 0,
-    free: true,
-  })
-  expect(quoteShipping('Cusco', 'courier', 39000)).toMatchObject({
-    kind: 'quoted',
-    feeCents: 3500,
-    estimate: 'Hasta 5 días',
-  })
+  ).toMatchObject({ kind: 'unavailable' })
+  expect(quoteShipping('Cusco', 'courier', 39000).kind).toBe('unavailable')
   expect(quoteShipping('Cusco', 'motorizado', 39000).kind).toBe('unavailable')
   expect(quoteShipping('departamento inexistente', 'courier', 39000).kind).toBe(
-    'pending',
+    'unavailable',
   )
   for (const department of peruDepartments) {
     expect(quoteShipping(department.value, 'courier', 39000).kind).toBe(
-      'quoted',
+      ['lima', 'callao'].includes(department.value) ? 'pending' : 'unavailable',
     )
   }
+  expect(quoteShipping('lima', 'courier', 39000, '1502', '150201').kind).toBe(
+    'unavailable',
+  )
+  expect(quoteShipping('callao', 'courier', 39000, '1501', '150122').kind).toBe(
+    'unavailable',
+  )
 
   expect(evaluatePromotion('', 39000).kind).toBe('empty')
   expect(evaluatePromotion('DESCONOCIDO', 39000).kind).toBe('not-found')
@@ -112,11 +120,9 @@ test('Cotización y promociones de muestra mantienen importes y estados explíci
   ).toBeNull()
 })
 
-test('El checkout cotiza courier para un departamento sin excepción', async ({
+test('El checkout ofrece solo Lima y Callao, reinicia el distrito y cotiza cada zona', async ({
   page,
 }) => {
-  const province = getPeruProvinceOptions('cusco')[0]
-  const district = getPeruDistrictOptions(province.value)[0]
   await page.addInitScript(() => {
     localStorage.setItem(
       'aroma-infini:cart:v1',
@@ -133,13 +139,35 @@ test('El checkout cotiza courier para un departamento sin excepción', async ({
   await page.getByLabel('Correo electrónico').fill('maria@ejemplo.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await page.getByLabel('Departamento').selectOption('cusco')
-  await page.getByLabel('Provincia').selectOption(province.value)
-  await page.getByLabel('Distrito').selectOption(district.value)
+  await expect(page.getByLabel('Departamento')).toHaveCount(0)
+  await expect(page.getByLabel('Provincia')).toHaveCount(0)
+  const zone = page.getByLabel('Zona de entrega')
+  const district = page.getByLabel('Distrito de entrega')
+  await expect(zone.locator('option')).toHaveCount(3)
+  await zone.selectOption('lima')
+  await expect(district).toHaveValue('')
+  await expect(
+    page.getByRole('button', { name: 'Revisar selección' }),
+  ).toBeDisabled()
+  await district.selectOption('150122')
   await expect(page.locator('.checkout-delivery-quote')).toContainText(
-    /S\/\s*35/,
+    /S\/\s*20/,
   )
-  await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeDisabled()
+  await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeEnabled()
+  await zone.selectOption('callao')
+  await expect(district).toHaveValue('')
+  await expect(district.locator('option[value="150122"]')).toHaveCount(0)
+  await expect(district.locator('option[value="070101"]')).toHaveText('Callao')
+  await expect(
+    page.getByRole('button', { name: 'Revisar selección' }),
+  ).toBeDisabled()
+  await district.selectOption('070101')
+  await expect(page.locator('.checkout-delivery-quote')).toContainText(
+    /S\/\s*20/,
+  )
+  await page
+    .getByLabel('Dirección', { exact: true })
+    .fill('Avenida de ejemplo 123')
   await expect(
     page.getByRole('button', { name: 'Revisar selección' }),
   ).toBeEnabled()
@@ -201,8 +229,7 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
   await page.getByLabel('Correo electrónico').fill('ana@example.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await page.getByLabel('Departamento').selectOption('lima')
-  await page.getByLabel('Provincia').selectOption('1501')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
   await page.getByLabel('Distrito').selectOption('150122')
   await page
     .getByLabel('Dirección', { exact: true })
@@ -258,8 +285,7 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
 
-  await page.getByLabel('Departamento').selectOption('lima')
-  await page.getByLabel('Provincia').selectOption('1501')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
   await page.getByLabel('Distrito').selectOption('150122')
   await page
     .getByLabel('Dirección', { exact: true })
@@ -363,8 +389,7 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
   await page.getByLabel('Correo electrónico').fill('lucia@ejemplo.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await page.getByLabel('Departamento').selectOption('lima')
-  await page.getByLabel('Provincia').selectOption('1501')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
   await page.getByLabel('Distrito').selectOption('150122')
   await page
     .getByLabel('Dirección', { exact: true })
@@ -390,6 +415,7 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
   await orderRow
     .getByRole('link', { name: new RegExp(`Ver ${reference}`) })
     .click()
+  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
   await page
     .getByRole('combobox', { name: /Preparación del pedido/ })
     .selectOption('preparing')
@@ -431,8 +457,7 @@ test('Un pago rechazado no crea pedido ni cliente en administración', async ({
   await page.getByLabel('Correo electrónico').fill('rechazado@ejemplo.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await page.getByLabel('Departamento').selectOption('lima')
-  await page.getByLabel('Provincia').selectOption('1501')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
   await page.getByLabel('Distrito').selectOption('150122')
   await page
     .getByLabel('Dirección', { exact: true })
@@ -466,18 +491,17 @@ test('La cuenta de ejemplo no autentica y el borrador se conserva al editar el c
   await page.getByLabel('Correo electrónico').fill('camila@example.invalid')
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Continuar a entrega' }).click()
-  await expect(page.getByLabel('Departamento')).toHaveValue('')
+  await expect(page.getByLabel('Distrito de entrega')).toHaveValue('')
   await expect(
     page.getByRole('button', { name: 'Revisar selección' }),
   ).toBeDisabled()
-  await page.getByLabel('Departamento').selectOption('arequipa')
-  await page.getByLabel('Provincia').selectOption('0401')
-  await page.getByLabel('Distrito').selectOption('040103')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
+  await page.getByLabel('Distrito de entrega').selectOption('150122')
   await page
     .getByLabel('Dirección', { exact: true })
     .fill('Calle de ejemplo 45')
-  await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeDisabled()
-  await expect(page.locator('.checkout-delivery-quote')).toContainText('S/ 35')
+  await expect(page.getByRole('radio', { name: /Motorizado/ })).toBeEnabled()
+  await expect(page.locator('.checkout-delivery-quote')).toContainText('S/ 20')
   await page.getByRole('button', { name: 'Revisar selección' }).click()
   await page
     .locator('.checkout-summary')
@@ -488,7 +512,9 @@ test('La cuenta de ejemplo no autentica y el borrador se conserva al editar el c
   await expect(
     page.getByRole('heading', { name: 'Revisa tu pedido' }),
   ).toBeVisible()
-  await expect(page.locator('.checkout-review-detail')).toContainText('Cayma')
+  await expect(page.locator('.checkout-review-detail')).toContainText(
+    'Miraflores',
+  )
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Tus datos' })).toBeVisible()
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('')

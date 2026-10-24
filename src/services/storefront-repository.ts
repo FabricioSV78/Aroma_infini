@@ -6,6 +6,7 @@ import type {
 } from '../types/catalog'
 import type { HomeContent, HomeMedia } from '../types/home'
 import type { ShippingSettings } from '../types/shipping'
+import type { StoreFeatures } from '../domain/store-features'
 import {
   adminService,
   getStoreBrands,
@@ -18,8 +19,7 @@ import {
 export interface StorefrontProductRecord {
   product: Product
   detail: ProductDetail
-  gender: ProductAudience
-  featured: boolean
+  gender: ProductAudience | null
   popularity: number
   newest: number
 }
@@ -27,10 +27,10 @@ export interface StorefrontProductRecord {
 export interface StorefrontSnapshot {
   brands: Brand[]
   products: StorefrontProductRecord[]
-  featuredOrder: string[]
   shipping: ShippingSettings
   media: HomeMedia
   content: HomeContent
+  features: StoreFeatures
 }
 
 /** Async boundary to replace with remote queries during Supabase integration. */
@@ -41,6 +41,7 @@ export interface StorefrontRepository {
 /** Compatibility read for the browser-local session; remote adapters need no sync API. */
 export interface LocalStorefrontRepository extends StorefrontRepository {
   peekSnapshot(): StorefrontSnapshot
+  subscribe(listener: () => void): () => void
 }
 
 let cachedState: AdminState | undefined
@@ -53,15 +54,16 @@ function peekLocalSnapshot(): StorefrontSnapshot {
   cachedSnapshot = {
     brands: getStoreBrands(),
     products: getStoreProductRecords(),
-    featuredOrder: state.featuredOrder,
     shipping: state.shipping,
     media: state.homeMedia,
     content: state.homeContent,
+    features: state.features,
   }
   return cachedSnapshot
 }
 
 export const localStorefrontRepository: LocalStorefrontRepository = {
+  subscribe: adminService.subscribe,
   async readSnapshot() {
     await hydrateAdminStore()
     return peekLocalSnapshot()

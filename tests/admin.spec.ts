@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+import { answerAdminNotice } from './admin-notice-fixtures'
 import {
   getInventoryAlerts,
   getProductInventory,
@@ -19,6 +20,14 @@ import {
 import { resolveCart } from '../src/services/commerce-service'
 
 test.afterEach(() => adminService.reset())
+
+async function deactivateProduct(page: Page, name: string) {
+  await page.getByRole('button', { name: `Desactivar ${name}` }).click()
+  await expect(page.locator('.admin-notice-dialog')).toContainText(
+    `¿Desactivar ${name}?`,
+  )
+  await answerAdminNotice(page, 'accept')
+}
 
 test('Una compra aprobada registra pedido, cliente, promoción y stock una sola vez', () => {
   expect(
@@ -166,13 +175,52 @@ test('La portada muestra el umbral de envío configurado y lo oculta en otras p�
     'Consulta las opciones disponibles',
   )
   await expect(page.locator('.announcement')).toContainText(
-    /Envíos a todo el Perú.*Gratis desde S\/\s*400/,
+    /Envíos en Lima y Callao.*Gratis desde S\/\s*400/,
   )
   await page.getByRole('link', { name: 'Envíos y entregas' }).click()
   await expect(page.locator('.announcement')).toHaveCount(0)
   await expect(page.locator('.institutional-page')).toContainText(
     'Consultar entrega',
   )
+})
+
+test('El administrador edita la franja del Home y el importe sigue la tarifa de envío', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/admin/home')
+  await page.getByRole('button', { name: 'Franja superior' }).click()
+  const delivery = page.getByRole('textbox', { name: 'Mensaje de entrega' })
+  const freeShipping = page.getByRole('textbox', {
+    name: 'Texto antes del importe de envío gratis',
+  })
+  await page.getByRole('button', { name: 'Abrir vista previa' }).click()
+  await expect(page.locator('.admin-home-announcement-preview')).toContainText(
+    'Envíos en Lima y Callao',
+  )
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click()
+  await delivery.fill('Entregamos en todo Lima')
+  await freeShipping.fill('Sin costo desde')
+  await page.getByRole('button', { name: 'Abrir vista previa' }).click()
+  await expect(page.locator('.admin-home-announcement-preview')).toContainText(
+    /Entregamos en todo Lima.*Sin costo desde S\/\s*450/,
+  )
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click()
+  await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Cambios guardados' }),
+  ).toBeVisible()
+  await page.goto('/')
+  await expect(page.locator('.announcement')).toContainText(
+    /Entregamos en todo Lima.*Sin costo desde S\/\s*450/,
+  )
+  await page.reload()
+  await expect(page.locator('.announcement')).toContainText(
+    'Entregamos en todo Lima',
+  )
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390)
 })
 
 test('Promociones rechaza importes, usos y fechas no válidos', () => {
@@ -242,11 +290,16 @@ test('Envíos rechaza umbrales, tarifas y plazos no válidos', () => {
   missingDepartment.zones[0].department = '   '
   invalid.push(missingDepartment)
   const duplicateDepartment = structuredClone(valid)
-  duplicateDepartment.zones[1].department =
-    duplicateDepartment.zones[0].department
+  duplicateDepartment.zones.push({
+    ...duplicateDepartment.zones[0],
+    id: 'zone-duplicate-coverage',
+  })
   invalid.push(duplicateDepartment)
   const duplicateId = structuredClone(valid)
-  duplicateId.zones[1].id = duplicateId.zones[0].id
+  duplicateId.zones.push({
+    ...duplicateId.zones[0],
+    district: '150122',
+  })
   invalid.push(duplicateId)
 
   for (const shipping of invalid) {
@@ -256,12 +309,24 @@ test('Envíos rechaza umbrales, tarifas y plazos no válidos', () => {
   }
 })
 
-test('Una zona nueva administrada alimenta la cotización de la tienda', () => {
+test('Una tarifa distrital se aplica y una zona histórica fuera de Lima y Callao no cotiza', () => {
   const shipping = structuredClone(
     adminService.getSnapshot().shipping,
   ) satisfies AdminShippingSettings
   shipping.zones.push({
-    id: 'zone-cusco-test',
+    id: 'zone-miraflores-test',
+    name: 'Miraflores',
+    department: 'lima',
+    province: '1501',
+    district: '150122',
+    courierFeeCents: 4200,
+    motorizadoFeeCents: null,
+    estimate: 'Hasta 5 días',
+    active: true,
+  })
+
+  shipping.zones.push({
+    id: 'zone-cusco-historical',
     name: 'Cusco',
     department: 'cusco',
     province: null,
@@ -273,110 +338,121 @@ test('Una zona nueva administrada alimenta la cotización de la tienda', () => {
   })
 
   expect(adminService.saveShipping(shipping)).toMatchObject({ kind: 'saved' })
-  expect(quoteShipping('Cusco', 'courier', 30000)).toMatchObject({
-    kind: 'quoted',
-    feeCents: 4200,
-    estimate: 'Hasta 5 días',
-  })
-})
-
-test('La tarifa nacional cubre rutas sin excepción activa y conserva las locales', () => {
-  const shipping = structuredClone(adminService.getSnapshot().shipping)
-  shipping.nationalCourierFeeCents = 3800
-  shipping.nationalEstimate = 'De 3 a 6 días'
-  shipping.zones.find((zone) => zone.id === 'zone-arequipa')!.active = false
-  expect(adminService.saveShipping(shipping)).toMatchObject({ kind: 'saved' })
-  expect(quoteShipping('cusco', 'courier', 30000)).toMatchObject({
-    kind: 'quoted',
-    feeCents: 3800,
-    estimate: 'De 3 a 6 días',
-  })
-  expect(quoteShipping('arequipa', 'courier', 30000)).toMatchObject({
-    kind: 'quoted',
-    feeCents: 3800,
-  })
   expect(
     quoteShipping('lima', 'courier', 30000, '1501', '150122'),
   ).toMatchObject({
     kind: 'quoted',
-    feeCents: 2000,
+    feeCents: 4200,
+    estimate: 'Hasta 5 días',
   })
-  expect(quoteShipping('cusco', 'motorizado', 30000).kind).toBe('unavailable')
+  expect(quoteShipping('cusco', 'courier', 30000, '0801', '080101').kind).toBe(
+    'unavailable',
+  )
 })
 
-test('El panel permite preparar una excepción nueva sin publicarla por accidente', async ({
+test('Las tarifas base de Lima y Callao se aplican de forma independiente', () => {
+  const shipping = structuredClone(adminService.getSnapshot().shipping)
+  shipping.nationalCourierFeeCents = 3800
+  shipping.nationalEstimate = 'De 3 a 6 días'
+  shipping.zones.find((zone) => zone.id === 'zone-lima')!.active = false
+  expect(adminService.saveShipping(shipping)).toMatchObject({ kind: 'saved' })
+  expect(
+    quoteShipping('lima', 'courier', 30000, '1501', '150122'),
+  ).toMatchObject({
+    kind: 'quoted',
+    feeCents: 3800,
+    estimate: 'De 3 a 6 días',
+  })
+  expect(
+    quoteShipping('callao', 'courier', 30000, '0701', '070101'),
+  ).toMatchObject({
+    kind: 'quoted',
+    feeCents: 2000,
+    estimate: 'Hasta 48 horas',
+  })
+})
+
+test('El panel permite preparar una tarifa distrital sin publicarla por accidente', async ({
   page,
 }) => {
   await page.goto('/admin/envios')
   await expect(
-    page.getByRole('heading', { name: 'Todo el Perú' }),
+    page.getByRole('heading', { name: 'Lima', exact: true }),
   ).toBeVisible()
   const previousZones = await page.locator('.admin-shipping-row').count()
 
-  await page.getByRole('button', { name: 'Agregar excepción' }).click()
+  await page
+    .getByRole('button', { name: 'Agregar tarifa por distrito' })
+    .click()
   const newZone = page.locator('.admin-shipping-editor')
   await expect(page.locator('.admin-shipping-row')).toHaveCount(
     previousZones + 1,
   )
-  await expect(newZone.getByLabel('Departamento')).toHaveValue('amazonas')
-  await expect(newZone.getByLabel('Nombre de la excepción')).toHaveValue(
-    'Amazonas',
+  await expect(newZone.getByLabel('Distrito')).toHaveValue('150101')
+  await expect(newZone.getByLabel('Nombre visible de la tarifa')).toHaveValue(
+    'Lima',
   )
-  await expect(newZone.getByLabel('Excepción activa')).not.toBeChecked()
+  await expect(newZone.getByLabel('Tarifa especial activa')).not.toBeChecked()
 
+  await newZone.getByLabel('Distrito').selectOption('150122')
+  await newZone.getByLabel('Nombre visible de la tarifa').fill('Miraflores')
   await newZone.getByLabel('Courier (S/)').fill('42')
-  await newZone.getByLabel('Excepción activa').check()
+  await newZone.getByLabel('Tarifa especial activa').check()
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
   await expect(
     page.getByText('Configuración aplicada a la tienda'),
   ).toBeVisible()
 
-  await newZone.getByRole('button', { name: 'Quitar excepción' }).click()
+  await newZone.getByRole('button', { name: 'Quitar tarifa especial' }).click()
   await expect(page.locator('.admin-shipping-row')).toHaveCount(previousZones)
 })
 
-test('El panel de envíos comparte el ubigeo encadenado con la tienda', async ({
+test('El panel de envíos ofrece distritos de Lima y Callao para tarifas especiales', async ({
   page,
 }) => {
   await page.goto('/admin/envios')
-  await page.locator('.admin-shipping-row').first().click()
-  const firstZone = page.locator('.admin-shipping-editor')
-  const department = firstZone.getByLabel('Departamento')
-  const province = firstZone.getByLabel('Provincia')
-  const district = firstZone.getByLabel('Distrito')
+  await page
+    .getByRole('button', { name: 'Agregar tarifa por distrito' })
+    .click()
+  const editor = page.locator('.admin-shipping-editor')
+  const district = editor.getByLabel('Distrito')
 
-  await expect(department.locator('option')).toHaveCount(25)
-  await expect(department).toHaveValue('lima')
-  await expect(province).toHaveValue('1501')
-  await expect(province.locator('option')).toHaveCount(11)
+  await expect(editor.getByLabel('Departamento')).toHaveCount(0)
+  await expect(editor.getByLabel('Provincia')).toHaveCount(0)
+  await expect(district.locator('option')).toHaveCount(43)
   await expect(district.locator('option[value="150122"]')).toHaveText(
     'Miraflores',
   )
-
-  await department.selectOption('arequipa')
-  await expect(province).toHaveValue('')
-  await expect(district).toBeDisabled()
-  await expect(province.locator('option')).toHaveCount(9)
+  await editor.getByLabel('Zona').selectOption('callao')
+  await expect(district.locator('option')).toHaveCount(7)
+  await expect(district.locator('option[value="070101"]')).toHaveText('Callao')
+  await expect(district.locator('option[value="150122"]')).toHaveCount(0)
 })
 
-test('La tarifa nacional se edita en un solo lugar y persiste al recargar', async ({
+test('Las tarifas base de Lima y Callao se editan por separado y persisten', async ({
   page,
 }) => {
   await page.goto('/admin/envios')
-  await page.getByLabel('Tarifa base de courier (S/)').fill('38')
-  await page.getByLabel('Plazo estimado general').fill('De 3 a 6 días')
+  await page.getByLabel('Courier en Lima (S/)').fill('38')
+  await page.getByLabel('Plazo estimado en Lima').fill('De 3 a 6 días')
+  await page.getByLabel('Courier en Callao (S/)').fill('28')
+  await page.getByLabel('Plazo estimado en Callao').fill('De 1 a 2 días')
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
   await expect(
     page.getByText('Configuración aplicada a la tienda.'),
   ).toBeVisible()
   await page.reload()
-  await expect(page.getByLabel('Tarifa base de courier (S/)')).toHaveValue('38')
-  await expect(page.getByLabel('Plazo estimado general')).toHaveValue(
+  await expect(page.getByLabel('Courier en Lima (S/)')).toHaveValue('38')
+  await expect(page.getByLabel('Plazo estimado en Lima')).toHaveValue(
     'De 3 a 6 días',
+  )
+  await expect(page.getByLabel('Courier en Callao (S/)')).toHaveValue('28')
+  await expect(page.getByLabel('Plazo estimado en Callao')).toHaveValue(
+    'De 1 a 2 días',
   )
 })
 
-test('Una configuración guardada antes de la tarifa nacional conserva sus excepciones', async ({
+test('Una configuración antigua conserva su tarifa de Lima al migrar', async ({
   page,
 }) => {
   await page.goto('/admin/envios')
@@ -408,11 +484,11 @@ test('Una configuración guardada antes de la tarifa nacional conserva sus excep
     db.close()
   })
   await page.reload()
-  await expect(page.getByLabel('Tarifa base de courier (S/)')).toHaveValue('35')
-  await expect(page.locator('.admin-shipping-row')).toHaveCount(3)
+  await expect(page.getByLabel('Courier en Lima (S/)')).toHaveValue('20')
+  await expect(page.locator('.admin-shipping-row')).toHaveCount(0)
 })
 
-test('Un producto inactivo no conserva una posición destacada', () => {
+test('Desactivar un producto conserva sus datos y retira su visibilidad', () => {
   const product = adminService
     .getSnapshot()
     .products.find((record) => record.product.id === 'sillage')
@@ -421,7 +497,48 @@ test('Un producto inactivo no conserva una posición destacada', () => {
   expect(adminService.saveProduct({ ...product, active: false }).kind).toBe(
     'saved',
   )
-  expect(adminService.getSnapshot().featuredOrder).not.toContain('sillage')
+  const saved = adminService
+    .getSnapshot()
+    .products.find((record) => record.product.id === 'sillage')
+  expect(saved?.active).toBe(false)
+  expect(saved?.product.variants).toEqual(product.product.variants)
+  expect(saved).not.toHaveProperty('featured')
+})
+
+test('Un borrador manual puede guardarse sin foto, pero no publicarse así', () => {
+  const stored = adminService
+    .getSnapshot()
+    .products.find((record) => record.product.id === 'cedre')
+  expect(stored).toBeDefined()
+  if (!stored) return
+  const draft = cloneAdminProduct(stored)
+  draft.active = false
+  draft.product.id = 'draft-without-photo'
+  draft.product.slug = 'borrador-sin-foto'
+  draft.product.name = 'Borrador sin foto'
+  draft.product.image = ''
+  draft.product.variants = draft.product.variants.map((variant) => ({
+    ...variant,
+    id: `draft-${variant.ml}`,
+  }))
+  draft.detail.gallery = []
+  draft.detail.recommendationIds = []
+
+  expect(adminService.saveProduct(draft).kind).toBe('saved')
+  expect(
+    adminService
+      .getSnapshot()
+      .products.find((record) => record.product.id === draft.product.id)
+      ?.active,
+  ).toBe(false)
+  const publish = adminService.saveProduct({ ...draft, active: true })
+  expect(publish.kind).toBe('validation')
+  expect(
+    adminService
+      .getSnapshot()
+      .products.find((record) => record.product.id === draft.product.id)
+      ?.active,
+  ).toBe(false)
 })
 
 test('El inventario clasifica cada presentación activa y excluye las inactivas', () => {
@@ -514,7 +631,7 @@ test('El panel declara sus límites y permite recorrer cada módulo', async ({
     ['/admin/pedidos', 'Pedidos'],
     ['/admin/clientes', 'Clientes'],
     ['/admin/promociones', 'Promociones'],
-    ['/admin/envios', 'Envíos'],
+    ['/admin/envios', 'Tarifas de envío'],
     ['/admin/home', 'Home'],
   ] as const
   for (const [path, title] of modules) {
@@ -623,8 +740,13 @@ test('Desactivar un producto lo retira de la tienda durante la misma sesión', a
   page,
 }) => {
   await page.goto('/admin/productos?guardado=1')
-  await expect(page.getByText('Producto guardado.')).toBeVisible()
+  await expect(page.getByText('Producto guardado.')).toHaveCount(0)
   await page.getByRole('button', { name: 'Desactivar Bois Clair' }).click()
+  await answerAdminNotice(page, 'dismiss')
+  await expect(
+    page.getByRole('button', { name: 'Desactivar Bois Clair' }),
+  ).toBeVisible()
+  await deactivateProduct(page, 'Bois Clair')
   await expect(page.getByText('Producto guardado.')).toHaveCount(0)
   await expect(page.getByText('Bois Clair desactivado.')).toBeVisible()
   const row = page
@@ -636,7 +758,7 @@ test('Desactivar un producto lo retira de la tienda durante la misma sesión', a
   await expect(page.getByRole('heading', { name: 'Bois Clair' })).toHaveCount(0)
 })
 
-test('Editar stock actualiza la disponibilidad comercial de la tienda', async ({
+test('Editar stock desactiva el producto agotado y lo retira de la tienda', async ({
   page,
 }) => {
   await page.goto('/admin/productos/cedre')
@@ -648,11 +770,17 @@ test('Editar stock actualiza la disponibilidad comercial de la tienda', async ({
   await stock100.fill('0')
   await page.getByRole('button', { name: 'Guardar producto' }).click()
   await expect(page).toHaveURL(/\/admin\/productos\?guardado=1$/)
+  const row = page
+    .locator('.admin-table tbody tr')
+    .filter({ hasText: 'Bois Clair' })
+  await expect(row.getByText('Inactivo', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Ver tienda' }).click()
   const card = page
     .locator('.bestsellers-section .product-card')
     .filter({ hasText: 'Bois Clair' })
-  await expect(card).toContainText('Agotado')
+  await expect(card).toHaveCount(0)
+  await page.goto('/tienda?q=Bois+Clair')
+  await expect(page.locator('.product-card')).toHaveCount(0)
 })
 
 test('El editor conserva comas al escribir notas y guarda la lista normalizada', async ({
@@ -709,7 +837,7 @@ test('Productos combina búsqueda, inventario y visibilidad en la URL', async ({
 }) => {
   await page.goto('/admin/productos')
 
-  await page.getByRole('button', { name: 'Desactivar Bois Clair' }).click()
+  await deactivateProduct(page, 'Bois Clair')
   await page.getByRole('searchbox', { name: 'Buscar' }).fill('Bois')
   await page.getByLabel('Estado de stock').selectOption('healthy')
   await page.getByLabel('Visibilidad').selectOption('inactive')
@@ -726,7 +854,10 @@ test('Productos combina búsqueda, inventario y visibilidad en la URL', async ({
 
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await expect(page).toHaveURL('/admin/productos')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(8)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
+  await expect(page.locator('.admin-pagination')).toContainText(
+    'Mostrando 1–12 de 16 productos',
+  )
 })
 
 test('Los filtros de inventario distinguen alertas, agotados y productos sanos', async ({
@@ -744,12 +875,21 @@ test('Los filtros de inventario distinguen alertas, agotados y productos sanos',
   await expect(page.locator('.admin-table tbody tr')).toContainText(
     'Ambre Lent',
   )
+  await expect(page.locator('.admin-table tbody tr')).toContainText('Inactivo')
 
   await page.getByLabel('Estado de stock').selectOption('healthy')
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page).toHaveURL('/admin/productos?stock=healthy')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(6)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
+  await expect(page.locator('.admin-pagination')).toContainText(
+    'Mostrando 1–12 de 14 productos',
+  )
   await expect(page.locator('.admin-table')).toContainText('Bois Clair')
+  await page
+    .getByRole('navigation', { name: 'Paginación de productos' })
+    .getByRole('button', { name: 'Siguiente' })
+    .click()
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(2)
   await expect(page.locator('.admin-table')).toContainText('Vert Silence')
 })
 
@@ -758,39 +898,31 @@ test('El editor advierte antes de descartar cambios sin guardar', async ({
 }) => {
   await page.goto('/admin/productos/cedre')
   await page.getByLabel('Nombre').fill('Bois editado')
-  let dialogPromise = page.waitForEvent('dialog')
-  let clickPromise = page.locator('.admin-back').click()
-  let dialog = await dialogPromise
-  expect(dialog.message()).toContain('cambios sin guardar')
-  await dialog.dismiss()
-  await clickPromise
+  await page.locator('.admin-back').click()
+  await expect(page.locator('.admin-notice-dialog')).toContainText(
+    '¿Salir sin guardar?',
+  )
+  await answerAdminNotice(page, 'dismiss')
   await expect(page).toHaveURL(/\/admin\/productos\/cedre$/)
 
-  dialogPromise = page.waitForEvent('dialog')
-  clickPromise = page.locator('.admin-back').click()
-  dialog = await dialogPromise
-  await dialog.accept()
-  await clickPromise
+  await page.locator('.admin-back').click()
+  await answerAdminNotice(page, 'accept')
   await expect(page).toHaveURL(/\/admin\/productos$/)
 })
 
-test('La selección de destacados permanece en la tienda tras retirar el bloque del Home', async ({
+test('El editor del Home conserva el recomendador sin la selección retirada', async ({
   page,
 }) => {
   await page.goto('/admin/home')
-  await page.getByRole('button', { name: 'Destacados', exact: true }).click()
-  await page.getByRole('button', { name: 'Invertir orden' }).click()
-  await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
-  await expect(page.getByText(/Cambios guardados/)).toBeVisible()
-  await page.getByRole('link', { name: 'Ver en tienda' }).click()
-  await expect(page.locator('.product-card')).toHaveCount(2)
-  const names = await page
-    .locator('.product-card .product-meta :is(h2, h3)')
-    .allTextContents()
-  expect(names.map((name) => name.trim()).sort()).toEqual([
-    'Bois Clair',
-    'Vert Silence',
-  ])
+  await expect(
+    page.getByRole('button', { name: 'Destacados', exact: true }),
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Encuentra tu perfume ideal' }),
+  ).toBeVisible()
+  await page.goto('/tienda?seleccion=destacados')
+  await expect(page).toHaveURL('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(12)
 })
 
 test('El detalle separa pago y preparación y permite actualizar el pedido', async ({
@@ -810,6 +942,7 @@ test('El detalle separa pago y preparación y permite actualizar el pedido', asy
     page.getByRole('combobox', { name: 'Pago', exact: true }),
   ).toHaveCount(0)
 
+  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
   await page
     .getByRole('combobox', { name: /Preparación del pedido/ })
     .selectOption('preparing')
@@ -871,6 +1004,20 @@ test('La acción rápida prepara un pedido y exige datos de entrega antes de env
   const row = page.locator('.admin-table tbody tr')
   await expect(row).toContainText('Nuevo')
   await page.getByRole('button', { name: 'Preparar AI-210926-01' }).click()
+  await page
+    .getByRole('dialog', {
+      name: 'Actualizar pedido AI-210926-01',
+      exact: true,
+    })
+    .getByLabel('Responsable de los cambios')
+    .fill('Ana Operaciones')
+  await page
+    .getByRole('dialog', {
+      name: 'Actualizar pedido AI-210926-01',
+      exact: true,
+    })
+    .getByRole('button', { name: 'Confirmar actualización', exact: true })
+    .click()
   await expect(row).toContainText('En preparación')
   await expect(
     page.getByRole('button', { name: 'Enviar AI-210926-01' }),
@@ -883,6 +1030,7 @@ test('Las validaciones evitan desactivar marcas con productos visibles', async (
 }) => {
   await page.goto('/admin/marcas')
   await page.getByRole('button', { name: 'Desactivar Atelier 01' }).click()
+  await answerAdminNotice(page, 'accept')
   await expect(
     page.getByText('Desactiva primero los productos visibles de esta marca.'),
   ).toBeVisible()
@@ -942,7 +1090,10 @@ test('Limpiar una búsqueda administrativa vacía también el campo y la URL', a
 
   await expect(page).toHaveURL('/admin/productos')
   await expect(search).toHaveValue('')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(8)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
+  await expect(page.locator('.admin-pagination')).toContainText(
+    'Mostrando 1–12 de 16 productos',
+  )
 })
 
 test('La lista corrige páginas inválidas y conserva la búsqueda al volver', async ({

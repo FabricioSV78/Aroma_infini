@@ -3,8 +3,23 @@ import type {
   Product,
   ProductAudience,
   ProductGalleryView,
+  ProductType,
 } from '../types/catalog'
+import {
+  OLFACTORY_FAMILIES,
+  getProductOlfactoryFamilies,
+  isOlfactoryFamily,
+  type OlfactoryFamily,
+} from '../domain/olfactory-family'
 import { getProductPresentation } from './product-presentation'
+import {
+  getProductType,
+  isPerfume,
+  isProductType,
+} from '../domain/product-type'
+import { getVariantPrice } from './product-discounts'
+import { getProductRecommendations } from './product-recommendations'
+import type { StoreFeatures } from '../domain/store-features'
 import {
   localStorefrontRepository,
   type StorefrontProductRecord,
@@ -37,22 +52,22 @@ export function getCatalogProductGallery(
   )
 }
 export const orders = [
-  { value: 'novedades', label: 'Novedades' },
+  { value: 'mas-vendidos', label: 'Más vendidos' },
   { value: 'precio-asc', label: 'Precio: menor a mayor' },
   { value: 'precio-desc', label: 'Precio: mayor a menor' },
-  { value: 'mas-vendidos', label: 'Más vendidos' },
 ] as const
 export type CatalogOrder = (typeof orders)[number]['value']
 export const PAGE_SIZE = 12
 export interface CatalogQuery {
+  productTypes: ProductType[]
   brands: string[]
   genders: CatalogGender[]
+  families: OlfactoryFamily[]
   min: string
   max: string
   order: CatalogOrder
   page: number
   search: string
-  featured: boolean
 }
 function priceParam(value: string | null) {
   return value && /^\d+(\.\d{1,2})?$/.test(value) && Number(value) <= 1000000
@@ -62,13 +77,20 @@ function priceParam(value: string | null) {
 export function readCatalogQuery(
   params: URLSearchParams,
   brands: readonly Brand[] = localStorefrontRepository.peekSnapshot().brands,
+  features: StoreFeatures = localStorefrontRepository.peekSnapshot().features,
 ): CatalogQuery {
   const genders = getCatalogGenders()
   let min = priceParam(params.get('min'))
   let max = priceParam(params.get('max'))
   const rawOrder = params.get('orden')
+  const productTypes = features.complementsEnabled
+    ? [...new Set(params.getAll('tipo').filter(isProductType))]
+    : []
+  const complementsOnly =
+    productTypes.length === 1 && productTypes[0] === 'complemento'
   if (min && max && Number(min) > Number(max)) [min, max] = [max, min]
   return {
+    productTypes,
     brands: [
       ...new Set(
         params
@@ -76,25 +98,29 @@ export function readCatalogQuery(
           .filter((slug) => brands.some((brand) => brand.slug === slug)),
       ),
     ],
-    genders: [
-      ...new Set(
-        params
-          .getAll('genero')
-          .filter((value): value is CatalogGender =>
-            genders.some((gender) => gender.value === value),
+    genders: complementsOnly
+      ? []
+      : [
+          ...new Set(
+            params
+              .getAll('genero')
+              .filter((value): value is CatalogGender =>
+                genders.some((gender) => gender.value === value),
+              ),
           ),
-      ),
-    ],
+        ],
+    families: complementsOnly
+      ? []
+      : [...new Set(params.getAll('familia').filter(isOlfactoryFamily))],
     min,
     max,
     order:
-      orders.find((order) => order.value === rawOrder)?.value ?? 'novedades',
+      orders.find((order) => order.value === rawOrder)?.value ?? 'mas-vendidos',
     page: Math.max(
       1,
       Math.min(100000, Number.parseInt(params.get('pagina') ?? '1', 10) || 1),
     ),
     search: (params.get('q') ?? '').trim().slice(0, 100),
-    featured: params.get('seleccion') === 'destacados',
   }
 }
 export function normalizeText(value: string) {
@@ -116,6 +142,9 @@ export function queryCatalog(
     records.map((record) => [record.product.id, record]),
   )
   const matched = source.filter((product) => {
+    const selectedTypes = query.productTypes ?? []
+    const complementsOnly =
+      selectedTypes.length === 1 && selectedTypes[0] === 'complemento'
     const brand = brands.find((item) => item.id === product.brandId)
     const details = recordsById.get(product.id)
     const activeVariants = product.variants.filter(
@@ -125,18 +154,30 @@ export function queryCatalog(
     const priceVariants = available.length ? available : activeVariants
     const priceMatch =
       (!query.min && !query.max) ||
-      priceVariants.some(
-        (variant) =>
-          (!query.min ||
-            variant.priceCents >= Math.round(Number(query.min) * 100)) &&
-          (!query.max ||
-            variant.priceCents <= Math.round(Number(query.max) * 100)),
-      )
+      priceVariants.some((variant) => {
+        const finalCents = getVariantPrice(product, variant).finalCents
+        return (
+          (!query.min || finalCents >= Math.round(Number(query.min) * 100)) &&
+          (!query.max || finalCents <= Math.round(Number(query.max) * 100))
+        )
+      })
+    const olfactoryFamilies = getProductOlfactoryFamilies(product)
     return (
+      (!selectedTypes.length ||
+        selectedTypes.includes(getProductType(product))) &&
       (!query.brands.length || query.brands.includes(brand?.slug ?? '')) &&
       (!query.genders.length ||
-        (details !== undefined && query.genders.includes(details.gender))) &&
-      (!query.featured || details?.featured) &&
+        complementsOnly ||
+        (isPerfume(product) &&
+          details?.gender !== null &&
+          details !== undefined &&
+          query.genders.includes(details.gender))) &&
+      (!query.families.length ||
+        complementsOnly ||
+        (isPerfume(product) &&
+          olfactoryFamilies.some((family) =>
+            query.families.includes(family),
+          ))) &&
       priceMatch &&
       (!query.search ||
         normalizeText(product.name + ' ' + (brand?.name ?? '')).includes(
@@ -144,9 +185,22 @@ export function queryCatalog(
         ))
     )
   })
+  const finalPrices = new Map(
+    matched.map((product) => {
+      const visible = getProductPresentation(product.variants).variants
+      const price = visible.length
+        ? Math.min(
+            ...visible.map(
+              (variant) => getVariantPrice(product, variant).finalCents,
+            ),
+          )
+        : null
+      return [product.id, price] as const
+    }),
+  )
   matched.sort((a, b) => {
-    const aPrice = getProductPresentation(a.variants).priceCents
-    const bPrice = getProductPresentation(b.variants).priceCents
+    const aPrice = finalPrices.get(a.id) ?? null
+    const bPrice = finalPrices.get(b.id) ?? null
     if (query.order.startsWith('precio')) {
       if (aPrice === null) return bPrice === null ? 0 : 1
       if (bPrice === null) return -1
@@ -154,9 +208,10 @@ export function queryCatalog(
     }
     const aRecord = recordsById.get(a.id)
     const bRecord = recordsById.get(b.id)
-    return query.order === 'mas-vendidos'
-      ? (aRecord?.popularity ?? Infinity) - (bRecord?.popularity ?? Infinity)
-      : (bRecord?.newest ?? 0) - (aRecord?.newest ?? 0)
+    return (
+      (aRecord?.popularity ?? Number.MAX_SAFE_INTEGER) -
+      (bRecord?.popularity ?? Number.MAX_SAFE_INTEGER)
+    )
   })
   const pages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE))
   const page = Math.min(query.page, pages)
@@ -171,7 +226,10 @@ export interface CatalogReadService {
   getCatalog(query: CatalogQuery): Promise<
     ReturnType<typeof queryCatalog> & {
       brands: Brand[]
+      availableTotal: number
       genders: ReturnType<typeof getCatalogGenders>
+      families: ReadonlyArray<(typeof OLFACTORY_FAMILIES)[number]>
+      features: StoreFeatures
     }
   >
   getBrands(): Promise<Brand[]>
@@ -196,6 +254,11 @@ export interface CatalogReadService {
 export const catalogService: CatalogReadService = {
   async getCatalog(query: CatalogQuery) {
     const snapshot = await localStorefrontRepository.readSnapshot()
+    const publishedFamilies = new Set(
+      snapshot.products.flatMap((record) =>
+        getProductOlfactoryFamilies(record.product),
+      ),
+    )
     return {
       ...queryCatalog(
         query,
@@ -204,7 +267,12 @@ export const catalogService: CatalogReadService = {
         snapshot.brands,
       ),
       brands: snapshot.brands,
+      availableTotal: snapshot.products.length,
+      features: snapshot.features,
       genders: getCatalogGenders(),
+      families: OLFACTORY_FAMILIES.filter((family) =>
+        publishedFamilies.has(family.value),
+      ),
     }
   },
   async getBrands() {
@@ -230,9 +298,11 @@ export const catalogService: CatalogReadService = {
       product,
       detail,
       brand: brands.find((brand) => brand.id === product.brandId),
-      recommendations: detail.recommendationIds
-        .map((id) => products.find((item) => item.id === id))
-        .filter((item): item is Product => Boolean(item)),
+      recommendations: getProductRecommendations(
+        product,
+        detail.recommendationIds,
+        products,
+      ),
       brands,
     }
   },

@@ -1,5 +1,7 @@
 # Assets temporales — fases 1 y 2
 
+**Categoría Complementos:** fotografía conceptual provisional de atomizadores, creada con la herramienta integrada `image_gen` para sustituir la ilustración del Home. Archivos WebP: `public/images/discovery-complements-v1-{480,960,1122}.webp`. El original mide 1122 × 1402 px; no se amplía artificialmente. Prompt exacto, origen y condición provisional: [category-complements-v1.json](../scripts/category-complements-v1.json). Preparación: `node scripts/prepare-category-complements.mjs <original>`. Es editable desde Contenido del Home → Categorías y no representa un producto comercial disponible.
+
 **Tercera campaña del hero:** [hero-v3-assets.json](../scripts/hero-v3-assets.json) registra los dos encuadres del frasco rosado, prompts y referencias. Preparación: [prepare-hero-v3.mjs](../scripts/prepare-hero-v3.mjs). Entrega: [HOME_REFINEMENT_REVIEW.md](HOME_REFINEMENT_REVIEW.md).
 
 **Fotografía de la revisión premium:** [HOME_PREMIUM_REVIEW.md](HOME_PREMIUM_REVIEW.md#fotografías-y-procedencia) documenta las composiciones `editorial-essential-v3` y `featured-duo-v3`, creadas a partir de los frascos conceptuales existentes. Prompts exactos, referencias y originales: [home-premium-assets.json](../scripts/home-premium-assets.json). El inventario siguiente corresponde a los primeros assets.

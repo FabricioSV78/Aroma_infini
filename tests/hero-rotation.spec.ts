@@ -24,16 +24,18 @@ async function expectCurrentIndicator(page: Page, index: number) {
   await expect(indicators.nth(index)).toHaveClass(/is-current/)
 }
 
-test('Cinco campañas cambian cada tres segundos sin alterar la altura', async ({
+test('Cinco campañas cambian aproximadamente cada 3,8 segundos sin alterar la altura', async ({
   page,
 }) => {
   await prepare(page)
   const hero = page.locator('.hero')
   const height = (await hero.boundingBox())!.height
   expect(
-    await page.locator('.hero-slide').evaluateAll((slides) =>
-      slides.map((slide) => slide.getAttribute('data-campaign')),
-    ),
+    await page
+      .locator('.hero-slide')
+      .evaluateAll((slides) =>
+        slides.map((slide) => slide.getAttribute('data-campaign')),
+      ),
   ).toEqual([
     'hero-v2-lumiere',
     'hero-v5-silence',
@@ -54,7 +56,7 @@ test('Cinco campañas cambian cada tres segundos sin alterar la altura', async (
     'Una fragancia',
   ]
   for (const [index, title] of titles.entries()) {
-    await page.clock.runFor(3100)
+    await page.clock.runFor(3900)
     await expect(page.getByRole('heading', { level: 1 })).toContainText(title)
     await expectCurrentIndicator(page, (index + 1) % 5)
     expect((await hero.boundingBox())!.height).toBe(height)
@@ -114,7 +116,7 @@ test('Las flechas pausan el carrusel mientras el usuario las explora', async ({
     'aria-live',
     'off',
   )
-  await page.clock.runFor(3100)
+  await page.clock.runFor(3900)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
@@ -211,8 +213,19 @@ test('Una fotografía fallida se omite sin interrumpir las campañas disponibles
     }),
   )
   await page.goto('/')
-  await expect(page.locator('.hero-image img')).toHaveCount(2)
-  await page.clock.runFor(3100)
+  await page.waitForFunction(() => {
+    const images = [
+      ...document.querySelectorAll<HTMLImageElement>('.hero-image img'),
+    ]
+    return (
+      images.length === 4 &&
+      images.every((image) => image.complete && image.naturalWidth > 0)
+    )
+  })
+  await expect(
+    page.locator('.hero-slide[data-campaign="hero-v4-amber"] img'),
+  ).toHaveCount(0)
+  await page.clock.runFor(3900)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Lo sutil también',
   )
@@ -222,7 +235,7 @@ test('Una fotografía fallida se omite sin interrumpir las campañas disponibles
     )
     return image?.complete && image.naturalWidth > 0
   })
-  await page.clock.runFor(3100)
+  await page.clock.runFor(3900)
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'La frescura',
   )

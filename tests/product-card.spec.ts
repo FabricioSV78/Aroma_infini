@@ -64,7 +64,7 @@ test('Los productos respetan la jerarquía de encabezados en tienda y Home', asy
   )
 })
 
-test('Favoritos compartidos: botón, teclado y estado coherente al repetir un producto', async ({
+test('Favoritos compartidos entre Home y tienda: botón, teclado y estado coherente', async ({
   page,
 }) => {
   await page.goto('/')
@@ -72,29 +72,28 @@ test('Favoritos compartidos: botón, teclado y estado coherente al repetir un pr
     name: 'Guardar Bois Clair en favoritos',
     exact: true,
   })
-  await expect(favorites).toHaveCount(2)
+  await expect(favorites).toHaveCount(1)
   await favorites.first().focus()
   await page.keyboard.press('Space')
   const savedFavorites = page.getByRole('button', {
     name: 'Quitar Bois Clair de favoritos',
     exact: true,
   })
-  for (const favorite of await savedFavorites.all())
-    await expect(favorite).toHaveAttribute('aria-pressed', 'true')
+  await expect(savedFavorites).toHaveAttribute('aria-pressed', 'true')
   await expect(page).toHaveURL('/')
-  await savedFavorites.last().click()
-  for (const favorite of await favorites.all()) {
-    await expect(favorite).toHaveAttribute('aria-pressed', 'false')
-    const box = (await favorite.boundingBox())!
-    expect(box.width).toBeGreaterThanOrEqual(44)
-    expect(box.height).toBeGreaterThanOrEqual(44)
-  }
+  await page.goto('/tienda')
+  await expect(savedFavorites).toHaveAttribute('aria-pressed', 'true')
+  await savedFavorites.click()
+  await expect(favorites).toHaveAttribute('aria-pressed', 'false')
+  const box = (await favorites.boundingBox())!
+  expect(box.width).toBeGreaterThanOrEqual(44)
+  expect(box.height).toBeGreaterThanOrEqual(44)
+  await page.goto('/')
+  await expect(favorites).toHaveAttribute('aria-pressed', 'false')
   const soldOut = page
     .locator('.product-card')
     .filter({ has: page.getByRole('heading', { name: 'Ambre Lent' }) })
-  await expect(soldOut).toContainText('Agotado')
-  await expect(soldOut).toContainText('Referencia:')
-  await expect(soldOut).not.toContainText('Desde')
+  await expect(soldOut).toHaveCount(0)
 })
 
 test('Las fotos de Más vendidos conservan tamaño, alineación y fundido sin zoom', async ({

@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import '../../styles/home-categories.css'
 import { SectionHeading } from '../../components/ui/SectionHeading'
 import { Icon } from '../../components/ui/Icon'
 import { categories } from '../../content/home'
@@ -6,7 +7,14 @@ import type { HomeData } from '../../services/home-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
 import { ProductCard } from './ProductCard'
 
-export function Categories({ media }: Pick<HomeData, 'media'>) {
+export function Categories({
+  media,
+  features,
+}: Pick<HomeData, 'media' | 'features'>) {
+  const visibleCategories = categories.filter(
+    (category) => category.id !== 'complementos' || features.complementsEnabled,
+  )
+  const fourCategories = features.complementsEnabled
   return (
     <section
       className="section container discovery-section"
@@ -16,11 +24,13 @@ export function Categories({ media }: Pick<HomeData, 'media'>) {
     >
       <SectionHeading
         id="categories-title"
-        eyebrow="Tres formas de explorar"
+        eyebrow={`${fourCategories ? 'Cuatro' : 'Tres'} formas de explorar`}
         title="Elige por dónde empezar"
       />
-      <div className="category-grid">
-        {categories.map((category) => (
+      <div
+        className={`category-grid${fourCategories ? ' category-grid--four' : ''}`}
+      >
+        {visibleCategories.map((category) => (
           <Link
             to={category.to}
             className={`category category--${category.layout}`}
@@ -35,9 +45,20 @@ export function Categories({ media }: Pick<HomeData, 'media'>) {
                 )}
                 srcSet={imageSourceSet(
                   media[category.id as keyof typeof media] ?? category.image,
-                  [480, 960, 1536],
+                  category.imageWidths ?? [480, 960, 1536],
                 )}
-                sizes="(min-width: 1440px) 760px, (min-width: 768px) 55vw, (max-width: 767px) 100vw"
+                sizes={
+                  fourCategories
+                    ? '(min-width: 1760px) 396px, (min-width: 1024px) 23vw, 46vw'
+                    : '(min-width: 1440px) 760px, (min-width: 768px) 55vw, (max-width: 767px) 100vw'
+                }
+                style={{
+                  objectPosition: media[category.id as keyof typeof media]
+                    ? 'center'
+                    : fourCategories
+                      ? category.imagePosition
+                      : undefined,
+                }}
                 width={category.width}
                 height={category.height}
                 alt=""

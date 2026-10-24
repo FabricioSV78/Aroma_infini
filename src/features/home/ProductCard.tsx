@@ -1,11 +1,15 @@
+import { isPerfume, variantLabel } from '../../domain/product-type'
 import { Link } from 'react-router'
 import type { Brand, Product } from '../../types/catalog'
 import { Icon } from '../../components/ui/Icon'
 import { useFavorites } from '../favorites/favorites-context'
 import { getProductPresentation } from '../../services/product-presentation'
-import { formatPEN } from '../../services/currency'
+import { getVariantPrice } from '../../services/product-discounts'
 import { getCatalogProductGallery } from '../../services/catalog-service'
 import { imageSource, imageSourceSet } from '../../services/image-source'
+import { PriceDisplay } from '../../components/ui/PriceDisplay'
+import { OfferBadge } from '../../components/ui/OfferBadge'
+import { useOfferPriceRevision } from '../../services/offer-price-clock'
 
 interface ProductCardProps {
   product: Product
@@ -14,6 +18,7 @@ interface ProductCardProps {
   showAction?: boolean
   imageSizes?: string
   headingLevel?: 2 | 3
+  preview?: boolean
 }
 export function ProductCard({
   product,
@@ -22,12 +27,24 @@ export function ProductCard({
   imageSizes: imageSizesOverride,
   headingLevel = 3,
   showAction = false,
+  preview = false,
 }: ProductCardProps) {
+  useOfferPriceRevision()
   const { favoriteIds, toggleFavorite } = useFavorites()
   const isFavorite = favoriteIds.has(product.id)
-  const { inStock, priceCents, showFrom, variants } = getProductPresentation(
-    product.variants,
+  const { inStock, variants } = getProductPresentation(product.variants)
+  const variantPrices = variants.map((variant) =>
+    getVariantPrice(product, variant),
   )
+  const displayPrice = variantPrices.reduce<
+    (typeof variantPrices)[number] | null
+  >(
+    (lowest, price) =>
+      !lowest || price.finalCents < lowest.finalCents ? price : lowest,
+    null,
+  )
+  const showFrom =
+    inStock && new Set(variantPrices.map((price) => price.finalCents)).size > 1
   const imageSizes =
     imageSizesOverride ??
     (variant === 'standard'
@@ -37,7 +54,7 @@ export function ProductCard({
   const alternateImage = gallery?.[1]?.image
   const productImageAlt =
     gallery[0]?.alt.trim() ||
-    `Frasco de ${product.name}${brand ? ` de ${brand.name}` : ''}`
+    `${isPerfume(product) ? 'Frasco de ' : ''}${product.name}${brand ? ` de ${brand.name}` : ''}`
   const Heading = headingLevel === 2 ? 'h2' : 'h3'
   const favoriteButton = (
     <button
@@ -45,8 +62,18 @@ export function ProductCard({
       className="icon-button product-favorite"
       aria-label={`${isFavorite ? 'Quitar' : 'Guardar'} ${product.name} ${isFavorite ? 'de' : 'en'} favoritos`}
       aria-pressed={isFavorite}
-      title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-      onClick={() => toggleFavorite(product.id)}
+      aria-disabled={preview}
+      tabIndex={preview ? -1 : undefined}
+      title={
+        preview
+          ? 'Disponible en la tienda'
+          : isFavorite
+            ? 'Quitar de favoritos'
+            : 'Guardar en favoritos'
+      }
+      onClick={() => {
+        if (!preview) toggleFavorite(product.id)
+      }}
     >
       <Icon name="heart" />
     </button>
@@ -62,6 +89,8 @@ export function ProductCard({
           }
           to={`/producto/${product.slug}`}
           aria-label={`Ver ${product.name}`}
+          aria-disabled={preview}
+          tabIndex={preview ? -1 : undefined}
         >
           <img
             className="product-image-primary"
@@ -89,41 +118,56 @@ export function ProductCard({
             />
           )}
         </Link>
+        <OfferBadge
+          discount={product.discount}
+          price={inStock ? displayPrice : null}
+        />
         {favoriteButton}
         {!inStock && <span className="stock-label">Agotado</span>}
       </div>
       <div className="product-meta">
         <p className="eyebrow brand-label">{brand?.name}</p>
         <Heading>
-          <Link to={`/producto/${product.slug}`}>
+          <Link
+            to={`/producto/${product.slug}`}
+            aria-disabled={preview}
+            tabIndex={preview ? -1 : undefined}
+          >
             {product.name}
             {!showAction && <Icon name="arrow" />}
           </Link>
         </Heading>
         {variant !== 'editorial' && (
-          <p className="product-family">{product.family}</p>
+          <p className="product-family">
+            {isPerfume(product) ? product.family : 'Complemento'}
+          </p>
         )}
         <div className="product-price">
-          <span>
-            {showFrom && <span className="price-prefix">Desde </span>}
-            {!inStock && priceCents !== null && (
-              <span className="price-prefix">Referencia: </span>
-            )}
-            {priceCents === null
-              ? 'Sin precio disponible'
-              : formatPEN(priceCents)}
-          </span>
+          {displayPrice ? (
+            <PriceDisplay
+              originalCents={displayPrice.originalCents}
+              finalCents={
+                inStock ? displayPrice.finalCents : displayPrice.originalCents
+              }
+              prefix={showFrom ? 'Desde' : !inStock ? 'Referencia:' : undefined}
+            />
+          ) : (
+            <span>Sin precio disponible</span>
+          )}
           <span className="product-volume">
-            {variants.map((variant) => `${variant.ml} ml`).join(' · ')}
+            {variants.map(variantLabel).join(' · ')}
           </span>
         </div>
         {showAction && (
           <Link
             className="text-link product-action"
             to={`/producto/${product.slug}`}
-            aria-label={`Ver perfume ${product.name}`}
+            aria-label={`${isPerfume(product) ? 'Ver perfume' : 'Ver complemento'} ${product.name}`}
+            aria-disabled={preview}
+            tabIndex={preview ? -1 : undefined}
           >
-            Ver perfume <Icon name="arrow" />
+            {isPerfume(product) ? 'Ver perfume' : 'Ver complemento'}{' '}
+            <Icon name="arrow" />
           </Link>
         )}
       </div>

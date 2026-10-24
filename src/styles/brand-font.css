@@ -22,3 +22,12 @@
   font-weight: 700 900;
   font-display: swap;
 }
+
+/* The offer label alone follows the rounded type of the supplied reference. */
+@font-face {
+  font-family: 'Quicksand';
+  src: url('/fonts/quicksand-latin-700-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}

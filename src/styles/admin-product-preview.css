@@ -1,3 +1,76 @@
+.admin-olfactory-classification {
+  display: block;
+  padding-block: 18px;
+  border-block: 1px solid var(--admin-border);
+}
+
+.admin-olfactory-classification fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-olfactory-classification legend {
+  margin-bottom: 12px;
+  color: var(--admin-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-olfactory-family-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-editor-page .admin-olfactory-family-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 7px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.admin-editor-page .admin-olfactory-family-options label.is-selected {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+}
+
+.admin-editor-page .admin-olfactory-family-options label:focus-within {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+.admin-shell .admin-olfactory-family-options input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  min-height: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-olfactory-classification p {
+  margin: 10px 0 0;
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-olfactory-classification .admin-olfactory-classification__warning {
+  color: var(--admin-danger);
+}
+
 .admin-olfactory-editor {
   margin-block: 24px 20px;
 }
@@ -61,77 +134,6 @@
   font-size: 12px;
   color: var(--profile-accent);
 }
-.admin-product-live-preview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
-.admin-product-live-preview > div {
-  min-width: 0;
-}
-.admin-product-preview-photos {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  align-self: start;
-}
-.admin-product-preview-main {
-  width: 100%;
-  max-height: 320px;
-  aspect-ratio: 4 / 5;
-  background: #f4f4f1;
-}
-
-.admin-product-preview-main img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  mix-blend-mode: darken;
-}
-
-.admin-product-preview-main p {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  padding: 28px;
-  color: var(--admin-muted);
-  text-align: center;
-}
-
-.admin-product-preview-thumbnails {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-}
-
-.admin-product-preview-thumbnails button {
-  flex: 0 0 58px;
-  width: 58px;
-  height: 72px;
-  padding: 2px;
-  border: 1px solid var(--admin-border);
-  background: white;
-}
-
-.admin-product-preview-thumbnails button[aria-pressed='true'] {
-  border-color: var(--admin-accent);
-}
-
-.admin-product-preview-thumbnails img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.admin-product-preview-thumbnails span {
-  display: grid;
-  height: 100%;
-  place-items: center;
-  color: var(--admin-muted);
-  font-size: 11px;
-}
-
 .admin-product-upload-area {
   display: grid;
   gap: 12px;
@@ -217,18 +219,6 @@
   font-weight: 500;
 }
 
-.admin-product-alt-label {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  font-size: 11px;
-}
-
-.admin-product-alt-label input {
-  min-width: 0;
-  min-height: 44px;
-}
-
 .admin-product-upload-item .admin-remove {
   min-height: 44px;
   padding: 3px 0;
@@ -258,6 +248,42 @@
   font-weight: 700;
 }
 
+.admin-products-page .admin-inventory-summary > a {
+  min-width: 0;
+  min-height: 74px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: filter 150ms ease;
+}
+
+.admin-products-page .admin-inventory-summary > a.is-warning {
+  background: var(--admin-warning-soft);
+}
+
+.admin-products-page .admin-inventory-summary > a.is-danger {
+  background: var(--admin-danger-soft);
+}
+
+.admin-products-page .admin-inventory-summary > a span {
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-underline-offset: 3px;
+}
+
+.admin-products-page .admin-inventory-summary > a:is(:hover, :focus-visible) {
+  filter: brightness(0.97);
+}
+
+.admin-products-page .admin-inventory-summary > a:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: -3px;
+}
+
 .admin-products-page .admin-row-actions button.is-deactivate {
   color: var(--admin-danger);
 }
@@ -271,60 +297,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.admin-product-live-preview h3 {
-  margin-block: 6px 12px;
-  font-size: 28px;
-  overflow-wrap: anywhere;
-}
-.admin-product-live-preview p {
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-.admin-product-live-preview ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-block: 16px;
-}
-.admin-product-live-preview li {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--admin-border);
-  font-size: 12px;
-}
-@media (min-width: 768px) {
-  .admin-product-live-preview {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
-  }
-}
-
-@media (min-width: 1280px) {
-  .admin-editor-page .admin-editor {
-    grid-template-columns: minmax(0, 1.1fr) minmax(330px, 0.9fr);
-  }
-
-  .admin-editor-page .admin-editor > section:first-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .admin-editor-page .admin-editor > section:nth-child(2) {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: start;
-  }
-
-  .admin-editor-page .admin-editor > :nth-child(n + 3) {
-    grid-column: 1 / -1;
-  }
-
-  .admin-editor-page .admin-product-live-preview {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (min-width: 768px) and (max-width: 1100px) {
   .admin-products-page .admin-table th,
   .admin-products-page .admin-table td {
@@ -371,5 +343,573 @@
     padding-inline: 8px;
     white-space: nowrap;
     font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-products-page .admin-inventory-summary > a {
+    transition: none;
+  }
+}
+
+/* Product editor: a readable work surface rather than two narrow forms. */
+.admin-editor-page .admin-editor {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.admin-editor-page .admin-editor-section-nav {
+  gap: 20px;
+  margin-block: 8px 18px;
+  padding: 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-editor-page .admin-editor-section-nav a {
+  min-height: 42px;
+  padding: 9px 1px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--admin-muted);
+  white-space: nowrap;
+  transition:
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.admin-editor-page .admin-editor-section-nav a:is(:hover, :focus-visible) {
+  color: var(--admin-accent);
+  box-shadow: inset 0 -2px var(--admin-accent);
+}
+
+.admin-editor-page .admin-editor-section-nav a:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: -2px;
+}
+
+.admin-editor-page .admin-editor > section > header {
+  margin-bottom: 16px;
+}
+
+.admin-editor-page .admin-product-general-fields {
+  gap: 16px 20px;
+}
+
+.admin-editor-page .admin-product-general-fields > label {
+  align-content: start;
+  grid-template-rows: auto 44px;
+}
+
+.admin-editor-page .admin-fields label,
+.admin-editor-page .admin-editor fieldset label {
+  font-size: 13px;
+}
+
+.admin-editor-page .admin-product-general-fields input,
+.admin-editor-page .admin-product-general-fields select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+}
+
+.admin-editor-page .admin-product-upload-area {
+  gap: 10px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-product-upload-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.admin-product-upload-toolbar > span {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-editor-page
+  .admin-product-upload-area
+  .admin-home-file-button:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.admin-editor-page .admin-product-upload-area > p {
+  margin: 0 0 4px;
+}
+
+.admin-editor-page .admin-product-preview-open {
+  margin-left: auto;
+  flex: none;
+}
+
+.admin-product-preview-dialog {
+  width: min(1800px, 96vw);
+  height: 94dvh;
+  max-height: 94dvh;
+  border-radius: 12px;
+  color: var(--admin-text);
+}
+
+.admin-product-preview-dialog .dialog-inner {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+}
+
+.admin-product-preview-dialog .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 12px clamp(16px, 2vw, 30px);
+  border-bottom: 1px solid var(--admin-border);
+  background: white;
+}
+
+.admin-product-preview-dialog .dialog-heading h2 {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.admin-product-preview-dialog .dialog-inner > .store-page {
+  min-width: 0;
+}
+
+.admin-editor-page .admin-product-upload-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-editor-page .admin-product-upload-item {
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 12px 18px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--admin-border);
+  border-radius: 0;
+}
+
+.admin-editor-page .admin-product-upload-item strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-editor-page .admin-product-upload-item > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+.admin-editor-page .admin-product-upload-item > div > strong {
+  grid-column: 1 / -1;
+}
+
+.admin-editor-page .admin-olfactory-editor {
+  margin-block: 16px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-card.has-image {
+  grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-visual {
+  min-height: 0;
+  max-height: 480px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-content {
+  padding: 20px 24px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-family {
+  margin-top: 7px;
+  font-size: 25px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-summary {
+  margin-top: 9px;
+  font-size: 14px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-evolution {
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-note-groups > div {
+  padding-block: 8px;
+}
+
+.admin-editor-page .admin-olfactory-editor .olfactory-profile-details {
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.admin-editor-page .admin-olfactory-editor :is(input, select) {
+  padding-inline: 10px;
+  text-align: left;
+}
+
+.admin-editor-page .admin-profile-notes {
+  gap: 8px;
+}
+
+.admin-editor-page .admin-threshold-control {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--admin-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin-editor-page .admin-threshold-control label {
+  width: min(100%, 220px);
+}
+
+.admin-editor-page .admin-threshold-control p {
+  padding-bottom: 8px;
+}
+
+.admin-editor-page .admin-variant-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-editor-page .admin-variant-list fieldset {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--admin-surface);
+}
+
+.admin-editor-page .admin-variant-list fieldset > label {
+  min-width: 0;
+}
+
+.admin-editor-page
+  .admin-variant-list
+  fieldset
+  > label:not(.admin-check)
+  input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-editor-page .admin-variant-list fieldset > .admin-check {
+  grid-column: 1;
+}
+
+.admin-editor-page .admin-variant-list fieldset > .admin-remove {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.admin-editor-page .admin-editor-actions {
+  gap: 10px;
+  margin-inline: 0;
+  padding: 10px 14px max(10px, env(safe-area-inset-bottom));
+  border: 1px solid var(--admin-border);
+  border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--admin-surface) 96%, transparent);
+  box-shadow: 0 -8px 24px rgb(19 36 31 / 6%);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 767px) {
+  .admin-editor-page .admin-olfactory-editor .olfactory-profile-card.has-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-editor-page .admin-olfactory-editor .olfactory-profile-visual {
+    height: 180px;
+  }
+
+  .admin-editor-page .admin-product-upload-item > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-editor-page .admin-product-upload-item {
+    grid-template-columns: 70px minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+
+  .admin-editor-page .admin-product-upload-item > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-editor-page .admin-product-upload-item > div > strong {
+    grid-column: 1;
+  }
+
+  .admin-editor-page .admin-variant-list fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-editor-page .admin-variant-list fieldset > .admin-check,
+  .admin-editor-page .admin-variant-list fieldset > .admin-remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 479px) {
+  .admin-editor-page .admin-product-photos-header {
+    flex-wrap: wrap;
+  }
+
+  .admin-editor-page .admin-product-preview-open {
+    margin-left: 0;
+  }
+
+  .admin-editor-page .admin-editor-section-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .admin-editor-page .admin-editor-actions .button {
+    flex: 1 1 0;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-editor-page .admin-editor-section-nav a,
+  .admin-editor-page .admin-olfactory-family-options label {
+    transition: none;
+  }
+}
+
+.admin-editor-page .admin-product-photo-controls,
+.admin-editor-page .admin-product-photo-order,
+.admin-olfactory-image-control__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.admin-editor-page .admin-product-photo-controls .admin-remove,
+.admin-olfactory-image-control__actions .admin-remove {
+  min-height: 44px;
+  padding-inline: 6px;
+}
+
+.admin-editor-page .admin-product-photo-order button {
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid var(--admin-border);
+  border-radius: 5px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-editor-page
+  .admin-product-photo-order
+  button:not(:disabled):focus-visible {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
+}
+
+.admin-editor-page .admin-product-photo-order button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.admin-olfactory-image-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 138px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-olfactory-image-control__copy h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.admin-olfactory-image-control__copy > p {
+  margin: 0 0 10px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-olfactory-image-control__copy > p.is-error {
+  color: var(--admin-danger);
+}
+
+.admin-olfactory-image-control > img,
+.admin-olfactory-image-control__empty {
+  width: 138px;
+  height: 172px;
+  border-radius: 5px;
+  background: var(--color-surface);
+}
+
+.admin-olfactory-image-control > img {
+  object-fit: cover;
+}
+
+.admin-olfactory-image-control__empty {
+  display: grid;
+  place-items: center;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-related-products {
+  margin-top: 18px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-related-products > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  color: var(--admin-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-related-products > summary small {
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.admin-related-products > summary:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+.admin-related-products fieldset {
+  margin: 0;
+  padding: 0 0 14px;
+  border: 0;
+}
+
+.admin-related-products legend {
+  margin-bottom: 10px;
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
+.admin-related-products__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-editor-page .admin-related-products__options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: var(--admin-surface);
+  cursor: pointer;
+}
+
+.admin-related-products__options label:focus-within {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 1px;
+}
+
+.admin-related-products__options input {
+  flex: none;
+  width: 17px;
+  min-height: 17px;
+  height: 17px;
+  margin: 0;
+}
+
+.admin-related-products__options span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.admin-related-products__options strong {
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-related-products__options small {
+  color: var(--admin-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 620px) {
+  .admin-related-products__options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-olfactory-image-control {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .admin-olfactory-image-control > img,
+  .admin-olfactory-image-control__empty {
+    width: 96px;
+    height: 120px;
+  }
+}
+
+@media (max-width: 479px) {
+  .admin-editor-page .admin-editor-actions {
+    gap: 8px;
+  }
+
+  .admin-editor-page .admin-editor-actions .button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 5px;
+    font-size: 11px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .admin-editor-page .admin-editor-actions .button:last-child {
+    flex-grow: 1.35;
+    white-space: nowrap;
+  }
+
+  .admin-product-preview-dialog .dialog-heading {
+    padding-block: 8px;
   }
 }

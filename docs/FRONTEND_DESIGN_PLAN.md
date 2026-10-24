@@ -271,7 +271,7 @@ Filtros, orden y página se reflejarán en query params, con defaults tolerantes
 
 ## 15. Product cards
 
-`ProductCard` recibirá datos tipados y acciones, sin importar fixtures. Fotografía neutra de proporción 4:5, frasco completo con `contain`; texto alineado a la izquierda, sin sombra y sin marco de tarjeta. Mostrar marca, nombre, tipo si resulta necesario para distinguir, precio y disponibilidad. El nombre podrá ocupar dos o más líneas sin esconder información esencial.
+`ProductCard` recibirá datos tipados y acciones, sin importar fixtures. Fotografía neutra de proporción 4:5, frasco completo con `contain`; texto alineado a la izquierda, sin sombra y sin marco de tarjeta. Mostrar marca, nombre, perfil aromático, precio y disponibilidad. El nombre podrá ocupar dos o más líneas sin esconder información esencial.
 
 Si existen varias presentaciones, comunicar precio desde y número de opciones. Propuesta de regla de visualización: precio mínimo de variantes activas disponibles; si ninguna está disponible, mostrar precio mínimo de variantes activas junto a «Agotado». Esta regla se validará para no anunciar un precio imposible de comprar. No se duplica el perfume por ml.
 
@@ -289,11 +289,11 @@ En desktop, cambio de imagen o zoom muy leve al hover/focus si hay un segundo as
 
 ## 16. Página de producto
 
-**CONFIRMADO:** marca, nombre, descripción, tipo, presentación/ml, precio, disponibilidad y aproximadamente cuatro fotografías.
+**CONFIRMADO:** marca, nombre, descripción, presentación/ml, precio, disponibilidad y aproximadamente cuatro fotografías. La concentración del perfume se retiró por decisión posterior del cliente.
 
 Propuesta desktop: galería a la izquierda, bloque de compra a la derecha con ancho suficiente para nombres largos. Preferir **imagen principal + miniaturas** frente a un grid largo, para mantener las decisiones de compra cerca. Cuatro fotografías orientativas: frasco, detalle, presentación/escala y contexto; las definitivas dependerán de los assets entregados.
 
-El bloque de compra reúne marca enlazada, H1, tipo de perfume, descripción breve (COPY TEMPORAL), precio de la variante, radios de ml, disponibilidad, cantidad si se necesita y CTA de agregar. Debajo: información de entrega confirmada y ayuda. Lo secundario continúa más abajo: perfil olfativo, descripción extendida, reseñas y recomendaciones. No hay FAQ.
+El bloque de compra reúne marca enlazada, H1, perfil aromático, descripción breve (COPY TEMPORAL), precio de la variante, radios de ml, disponibilidad, cantidad si se necesita y CTA de agregar. Debajo: información de entrega confirmada y ayuda. Lo secundario continúa más abajo: perfil olfativo, descripción extendida, reseñas y recomendaciones. No hay FAQ.
 
 En móvil se prioriza una galería compacta, con desplazamiento táctil nativo, indicadores/botones y altura limitada para acercar nombre y precio. Marca, nombre, precio y selección deben quedar próximos; no se garantiza todo el contenido en el primer viewport de 360 px. Propuesta de barra inferior contextual con precio y CTA solamente cuando el botón principal salga de vista; respeta foco y no tapa WhatsApp.
 
@@ -456,7 +456,7 @@ En todas las pantallas se identifica el entorno de demostración. El inicio prio
 
 ### 25.1 Producto y variantes
 
-Formulario dividido en secciones de lectura: información general; imágenes; presentaciones; perfil olfativo; visibilidad. Debe permitir marca, género, ocasión, tipo de perfume, descripción, familia, intensidad, temporada, notas de salida/corazón/fondo, badges, activo y destacado.
+Formulario dividido en secciones de lectura: información general; imágenes; presentaciones; perfil olfativo; visibilidad. Debe permitir tipo de producto (perfume o complemento), marca, género, ocasión, descripción, familia, intensidad, temporada, notas de salida/corazón/fondo, badges y activo. No incluye concentración ni la selección retirada de destacados.
 
 Imágenes: vista previa local, texto alternativo, orden y eliminación. Propuesta de aproximadamente cuatro; si faltan, usar fallback. No subida a R2. Si se permite elegir archivos locales, usar URLs temporales con liberación de memoria; no guardar imágenes base64 en localStorage.
 
@@ -639,20 +639,20 @@ Dentro de cada función, componentes/hooks específicos se quedan juntos. `pages
 
 Todos los registros proceden de una capa separada, con IDs/slugs estables y referencias consistentes. Dinero propuesto en céntimos enteros y moneda PEN; presentación con formato peruano. Fechas de ejemplo estables y un reloj de escenario para no depender del día en que se muestre la demo.
 
-| Entidad requerida | Contrato conceptual mínimo                                                                                                                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Product`         | ID, slug, nombre, brandId, categoryIds, género(s), descripción breve/larga, tipo/concentración, imágenes, familia, notas por etapa, intensidad, ocasiones, temporadas, badges, activo, fecha y variantes |
-| `ProductVariant`  | ID, productId, ml, presentación, precio, precio anterior opcional, stock simulado, activo e imagen opcional                                                                                              |
-| `Brand`           | ID, slug, nombre, descripción temporal, imagen/logo opcional, activo y destacado                                                                                                                         |
-| `Category`        | ID, slug, nombre y tipo de agrupación; no duplicar automáticamente filtros                                                                                                                               |
-| `CartItem`        | productId, variantId y cantidad; precio/estado resueltos desde servicios                                                                                                                                 |
-| `Customer`        | ID, nombre/email/teléfono de muestra, addressIds y referencias de pedido; sin credenciales                                                                                                               |
-| `Address`         | ID, customerId opcional, destinatario ficticio, departamento/provincia/distrito, dirección y referencia                                                                                                  |
-| `Order`           | ID/código mock, customerId opcional o invitado, items, copia de dirección ficticia, estados de pedido/pago, resumen, entrega y fecha                                                                     |
-| `OrderItem`       | ID/variantId y copia del nombre, marca, ml, cantidad, precio unitario y subtotal al confirmar                                                                                                            |
-| `Promotion`       | Código, activo, tipo, valor, inicio/fin, límite/usos simulados y mínimo opcional                                                                                                                         |
-| `ShippingZone`    | ID, nombre, ámbito de ejemplo, modalidad, tarifa o costo pendiente, plazo y estado                                                                                                                       |
-| `Review`          | ID, productId, autor, valoración, texto, fecha, estado de publicación y eventual compra verificada; los ejemplos actuales son solo una vista visual desacoplada del futuro modelo real                   |
+| Entidad requerida | Contrato conceptual mínimo                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Product`         | ID, slug, nombre, tipo de producto (perfume o complemento), brandId, categoryIds, género(s), descripción breve/larga, imágenes, familia, notas por etapa, intensidad, ocasiones, temporadas, badges, activo, fecha y variantes |
+| `ProductVariant`  | ID, productId, ml, presentación, precio, precio anterior opcional, stock simulado, activo e imagen opcional                                                                                                                    |
+| `Brand`           | ID, slug, nombre, descripción temporal, imagen/logo opcional, activo y destacado                                                                                                                                               |
+| `Category`        | ID, slug, nombre y tipo de agrupación; no duplicar automáticamente filtros                                                                                                                                                     |
+| `CartItem`        | productId, variantId y cantidad; precio/estado resueltos desde servicios                                                                                                                                                       |
+| `Customer`        | ID, nombre/email/teléfono de muestra, addressIds y referencias de pedido; sin credenciales                                                                                                                                     |
+| `Address`         | ID, customerId opcional, destinatario ficticio, departamento/provincia/distrito, dirección y referencia                                                                                                                        |
+| `Order`           | ID/código mock, customerId opcional o invitado, items, copia de dirección ficticia, estados de pedido/pago, resumen, entrega y fecha                                                                                           |
+| `OrderItem`       | ID/variantId y copia del nombre, marca, ml, cantidad, precio unitario y subtotal al confirmar                                                                                                                                  |
+| `Promotion`       | Código, activo, tipo, valor, inicio/fin, límite/usos simulados y mínimo opcional                                                                                                                                               |
+| `ShippingZone`    | ID, nombre, ámbito de ejemplo, modalidad, tarifa o costo pendiente, plazo y estado                                                                                                                                             |
+| `Review`          | ID, productId, autor, valoración, texto, fecha, estado de publicación y eventual compra verificada; los ejemplos actuales son solo una vista visual desacoplada del futuro modelo real                                         |
 
 Modelos auxiliares pequeños: `ProductImage` con alt/dimensiones/procedencia/estado temporal; `HomeSelection` con productId/posición/activo; `ProductQuery`; `ShippingQuote`; `CheckoutResult`; metadata de copy y procedencia. No diseñar tablas SQL.
 

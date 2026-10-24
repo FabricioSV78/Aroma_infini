@@ -19,7 +19,14 @@ function database() {
         request.result.createObjectStore(storeName)
       }
     }
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      const db = request.result
+      db.onversionchange = () => {
+        db.close()
+        databasePromise = undefined
+      }
+      resolve(db)
+    }
     request.onerror = () => reject(request.error)
   }).catch((error: unknown) => {
     databasePromise = undefined

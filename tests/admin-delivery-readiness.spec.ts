@@ -25,6 +25,14 @@ test('Un pedido solo se puede enviar cuando contacto y ubicación están complet
   expect(
     adminService.saveOrderDelivery(reference, { ...details, district: '' }),
   ).toMatchObject({ kind: 'validation' })
+  expect(
+    adminService.saveOrderDelivery(reference, {
+      ...details,
+      department: 'arequipa',
+      province: '0401',
+      district: '040101',
+    }),
+  ).toMatchObject({ kind: 'validation' })
   expect(adminService.setOrderStatus(reference, 'shipped')).toMatchObject({
     kind: 'validation',
   })

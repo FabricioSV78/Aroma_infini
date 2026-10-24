@@ -1,0 +1,311 @@
+.admin-promotion-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 22px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-promotion-tabs button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-promotion-tabs button[aria-selected='true'] {
+  border-bottom-color: var(--admin-accent);
+  color: var(--admin-text);
+}
+
+.admin-promotion-tabs button:hover {
+  color: var(--admin-text);
+}
+
+.admin-promotion-tabs button:focus-visible,
+.admin-offers :is(button, input, select):focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+.admin-offers-toolbar {
+  min-height: 55px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-offers-toolbar p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.8125rem;
+}
+
+.admin-offers-editor {
+  max-width: 850px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  display: grid;
+  gap: 24px;
+}
+
+.admin-offers-editor-heading,
+.admin-offers-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+}
+
+.admin-offers-editor-heading .eyebrow {
+  margin: 0 0 5px;
+}
+
+.admin-offers-editor-heading h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+  line-height: 1.2;
+}
+
+.admin-offers-editor-heading > button,
+.admin-offers-actions .admin-offers-remove,
+.admin-offers-list-actions button {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--admin-accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.admin-offers-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr) minmax(
+      125px,
+      0.65fr
+    );
+  gap: 16px;
+  align-items: end;
+}
+
+.admin-offers-fields label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--admin-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.admin-offers-fields :is(input:not([type='checkbox']), select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.admin-offers-fields :is(input, select):disabled {
+  background: var(--admin-surface-muted);
+  color: var(--admin-muted);
+}
+
+.admin-offers-fields .admin-offers-check {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.admin-offers-price-note {
+  margin: -8px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.admin-offers-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--admin-accent);
+}
+
+.admin-offers-preview-button {
+  justify-self: start;
+}
+
+.admin-offers-preview-dialog {
+  width: min(640px, calc(100% - 28px));
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+  border-radius: var(--admin-radius);
+  color: var(--admin-text);
+}
+
+.admin-offers-preview-list {
+  display: grid;
+}
+
+.admin-offers-preview-list > div {
+  min-height: 43px;
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) repeat(3, minmax(80px, auto));
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--admin-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-offers-preview-list > div > span:first-child {
+  font-weight: 600;
+}
+
+.admin-offers-preview-list s,
+.admin-offers-list-prices s {
+  color: var(--admin-muted);
+  text-decoration-thickness: 1px;
+}
+
+.admin-offers-preview-list strong,
+.admin-offers-list-prices strong {
+  color: var(--admin-accent);
+  font-weight: 800;
+}
+
+.admin-offers-actions,
+.admin-offers-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.admin-offers-actions .admin-offers-remove {
+  color: var(--admin-danger);
+}
+
+.admin-offers-list {
+  max-width: 920px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-offers-list > li {
+  padding: 18px 0;
+  border-top: 1px solid var(--admin-border);
+  display: grid;
+  gap: 13px;
+}
+
+.admin-offers-list > li:last-child {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-offers-list-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.admin-offers-list-heading small,
+.admin-offers-list-heading span,
+.admin-offers-list-prices {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+.admin-offers-list-heading strong {
+  font-size: 1rem;
+}
+
+.admin-offers-list-prices {
+  display: flex;
+  gap: 8px 22px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .admin-offers-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-offers-product-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-promotion-tabs {
+    overflow-x: auto;
+  }
+
+  .admin-promotion-tabs button {
+    flex-shrink: 0;
+    padding-inline: 12px;
+  }
+
+  .admin-offers-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-offers-product-field {
+    grid-column: auto;
+  }
+
+  .admin-offers-preview-list > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 12px;
+    padding: 10px 0;
+  }
+
+  .admin-offers-preview-list > div > span:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .admin-offers-preview-list > div strong {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-offers-preview-list > div s {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .admin-offers-preview-list > div > span:nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .admin-offers-preview-list > div strong,
+  .admin-offers-preview-list > div > span:nth-child(3) {
+    text-align: right;
+  }
+
+  .admin-offers-toolbar .button {
+    width: 100%;
+  }
+}

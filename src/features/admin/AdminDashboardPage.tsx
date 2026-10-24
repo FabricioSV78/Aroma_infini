@@ -1,7 +1,8 @@
-import { Link, useLocation } from 'react-router'
+import { variantLabel } from '../../domain/product-type'
+import { Link } from 'react-router'
 import { Icon, type IconName } from '../../components/ui/Icon'
 import { formatPEN } from '../../services/currency'
-import { AdminBadge, AdminNotice, AdminPageHeader } from './AdminShared'
+import { AdminBadge, AdminPageHeader } from './AdminShared'
 import {
   adminOrderStatusMeta,
   adminPaymentStatusMeta,
@@ -16,6 +17,7 @@ interface DashboardMetric {
   value: number
   detail: string
   action: string
+  ariaLabel?: string
   to: string
   icon: IconName
   tone: AdminTone
@@ -23,14 +25,13 @@ interface DashboardMetric {
 
 export function AdminDashboardPage() {
   const state = useAdminStore()
-  const location = useLocation()
   const activeBrandIds = new Set(
     state.brands.filter((brand) => brand.active).map((brand) => brand.id),
   )
   const activeProducts = state.products.filter(
     (record) => record.active && activeBrandIds.has(record.product.brandId),
   )
-  const inventoryAlerts = getInventoryAlerts(activeProducts)
+  const inventoryAlerts = getInventoryAlerts(state.products)
   const totalStock = activeProducts.reduce(
     (total, record) => total + getProductInventory(record).totalStock,
     0,
@@ -57,10 +58,33 @@ export function AdminDashboardPage() {
       label: 'Pedidos por preparar',
       value: ordersToPrepare.length,
       detail: 'Aprobados y aún no enviados',
-      action: 'Ver pedidos por preparar',
+      action: 'Ver pedidos',
       to: '/admin/pedidos?preparacion=atencion',
       icon: 'orders',
       tone: ordersToPrepare.length ? 'info' : 'success',
+    },
+    {
+      label: 'Alertas de stock',
+      value: inventoryAlerts.length,
+      detail: 'Presentaciones bajas o agotadas',
+      action: 'Ver alertas',
+      to: '/admin/productos?stock=alert',
+      icon: 'alert',
+      tone: inventoryAlerts.some((item) => item.tone === 'danger')
+        ? 'danger'
+        : inventoryAlerts.length
+          ? 'warning'
+          : 'success',
+    },
+    {
+      label: 'Envíos en curso',
+      value: shipmentsInProgress.length,
+      detail: 'Pedidos despachados por entregar',
+      action: 'Ver envíos',
+      ariaLabel: 'Envíos en curso: ver detalle',
+      to: '/admin/pedidos?preparacion=shipped',
+      icon: 'truck',
+      tone: shipmentsInProgress.length ? 'info' : 'success',
     },
     {
       label: 'Unidades disponibles',
@@ -69,25 +93,7 @@ export function AdminDashboardPage() {
       action: 'Ver productos',
       to: '/admin/productos',
       icon: 'package',
-      tone: 'success',
-    },
-    {
-      label: 'Alertas de stock',
-      value: inventoryAlerts.length,
-      detail: 'Presentaciones bajas o agotadas',
-      action: 'Revisar alertas',
-      to: '/admin/productos?stock=alert&visibilidad=active',
-      icon: 'alert',
-      tone: inventoryAlerts.length ? 'danger' : 'success',
-    },
-    {
-      label: 'Envíos en curso',
-      value: shipmentsInProgress.length,
-      detail: 'Pedidos despachados por entregar',
-      action: 'Ver detalle de envíos',
-      to: '/admin/pedidos?preparacion=shipped',
-      icon: 'truck',
-      tone: shipmentsInProgress.length ? 'info' : 'success',
+      tone: totalStock ? 'success' : 'neutral',
     },
   ]
 
@@ -108,9 +114,6 @@ export function AdminDashboardPage() {
         title="Resumen del negocio"
         description="Prioridades que requieren atención hoy."
       />
-      {new URLSearchParams(location.search).get('guardado') === '1' ? (
-        <AdminNotice>Producto e inventario actualizados.</AdminNotice>
-      ) : null}
 
       <section
         className="admin-metric-grid"
@@ -129,12 +132,34 @@ export function AdminDashboardPage() {
             <small>{metric.detail}</small>
             <Link
               to={metric.to}
-              aria-label={`${metric.label}: ${metric.action.toLowerCase()}`}
+              aria-label={
+                metric.ariaLabel ??
+                `${metric.action}: ${metric.label.toLowerCase()}`
+              }
             >
               {metric.action} <Icon name="arrow" />
             </Link>
           </article>
         ))}
+      </section>
+
+      <section
+        className="admin-quick-links"
+        aria-labelledby="quick-links-title"
+      >
+        <h2 id="quick-links-title">Acciones rápidas</h2>
+        <div>
+          <Link to="/admin/productos/nuevo">
+            <Icon name="package" aria-hidden="true" />
+            <span>Crear producto</span>
+            <Icon name="arrow" aria-hidden="true" />
+          </Link>
+          <Link to="/admin/home" aria-label="Editar contenido del Home">
+            <Icon name="home" aria-hidden="true" />
+            <span>Editar Home</span>
+            <Icon name="arrow" aria-hidden="true" />
+          </Link>
+        </div>
       </section>
 
       <div className="admin-dashboard-grid">
@@ -152,9 +177,7 @@ export function AdminDashboardPage() {
                 <p>Presentaciones en o debajo de su umbral.</p>
               </div>
             </div>
-            <Link to="/admin/productos?stock=alert&visibilidad=active">
-              Ver inventario
-            </Link>
+            <Link to="/admin/productos?stock=alert">Ver inventario</Link>
           </header>
           {inventoryAlerts.length ? (
             <ul>
@@ -162,7 +185,7 @@ export function AdminDashboardPage() {
                 <li key={item.variantId}>
                   <div>
                     <strong>{item.productName}</strong>
-                    <span>{item.ml} ml</span>
+                    <span>{variantLabel(item)}</span>
                   </div>
                   <div className="admin-stock-alert-value">
                     <AdminBadge tone={item.tone}>
@@ -173,7 +196,7 @@ export function AdminDashboardPage() {
                   <Link
                     to={`/admin/productos/${item.productId}#product-variants-title`}
                     state={{ returnTo: '/admin' }}
-                    aria-label={`Editar stock de ${item.productName}, ${item.ml} mililitros`}
+                    aria-label={`Editar stock de ${item.productName}, ${variantLabel(item)}`}
                   >
                     Editar
                   </Link>
@@ -199,7 +222,6 @@ export function AdminDashboardPage() {
               </span>
               <div>
                 <h2 id="order-overview-title">Flujo de pedidos</h2>
-                <p>Del ingreso a la entrega.</p>
               </div>
             </div>
           </header>
@@ -207,32 +229,48 @@ export function AdminDashboardPage() {
             <div>
               <dt>Nuevos</dt>
               <dd>
-                <Link to="/admin/pedidos?preparacion=received">
+                <Link
+                  to="/admin/pedidos?preparacion=received"
+                  aria-label={`Ver ${orderCounts.received} pedidos nuevos`}
+                >
                   {orderCounts.received}
+                  <Icon name="arrow" aria-hidden="true" />
                 </Link>
               </dd>
             </div>
             <div>
               <dt>En preparación</dt>
               <dd>
-                <Link to="/admin/pedidos?preparacion=preparing">
+                <Link
+                  to="/admin/pedidos?preparacion=preparing"
+                  aria-label={`Ver ${orderCounts.preparing} pedidos en preparación`}
+                >
                   {orderCounts.preparing}
+                  <Icon name="arrow" aria-hidden="true" />
                 </Link>
               </dd>
             </div>
             <div>
               <dt>Enviados</dt>
               <dd>
-                <Link to="/admin/pedidos?preparacion=shipped">
+                <Link
+                  to="/admin/pedidos?preparacion=shipped"
+                  aria-label={`Ver ${orderCounts.shipped} pedidos enviados`}
+                >
                   {orderCounts.shipped}
+                  <Icon name="arrow" aria-hidden="true" />
                 </Link>
               </dd>
             </div>
             <div>
               <dt>Entregados</dt>
               <dd>
-                <Link to="/admin/pedidos?preparacion=delivered">
+                <Link
+                  to="/admin/pedidos?preparacion=delivered"
+                  aria-label={`Ver ${orderCounts.delivered} pedidos entregados`}
+                >
                   {orderCounts.delivered}
+                  <Icon name="arrow" aria-hidden="true" />
                 </Link>
               </dd>
             </div>
@@ -251,7 +289,6 @@ export function AdminDashboardPage() {
             </span>
             <div>
               <h2 id="recent-orders-title">Pedidos recientes</h2>
-              <p>Pedidos más recientes por fecha de creación.</p>
             </div>
           </div>
           <Link to="/admin/pedidos">Ver todos</Link>
@@ -272,6 +309,7 @@ export function AdminDashboardPage() {
                     {new Intl.DateTimeFormat('es-PE', {
                       day: '2-digit',
                       month: 'short',
+                      year: '2-digit',
                     }).format(new Date(order.placedAt))}
                   </span>
                   <AdminBadge
@@ -297,7 +335,7 @@ export function AdminDashboardPage() {
                     state={{ returnTo: '/admin' }}
                     aria-label={`Ver pedido ${order.reference}`}
                   >
-                    Abrir
+                    Ver pedido
                   </Link>
                 </li>
               )
@@ -306,25 +344,6 @@ export function AdminDashboardPage() {
         ) : (
           <p className="admin-dashboard-empty">Todavía no hay pedidos.</p>
         )}
-      </section>
-
-      <section
-        className="admin-quick-links"
-        aria-labelledby="quick-links-title"
-      >
-        <h2 id="quick-links-title">Crear y editar</h2>
-        <div>
-          <Link to="/admin/productos/nuevo">
-            <Icon name="package" />
-            <span>Nuevo producto</span>
-            <Icon name="arrow" />
-          </Link>
-          <Link to="/admin/home">
-            <Icon name="home" />
-            <span>Editar contenido del Home</span>
-            <Icon name="arrow" />
-          </Link>
-        </div>
       </section>
     </div>
   )

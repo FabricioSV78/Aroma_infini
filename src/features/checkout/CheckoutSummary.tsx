@@ -1,3 +1,4 @@
+import { variantLabel } from '../../domain/product-type'
 import { Link } from 'react-router'
 import type { ResolvedCart } from '../../services/commerce-service'
 import {
@@ -6,6 +7,7 @@ import {
 } from '../../services/checkout-service'
 import { formatPEN } from '../../services/currency'
 import { imageSource } from '../../services/image-source'
+import { PriceDisplay } from '../../components/ui/PriceDisplay'
 
 interface CheckoutSummaryProps {
   cart: ResolvedCart
@@ -41,10 +43,17 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
                 <small>{line.brand?.name}</small>
                 <strong>{line.product.name}</strong>
                 <span>
-                  {line.variant.ml} ml · Cant. {line.item.quantity}
+                  {variantLabel(line.variant)} · Cant. {line.item.quantity}
                 </span>
               </div>
-              <span>{formatPEN(line.subtotalCents)}</span>
+              <span className="checkout-line-price">
+                <PriceDisplay
+                  originalCents={
+                    line.originalUnitPriceCents * line.item.quantity
+                  }
+                  finalCents={line.subtotalCents}
+                />
+              </span>
             </li>
           ) : null,
         )}
@@ -79,6 +88,11 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
           </dd>
         </div>
       </dl>
+      {cart.productDiscountCents > 0 ? (
+        <p className="checkout-product-savings">
+          Ahorras {formatPEN(cart.productDiscountCents)} en productos
+        </p>
+      ) : null}
       {amount.discountCents > 0 ? (
         <p className="checkout-summary-note">
           El importe de entrega se calcula sobre el subtotal.

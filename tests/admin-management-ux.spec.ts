@@ -5,9 +5,9 @@ test('El resumen evita acciones repetidas y abre el trabajo editorial', async ({
 }) => {
   await page.goto('/admin')
 
-  const shortcuts = page.getByRole('region', { name: 'Crear y editar' })
+  const shortcuts = page.getByRole('region', { name: 'Acciones rápidas' })
   await expect(
-    shortcuts.getByRole('link', { name: 'Nuevo producto' }),
+    shortcuts.getByRole('link', { name: 'Crear producto' }),
   ).toBeVisible()
   await shortcuts
     .getByRole('link', { name: 'Editar contenido del Home' })
@@ -18,7 +18,7 @@ test('El resumen evita acciones repetidas y abre el trabajo editorial', async ({
   ).toBeVisible()
 })
 
-test('La edición del Home informa si hay cambios y explica una búsqueda sin resultados', async ({
+test('La edición del Home muestra la experiencia de perfume y comunica el guardado', async ({
   page,
 }) => {
   await page.goto('/admin/home')
@@ -28,13 +28,10 @@ test('La edición del Home informa si hay cambios y explica una búsqueda sin re
   const savebar = page.locator('.admin-home-savebar')
   await expect(savebar).toContainText('Todo guardado')
 
-  await page.getByRole('button', { name: 'Destacados', exact: true }).click()
-  await page
-    .getByRole('searchbox', { name: /Buscar un producto/ })
-    .fill('fragancia-que-no-existe')
+  await page.getByRole('button', { name: 'Encuentra tu perfume ideal' }).click()
   await expect(
-    page.getByText('No hay productos con ese nombre o marca.'),
-  ).toBeVisible()
+    page.getByRole('button', { name: 'Destacados', exact: true }),
+  ).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Video editorial' }).click()
   await page
@@ -50,7 +47,7 @@ test('El editor de envíos mantiene el importe vacío, permite deshacer y comuni
   page,
 }) => {
   await page.goto('/admin/envios')
-  const fee = page.getByLabel('Tarifa base de courier (S/)')
+  const fee = page.getByLabel('Courier en Lima (S/)')
   const footer = page.locator('.admin-shipping-footer')
   await expect(footer).toContainText('Todo guardado')
 
@@ -61,9 +58,12 @@ test('El editor de envíos mantiene el importe vacío, permite deshacer y comuni
   await expect(fee).toBeFocused()
   await fee.fill('38')
 
+  await page
+    .getByRole('button', { name: 'Agregar tarifa por distrito' })
+    .click()
   const before = await page.locator('.admin-shipping-row').count()
   await page.locator('.admin-shipping-row').first().click()
-  await page.getByRole('button', { name: 'Quitar excepción' }).click()
+  await page.getByRole('button', { name: 'Quitar tarifa especial' }).click()
   await expect(page.locator('.admin-shipping-row')).toHaveCount(before - 1)
   await footer.getByRole('button', { name: 'Deshacer eliminación' }).click()
   await expect(page.locator('.admin-shipping-row')).toHaveCount(before)

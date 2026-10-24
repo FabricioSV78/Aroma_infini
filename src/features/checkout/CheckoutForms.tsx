@@ -1,15 +1,15 @@
 import { Link } from 'react-router'
-import type { FormEvent } from 'react'
+import { useSyncExternalStore, type FormEvent } from 'react'
 import { Icon } from '../../components/ui/Icon'
 import {
   getPeruDistrictOptions,
   getPeruProvinceOptions,
-  isValidPeruLocation,
-  peruDepartments,
+  getDeliveryArea,
 } from '../../content/peru'
 import { formatPEN } from '../../services/currency'
 import {
   isValidAlternateRecipient,
+  getDeliveryZoneOptions,
   quoteShipping,
   type CheckoutAddress,
   type CheckoutContact,
@@ -17,6 +17,8 @@ import {
   type DeliveryMethod,
 } from '../../services/checkout-service'
 import { useCheckout } from './checkout-context'
+import { shippingService } from '../../services/shipping-service'
+import { isShippingDestinationEnabled } from '../../services/shipping-rates'
 
 interface ContactFormProps {
   onNext: () => void
@@ -200,8 +202,21 @@ export function CheckoutDeliveryForm({
   onBack,
 }: DeliveryFormProps) {
   const { draft, setDraft } = useCheckout()
-  const provinceOptions = getPeruProvinceOptions(draft.address.department)
-  const districtOptions = getPeruDistrictOptions(draft.address.province)
+  const shipping = useSyncExternalStore(
+    shippingService.subscribe,
+    shippingService.getSnapshot,
+  )
+  const savedArea = getDeliveryArea(draft.address.department)
+  const area =
+    savedArea?.province === draft.address.province ? savedArea : undefined
+  const provinceOptions = shipping.provinceShippingEnabled
+    ? getPeruProvinceOptions(draft.address.department)
+    : []
+  const districtOptions = shipping.provinceShippingEnabled
+    ? getPeruDistrictOptions(draft.address.province)
+    : area
+      ? getPeruDistrictOptions(area.province)
+      : []
   const quote = quoteShipping(
     draft.address.department,
     draft.deliveryMethod,
@@ -209,8 +224,7 @@ export function CheckoutDeliveryForm({
     draft.address.province,
     draft.address.district,
   )
-  const inProvince =
-    Boolean(draft.address.department.trim()) &&
+  const motorizadoUnavailable =
     quoteShipping(
       draft.address.department,
       'motorizado',
@@ -219,25 +233,55 @@ export function CheckoutDeliveryForm({
       draft.address.district,
     ).kind !== 'quoted'
 
-  function updateAddress(field: keyof CheckoutAddress, value: string) {
+  function updateAddress(
+    field: Exclude<keyof CheckoutAddress, 'department' | 'province'>,
+    value: string,
+  ) {
     setDraft((current) => ({
       ...current,
-      address:
-        field === 'department'
-          ? {
-              ...current.address,
-              department: value,
-              province: '',
-              district: '',
-            }
-          : field === 'province'
-            ? { ...current.address, province: value, district: '' }
-            : { ...current.address, [field]: value },
+      address: { ...current.address, [field]: value },
       deliveryMethod:
-        field === 'department' &&
-        quoteShipping(value, 'motorizado', subtotalCents).kind === 'unavailable'
+        field === 'district' &&
+        current.deliveryMethod === 'motorizado' &&
+        quoteShipping(
+          current.address.department,
+          'motorizado',
+          subtotalCents,
+          current.address.province,
+          value,
+        ).kind !== 'quoted'
           ? 'courier'
           : current.deliveryMethod,
+    }))
+  }
+
+  function updateArea(department: string) {
+    const selected = getDeliveryArea(department)
+    setDraft((current) => ({
+      ...current,
+      address: {
+        ...current.address,
+        department: selected?.department ?? '',
+        province: selected?.province ?? '',
+        district: '',
+      },
+      deliveryMethod: 'courier',
+    }))
+  }
+
+  function updateDepartment(department: string) {
+    setDraft((current) => ({
+      ...current,
+      address: { ...current.address, department, province: '', district: '' },
+      deliveryMethod: 'courier',
+    }))
+  }
+
+  function updateProvince(province: string) {
+    setDraft((current) => ({
+      ...current,
+      address: { ...current.address, province, district: '' },
+      deliveryMethod: 'courier',
     }))
   }
 
@@ -256,7 +300,8 @@ export function CheckoutDeliveryForm({
     event.preventDefault()
     if (!reportTrimmedValidity(event.currentTarget)) return
     if (
-      !isValidPeruLocation(
+      !isShippingDestinationEnabled(
+        shipping,
         draft.address.department,
         draft.address.province,
         draft.address.district,
@@ -295,61 +340,84 @@ export function CheckoutDeliveryForm({
         <h2 id="checkout-step-title" tabIndex={-1}>
           A dónde lo enviamos
         </h2>
-        <p>Entrega a domicilio en Perú.</p>
+        <p>
+          {shipping.provinceShippingEnabled
+            ? 'Elige departamento, provincia y distrito para ver la tarifa.'
+            : 'Por ahora entregamos en Lima y Callao. Elige tu zona y distrito para ver la tarifa.'}
+        </p>
       </div>
 
       <div className="checkout-fields">
-        <div className="checkout-field">
-          <label htmlFor="checkout-department">Departamento</label>
-          <select
-            id="checkout-department"
-            name="address-level1"
-            autoComplete="address-level1"
-            required
-            value={draft.address.department}
-            onChange={(event) => {
-              event.currentTarget.setCustomValidity('')
-              updateAddress('department', event.target.value)
-            }}
-          >
-            <option value="">Selecciona un departamento</option>
-            {peruDepartments.map((zone) => (
-              <option key={zone.value} value={zone.value}>
-                {zone.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="checkout-field">
-          <label htmlFor="checkout-province">Provincia</label>
-          <select
-            id="checkout-province"
-            name="address-level2"
-            autoComplete="address-level2"
-            required
-            disabled={!draft.address.department}
-            value={draft.address.province}
-            onChange={(event) => {
-              event.currentTarget.setCustomValidity('')
-              updateAddress('province', event.target.value)
-            }}
-          >
-            <option value="">Selecciona una provincia</option>
-            {provinceOptions.map((province) => (
-              <option key={province.value} value={province.value}>
-                {province.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="checkout-field">
-          <label htmlFor="checkout-district">Distrito</label>
+        {shipping.provinceShippingEnabled ? (
+          <>
+            <div className="checkout-field">
+              <label htmlFor="checkout-department">Departamento</label>
+              <select
+                id="checkout-department"
+                name="address-level1"
+                autoComplete="address-level1"
+                required
+                value={draft.address.department}
+                onChange={(event) => updateDepartment(event.target.value)}
+              >
+                <option value="">Selecciona un departamento</option>
+                {getDeliveryZoneOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="checkout-field">
+              <label htmlFor="checkout-province">Provincia</label>
+              <select
+                id="checkout-province"
+                name="address-level2"
+                autoComplete="address-level2"
+                required
+                disabled={!draft.address.department}
+                value={draft.address.province}
+                onChange={(event) => updateProvince(event.target.value)}
+              >
+                <option value="">Selecciona una provincia</option>
+                {provinceOptions.map((province) => (
+                  <option key={province.value} value={province.value}>
+                    {province.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : (
+          <div className="checkout-field checkout-field--wide">
+            <label htmlFor="checkout-zone">Zona de entrega</label>
+            <select
+              id="checkout-zone"
+              name="address-level1"
+              autoComplete="address-level1"
+              required
+              value={area?.department ?? ''}
+              onChange={(event) => updateArea(event.target.value)}
+            >
+              <option value="">Selecciona una zona</option>
+              {getDeliveryZoneOptions().map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="checkout-field checkout-field--wide">
+          <label htmlFor="checkout-district">Distrito de entrega</label>
           <select
             id="checkout-district"
             name="address-level3"
             autoComplete="address-level3"
             required
-            disabled={!draft.address.province}
+            disabled={
+              shipping.provinceShippingEnabled ? !draft.address.province : !area
+            }
             value={draft.address.district}
             onChange={(event) => {
               event.currentTarget.setCustomValidity('')
@@ -490,13 +558,13 @@ export function CheckoutDeliveryForm({
             name="delivery-method"
             value="motorizado"
             checked={draft.deliveryMethod === 'motorizado'}
-            disabled={inProvince}
+            disabled={motorizadoUnavailable}
             onChange={() => chooseDelivery('motorizado')}
           />
           <span>
             <strong>Motorizado</strong>
             <small>
-              {inProvince
+              {motorizadoUnavailable
                 ? 'No disponible para la ubicación elegida'
                 : 'Disponible según ubicación'}
             </small>
@@ -512,9 +580,9 @@ export function CheckoutDeliveryForm({
           </strong>
         ) : (
           <strong>
-            {draft.address.department.trim()
-              ? 'Sin tarifa disponible'
-              : 'Completa el departamento'}
+            {quote.kind === 'pending'
+              ? 'Selecciona tu distrito'
+              : 'Sin tarifa disponible'}
           </strong>
         )}
         {quote.kind === 'quoted' ? <small>{quote.estimate}</small> : null}

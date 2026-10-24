@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
-import { useAccount } from '../account/account-context'
+import { AccountContext } from '../account/account-context'
 import {
   getPublishedReviews,
   readLocalReviews,
@@ -21,15 +21,20 @@ const dateFormatter = new Intl.DateTimeFormat('es-PE', {
 export function ProductReviewsPreview({
   productId,
   sizes,
+  readOnly = false,
+  productType,
 }: {
   productId: string
   sizes: number[]
+  readOnly?: boolean
+  productType?: 'perfume' | 'complemento'
 }) {
   const [localReviews, setLocalReviews] = useState(() =>
     readLocalReviews(productId),
   )
   const reviews = [...localReviews, ...getPublishedReviews(productId)]
-  const { active } = useAccount()
+  const account = useContext(AccountContext)
+  const active = account?.active ?? false
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState(0)
   const [sort, setSort] = useState('recent')
@@ -64,7 +69,7 @@ export function ProductReviewsPreview({
   }
 
   function saveReview(review: ProductReview) {
-    if (!active) return false
+    if (readOnly || !active) return false
     try {
       saveLocalReview(productId, review)
     } catch {
@@ -102,15 +107,17 @@ export function ProductReviewsPreview({
             <p className="eyebrow">Opiniones de clientes</p>
             <h2 id="product-reviews-title">Reseñas</h2>
           </div>
-          <button
-            ref={writeButton}
-            type="button"
-            className="button"
-            aria-haspopup="dialog"
-            onClick={() => setFormOpen(true)}
-          >
-            Escribir una reseña
-          </button>
+          {!readOnly ? (
+            <button
+              ref={writeButton}
+              type="button"
+              className="button"
+              aria-haspopup="dialog"
+              onClick={() => setFormOpen(true)}
+            >
+              Escribir una reseña
+            </button>
+          ) : null}
         </header>
         <div className="review-overview">
           <div
@@ -168,13 +175,19 @@ export function ProductReviewsPreview({
             })}
           </div>
           <p className="review-overview-note">
-            Cada piel cuenta una historia.
-            <br />
-            Descubre cómo se siente este perfume en otras personas.
+            {productType === 'complemento' ? (
+              'Conoce las experiencias con este producto.'
+            ) : (
+              <>
+                Cada piel cuenta una historia.
+                <br />
+                Descubre cómo se siente este perfume en otras personas.
+              </>
+            )}
           </p>
         </div>
         <Dialog
-          open={formOpen}
+          open={formOpen && !readOnly}
           onClose={closeForm}
           id="review-dialog"
           className="review-dialog"
@@ -255,7 +268,9 @@ export function ProductReviewsPreview({
                 <time dateTime={review.date}>
                   {dateFormatter.format(new Date(`${review.date}T00:00:00Z`))}
                 </time>
-                <span>{review.sizeMl} ml</span>
+                <span>
+                  {review.sizeMl > 0 ? `${review.sizeMl} ml` : 'Producto'}
+                </span>
               </div>
               <div className="product-review-content">
                 <span

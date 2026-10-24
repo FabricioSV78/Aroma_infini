@@ -1,0 +1,241 @@
+/* A single restrained offer pill reads clearly over the neutral photography. */
+.offer-label {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--color-offer);
+  color: var(--color-offer-contrast);
+  font-family: 'Quicksand', var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.offer-label--fixed {
+  letter-spacing: 0.04em;
+}
+
+.store-layout .stock-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #d9d7d2;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.96);
+  color: var(--color-ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.price-display {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 9px;
+  min-width: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.price-display__prefix {
+  color: var(--color-muted);
+  font-size: 0.7em;
+  font-weight: 400;
+}
+
+.price-display__current {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+
+.price-display__original {
+  color: var(--color-muted);
+  font-size: 0.72em;
+  font-weight: 400;
+  text-decoration-thickness: 1px;
+  white-space: nowrap;
+}
+
+.store-layout
+  .product-card
+  .product-price
+  .price-display--discounted
+  .price-display__current,
+.store-layout .finder-price .price-display--discounted .price-display__current,
+.store-layout
+  .cart-line-variant
+  .price-display--discounted
+  .price-display__current {
+  color: var(--color-offer);
+}
+
+.product-selected-price .price-display--discounted .price-display__current {
+  color: var(--color-brand);
+}
+
+.product-selected-price__amounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 13px;
+  min-width: 0;
+}
+
+.product-selected-price .offer-label--inline {
+  position: static;
+  flex: 0 0 auto;
+  align-self: center;
+  min-width: 0;
+  height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-sage);
+  color: var(--color-brand);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.product-selected-price .price-display {
+  gap: 5px 13px;
+}
+
+.product-selected-price .price-display__original {
+  font-size: 15px;
+}
+
+.product-variants .price-display {
+  gap: 2px 7px;
+}
+
+.product-variants .price-display__current {
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.product-variants .price-display--discounted .price-display__current {
+  color: var(--color-brand);
+  font-weight: 700;
+}
+
+.product-variants .price-display__original {
+  font-size: 10px;
+}
+
+.product-variants label:has(.price-display--discounted) > span {
+  min-height: 72px;
+}
+
+.finder-result-photo {
+  position: relative;
+}
+
+.finder-price .price-display {
+  gap: 3px 11px;
+}
+
+.finder-price .price-display__original {
+  font-size: 13px;
+}
+
+.cart-line-variant .price-display__current {
+  font-weight: 400;
+}
+
+.cart-line-variant .price-display__original {
+  font-size: 10px;
+}
+
+.cart-product-savings,
+.checkout-product-savings {
+  margin-top: 10px;
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cart-drawer-footer .cart-product-savings {
+  margin: -8px 0 14px;
+}
+
+.checkout-line-price .price-display {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.checkout-line-price .price-display__current {
+  color: var(--color-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.checkout-line-price .price-display__original {
+  font-size: 10px;
+}
+
+.search-suggestions li a > span:last-child {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.search-suggestions .price-display {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.search-suggestions .price-display__current {
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .offer-label {
+    top: 8px;
+    left: 8px;
+    min-width: 58px;
+    height: 28px;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .offer-label--fixed {
+    font-size: 12px;
+  }
+
+  .product-selected-price .offer-label--inline {
+    width: auto;
+    height: 28px;
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  .product-variants label:has(.price-display--discounted) > span {
+    min-height: 66px;
+  }
+
+  .product-selected-price:has(.price-display--discounted) {
+    padding-right: 0;
+  }
+}

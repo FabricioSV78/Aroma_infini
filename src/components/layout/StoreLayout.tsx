@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router'
 import { Header } from './Header'
 import { Footer } from './Footer'
 import { Icon } from '../ui/Icon'
+import { NavigationStatus } from '../ui/NavigationStatus'
 import { CartProvider } from '../../features/cart/CartProvider'
 import { FavoritesProvider } from '../../features/favorites/FavoritesProvider'
 import { CartNotice } from '../../features/cart/CartNotice'
@@ -12,9 +13,12 @@ import { AccountProvider } from '../../features/account/AccountProvider'
 import { useStoreReveal } from './useStoreReveal'
 import { contactDetails } from '../../content/institutional'
 import { buildWhatsAppUrl } from '../../utils/whatsapp'
+import { localStorefrontRepository } from '../../services/storefront-repository'
+import { OfferPriceClockContext } from '../../services/offer-price-clock'
 
 function StoreFrame() {
   const [helpOffset, setHelpOffset] = useState(16)
+  const [offerPriceRevision, refreshOfferPrices] = useState(() => Date.now())
   const location = useLocation()
   const helpTriggerRef = useRef<HTMLAnchorElement>(null)
   const whatsappUrl = buildWhatsAppUrl(contactDetails.whatsappNumber)
@@ -22,6 +26,46 @@ function StoreFrame() {
   const previousPath = useRef(location.pathname)
   const storeRef = useRef<HTMLDivElement>(null)
   useStoreReveal(storeRef, location.key)
+  useEffect(() => {
+    let timer: number | undefined
+    function scheduleNextOfferChange() {
+      window.clearTimeout(timer)
+      const now = Date.now()
+      const next = localStorefrontRepository
+        .peekSnapshot()
+        .products.flatMap(({ product }) => {
+          const offer = product.discount
+          return offer?.active ? [offer.startsAt, offer.endsAt] : []
+        })
+        .filter(Boolean)
+        .map((value) => Date.parse(value))
+        .filter((value) => Number.isFinite(value) && value > now)
+        .sort((first, second) => first - second)[0]
+      if (next === undefined) return
+      timer = window.setTimeout(
+        () => {
+          refreshOfferPrices(Date.now())
+          scheduleNextOfferChange()
+        },
+        Math.min(next - now + 1, 2_147_483_647),
+      )
+    }
+    function refreshWhenVisible() {
+      if (document.visibilityState !== 'visible') return
+      refreshOfferPrices(Date.now())
+      scheduleNextOfferChange()
+    }
+    const unsubscribe = localStorefrontRepository.subscribe(
+      scheduleNextOfferChange,
+    )
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    scheduleNextOfferChange()
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      unsubscribe()
+    }
+  }, [])
   useEffect(() => {
     let frame = 0
     function placeHelp() {
@@ -135,36 +179,39 @@ function StoreFrame() {
     else window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location])
   return (
-    <div
-      ref={storeRef}
-      className={
-        location.pathname === '/'
-          ? 'store-layout store-layout--home'
-          : 'store-layout'
-      }
-      style={{ '--help-offset': `${helpOffset}px` } as CSSProperties}
-    >
-      <SeoManager />
-      <Header />
-      <main id="contenido" tabIndex={-1}>
-        <Outlet />
-      </main>
-      <a
-        ref={helpTriggerRef}
-        href={whatsappUrl ?? '/contacto'}
-        target={whatsappUrl ? '_blank' : undefined}
-        rel={whatsappUrl ? 'noopener noreferrer' : undefined}
-        aria-label={
-          whatsappUrl ? 'Abrir WhatsApp para recibir ayuda' : 'Ir a contacto'
+    <OfferPriceClockContext.Provider value={offerPriceRevision}>
+      <div
+        ref={storeRef}
+        className={
+          location.pathname === '/'
+            ? 'store-layout store-layout--home'
+            : 'store-layout'
         }
-        className="help-button"
+        style={{ '--help-offset': `${helpOffset}px` } as CSSProperties}
       >
-        <Icon name="chat" />
-        <span>Ayuda</span>
-      </a>
-      <Footer />
-      <CartNotice />
-    </div>
+        <SeoManager />
+        <Header />
+        <NavigationStatus />
+        <main id="contenido" tabIndex={-1}>
+          <Outlet />
+        </main>
+        <a
+          ref={helpTriggerRef}
+          href={whatsappUrl ?? '/contacto'}
+          target={whatsappUrl ? '_blank' : undefined}
+          rel={whatsappUrl ? 'noopener noreferrer' : undefined}
+          aria-label={
+            whatsappUrl ? 'Abrir WhatsApp para recibir ayuda' : 'Ir a contacto'
+          }
+          className="help-button"
+        >
+          <Icon name="chat" />
+          <span>Ayuda</span>
+        </a>
+        <Footer />
+        <CartNotice />
+      </div>
+    </OfferPriceClockContext.Provider>
   )
 }
 
