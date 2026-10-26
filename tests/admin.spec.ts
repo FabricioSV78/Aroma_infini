@@ -689,7 +689,7 @@ test('El dashboard resume inventario y flujo de pedidos con enlaces operativos',
     .getByRole('link', { name: 'Envíos en curso: ver detalle' })
     .click()
   await expect(page).toHaveURL('/admin/pedidos?preparacion=shipped')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(1)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
   await expect(page.getByText('Cliente 01')).toBeVisible()
 })
 
@@ -702,7 +702,7 @@ test('Los datos de pedidos recientes conservan separación en tablet y escritori
 
     const row = page
       .locator('.admin-recent-orders li')
-      .filter({ hasText: 'AI-200926-01' })
+      .filter({ hasText: 'AI-DEMO-0002' })
 
     const gaps = await row.evaluate((element) => {
       const selectors = [
@@ -942,10 +942,8 @@ test('El detalle separa pago y preparación y permite actualizar el pedido', asy
     page.getByRole('combobox', { name: 'Pago', exact: true }),
   ).toHaveCount(0)
 
-  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
-  await page
-    .getByRole('combobox', { name: /Preparación del pedido/ })
-    .selectOption('preparing')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'En preparación', exact: true }).check()
   await page.getByRole('button', { name: 'Guardar estado' }).click()
   await expect(page.getByText(/Estado actualizado/)).toBeVisible()
   await expect(
@@ -957,7 +955,7 @@ test('Pedidos combina búsqueda y preparación y permite limpiar filtros', async
   page,
 }) => {
   await page.goto('/admin/pedidos')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(4)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(20)
 
   await page.getByRole('searchbox', { name: 'Buscar' }).fill('Cliente 02')
   await page.getByLabel('Estado del pedido').selectOption('received')
@@ -975,26 +973,27 @@ test('Pedidos combina búsqueda y preparación y permite limpiar filtros', async
 
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await expect(page).toHaveURL('/admin/pedidos')
-  await expect(rows).toHaveCount(4)
+  await expect(rows).toHaveCount(20)
 })
 
 test('Los accesos del flujo filtran nuevos, entregados y enviados', async ({
   page,
 }) => {
   await page.goto('/admin/pedidos?preparacion=received')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(1)
-  await expect(page.getByText('1 pedido', { exact: true })).toBeVisible()
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(13)
+  await expect(page.getByText('13 pedidos', { exact: true })).toBeVisible()
 
   await page.getByLabel('Estado del pedido').selectOption('delivered')
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page).toHaveURL('/admin/pedidos?preparacion=delivered')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(1)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
 
   await page.getByLabel('Estado del pedido').selectOption('shipped')
   await page.getByRole('button', { name: 'Aplicar' }).click()
   await expect(page).toHaveURL('/admin/pedidos?preparacion=shipped')
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(1)
-  await expect(page.locator('.admin-table tbody tr')).toContainText('Enviado')
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
+  for (const row of await page.locator('.admin-table tbody tr').all())
+    await expect(row).toContainText('Enviado')
 })
 
 test('La acción rápida prepara un pedido y exige datos de entrega antes de enviarlo', async ({
@@ -1004,13 +1003,7 @@ test('La acción rápida prepara un pedido y exige datos de entrega antes de env
   const row = page.locator('.admin-table tbody tr')
   await expect(row).toContainText('Nuevo')
   await page.getByRole('button', { name: 'Preparar AI-210926-01' }).click()
-  await page
-    .getByRole('dialog', {
-      name: 'Actualizar pedido AI-210926-01',
-      exact: true,
-    })
-    .getByLabel('Responsable de los cambios')
-    .fill('Ana Operaciones')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
   await page
     .getByRole('dialog', {
       name: 'Actualizar pedido AI-210926-01',
@@ -1079,7 +1072,7 @@ test('Limpiar una búsqueda administrativa vacía también el campo y la URL', a
 }) => {
   await page.goto('/admin/productos?q=sin-coincidencias')
   const search = page.getByRole('searchbox', {
-    name: 'Buscar producto o marca',
+    name: 'Buscar producto, marca o SKU',
   })
 
   await expect(search).toHaveValue('sin-coincidencias')
@@ -1108,7 +1101,7 @@ test('La lista corrige páginas inválidas y conserva la búsqueda al volver', a
 
   await expect(page).toHaveURL('/admin/productos?q=Bois')
   await expect(
-    page.getByRole('searchbox', { name: 'Buscar producto o marca' }),
+    page.getByRole('searchbox', { name: 'Buscar producto, marca o SKU' }),
   ).toHaveValue('Bois')
 })
 

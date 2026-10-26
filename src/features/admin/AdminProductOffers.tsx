@@ -119,8 +119,14 @@ export function AdminProductOffers() {
   const [originalDraft, setOriginalDraft] = useState<OfferDraft | null>(null)
   const [error, setError] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [saveAction, setSaveAction] = useState<'finish' | 'create-another'>(
+    'finish',
+  )
   const [now, setNow] = useState(() => Date.now())
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const productRef = useRef<HTMLSelectElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  const removingRef = useRef(false)
   const persistence = useAdminSave()
   const isEditing = Boolean(draft && originalDraft?.productId)
   const dirty = Boolean(
@@ -177,6 +183,15 @@ export function AdminProductOffers() {
   const selectedProduct = draft
     ? state.products.find((record) => record.product.id === draft.productId)
     : undefined
+  // A local change reaches the store before its browser write completes.
+  // Keep the selected option available until persistence confirms the save.
+  const selectableProducts =
+    isEditing && selectedProduct
+      ? [selectedProduct]
+      : sortedProducts.filter(
+          (record) =>
+            !record.product.discount || record.product.id === draft?.productId,
+        )
   const parsedDiscount = draft ? discountFrom(draft) : null
   const previewError =
     draft && selectedProduct
@@ -219,16 +234,29 @@ export function AdminProductOffers() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (persistence.saving || persistence.persistenceFailed) return
     if (!draft || !selectedProduct || !parsedDiscount) {
       setError('Elige un producto y revisa el importe del descuento.')
       return
     }
+    const createAnother =
+      !isEditing &&
+      (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') ===
+        'create-another'
+    setSaveAction(createAnother ? 'create-another' : 'finish')
     setError('')
     const result = await persistence.save(
       () => adminService.saveProductDiscount(draft.productId, parsedDiscount),
       () => {
-        setDraft(null)
-        setOriginalDraft(null)
+        if (createAnother) {
+          setDraft({ ...emptyDraft })
+          setOriginalDraft({ ...emptyDraft })
+          setError('')
+          window.requestAnimationFrame(() => productRef.current?.focus())
+        } else {
+          setDraft(null)
+          setOriginalDraft(null)
+        }
         setPreviewOpen(false)
         notice.toast(`Oferta de ${selectedProduct.product.name} guardada.`)
       },
@@ -262,34 +290,55 @@ export function AdminProductOffers() {
     }
   }
 
-  async function remove() {
-    if (persistence.saving || persistence.persistenceFailed) return
-    if (!draft || !selectedProduct || !isEditing) return
+  async function remove(record: AdminProduct, fromEditor = false) {
     if (
-      !(await notice.confirm({
-        title: `¿Retirar la oferta de ${selectedProduct.product.name}?`,
-        description:
-          'El producto volverá a su precio habitual. Sus presentaciones y existencias se conservarán.',
-        confirmLabel: 'Retirar oferta',
-        destructive: true,
-      }))
+      persistence.saving ||
+      persistence.persistenceFailed ||
+      removingRef.current
     )
       return
-    setError('')
-    const result = await persistence.save(
-      () => adminService.saveProductDiscount(draft.productId, null),
-      () => {
-        setDraft(null)
-        setOriginalDraft(null)
-        setPreviewOpen(false)
-        notice.toast(`Oferta de ${selectedProduct.product.name} retirada.`)
-      },
-    )
-    if (result?.kind === 'validation') setError(result.message)
+    removingRef.current = true
+    try {
+      if (
+        !(await notice.confirm({
+          title: fromEditor
+            ? `¿Retirar la oferta de ${record.product.name}?`
+            : `¿Eliminar la oferta de ${record.product.name}?`,
+          description:
+            'El producto volverá a su precio habitual. Sus presentaciones y existencias se conservarán.',
+          confirmLabel: fromEditor ? 'Retirar oferta' : 'Eliminar oferta',
+          destructive: true,
+        }))
+      )
+        return
+      setError('')
+      const result = await persistence.save(
+        () => adminService.saveProductDiscount(record.product.id, null),
+        () => {
+          if (fromEditor) {
+            setDraft(null)
+            setOriginalDraft(null)
+            setPreviewOpen(false)
+          }
+          notice.toast(
+            `Oferta de ${record.product.name} ${fromEditor ? 'retirada' : 'eliminada'}.`,
+          )
+          window.requestAnimationFrame(() => sectionRef.current?.focus())
+        },
+      )
+      if (result?.kind === 'validation') setError(result.message)
+    } finally {
+      removingRef.current = false
+    }
   }
 
   return (
-    <section className="admin-offers" aria-label="Ofertas de productos">
+    <section
+      className="admin-offers"
+      aria-label="Ofertas de productos"
+      ref={sectionRef}
+      tabIndex={-1}
+    >
       <div className="admin-offers-toolbar">
         <p>
           {offeredProducts.length}{' '}
@@ -335,6 +384,7 @@ export function AdminProductOffers() {
             <label className="admin-offers-product-field">
               Producto
               <select
+                ref={productRef}
                 value={draft.productId}
                 disabled={isEditing}
                 onChange={(event) =>
@@ -347,10 +397,7 @@ export function AdminProductOffers() {
                 required
               >
                 <option value="">Selecciona un producto</option>
-                {(isEditing && selectedProduct
-                  ? [selectedProduct]
-                  : availableProducts
-                ).map((record) => {
+                {selectableProducts.map((record) => {
                   const brand = state.brands.find(
                     (item) => item.id === record.product.brandId,
                   )?.name
@@ -475,22 +522,49 @@ export function AdminProductOffers() {
             <button
               className="button button--primary"
               type="submit"
+              name="afterSave"
+              value="finish"
               disabled={
                 persistence.saving ||
                 persistence.persistenceFailed ||
                 Boolean(previewError) ||
                 !selectedProduct
               }
-              aria-busy={persistence.saving}
+              aria-busy={persistence.saving && saveAction === 'finish'}
             >
-              {persistence.saving ? 'Guardando…' : 'Guardar oferta'}
+              {persistence.saving && saveAction === 'finish'
+                ? 'Guardando…'
+                : 'Guardar oferta'}
             </button>
+            {!isEditing ? (
+              <button
+                className="button button--secondary"
+                type="submit"
+                name="afterSave"
+                value="create-another"
+                disabled={
+                  persistence.saving ||
+                  persistence.persistenceFailed ||
+                  Boolean(previewError) ||
+                  !selectedProduct
+                }
+                aria-busy={
+                  persistence.saving && saveAction === 'create-another'
+                }
+              >
+                {persistence.saving && saveAction === 'create-another'
+                  ? 'Guardando…'
+                  : 'Guardar y crear otra'}
+              </button>
+            ) : null}
             {isEditing ? (
               <button
                 className="admin-offers-remove"
                 type="button"
                 disabled={persistence.saving || persistence.persistenceFailed}
-                onClick={() => void remove()}
+                onClick={() =>
+                  selectedProduct && void remove(selectedProduct, true)
+                }
               >
                 Retirar oferta
               </button>
@@ -605,6 +679,17 @@ export function AdminProductOffers() {
                     onClick={() => void toggle(record)}
                   >
                     {discount.active ? 'Desactivar' : 'Activar'}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-offers-delete"
+                    aria-label={`Eliminar oferta de ${record.product.name}`}
+                    disabled={
+                      persistence.saving || persistence.persistenceFailed
+                    }
+                    onClick={() => void remove(record)}
+                  >
+                    Eliminar oferta
                   </button>
                 </div>
               </li>

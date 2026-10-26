@@ -21,7 +21,7 @@ async function saveHome(page: Page) {
   await expect(page.locator('.admin-home-savebar')).toContainText(
     'Todo guardado',
   )
-  await expect(page.locator('.admin-home-savebar')).toContainText(
+  await expect(page.locator('.admin-toast')).toContainText(
     'Cambios guardados',
   )
 }

@@ -55,7 +55,9 @@ test('Clientes permite buscar y abrir solo los pedidos de ese cliente', async ({
   await page.goto('/admin/clientes')
   const search = page.getByRole('searchbox', { name: 'Buscar cliente' })
   await search.fill('Miraflores')
-  await expect(page.locator('.admin-customers-page tbody tr')).toHaveCount(2)
+  await expect(page.locator('.admin-customers-page tbody tr')).toHaveCount(25)
+  await search.fill('Cliente 01')
+  await expect(page.locator('.admin-customers-page tbody tr')).toHaveCount(1)
   await page.getByRole('link', { name: 'Ver pedidos de Cliente 01' }).click()
   await expect(page).toHaveURL(/\/admin\/pedidos\?cliente=customer-demo-1$/)
   await expect(page.locator('.admin-orders-page tbody tr')).toHaveCount(1)
@@ -85,20 +87,21 @@ test('Un pedido heredado conserva ubicación al completar la entrega y se puede 
   await expect(page.getByText('Datos de entrega guardados.')).toBeVisible()
   await expect(page.getByText('Completos', { exact: true })).toBeVisible()
 
-  await page.getByText('Resumen de envío', { exact: true }).click()
+  await page.getByText('Ficha de envío', { exact: true }).click()
   await expect(
-    page.getByRole('button', { name: 'Imprimir resumen' }),
+    page.getByRole('button', { name: 'Imprimir ficha' }),
   ).toBeEnabled()
   await expect(page.locator('.admin-shipping-sheet')).toContainText(
     'San Isidro',
   )
 
-  const status = page.getByRole('combobox', { name: 'Preparación del pedido' })
-  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
-  await status.selectOption('preparing')
+  const selectStatus = (name: string) =>
+    page.getByRole('radio', { name, exact: true }).check()
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
+  await selectStatus('En preparación')
   await page.getByRole('button', { name: 'Guardar estado' }).click()
   await expect(page.getByText('Estado actualizado.')).toBeVisible()
-  await status.selectOption('shipped')
+  await selectStatus('Enviado')
   await page.getByRole('button', { name: 'Guardar estado' }).click()
   await answerAdminNotice(page, 'accept')
   await expect(page.getByText('Enviado', { exact: true }).first()).toBeVisible()
@@ -125,14 +128,26 @@ test('Un pedido histórico fuera de cobertura conserva su destino al corregir el
 
 test('Marcas genera una URL entendible desde el nombre', async ({ page }) => {
   await page.goto('/admin/marcas')
-  await page.getByRole('button', { name: 'Nueva marca' }).click()
-  await expect(page.getByRole('heading', { name: 'Nueva marca' })).toBeFocused()
-  await page.getByLabel('Nombre', { exact: true }).fill('Casa Élite')
-  await expect(page.getByLabel('URL de la marca')).toHaveValue('casa-elite')
-  await page.getByRole('button', { name: 'Guardar marca' }).click()
-  await expect(page.getByText('Marca guardada.')).toBeVisible()
+  await page
+    .getByRole('button', { name: 'Registrar marcas', exact: true })
+    .click()
+  await page
+    .getByLabel('Marcas (una por línea)', { exact: true })
+    .fill('Casa Élite')
+  await page
+    .getByRole('button', { name: 'Revisar marcas', exact: true })
+    .click()
+  await expect(
+    page.getByRole('region', { name: 'Resultados de la revisión' }),
+  ).toContainText('/casa-elite')
+  await page
+    .getByRole('button', { name: 'Guardar marcas', exact: true })
+    .click()
+  await expect(page.locator('#brand-registration-result')).toContainText(
+    '1 marca creada.',
+  )
   await expect(page.locator('.admin-brands-page tbody')).toContainText(
-    'Casa élite',
+    'Casa Élite',
   )
 })
 

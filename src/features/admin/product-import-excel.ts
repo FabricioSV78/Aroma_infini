@@ -913,7 +913,7 @@ export async function createProductTemplateWorkbook(
     ],
     [
       'sku',
-      'Opcional: puedes dejarlo vacío; el sistema crea identificadores internos, pero no inventa un SKU comercial. Si lo utilizas, debe ser único por presentación, hasta 64 letras, números, puntos, guiones o guiones bajos. No distingue mayúsculas y minúsculas.',
+      'Código opcional de la presentación. Si lo utilizas, debe ser único, de hasta 64 letras, números, puntos, guiones o guiones bajos. El SKU numérico de cinco dígitos del producto se asigna automáticamente al importar; no se escribe en el Excel.',
     ],
     [
       'Duplicados',

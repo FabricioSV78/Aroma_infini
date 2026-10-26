@@ -212,123 +212,7 @@ test('la edición individual registra responsable y fecha sin duplicar cambios r
   ).toBe(true)
 })
 
-test('varios lotes persisten, evitan duplicados activos y archivar libera sin perder pedidos', async ({
-  page,
-}) => {
-  const references = await seedWorkflowOrders(page, 100, [
-    { index: 1, status: 'preparing' },
-    { index: 2, status: 'shipped' },
-    { index: 3, status: 'delivered' },
-  ])
-  const before = await workflowSnapshot(page)
-  const results = await page.evaluate(
-    async ({ selected, operator }) => {
-      const module = '/src/services/admin-service.ts'
-      const { adminService } = (await import(
-        module
-      )) as typeof import('../src/services/admin-service')
-      const first = adminService.createOrderBatch(
-        'Despacho mañana',
-        [...selected.slice(0, 30), selected[0]],
-        operator,
-      )
-      const second = adminService.createOrderBatch(
-        'Despacho tarde',
-        selected.slice(30, 50),
-        operator,
-      )
-      if (first.kind !== 'saved' || second.kind !== 'saved')
-        throw new Error('No se crearon los lotes de prueba.')
-      const conflict = adminService.createOrderBatch(
-        'Duplicado',
-        [selected[0]],
-        operator,
-      )
-      const missing = adminService.createOrderBatch(
-        'Inexistente',
-        ['AI-INEXISTENTE'],
-        operator,
-      )
-      const invalidName = adminService.createOrderBatch(
-        '',
-        selected.slice(50, 60),
-        operator,
-      )
-      const rename = adminService.updateOrderBatch(first.batch.id, {
-        name: 'Mañana · Lima',
-      })
-      const add = adminService.updateOrderBatch(second.batch.id, {
-        orderReferences: selected.slice(30, 60),
-      })
-      const invalidMove = adminService.updateOrderBatch(second.batch.id, {
-        orderReferences: [selected[0]],
-      })
-      const archive = adminService.updateOrderBatch(first.batch.id, {
-        archived: true,
-      })
-      const reuse = adminService.createOrderBatch(
-        'Nueva ronda',
-        selected.slice(0, 5),
-        operator,
-      )
-      const restoreConflict = adminService.updateOrderBatch(first.batch.id, {
-        archived: false,
-      })
-      if (reuse.kind !== 'saved')
-        throw new Error('No se liberó el lote archivado.')
-      adminService.updateOrderBatch(reuse.batch.id, { archived: true })
-      const restore = adminService.updateOrderBatch(first.batch.id, {
-        archived: false,
-      })
-      await adminService.flush()
-      return {
-        first,
-        second,
-        conflict,
-        missing,
-        invalidName,
-        rename,
-        add,
-        invalidMove,
-        archive,
-        reuse,
-        restoreConflict,
-        restore,
-      }
-    },
-    { selected: references, operator: workflowOperator },
-  )
-  expect(results.conflict.kind).toBe('validation')
-  expect(results.missing.kind).toBe('validation')
-  expect(results.invalidName.kind).toBe('validation')
-  expect(results.invalidMove.kind).toBe('validation')
-  expect(results.restoreConflict.kind).toBe('validation')
-  for (const result of [
-    results.rename,
-    results.add,
-    results.archive,
-    results.restore,
-  ])
-    expect(result.kind).toBe('saved')
-  const after = await workflowSnapshot(page)
-  expect(after.orders).toEqual(before.orders)
-  expect(after.products).toEqual(before.products)
-  expect(after.orderHistory).toEqual([])
-  expect(after.orderBatches).toHaveLength(3)
-  const active = after.orderBatches.filter((batch) => !batch.archived)
-  expect(active).toHaveLength(2)
-  expect(active.map((batch) => batch.orderReferences.length)).toEqual([30, 30])
-  const assigned = active.flatMap((batch) => batch.orderReferences)
-  expect(new Set(assigned).size).toBe(60)
-  expect(active[0].name).toBe('Mañana · Lima')
-  expect(new Set(after.orderBatches.map((batch) => batch.code)).size).toBe(3)
-  await page.reload()
-  expect((await workflowSnapshot(page)).orderBatches).toEqual(
-    after.orderBatches,
-  )
-})
-
-test('un snapshot anterior conserva pedidos y comienza con historial y lotes vacíos', async ({
+test('un snapshot anterior conserva pedidos y comienza con historial vacío', async ({
   page,
 }) => {
   const references = await seedWorkflowOrders(page, 10)
@@ -357,6 +241,6 @@ test('un snapshot anterior conserva pedidos y comienza con historial y lotes vac
     return structuredClone(adminService.getSnapshot())
   })
   expect(restored.orders.map((order) => order.reference)).toEqual(references)
-  expect(restored.orderBatches).toEqual([])
+  expect(Reflect.has(restored, 'orderBatches')).toBe(false)
   expect(restored.orderHistory).toEqual([])
 })

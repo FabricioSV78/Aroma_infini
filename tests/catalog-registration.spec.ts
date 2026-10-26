@@ -17,7 +17,6 @@ function unchangedSettings(state: AdminState) {
   return {
     brands: state.brands,
     orders: state.orders,
-    orderBatches: state.orderBatches,
     orderHistory: state.orderHistory,
     customers: state.customers,
     promotions: state.promotions,
@@ -261,6 +260,7 @@ test('La migración respeta productos propios y completa solo los registros nece
           id,
           slug: id,
           name: `Producto propio ${index + 1}`,
+          sku: String(20000 + index),
           variants: source.product.variants.map((variant, variantIndex) => ({
             ...variant,
             id: `${id}-${variantIndex}`,

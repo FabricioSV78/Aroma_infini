@@ -132,8 +132,20 @@ for (const width of [
 
     for (const path of ['/nosotros', '/contacto']) {
       await page.goto(path)
-      await expect(page.locator('main')).toBeVisible()
-      await expect(page.locator('main h1')).toHaveCount(1)
+      const expectedHeading = institutionalRoutes.find(
+        ([route]) => route === path,
+      )![1]
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        expectedHeading,
+      )
+      await expect(
+        page.getByRole('navigation', {
+          name: 'Ruta de navegación',
+          exact: true,
+        }),
+      ).toBeVisible()
+      await expect(page.locator('.site-header')).toBeVisible()
+      await page.evaluate(() => document.fonts.ready.then(() => true))
 
       const geometry = await page.evaluate(() => {
         const header = document.querySelector<HTMLElement>('.site-header')
@@ -152,19 +164,15 @@ for (const width of [
       expect(geometry.overflow, path).toBe(false)
       expect(geometry.spacing, path).toBeCloseTo(24, 0)
 
-      await expect
-        .poll(() =>
-          page
-            .locator('img')
-            .evaluateAll((images) =>
-              images.every(
-                (image) =>
-                  !(image instanceof HTMLImageElement) ||
-                  image.naturalWidth > 0,
-              ),
-            ),
-        )
-        .toBe(true)
+      for (const image of await page.locator('img').all()) {
+        await image.scrollIntoViewIfNeeded()
+        await expect(image).toHaveJSProperty('complete', true)
+        expect(
+          await image.evaluate(
+            (node) => (node as HTMLImageElement).naturalWidth,
+          ),
+        ).toBeGreaterThan(0)
+      }
 
       if (path === '/nosotros') {
         const imageSource = await page

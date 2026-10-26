@@ -289,13 +289,15 @@ test('El administrador edita portada, pregunta, opción y resultado sin alterar 
     'srcset',
     /^data:image\/webp;base64,/,
   )
-  expect(
-    await finder.locator('picture').evaluate((element) => {
-      const image = element.querySelector('img')
-      const source = element.querySelector('source')
-      return image?.currentSrc === source?.srcset
-    }),
-  ).toBe(true)
+  await expect
+    .poll(() =>
+      finder.locator('picture').evaluate((element) => {
+        const image = element.querySelector('img')
+        const source = element.querySelector('source')
+        return image?.currentSrc === source?.srcset
+      }),
+    )
+    .toBe(true)
   await page.reload()
   await finder.getByRole('button', { name: 'Descubrir mi aroma' }).click()
   const dialog = page.getByRole('dialog', { name: 'Tu recorrido olfativo' })
@@ -359,7 +361,11 @@ test('Un producto nuevo admite archivos, previsualiza la galería y se publica c
     preview.getByRole('heading', { name: 'Aura Uno', level: 1 }),
   ).toBeVisible()
   await preview.getByRole('button', { name: 'Cerrar' }).click()
-  await page.getByRole('button', { name: 'Añadir otra foto' }).click()
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
+  await expect(page.locator('.admin-product-upload-item > img')).toHaveCount(1)
+  await expect(
+    page.getByRole('button', { name: 'Añadir otra foto' }),
+  ).toHaveCount(0)
   await page
     .getByLabel('Subir vista 2 del producto')
     .setInputFiles('public/images/cedre-960.webp')

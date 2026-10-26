@@ -163,9 +163,11 @@ test('Formularios de marcas, promociones y vista previa de producto', async ({
     const base = `artifacts/admin-audit/${stage}/${viewport.name}`
 
     await page.goto('/admin/marcas')
-    await page.getByRole('button', { name: 'Nueva marca' }).click()
+    await page
+      .getByRole('button', { name: 'Registrar marcas', exact: true })
+      .click()
     await expect(
-      page.getByRole('heading', { name: 'Nueva marca' }),
+      page.getByRole('heading', { name: 'Registrar marcas', exact: true }),
     ).toBeVisible()
     await capture(page, `${base}/marca-formulario.png`)
 

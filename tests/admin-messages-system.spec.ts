@@ -266,6 +266,12 @@ test('Pedidos masivos muestran resultados parciales reales y permiten revisar so
     { index: 2, status: 'delivered' },
   ])
   await page.getByLabel('Seleccionar pedidos de esta página').check()
+  await expect(
+    page.getByRole('button', { name: 'Exportar PDF', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Crear lote', exact: true }),
+  ).toHaveCount(0)
   await page
     .getByRole('button', { name: 'Cambiar estado', exact: true })
     .click()
@@ -273,7 +279,7 @@ test('Pedidos masivos muestran resultados parciales reales y permiten revisar so
     name: 'Actualizar 10 pedidos',
     exact: true,
   })
-  await update.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
   await update.getByLabel('Nuevo estado').selectOption('preparing')
   await update.getByRole('button', { name: 'Confirmar actualización' }).click()
   await expect(modal(page)).toContainText('8 de 10 pedidos actualizados')
@@ -341,7 +347,7 @@ test('Revisar un resultado parcial incluye pedidos cuyo estado cambió fuera del
     name: 'Actualizar 3 pedidos',
     exact: true,
   })
-  await update.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
   await page.evaluate(async (reference) => {
     const path = '/src/services/admin-service.ts'
     const { adminService } = (await import(
@@ -377,8 +383,15 @@ test('Reintentos fallidos no acumulan modales y al cerrar el foco queda en una a
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/admin/marcas')
-  await page.getByRole('button', { name: 'Nueva marca', exact: true }).click()
-  await page.getByLabel('Nombre', { exact: true }).fill('Marca Recuperable')
+  await page
+    .getByRole('button', { name: 'Registrar marcas', exact: true })
+    .click()
+  await page
+    .getByLabel('Marcas (una por línea)', { exact: true })
+    .fill('Marca Recuperable')
+  await page
+    .getByRole('button', { name: 'Revisar marcas', exact: true })
+    .click()
   await page.evaluate(async () => {
     const path = '/src/services/admin-persistence.ts'
     const { localAdminStateRepository } = (await import(
@@ -392,7 +405,9 @@ test('Reintentos fallidos no acumulan modales y al cerrar el foco queda en una a
     }
   })
   const before = await persistedAdminState(page)
-  await page.getByRole('button', { name: 'Guardar marca', exact: true }).click()
+  await page
+    .getByRole('button', { name: 'Guardar marcas', exact: true })
+    .click()
   await expect(modal(page)).toContainText('espacio suficiente')
   await expect(modal(page)).not.toContainText('sensitive-secret-stack')
   await modal(page).getByRole('button', { name: 'Reintentar guardado' }).click()
@@ -414,7 +429,9 @@ test('Reintentos fallidos no acumulan modales y al cerrar el foco queda en una a
     ;(window as Window & { __allowSave?: boolean }).__allowSave = true
   })
   await retry.click()
-  await expect(page.locator('.admin-toast')).toContainText('Marca guardada')
+  await expect(page.locator('#brand-registration-result')).toContainText(
+    '1 marca creada.',
+  )
   const after = await persistedAdminState(page)
   expect(after.revision).toBe(before.revision + 1)
   expect(
@@ -481,7 +498,7 @@ test('Un fallo inesperado de importación sustituye la ventana de revisión y pe
   )
 })
 
-test('Un lote sin pedidos aptos explica el resultado sin anunciar éxito ni registrar cambios', async ({
+test('Una selección sin pedidos aptos explica el resultado sin anunciar éxito ni registrar cambios', async ({
   page,
 }) => {
   await seedWorkflowOrders(
@@ -498,7 +515,7 @@ test('Un lote sin pedidos aptos explica el resultado sin anunciar éxito ni regi
     name: 'Actualizar 3 pedidos',
     exact: true,
   })
-  await update.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
   await update.getByRole('button', { name: 'Confirmar actualización' }).click()
   await expect(modal(page)).toHaveAttribute('role', 'dialog')
   await expect(modal(page)).toContainText('0 de 3 pedidos actualizados')
@@ -531,7 +548,8 @@ test('Escape cierra una confirmación móvil sin cerrar el menú que la abrió',
   await expect(
     page.getByRole('button', { name: 'Borrar datos de este navegador' }),
   ).toBeFocused()
-  await page.locator('#admin-navigation')
+  await page
+    .locator('#admin-navigation')
     .getByRole('button', { name: 'Cerrar menú administrativo', exact: true })
     .click()
   await expect(page.locator('#admin-navigation')).not.toHaveClass(/is-open/)

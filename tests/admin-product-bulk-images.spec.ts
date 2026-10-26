@@ -173,14 +173,14 @@ test('añadir varias fotos rellena espacios y conserva las existentes, su orden 
     .getByRole('button', { name: 'Quitar', exact: true })
     .click()
   await gallery
-    .last()
+    .nth(2)
     .getByRole('button', { name: 'Quitar', exact: true })
     .click()
   const originals = await gallerySources(page)
-  await page
-    .getByRole('button', { name: 'Añadir otra foto', exact: true })
-    .click()
-  await expect(gallery).toHaveCount(3)
+  await expect(gallery).toHaveCount(4)
+  await expect(
+    page.getByRole('button', { name: 'Añadir otra foto', exact: true }),
+  ).toHaveCount(0)
   await expect(gallery.last()).toContainText('Sin imagen')
   await page
     .getByLabel('Subir varias fotos del producto', { exact: true })
@@ -247,21 +247,22 @@ test('un lote con una imagen inválida o demasiados archivos no incorpora fotos 
     .locator('.admin-notice-dialog')
     .getByRole('button', { name: 'Entendido' })
     .click()
-  await expect(page.locator('.admin-product-upload-item')).toHaveCount(1)
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
+  await expect(page.locator('.admin-product-olfactory-slot')).toHaveCount(1)
   expect(await gallerySources(page)).toEqual([])
-  await bulk.setInputFiles([...imageFiles, imageFiles[0]])
-  await expect(page.locator('.admin-notice-dialog')).toContainText(/4|cuatro/)
+  await bulk.setInputFiles([...imageFiles, imageFiles[0], imageFiles[1]])
+  await expect(page.locator('.admin-notice-dialog')).toContainText(/5|cinco/)
   await page
     .locator('.admin-notice-dialog')
     .getByRole('button', { name: 'Entendido' })
     .click()
   expect(await gallerySources(page)).toEqual([])
-  await expect(page.locator('.admin-product-upload-item')).toHaveCount(1)
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
   await bulk.setInputFiles(imageFiles.slice(0, 2))
   await expect(page.locator('.admin-product-upload-item > img')).toHaveCount(2)
   const sources = await gallerySources(page)
-  await bulk.setInputFiles(imageFiles.slice(0, 3))
-  await expect(page.locator('.admin-notice-dialog')).toContainText(/2|dos/)
+  await bulk.setInputFiles(imageFiles)
+  await expect(page.locator('.admin-notice-dialog')).toContainText(/3|tres/)
   await page
     .locator('.admin-notice-dialog')
     .getByRole('button', { name: 'Entendido' })

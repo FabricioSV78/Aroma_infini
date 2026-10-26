@@ -13,6 +13,18 @@ test('el editor ordena y quita fotografías sin pedir encuadre ni desincronizar 
     'src',
     originalSecond ?? '',
   )
+  await page.getByRole('button', { name: 'Mover foto 1 después' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(photos.nth(0).locator('img')).toHaveAttribute(
+    'src',
+    originalMain ?? '',
+  )
+  await page.getByRole('button', { name: 'Mover foto 2 antes' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(photos.nth(0).locator('img')).toHaveAttribute(
+    'src',
+    originalSecond ?? '',
+  )
   await expect(page.getByLabel(/Encuadre de foto/)).toHaveCount(0)
   await photos
     .nth(0)
@@ -27,7 +39,9 @@ test('el editor ordena y quita fotografías sin pedir encuadre ni desincronizar 
   await page.getByRole('button', { name: 'Guardar producto' }).click()
   await expect(page).toHaveURL(/guardado=1/)
   await page.getByRole('link', { name: 'Editar Bois Clair' }).click()
-  await expect(page.locator('.admin-product-upload-item')).toHaveCount(3)
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
+  await expect(page.locator('.admin-product-upload-item > img')).toHaveCount(3)
+  await expect(photos.last()).toContainText('Sin imagen')
   await expect(
     page.locator('.admin-product-upload-item').first().locator('img'),
   ).toHaveAttribute('src', originalMain ?? '')
@@ -44,7 +58,7 @@ test('la fotografía olfativa y los relacionados se editan por perfume sin campo
     .getByLabel('Subir imagen del perfil olfativo')
     .setInputFiles('public/images/olfactory-petale.webp')
   await expect(
-    page.locator('.admin-olfactory-image-control > img'),
+    page.locator('.admin-product-olfactory-slot > img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
 
   await page.locator('.admin-related-products > summary').click()
@@ -61,7 +75,7 @@ test('la fotografía olfativa y los relacionados se editan por perfume sin campo
     page.getByRole('combobox', { name: 'Tipo de perfume' }),
   ).toHaveCount(0)
   await expect(
-    page.locator('.admin-olfactory-image-control > img'),
+    page.locator('.admin-product-olfactory-slot > img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
   await page.locator('.admin-related-products > summary').click()
   await expect(

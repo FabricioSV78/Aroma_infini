@@ -60,7 +60,6 @@ export async function seedWorkflowOrders(
       })
       const fixture = Object.assign(snapshot, {
         orders,
-        orderBatches: [],
         orderHistory: [],
       })
       await writeAdminState(fixture)
@@ -69,6 +68,13 @@ export async function seedWorkflowOrders(
     { total: count, patches: overrides },
   )
   await page.reload()
+  await page.evaluate(async () => {
+    const path = '/src/services/admin-service.ts'
+    const { hydrateAdminStore } = (await import(
+      path
+    )) as typeof import('../src/services/admin-service')
+    await hydrateAdminStore()
+  })
   return references
 }
 

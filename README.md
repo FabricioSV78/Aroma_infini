@@ -6,9 +6,11 @@ La referencia técnica vigente es [Auditoría técnica](docs/TECHNICAL_AUDIT.md)
 
 El sistema de mensajes del panel, sus criterios de modal/toast/validación, recuperación de guardados y capturas se documentan en [Mensajes administrativos](docs/ADMIN_MESSAGES.md).
 
+La selección de pedidos, los cambios de estado y la exportación de documentos se explican en [Pedidos y PDF](docs/pedidos-pdf.md).
+
 ## Ejecutar en Windows / PowerShell
 
-Requiere Node.js 22.12 o posterior compatible con Vite 8. Se verificó con Node.js 24.18.1.
+Requiere Node.js 22.13 o posterior compatible con Vite 8 y las herramientas de verificación de PDF. Se verificó con Node.js 24.18.1.
 
 ```powershell
 npm.cmd ci

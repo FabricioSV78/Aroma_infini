@@ -1,15 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
   seedWorkflowOrders,
-  workflowOperator,
   workflowSnapshot,
   workflowViewports,
 } from './order-workflow-fixtures'
 
-async function identifyOperator(page: Page | Locator) {
-  await page
-    .getByLabel('Responsable de los cambios')
-    .fill(workflowOperator.name)
+async function verifyNoManualOperator(page: Page | Locator) {
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
 }
 
 async function selectOrder(page: Page, reference: string) {
@@ -54,7 +51,7 @@ test('seleccionar los 100 filtrados exige confirmación, permite cancelar y no d
     exact: true,
   })
   await expect(dialog).toBeVisible()
-  await identifyOperator(dialog)
+  await verifyNoManualOperator(dialog)
   await dialog.getByLabel('Nuevo estado').selectOption('preparing')
   expect((await workflowSnapshot(page)).orderHistory).toEqual([])
   await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click()
@@ -87,7 +84,10 @@ test('seleccionar los 100 filtrados exige confirmación, permite cancelar y no d
   expect(after.orderHistory).toHaveLength(100)
   expect(
     after.orderHistory.every(
-      (entry) => entry.operator.name === workflowOperator.name,
+      (entry) =>
+        entry.operator.verified === false &&
+        entry.operator.id === null &&
+        entry.operator.name.length > 0,
     ),
   ).toBe(true)
   await page.reload()
@@ -132,7 +132,7 @@ test('las selecciones corresponden al filtro de fecha y estado, sin tocar pedido
     name: 'Actualizar 25 pedidos',
     exact: true,
   })
-  await identifyOperator(dialog)
+  await verifyNoManualOperator(dialog)
   await dialog.getByLabel('Nuevo estado').selectOption('preparing')
   await dialog
     .getByRole('button', { name: 'Confirmar actualización', exact: true })
@@ -168,7 +168,7 @@ test('el resultado masivo identifica cada error y conserva los pedidos no válid
     name: 'Actualizar 3 pedidos',
     exact: true,
   })
-  await identifyOperator(dialog)
+  await verifyNoManualOperator(dialog)
   await dialog.getByLabel('Nuevo estado').selectOption('shipped')
   await dialog
     .getByRole('checkbox', {
@@ -298,158 +298,24 @@ test('la selección persiste entre páginas y se limpia al filtrar o volver Atr�
   expect((await workflowSnapshot(page)).orderHistory).toEqual([])
 })
 
-test('los lotes se crean desde pedidos y solo agrupan el filtro sin una interfaz independiente', async ({
+test('la selección ofrece exportar y no muestra herramientas retiradas', async ({
   page,
 }) => {
-  const references = await seedWorkflowOrders(page, 10, [
-    { index: 1, status: 'preparing' },
-    { index: 2, status: 'shipped' },
-    { index: 3, status: 'delivered' },
-  ])
-  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
-  const before = await workflowSnapshot(page)
-  for (const reference of references.slice(0, 4))
-    await selectOrder(page, reference)
-  await page.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  const create = page.getByRole('dialog', {
-    name: 'Crear lote de trabajo',
-    exact: true,
-  })
-  await expect(create).toBeVisible()
-  const responsible = create.getByLabel('Responsable de los cambios')
-  await expect(responsible).toHaveValue('')
-  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(1)
-  await create.getByLabel('Nombre del lote').fill('Despacho Miraflores')
-  await create.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  await expect(create).toBeVisible()
-  expect(
-    await responsible.evaluate(
-      (input: HTMLInputElement) => input.validity.valueMissing,
-    ),
-  ).toBe(true)
-  expect((await workflowSnapshot(page)).orderBatches).toEqual([])
-  await responsible.fill('  ')
-  await create.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  await expect(create.getByRole('alert')).toContainText(/responsable/i)
-  await expect(responsible).toBeFocused()
-  expect((await workflowSnapshot(page)).orderBatches).toEqual([])
-  await identifyOperator(create)
-  await create.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  await expect(create).not.toBeVisible()
-  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
-  await expect
-    .poll(async () => (await workflowSnapshot(page)).orderBatches.length)
-    .toBe(1)
-  const stored = await workflowSnapshot(page)
-  expect(stored.orders).toEqual(before.orders)
-  expect(stored.orderHistory).toEqual([])
-  const batch = stored.orderBatches[0]
-  expect(batch).toMatchObject({
-    name: 'Despacho Miraflores',
-    orderReferences: references.slice(0, 4),
-    operator: workflowOperator,
-  })
+  const references = await seedWorkflowOrders(page, 10)
+  await page.goto('/admin/pedidos?lote=retirado&vista=lotes')
+  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(10)
   await expect(
-    page.getByRole('link', { name: /^Lotes de trabajo/ }),
+    page.getByRole('combobox', { name: 'Lote de trabajo', exact: true }),
   ).toHaveCount(0)
+  await selectOrder(page, references[0])
   await expect(
-    page.getByRole('region', { name: 'Lotes de trabajo', exact: true }),
-  ).toHaveCount(0)
-
-  for (const reference of references.slice(4, 6))
-    await selectOrder(page, reference)
-  await page.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  await expect(create.getByLabel('Responsable de los cambios')).toHaveValue(
-    workflowOperator.name,
-  )
-  await create.getByLabel('Nombre del lote').fill('Despacho Callao')
-  await create.getByRole('button', { name: 'Crear lote', exact: true }).click()
-  await expect(create).not.toBeVisible()
-  await expect
-    .poll(async () => (await workflowSnapshot(page)).orderBatches.length)
-    .toBe(2)
-  const secondBatch = (await workflowSnapshot(page)).orderBatches[1]
-  const batchFilter = page.getByRole('combobox', {
-    name: 'Lote de trabajo',
-    exact: true,
-  })
-  await expect(batchFilter.locator(`option[value="${batch.id}"]`)).toHaveText(
-    `Despacho Miraflores · ${batch.code}`,
-  )
-  await batchFilter.selectOption(secondBatch.id)
-  await page
-    .getByRole('button', { name: 'Aplicar filtros', exact: true })
-    .click()
-  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(2)
-  for (const reference of references.slice(4, 6))
-    await expect(
-      page.getByRole('checkbox', {
-        name: `Seleccionar pedido ${reference}`,
-        exact: true,
-      }),
-    ).toBeVisible()
-
-  await batchFilter.selectOption(batch.id)
-  await page
-    .getByRole('button', { name: 'Aplicar filtros', exact: true })
-    .click()
-  await expect(page).toHaveURL(new RegExp(`lote=${batch.id}`))
-  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(4)
-  await page.reload()
-  await expect(batchFilter).toHaveValue(batch.id)
-  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(4)
-
-  // Existing bookmarks for the retired workspace keep the useful order list.
-  await page.goto(`/admin/pedidos?vista=lotes&lote=${batch.id}`)
-  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(4)
-  await expect(
-    page.getByRole('link', { name: /^Lotes de trabajo/ }),
-  ).toHaveCount(0)
-  await expect(
-    page.getByRole('region', { name: 'Lotes de trabajo', exact: true }),
-  ).toHaveCount(0)
-  await expect(
-    page.getByRole('button', { name: /^Editar lote|^Archivar lote/ }),
-  ).toHaveCount(0)
-
-  await page.getByLabel('Estado del pedido').selectOption('received')
-  await page
-    .getByRole('button', { name: 'Aplicar filtros', exact: true })
-    .click()
-  await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(1)
-  await expect(
-    page.getByRole('checkbox', {
-      name: `Seleccionar pedido ${references[0]}`,
-      exact: true,
-    }),
+    page.getByRole('button', { name: 'Exportar PDF', exact: true }),
   ).toBeVisible()
-  await page
-    .getByRole('checkbox', {
-      name: 'Seleccionar pedidos de esta página',
-      exact: true,
-    })
-    .check()
-  await page
-    .getByRole('button', { name: 'Cambiar estado', exact: true })
-    .click()
-  const update = page.getByRole('dialog', {
-    name: 'Actualizar 1 pedidos',
-    exact: true,
-  })
-  await update.getByLabel('Nuevo estado').selectOption('preparing')
-  await update
-    .getByRole('button', { name: 'Confirmar actualización', exact: true })
-    .click()
-  await expect(update).not.toBeVisible()
-  await expect
-    .poll(async () => (await workflowSnapshot(page)).orderHistory.length)
-    .toBe(1)
-  const after = await workflowSnapshot(page)
-  expect(after.orders[0].status).toBe('preparing')
-  expect(after.orders.slice(1)).toEqual(before.orders.slice(1))
-  expect(after.orderBatches).toHaveLength(2)
-  expect(after.orderBatches[0]).toEqual(batch)
-  expect(after.orderBatches[1]).toEqual(secondBatch)
+  await expect(
+    page.getByRole('button', { name: 'Crear lote', exact: true }),
+  ).toHaveCount(0)
+  await verifyNoManualOperator(page)
+  expect((await workflowSnapshot(page)).orderHistory).toEqual([])
 })
 
 test('el modal se utiliza con teclado y conserva el foco dentro de sus controles', async ({
@@ -517,7 +383,7 @@ test('si falla el guardado local, reintentar persiste los cambios sin volver a a
     name: 'Actualizar 10 pedidos',
     exact: true,
   })
-  await identifyOperator(dialog)
+  await verifyNoManualOperator(dialog)
   await dialog.getByLabel('Nuevo estado').selectOption('preparing')
   await dialog
     .getByRole('button', { name: 'Confirmar actualización', exact: true })
@@ -565,12 +431,10 @@ test('el detalle conserva la gestión individual, exige confirmar entregas y mue
 }) => {
   const references = await seedWorkflowOrders(page, 10)
   await page.goto(`/admin/pedidos/${references[0]}`)
-  await identifyOperator(page)
-  const status = page.getByRole('combobox', {
-    name: 'Preparación del pedido',
-    exact: true,
-  })
-  await status.selectOption('preparing')
+  await verifyNoManualOperator(page)
+  const selectStatus = (name: string) =>
+    page.getByRole('radio', { name, exact: true }).check()
+  await selectStatus('En preparación')
   await page
     .getByRole('button', { name: 'Guardar estado', exact: true })
     .click()
@@ -578,7 +442,7 @@ test('el detalle conserva la gestión individual, exige confirmar entregas y mue
     .poll(async () => (await workflowSnapshot(page)).orderHistory.length)
     .toBe(1)
   expect((await workflowSnapshot(page)).orders[0].status).toBe('preparing')
-  await status.selectOption('shipped')
+  await selectStatus('Enviado')
   await page
     .getByRole('button', { name: 'Guardar estado', exact: true })
     .click()
@@ -598,7 +462,7 @@ test('el detalle conserva la gestión individual, exige confirmar entregas y mue
     .poll(async () => (await workflowSnapshot(page)).orderHistory.length)
     .toBe(2)
   expect((await workflowSnapshot(page)).orders[0].status).toBe('shipped')
-  await status.selectOption('delivered')
+  await selectStatus('Entregado')
   await page
     .getByRole('button', { name: 'Guardar estado', exact: true })
     .click()
@@ -610,10 +474,10 @@ test('el detalle conserva la gestión individual, exige confirmar entregas y mue
     .poll(async () => (await workflowSnapshot(page)).orderHistory.length)
     .toBe(3)
   const history = page.getByRole('region', {
-    name: 'Historial y lotes del pedido',
+    name: 'Historial del pedido',
     exact: true,
   })
-  await expect(history).toContainText(workflowOperator.name)
+  await expect(history).toContainText('Cambio individual')
   await expect(history).toContainText('Entregado')
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.screenshot({
@@ -637,7 +501,7 @@ test('el detalle conserva la gestión individual, exige confirmar entregas y mue
 })
 
 for (const viewport of workflowViewports) {
-  test(`pedidos, acciones y lotes son legibles y operables a ${viewport.width} × ${viewport.height}`, async ({
+  test(`pedidos, acciones y exportación son legibles y operables a ${viewport.width} × ${viewport.height}`, async ({
     page,
   }) => {
     await page.setViewportSize({
@@ -676,7 +540,7 @@ for (const viewport of workflowViewports) {
       exact: true,
     })
     await expect(update).toBeVisible()
-    await identifyOperator(update)
+    await verifyNoManualOperator(update)
     await update.getByLabel('Nuevo estado').selectOption('preparing')
     const bounds = await update.boundingBox()
     expect(bounds).not.toBeNull()
@@ -686,48 +550,34 @@ for (const viewport of workflowViewports) {
       animations: 'disabled',
     })
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Crear lote', exact: true }).click()
-    const create = page.getByRole('dialog', {
-      name: 'Crear lote de trabajo',
+    await page
+      .getByRole('button', { name: 'Exportar PDF', exact: true })
+      .click()
+    const exporting = page.getByRole('dialog', {
+      name: 'Exportar PDF',
       exact: true,
     })
-    await create.getByLabel('Nombre del lote').fill('Ronda Lima y Callao')
-    await identifyOperator(create)
+    await expect(exporting).toBeVisible()
+    await expect(
+      exporting.getByRole('radio', { name: 'Fichas de envío', exact: true }),
+    ).toBeVisible()
+    await expect(
+      exporting.getByRole('radio', {
+        name: 'Resúmenes de pedidos',
+        exact: true,
+      }),
+    ).toBeVisible()
     await page.screenshot({
-      path: `artifacts/order-workflow/create-batch-${viewport.name}.png`,
+      path: `artifacts/order-workflow/export-${viewport.name}.png`,
       animations: 'disabled',
     })
-    await create
-      .getByRole('button', { name: 'Crear lote', exact: true })
-      .click()
-    await expect(create).not.toBeVisible()
-    await expect
-      .poll(async () => (await workflowSnapshot(page)).orderBatches.length)
-      .toBe(1)
-    const batch = (await workflowSnapshot(page)).orderBatches[0]
-    await page
-      .getByRole('combobox', { name: 'Lote de trabajo', exact: true })
-      .selectOption(batch.id)
-    await page
-      .getByRole('button', { name: 'Aplicar filtros', exact: true })
-      .click()
-    await expect(page.locator('.admin-table--orders tbody tr')).toHaveCount(4)
-    await expect(
-      page.getByRole('link', { name: /^Lotes de trabajo/ }),
-    ).toHaveCount(0)
-    await expect(
-      page.getByRole('region', { name: 'Lotes de trabajo', exact: true }),
-    ).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(exporting).not.toBeVisible()
+    expect((await workflowSnapshot(page)).orderHistory).toEqual([])
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
       ),
     ).toBe(true)
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
-    await page.screenshot({
-      path: `artifacts/order-workflow/filtered-batch-${viewport.name}.png`,
-      fullPage: true,
-      animations: 'disabled',
-    })
   })
 }

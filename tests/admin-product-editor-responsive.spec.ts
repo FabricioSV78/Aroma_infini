@@ -57,7 +57,7 @@ test('el editor conserva controles utilizables en cuatro tamaños', async ({
     await page.locator('.admin-product-upload-area').screenshot({
       path: `artifacts/admin-product-editor/photos-${viewport.name}.png`,
     })
-    await page.locator('.admin-olfactory-image-control').screenshot({
+    await page.locator('.admin-product-olfactory-slot').screenshot({
       path: `artifacts/admin-product-editor/olfactory-${viewport.name}.png`,
     })
     await page.locator('.admin-related-products').screenshot({

@@ -67,15 +67,18 @@ const scenarios = [
   {
     name: 'marca',
     path: '/admin/marcas',
-    editor: '.admin-compact-form',
-    submit: 'Guardar marca',
+    editor: '.admin-brand-registration',
+    submit: 'Guardar marcas',
     prepare: async (page: Page) => {
       await page
-        .getByRole('button', { name: 'Nueva marca', exact: true })
+        .getByRole('button', { name: 'Registrar marcas', exact: true })
         .click()
       await page
-        .getByLabel('Nombre', { exact: true })
+        .getByLabel('Marcas (una por línea)', { exact: true })
         .fill('Casa Prueba Estados')
+      await page
+        .getByRole('button', { name: 'Revisar marcas', exact: true })
+        .click()
     },
   },
   {

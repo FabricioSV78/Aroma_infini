@@ -27,7 +27,7 @@ test('el borrador muestra la ficha completa sin publicar cambios y luego se refl
     .getByLabel('Subir imagen del perfil olfativo')
     .setInputFiles('public/images/olfactory-iris.webp')
   await expect(
-    page.locator('.admin-olfactory-image-control img'),
+    page.locator('.admin-product-olfactory-slot > img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
 
   await page.getByRole('button', { name: 'Vista previa', exact: true }).click()

@@ -127,6 +127,16 @@ test('preparar una foto protege el orden y la eliminación hasta completar el ar
     .setInputFiles('public/images/petale-960.webp')
   await expect(
     page.getByRole('button', { name: 'Añadir otra foto', exact: true }),
+  ).toHaveCount(0)
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
+  await expect(
+    page.getByLabel('Subir varias fotos del producto', { exact: true }),
+  ).toBeDisabled()
+  await expect(
+    page.getByLabel('Ubicación de foto 1', { exact: true }),
+  ).toBeDisabled()
+  await expect(
+    page.getByRole('button', { name: 'Mover foto 2 antes', exact: true }),
   ).toBeDisabled()
   const remove = page
     .locator('.admin-product-upload-item')

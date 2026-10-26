@@ -25,42 +25,13 @@
 }
 
 .admin-order-history time,
-.admin-order-history small,
-.admin-order-history p span {
+.admin-order-history li p {
   color: var(--admin-muted);
   font-size: 11px;
 }
 
 .admin-order-layout .admin-order-history p {
   margin-top: 5px;
-}
-
-.admin-order-batch-membership {
-  display: grid;
-  gap: 6px;
-  margin-top: 20px;
-}
-
-.admin-order-batch-membership h3 {
-  font-size: 14px;
-}
-
-.admin-order-batch-membership a {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  min-height: 44px;
-  color: var(--admin-accent);
-  font-size: 13px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.admin-order-batch-membership a span {
-  color: var(--admin-muted);
-  font-size: 11px;
 }
 
 @media (max-width: 1199px) {

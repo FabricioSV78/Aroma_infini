@@ -13,6 +13,7 @@ interface DialogProps {
   id: string
   children: ReactNode
   className?: string
+  closeDisabled?: boolean
 }
 export function Dialog({
   open,
@@ -21,6 +22,7 @@ export function Dialog({
   id,
   children,
   className = '',
+  closeDisabled = false,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   function keepFocusInside(event: KeyboardEvent<HTMLDialogElement>) {
@@ -76,7 +78,12 @@ export function Dialog({
       <div className="dialog-inner">
         <div className="dialog-heading">
           <h2 id={`${id}-title`}>{title}</h2>
-          <IconButton label="Cerrar" icon="close" onClick={onClose} />
+          <IconButton
+            label="Cerrar"
+            icon="close"
+            onClick={onClose}
+            disabled={closeDisabled}
+          />
         </div>
         {children}
       </div>

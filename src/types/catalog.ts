@@ -41,6 +41,8 @@ export interface Product {
   /** Missing on legacy records; interpreted as perfume at the domain boundary. */
   productType?: ProductType
   id: string
+  /** Automatic five-digit product code; absent only on legacy/unsaved records. */
+  sku?: string
   slug: string
   name: string
   brandId: string

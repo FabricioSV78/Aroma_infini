@@ -4,6 +4,10 @@ import {
 } from '../mocks/home'
 import { getProductDetail } from '../mocks/product-details'
 import {
+  createAdditionalDemoOrders,
+  DEMO_ORDERS_VERSION,
+} from '../content/demo-orders'
+import {
   createRegisteredCatalogProducts,
   registeredCatalogIds,
 } from '../content/catalog-products'
@@ -19,9 +23,18 @@ import {
   isValidAlternateRecipient,
   type AlternateRecipient,
 } from './shipping-recipient'
-import { formatBrandName } from '../utils/brand-name'
+import {
+  brandNameKey,
+  normalizeBrandName,
+  previewBrandRegistration,
+  type BrandRegistrationPreview,
+} from '../domain/brand-registration'
 import { validateProductOlfactoryClassification } from '../domain/olfactory-family'
-import { normalizeSku, isValidSku } from '../domain/product-identity'
+import {
+  normalizeSku,
+  isValidSku,
+  planProductSkus,
+} from '../domain/product-identity'
 import {
   hasProductMainImage,
   hasProductStock,
@@ -85,9 +98,6 @@ import type {
 import type { ShippingSettings, ShippingZone } from '../types/shipping'
 import type {
   BulkOrderStatusResult,
-  CreateOrderBatchResult,
-  OrderBatch,
-  OrderBatchUpdate,
   OrderHistoryEntry,
   OrderOperator,
 } from '../types/order-workflow'
@@ -102,6 +112,10 @@ export type AdminPromotionType = 'percent' | 'fixed'
 export interface AdminBrand extends Brand {
   active: boolean
 }
+
+export type BatchBrandSaveResult =
+  | { kind: 'saved'; created: AdminBrand[]; preview: BrandRegistrationPreview }
+  | { kind: 'validation'; message: string }
 
 export interface AdminProduct {
   product: Product
@@ -218,10 +232,13 @@ export type AdminShippingSettings = ShippingSettings
 export interface AdminState {
   /** One-time catalog registration, independent of later merchant edits. */
   catalogVersion?: number
+  /** One-time local demonstration data, independent of later order edits. */
+  demoOrdersVersion?: number
+  /** Next automatic product code; persisted atomically to avoid reusing codes. */
+  nextProductSku?: number
   products: AdminProduct[]
   brands: AdminBrand[]
   orders: AdminOrder[]
-  orderBatches: OrderBatch[]
   orderHistory: OrderHistoryEntry[]
   customers: AdminCustomer[]
   promotions: AdminPromotion[]
@@ -364,12 +381,19 @@ function createInitialState(): AdminState {
       lowStockThreshold: 2,
     }
   })
-  return {
+  const products = [
+    ...productRecords,
+    ...createRegisteredCatalogProducts(productRecords),
+  ]
+  const skuPlan = planProductSkus(products.map((record) => record.product))
+  if (!skuPlan) throw new Error('No quedan códigos SKU de cinco dígitos.')
+  const initial: AdminState = {
     catalogVersion: 1,
-    products: [
-      ...productRecords,
-      ...createRegisteredCatalogProducts(productRecords),
-    ],
+    nextProductSku: skuPlan.nextProductSku,
+    products: products.map((record, index) => ({
+      ...record,
+      product: { ...record.product, sku: skuPlan.skus[index] },
+    })),
     brands: fixtureBrands.map((brand) => ({ ...brand, active: true })),
     orders: [
       {
@@ -560,9 +584,21 @@ function createInitialState(): AdminState {
     },
     homeContent: createDefaultHomeContent(),
     features: normalizeStoreFeatures(),
-    orderBatches: [],
     orderHistory: [],
     revision: 0,
+  }
+  const additions = createAdditionalDemoOrders(
+    initial.orders,
+    initial.customers,
+    initial.products,
+    initial.brands,
+    initial.shipping,
+  )
+  return {
+    ...initial,
+    demoOrdersVersion: DEMO_ORDERS_VERSION,
+    orders: [...initial.orders, ...additions.orders],
+    customers: [...initial.customers, ...additions.customers],
   }
 }
 
@@ -571,11 +607,12 @@ const listeners = new Set<() => void>()
 let persistenceQueue: Promise<void> = Promise.resolve()
 let hydrationPromise: Promise<void> | undefined
 
-/** Drop the retired selection without resetting saved catalog or Home edits. */
+/** Drop retired selections and order grouping metadata without resetting saved records. */
 function withoutRetiredSelection<T extends object>(value: T): T {
   const copy = { ...value }
   Reflect.deleteProperty(copy, 'featured')
   Reflect.deleteProperty(copy, 'featuredOrder')
+  Reflect.deleteProperty(copy, 'orderBatches')
   return copy
 }
 
@@ -589,17 +626,21 @@ export function hydrateAdminStore() {
         return
       }
       const initial = createInitialState()
+      const skuPlan = planProductSkus(
+        saved.products.map((record) => record.product),
+        saved.nextProductSku,
+      )
+      if (!skuPlan) throw new Error('No quedan códigos SKU de cinco dígitos.')
       state = {
         ...initial,
         ...withoutRetiredSelection(saved),
         catalogVersion: saved.catalogVersion ?? 0,
-        orderBatches: Array.isArray(saved.orderBatches)
-          ? saved.orderBatches
-          : [],
+        demoOrdersVersion: saved.demoOrdersVersion ?? 0,
+        nextProductSku: skuPlan.nextProductSku,
         orderHistory: Array.isArray(saved.orderHistory)
           ? saved.orderHistory
           : [],
-        products: saved.products.map((record) => {
+        products: saved.products.map((record, index) => {
           const legacyImages: Record<string, string> = {
             neroli: 'cedre',
             iris: 'petale',
@@ -647,7 +688,7 @@ export function hydrateAdminStore() {
           return {
             ...withoutRetiredSelection(record),
             active: record.active && hasProductStock(product),
-            product,
+            product: { ...product, sku: skuPlan.skus[index] },
             detail: {
               ...withoutRetiredConcentration(record.detail),
               // Old records displayed a demo photo only while notes matched.
@@ -664,7 +705,7 @@ export function hydrateAdminStore() {
         }),
         brands: (saved.brands ?? initial.brands).map((brand) => ({
           ...brand,
-          name: formatBrandName(brand.name),
+          name: normalizeBrandName(brand.name),
         })),
         shipping: {
           ...initial.shipping,
@@ -712,6 +753,11 @@ export function hydrateAdminStore() {
         features: normalizeStoreFeatures(saved.features),
       }
       if (
+        Object.hasOwn(saved, 'orderBatches') ||
+        saved.nextProductSku !== skuPlan.nextProductSku ||
+        saved.products.some(
+          (record, index) => record.product.sku !== skuPlan.skus[index],
+        ) ||
         saved.products.some(
           (record) =>
             Object.hasOwn(record.detail, 'type') ||
@@ -725,8 +771,28 @@ export function hydrateAdminStore() {
     } catch {
       // The storefront remains available when browser storage is unavailable.
     }
-  })().then(completeCatalogRegistration)
+  })()
+    .then(completeCatalogRegistration)
+    .then(completeDemoOrdersRegistration)
   return hydrationPromise
+}
+
+async function completeDemoOrdersRegistration() {
+  if ((state.demoOrdersVersion ?? 0) >= DEMO_ORDERS_VERSION) return
+  const additions = createAdditionalDemoOrders(
+    state.orders,
+    state.customers,
+    state.products,
+    state.brands,
+    state.shipping,
+  )
+  commit((current) => ({
+    ...current,
+    demoOrdersVersion: DEMO_ORDERS_VERSION,
+    orders: [...current.orders, ...additions.orders],
+    customers: [...current.customers, ...additions.customers],
+  }))
+  await persistenceQueue.catch(() => undefined)
 }
 
 async function completeCatalogRegistration() {
@@ -898,6 +964,12 @@ function promotionDiscount(promotion: AdminPromotion, subtotalCents: number) {
 function normalizeOrderOperator(
   operator: OrderOperator | undefined,
 ): OrderOperator | null {
+  if (operator === undefined)
+    return {
+      name: 'Administrador local (sin identificar)',
+      verified: false,
+      id: null,
+    }
   const name = typeof operator?.name === 'string' ? operator.name.trim() : ''
   if (name.length < 2 || name.length > 80 || /[\r\n\t]/.test(name)) return null
   return { name, verified: false, id: null }
@@ -914,31 +986,6 @@ function normalizeOrderReferences(references: string[]): string[] {
         ),
       ]
     : []
-}
-
-function validateBatchReferences(
-  references: string[],
-  archived: boolean,
-  excludedBatchId?: string,
-): string | null {
-  if (!references.length) return 'Selecciona al menos un pedido para el lote.'
-  const orderReferences = new Set(state.orders.map((order) => order.reference))
-  const missing = references.filter(
-    (reference) => !orderReferences.has(reference),
-  )
-  if (missing.length)
-    return `Estos pedidos ya no existen: ${missing.join(', ')}.`
-  if (archived) return null
-  const requested = new Set(references)
-  const conflicts = state.orderBatches.filter(
-    (batch) =>
-      batch.id !== excludedBatchId &&
-      !batch.archived &&
-      batch.orderReferences.some((reference) => requested.has(reference)),
-  )
-  if (conflicts.length)
-    return `Hay pedidos asignados a otro lote activo (${conflicts.map((batch) => batch.name).join(', ')}). Selecciona pedidos sin lote para crear una agrupación nueva.`
-  return null
 }
 
 function createOrderHistory(
@@ -1128,10 +1175,22 @@ export const adminService = {
         message:
           'Un producto visible necesita una presentación activa con precio mayor que cero.',
       }
+    const skuPlan = previousRecord
+      ? null
+      : planProductSkus(
+          [...state.products.map((item) => item.product), {}],
+          state.nextProductSku,
+        )
+    if (!previousRecord && !skuPlan)
+      return {
+        kind: 'validation',
+        message: 'Se agotaron los códigos SKU de cinco dígitos disponibles.',
+      }
     const saved: AdminProduct = {
       ...record,
       product: cloneProduct({
         ...product,
+        sku: previousRecord?.product.sku ?? skuPlan?.skus.at(-1),
         name: product.name.trim(),
         slug: product.slug.trim(),
         family: product.family.trim(),
@@ -1159,6 +1218,7 @@ export const adminService = {
       )
       return {
         ...current,
+        nextProductSku: skuPlan?.nextProductSku ?? current.nextProductSku,
         products: exists
           ? current.products.map((item) =>
               item.product.id === product.id ? saved : item,
@@ -1337,9 +1397,24 @@ export const adminService = {
       batchIds.add(product.id)
       batchNames.add(nameKey)
     }
-    const saved = records.map((record) => ({
+    const skuPlan = planProductSkus(
+      [
+        ...state.products.map((item) => item.product),
+        ...records.map(() => ({})),
+      ],
+      state.nextProductSku,
+    )
+    if (!skuPlan)
+      return {
+        kind: 'validation',
+        message: 'No hay suficientes códigos SKU de cinco dígitos disponibles.',
+      }
+    const saved = records.map((record, index) => ({
       ...record,
-      product: cloneProduct(record.product),
+      product: cloneProduct({
+        ...record.product,
+        sku: skuPlan.skus[state.products.length + index],
+      }),
       detail: cloneDetail({
         ...record.detail,
         gallery: withGeneratedGalleryAlts(
@@ -1352,6 +1427,7 @@ export const adminService = {
     }))
     commit((current) => ({
       ...current,
+      nextProductSku: skuPlan.nextProductSku,
       products: [...current.products, ...saved],
     }))
     return { kind: 'saved' }
@@ -1415,7 +1491,7 @@ export const adminService = {
   saveBrand(brand: AdminBrand): AdminSaveResult {
     const normalized = {
       ...brand,
-      name: formatBrandName(brand.name),
+      name: normalizeBrandName(brand.name),
       slug: brand.slug.trim(),
     }
     if (!normalized.name || !validSlug(normalized.slug))
@@ -1423,6 +1499,14 @@ export const adminService = {
         kind: 'validation',
         message: 'Completa el nombre y usa un slug válido.',
       }
+    if (
+      state.brands.some(
+        (item) =>
+          item.id !== brand.id &&
+          brandNameKey(item.name) === brandNameKey(normalized.name),
+      )
+    )
+      return { kind: 'validation', message: 'Esa marca ya está registrada.' }
     if (
       state.brands.some(
         (item) => item.id !== brand.id && item.slug === normalized.slug,
@@ -1441,6 +1525,43 @@ export const adminService = {
       }
     })
     return { kind: 'saved' }
+  },
+  saveBrandsBatch(
+    text: string,
+    expectedRevision: number,
+  ): BatchBrandSaveResult {
+    if (state.revision !== expectedRevision)
+      return {
+        kind: 'validation',
+        message:
+          'Las marcas cambiaron mientras revisabas la lista. Vuelve a revisar antes de guardar.',
+      }
+    const preview = previewBrandRegistration(text, state.brands)
+    if (preview.limitExceeded)
+      return {
+        kind: 'validation',
+        message:
+          'Registra hasta 1000 marcas por operación. Divide la lista y vuelve a revisar.',
+      }
+    if (!preview.valid)
+      return {
+        kind: 'validation',
+        message:
+          'No hay marcas nuevas válidas para registrar. Revisa la lista.',
+      }
+    const created: AdminBrand[] = preview.rows
+      .filter((row) => row.status === 'valid')
+      .map(({ name, slug }) => ({
+        id: `brand-${crypto.randomUUID()}`,
+        name,
+        slug,
+        active: true,
+      }))
+    commit((current) => ({
+      ...current,
+      brands: [...current.brands, ...created],
+    }))
+    return { kind: 'saved', created, preview }
   },
   setBrandActive(id: string, active: boolean): AdminSaveResult {
     if (
@@ -1739,7 +1860,7 @@ export const adminService = {
   bulkSetOrderStatus(
     references: string[],
     status: AdminOrderStatus,
-    operator: OrderOperator,
+    operator?: OrderOperator,
     expectedStatuses?: Record<string, OrderStatus>,
   ): BulkOrderStatusResult {
     const actor = normalizeOrderOperator(operator)
@@ -1826,87 +1947,6 @@ export const adminService = {
       }))
     }
     return result
-  },
-  createOrderBatch(
-    name: string,
-    references: string[],
-    operator: OrderOperator,
-  ): CreateOrderBatchResult {
-    const actor = normalizeOrderOperator(operator)
-    if (!actor)
-      return {
-        kind: 'validation',
-        message: 'Indica el nombre del responsable (de 2 a 80 caracteres).',
-      }
-    const batchName = name.trim()
-    if (batchName.length < 2 || batchName.length > 80)
-      return {
-        kind: 'validation',
-        message: 'El nombre del lote debe tener de 2 a 80 caracteres.',
-      }
-    const orderReferences = normalizeOrderReferences(references)
-    const error = validateBatchReferences(orderReferences, false)
-    if (error) return { kind: 'validation', message: error }
-    const id = crypto.randomUUID()
-    const createdAt = new Date().toISOString()
-    const batch: OrderBatch = {
-      id,
-      code: `LOT-${createdAt.slice(0, 10).replaceAll('-', '')}-${id.slice(0, 8).toUpperCase()}`,
-      name: batchName,
-      orderReferences,
-      createdAt,
-      operator: actor,
-      archived: false,
-    }
-    commit((current) => ({
-      ...current,
-      orderBatches: [...current.orderBatches, batch],
-    }))
-    return { kind: 'saved', batch }
-  },
-  updateOrderBatch(id: string, update: OrderBatchUpdate): AdminSaveResult {
-    const batch = state.orderBatches.find((item) => item.id === id)
-    if (!batch) return { kind: 'validation', message: 'El lote ya no existe.' }
-    const name = update.name === undefined ? batch.name : update.name.trim()
-    if (name.length < 2 || name.length > 80)
-      return {
-        kind: 'validation',
-        message: 'El nombre del lote debe tener de 2 a 80 caracteres.',
-      }
-    if (update.archived !== undefined && typeof update.archived !== 'boolean')
-      return { kind: 'validation', message: 'El estado del lote no es válido.' }
-    const orderReferences =
-      update.orderReferences === undefined
-        ? batch.orderReferences
-        : normalizeOrderReferences(update.orderReferences)
-    const archived = update.archived ?? batch.archived
-    const error = validateBatchReferences(orderReferences, archived, id)
-    if (error) return { kind: 'validation', message: error }
-    if (
-      name === batch.name &&
-      archived === batch.archived &&
-      orderReferences.length === batch.orderReferences.length &&
-      orderReferences.every(
-        (reference, index) => reference === batch.orderReferences[index],
-      )
-    )
-      return { kind: 'saved' }
-    commit((current) => ({
-      ...current,
-      orderBatches: current.orderBatches.map((item) =>
-        item.id === id ? { ...item, name, orderReferences, archived } : item,
-      ),
-    }))
-    return { kind: 'saved' }
-  },
-  deleteOrderBatch(id: string): AdminSaveResult {
-    if (!state.orderBatches.some((batch) => batch.id === id))
-      return { kind: 'validation', message: 'El lote ya no existe.' }
-    commit((current) => ({
-      ...current,
-      orderBatches: current.orderBatches.filter((batch) => batch.id !== id),
-    }))
-    return { kind: 'saved' }
   },
   saveOrderDelivery(
     reference: string,
@@ -2050,6 +2090,18 @@ export const adminService = {
           : [...current.promotions, saved],
       }
     })
+    return { kind: 'saved' }
+  },
+  deletePromotion(id: string): AdminSaveResult {
+    if (!state.promotions.some((promotion) => promotion.id === id))
+      return {
+        kind: 'validation',
+        message: 'Ese cupón ya no está disponible. Actualiza la lista.',
+      }
+    commit((current) => ({
+      ...current,
+      promotions: current.promotions.filter((promotion) => promotion.id !== id),
+    }))
     return { kind: 'saved' }
   },
   setPromotionActive(id: string, active: boolean) {

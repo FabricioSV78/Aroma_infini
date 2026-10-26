@@ -76,6 +76,14 @@ test('la carga inicial del catálogo reserva contenido y termina al resolver la 
   await page.setViewportSize({ width: 1366, height: 768 })
   await controlCatalog(page, 'getCatalog')
   await page.goto('/tienda', { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () =>
+      (
+        window as unknown as {
+          __loadingRead: { calls: number; release?: () => void }
+        }
+      ).__loadingRead.calls > 0,
+  )
   await expect(page.locator('.ui-loading-page')).toHaveAttribute(
     'aria-busy',
     'true',
@@ -88,6 +96,7 @@ test('la carga inicial del catálogo reserva contenido y termina al resolver la 
     .locator('.ui-loading-card')
     .first()
     .boundingBox()
+  expect(placeholder).not.toBeNull()
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -164,19 +173,20 @@ test('la carga estructurada respeta movimiento reducido y el ancho móvil', asyn
   await page.setViewportSize({ width: 390, height: 844 })
   await controlCatalog(page, 'getProduct')
   await page.goto('/producto/bois-clair', { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () =>
+      (window as unknown as { __loadingRead: { calls: number } }).__loadingRead
+        .calls > 0,
+  )
   await expect(page.locator('.ui-loading-product')).toBeVisible()
-  expect(
-    await page
-      .locator('.ui-skeleton')
-      .first()
-      .evaluate((element) => getComputedStyle(element).animationName),
-  ).toBe('none')
-  expect(
-    await page
-      .locator('.ui-spinner')
-      .first()
-      .evaluate((element) => getComputedStyle(element).animationName),
-  ).toBe('none')
+  await expect(page.locator('.ui-skeleton').first()).toHaveCSS(
+    'animation-name',
+    'none',
+  )
+  await expect(page.locator('.ui-spinner').first()).toHaveCSS(
+    'animation-name',
+    'none',
+  )
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

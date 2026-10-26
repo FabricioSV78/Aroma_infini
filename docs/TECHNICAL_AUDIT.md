@@ -77,7 +77,7 @@ Con el servidor de cada versión activo, `node scripts/capture-technical-audit.m
 
 ## Pendientes antes de Supabase y datos reales
 
-1. Definir roles/autenticación y políticas de acceso. El nombre de responsable de pedidos actual es autodeclarado, sin identidad verificada.
+1. Definir roles/autenticación y políticas de acceso. Los eventos de pedidos actuales usan un actor técnico local, sin identidad autenticada; el panel ya no solicita un nombre manual.
 2. Versionar/validar el snapshot y preparar una migración con respaldo y diagnóstico recuperable. La hidratación actual no valida exhaustivamente todas las estructuras antiguas.
 3. Resolver concurrencia entre pestañas/equipos y trasladar stock, precios, cupones, pedidos e idempotencia a operaciones atómicas del servidor; el contador de revisión local no sustituye esa protección.
 4. La posterior [auditoría de estados de UI](UI_STATES_AUDIT.md) unificó marcas, cupones, ofertas, publicación y datos de entrega para confirmar después de `flush()` y reintentar sin repetir la mutación. Sigue pendiente trasladar estas garantías a transacciones e idempotencia en servidor.

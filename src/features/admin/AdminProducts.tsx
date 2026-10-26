@@ -1,5 +1,6 @@
 import { OlfactoryProfile } from '../product/OlfactoryProfile'
 import { productSlug, normalizeSku } from '../../domain/product-identity'
+import { getProductPhotoStatus } from '../../domain/product-photos'
 import {
   hasProductMainImage,
   hasProductStock,
@@ -39,8 +40,6 @@ import {
 import { formatPEN } from '../../services/currency'
 import { getVariantPrice } from '../../services/product-discounts'
 import { imageSource } from '../../services/image-source'
-import { assetSource } from '../../services/asset-source'
-import { UserFacingError } from '../../services/admin-messages'
 import type { ProductVariant } from '../../types/catalog'
 import { AdminPagination } from './AdminPagination'
 import { AdminBadge, AdminPageHeader, AdminStatus } from './AdminShared'
@@ -51,7 +50,7 @@ import {
 } from './admin-utils'
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
-import { prepareImageFile, productImagePreset } from './prepareImageFile'
+import { AdminProductPhotos } from './AdminProductPhotos'
 import { AdminProductImport } from './AdminProductImport'
 import { useAdminSave } from './useAdminSave'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
@@ -125,7 +124,7 @@ export function AdminProductsPage() {
   const products = productRows
     .filter(({ record, brand, inventory }) => {
       const matchesSearch =
-        `${record.product.name} ${brand?.name ?? ''} ${record.product.variants.map((variant) => variant.sku ?? '').join(' ')}`
+        `${record.product.name} ${record.product.sku ?? ''} ${brand?.name ?? ''} ${record.product.variants.map((variant) => variant.sku ?? '').join(' ')}`
           .toLocaleLowerCase('es')
           .includes(normalizedSearch)
       const matchesStock =
@@ -283,14 +282,14 @@ export function AdminProductsPage() {
       >
         <div className="admin-filter-fields">
           <label htmlFor="admin-product-search">
-            Buscar producto o marca
+            Buscar producto, marca o SKU
             <input
               id="admin-product-search"
               name="q"
               key={search}
               defaultValue={search}
               type="search"
-              placeholder="Producto o marca"
+              placeholder="Nombre, marca o SKU"
             />
           </label>
           <label>
@@ -345,6 +344,7 @@ export function AdminProductsPage() {
             </thead>
             <tbody>
               {pagination.items.map(({ record, brand, inventory }) => {
+                const photos = getProductPhotoStatus(record)
                 return (
                   <tr key={record.product.id}>
                     <th scope="row">
@@ -369,6 +369,10 @@ export function AdminProductsPage() {
                         <span>
                           <strong>{record.product.name}</strong>
                           <small>{brand?.name}</small>
+                          <small>
+                            SKU {record.product.sku} · {photos.count}/
+                            {photos.expected} fotos
+                          </small>
                         </span>
                       </div>
                     </th>
@@ -412,6 +416,22 @@ export function AdminProductsPage() {
                     <td>
                       <span className="admin-cell-label">Acciones</span>
                       <div className="admin-row-actions">
+                        <Link
+                          to={`/admin/productos/${record.product.id}/fotos`}
+                          aria-label={`Gestionar fotos de ${record.product.name}`}
+                          state={{
+                            returnTo: `${location.pathname}${location.search}`,
+                            photoQueue: products
+                              .filter(
+                                ({ record: item }) =>
+                                  getProductPhotoStatus(item).status !==
+                                  'complete',
+                              )
+                              .map(({ record: item }) => item.product.id),
+                          }}
+                        >
+                          Fotografías
+                        </Link>
                         <Link
                           to={`/admin/productos/${record.product.id}${hasProductMainImage(record) ? '' : '#product-photos-title'}`}
                           state={{
@@ -485,12 +505,6 @@ export function AdminProductsPage() {
     </div>
   )
 }
-
-const olfactoryImagePreset = {
-  width: 960,
-  height: 1200,
-  label: '4:5 · mínimo 960 × 1200 px',
-} as const
 
 const noteFields = ['top', 'heart', 'base'] as const
 type NoteField = (typeof noteFields)[number]
@@ -610,22 +624,11 @@ export function AdminProductFormPage() {
   const [initialForm] = useState(form)
   const [initialNoteDraft] = useState(noteDraft)
   const [message, setMessage] = useState('')
-  const [mediaMessage, setMediaMessage] = useState('')
-  const [uploadingImage, setUploadingImage] = useState<number | 'batch' | null>(
-    null,
-  )
-  const [uploadingOlfactoryImage, setUploadingOlfactoryImage] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
   const mediaUploadRef = useRef(false)
-  const bulkImageInputRef = useRef<HTMLInputElement>(null)
-  const [olfactoryImageMessage, setOlfactoryImageMessage] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const persistence = useAdminSave()
   const saving = persistence.saving
-  const mediaBusy = uploadingImage !== null || uploadingOlfactoryImage
-  const galleryPhotoCount = form.detail.gallery.filter((view) =>
-    view.image.trim(),
-  ).length
-  const remainingPhotoCount = Math.max(0, 4 - galleryPhotoCount)
   const perfume = isPerfume(form.product)
   const editorialPrimaryFamily = getEditorialPrimaryFamily(form.product.family)
   const selectedFamilies = getProductOlfactoryFamilies(form.product)
@@ -758,176 +761,6 @@ export function AdminProductFormPage() {
     })
   }
 
-  async function uploadGalleryImage(file: File, index: number) {
-    if (mediaUploadRef.current || saving) return
-    mediaUploadRef.current = true
-    setUploadingImage(index)
-    setMediaMessage('')
-    try {
-      const image = await prepareImageFile(file, productImagePreset)
-      setForm((current) => ({
-        ...current,
-        product: index === 0 ? { ...current.product, image } : current.product,
-        detail: {
-          ...current.detail,
-          gallery: current.detail.gallery.map((view, viewIndex) =>
-            viewIndex === index ? { ...view, image, framing: 'full' } : view,
-          ),
-        },
-      }))
-      notice.toast('Foto preparada. Guarda el producto para aplicar el cambio.')
-    } catch (error) {
-      notice.error(error, 'image')
-    } finally {
-      mediaUploadRef.current = false
-      setUploadingImage(null)
-    }
-  }
-
-  async function uploadGalleryImages(files: File[]) {
-    if (!files.length || mediaUploadRef.current || saving) return
-    if (files.length > remainingPhotoCount) {
-      notice.error(
-        new UserFacingError(
-          'image-gallery-limit',
-          remainingPhotoCount > 0
-            ? `Puedes añadir ${remainingPhotoCount} ${remainingPhotoCount === 1 ? 'foto más' : 'fotos más'}. Selecciona hasta esa cantidad.`
-            : 'La galería ya tiene 4 fotos. Quita una para añadir otra.',
-        ),
-        'image',
-      )
-      return
-    }
-    mediaUploadRef.current = true
-    setUploadingImage('batch')
-    setMediaMessage(
-      `Preparando ${files.length} ${files.length === 1 ? 'foto' : 'fotos'}…`,
-    )
-    try {
-      const images: string[] = []
-      for (const file of files) {
-        try {
-          images.push(await prepareImageFile(file, productImagePreset))
-        } catch (error) {
-          if (error instanceof UserFacingError)
-            throw new UserFacingError(
-              error.code,
-              `${file.name}: ${error.message} No se añadió ninguna foto.`,
-            )
-          throw error
-        }
-      }
-      setForm((current) => {
-        const gallery = current.detail.gallery.map((view) => ({ ...view }))
-        let nextImage = 0
-        for (
-          let index = 0;
-          index < gallery.length && nextImage < images.length;
-          index += 1
-        ) {
-          if (!gallery[index].image.trim()) {
-            gallery[index] = {
-              ...gallery[index],
-              image: images[nextImage++],
-              framing: 'full',
-            }
-          }
-        }
-        while (nextImage < images.length) {
-          gallery.push({ image: images[nextImage++], alt: '', framing: 'full' })
-        }
-        return {
-          ...current,
-          product: { ...current.product, image: gallery[0].image },
-          detail: { ...current.detail, gallery },
-        }
-      })
-      notice.toast(
-        `${files.length} ${files.length === 1 ? 'foto preparada' : 'fotos preparadas'}. Revisa la vista previa y guarda el producto.`,
-      )
-    } catch (error) {
-      notice.error(error, 'image')
-    } finally {
-      mediaUploadRef.current = false
-      setUploadingImage(null)
-      setMediaMessage('')
-    }
-  }
-
-  async function uploadOlfactoryImage(file: File) {
-    if (mediaUploadRef.current || saving) return
-    mediaUploadRef.current = true
-    setUploadingOlfactoryImage(true)
-    setOlfactoryImageMessage('Preparando imagen…')
-    try {
-      const image = await prepareImageFile(file, olfactoryImagePreset)
-      setForm((current) => ({
-        ...current,
-        detail: { ...current.detail, olfactoryImage: image },
-      }))
-      notice.toast('Imagen preparada. Guárdala con el producto.')
-    } catch (error) {
-      notice.error(error, 'image')
-    } finally {
-      mediaUploadRef.current = false
-      setUploadingOlfactoryImage(false)
-      setOlfactoryImageMessage('')
-    }
-  }
-
-  function moveGalleryView(index: number, direction: -1 | 1) {
-    if (mediaUploadRef.current || saving) return
-    const target = index + direction
-    setForm((current) => {
-      if (target < 0 || target >= current.detail.gallery.length) return current
-      const gallery = [...current.detail.gallery]
-      ;[gallery[index], gallery[target]] = [gallery[target], gallery[index]]
-      return {
-        ...current,
-        product: { ...current.product, image: gallery[0].image },
-        detail: { ...current.detail, gallery },
-      }
-    })
-  }
-
-  function removeGalleryView(index: number) {
-    if (mediaUploadRef.current || saving) return
-    setForm((current) => {
-      const gallery = current.detail.gallery.filter(
-        (_, galleryIndex) => galleryIndex !== index,
-      )
-      if (gallery.length === 0) {
-        gallery.push({ image: '', alt: '', framing: 'full' })
-      }
-      return {
-        ...current,
-        product: { ...current.product, image: gallery[0].image },
-        detail: { ...current.detail, gallery },
-      }
-    })
-  }
-
-  function addGalleryView() {
-    if (mediaUploadRef.current || saving) return
-    setForm((current) => {
-      if (current.detail.gallery.length >= 4) return current
-      return {
-        ...current,
-        detail: {
-          ...current.detail,
-          gallery: [
-            ...current.detail.gallery,
-            {
-              image: '',
-              alt: `Vista alternativa de ${current.product.name}`,
-              framing: 'full',
-            },
-          ],
-        },
-      }
-    })
-  }
-
   function updateVariant(
     variantId: string,
     field: keyof Pick<
@@ -1055,7 +888,11 @@ export function AdminProductFormPage() {
       <AdminPageHeader
         eyebrow={editing ? 'Editar producto' : 'Nuevo producto'}
         title={editing ? form.product.name : 'Crear producto'}
-        description="Completa la ficha y guarda los cambios."
+        description={
+          editing
+            ? `SKU ${form.product.sku ?? 'pendiente'} · Completa la ficha y guarda los cambios.`
+            : 'El SKU del producto se asigna automáticamente al guardar.'
+        }
       />
       <nav
         className="admin-editor-section-nav"
@@ -1230,135 +1067,20 @@ export function AdminProductFormPage() {
                 Fotografías
               </h2>
               <p>
-                Sube hasta 4 fotos juntas. La primera de la galería es la
-                principal.
+                La primera foto es la portada. La imagen olfativa se guarda
+                aparte.
               </p>
             </div>
           </header>
-          <div className="admin-product-upload-area">
-            <div className="admin-product-upload-toolbar">
-              <button
-                type="button"
-                className="button button--primary"
-                disabled={mediaBusy || saving || remainingPhotoCount === 0}
-                aria-describedby="product-photo-help product-photo-count"
-                onClick={() => bulkImageInputRef.current?.click()}
-              >
-                {uploadingImage === 'batch'
-                  ? 'Preparando fotos…'
-                  : 'Subir fotos'}
-              </button>
-              <input
-                ref={bulkImageInputRef}
-                type="file"
-                hidden
-                multiple
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                aria-label="Subir varias fotos del producto"
-                disabled={mediaBusy || saving || remainingPhotoCount === 0}
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files ?? [])
-                  event.currentTarget.value = ''
-                  void uploadGalleryImages(files)
-                }}
-              />
-              <span id="product-photo-count">
-                {galleryPhotoCount} de 4 fotos
-              </span>
-            </div>
-            <p id="product-photo-help">
-              {productImagePreset.label}. JPG, PNG, WebP o AVIF. Hasta 20 MB por
-              foto.
-            </p>
-            {mediaMessage ? (
-              <p className="admin-product-upload-feedback" role="status">
-                {mediaMessage}
-              </p>
-            ) : null}
-            <div className="admin-product-upload-grid">
-              {form.detail.gallery.map((view, index) => (
-                <div className="admin-product-upload-item" key={index}>
-                  {view.image ? (
-                    <img src={imageSource(view.image)} alt="" />
-                  ) : (
-                    <div className="admin-product-upload-placeholder">
-                      Sin imagen
-                    </div>
-                  )}
-                  <div>
-                    <strong>
-                      {index === 0 ? 'Foto principal' : `Vista ${index + 1}`}
-                    </strong>
-                    <div className="admin-product-photo-controls">
-                      <label className="admin-home-file-button">
-                        {uploadingImage === index
-                          ? 'Preparando…'
-                          : view.image
-                            ? 'Reemplazar'
-                            : 'Subir archivo'}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/avif"
-                          aria-label={`${view.image ? 'Reemplazar' : 'Subir'} ${index === 0 ? 'foto principal' : `vista ${index + 1}`} del producto`}
-                          disabled={mediaBusy || saving}
-                          onChange={(event) => {
-                            const file = event.currentTarget.files?.[0]
-                            event.currentTarget.value = ''
-                            if (file) void uploadGalleryImage(file, index)
-                          }}
-                        />
-                      </label>
-                      {view.image || index > 0 ? (
-                        <button
-                          type="button"
-                          className="admin-remove"
-                          disabled={mediaBusy || saving}
-                          onClick={() => removeGalleryView(index)}
-                        >
-                          Quitar
-                        </button>
-                      ) : null}
-                    </div>
-                    <div
-                      className="admin-product-photo-order"
-                      aria-label={`Orden de foto ${index + 1}`}
-                    >
-                      <button
-                        type="button"
-                        disabled={index === 0 || mediaBusy || saving}
-                        aria-label={`Mover foto ${index + 1} antes`}
-                        onClick={() => moveGalleryView(index, -1)}
-                      >
-                        ↑ <span aria-hidden="true">Subir</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          index === form.detail.gallery.length - 1 ||
-                          mediaBusy ||
-                          saving
-                        }
-                        aria-label={`Mover foto ${index + 1} después`}
-                        onClick={() => moveGalleryView(index, 1)}
-                      >
-                        ↓ <span aria-hidden="true">Bajar</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {form.detail.gallery.length < 4 ? (
-              <button
-                type="button"
-                className="button button--secondary"
-                disabled={mediaBusy || saving}
-                onClick={addGalleryView}
-              >
-                Añadir otra foto
-              </button>
-            ) : null}
-          </div>
+          <AdminProductPhotos
+            record={form}
+            onChange={setForm}
+            busy={saving || persistence.persistenceFailed}
+            onBusyChange={(value) => {
+              mediaUploadRef.current = value
+              setMediaBusy(value)
+            }}
+          />
         </section>
 
         <section aria-labelledby="product-content-title">
@@ -1441,64 +1163,6 @@ export function AdminProductFormPage() {
                     perfil aromático breve. Revisa ambos antes de guardar.
                   </p>
                 ) : null}
-              </div>
-              <div className="admin-olfactory-image-control">
-                <div className="admin-olfactory-image-control__copy">
-                  <h3>Fotografía del perfil olfativo</h3>
-                  <p>
-                    Imagen propia de este perfume en «Familia olfativa».{' '}
-                    {olfactoryImagePreset.label}.
-                  </p>
-                  <div className="admin-olfactory-image-control__actions">
-                    <label className="admin-home-file-button">
-                      {uploadingOlfactoryImage
-                        ? 'Preparando…'
-                        : form.detail.olfactoryImage
-                          ? 'Reemplazar imagen'
-                          : 'Subir imagen'}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/avif"
-                        aria-label="Subir imagen del perfil olfativo"
-                        disabled={mediaBusy || saving}
-                        onChange={(event) => {
-                          const file = event.currentTarget.files?.[0]
-                          event.currentTarget.value = ''
-                          if (file) void uploadOlfactoryImage(file)
-                        }}
-                      />
-                    </label>
-                    {form.detail.olfactoryImage ? (
-                      <button
-                        type="button"
-                        className="admin-remove"
-                        disabled={mediaBusy || saving}
-                        onClick={() => {
-                          setForm((current) => ({
-                            ...current,
-                            detail: { ...current.detail, olfactoryImage: null },
-                          }))
-                          notice.toast('La imagen se quitará al guardar.')
-                        }}
-                      >
-                        Quitar imagen
-                      </button>
-                    ) : null}
-                  </div>
-                  {olfactoryImageMessage ? (
-                    <p role="status">{olfactoryImageMessage}</p>
-                  ) : null}
-                </div>
-                {form.detail.olfactoryImage ? (
-                  <img
-                    src={assetSource(form.detail.olfactoryImage)}
-                    alt="Vista previa de la imagen del perfil olfativo"
-                  />
-                ) : (
-                  <span className="admin-olfactory-image-control__empty">
-                    Sin imagen
-                  </span>
-                )}
               </div>
               <div className="admin-olfactory-editor">
                 <OlfactoryProfile
@@ -1808,7 +1472,7 @@ export function AdminProductFormPage() {
                     </label>
                   )}
                   <label>
-                    SKU (opcional)
+                    SKU de presentación (opcional)
                     <input
                       aria-label={`SKU de presentación ${variantLabel(variant)}`}
                       value={variant.sku ?? ''}

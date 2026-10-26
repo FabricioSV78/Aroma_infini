@@ -303,10 +303,15 @@ test('Tipos múltiples, precio y marca se combinan sin clasificar accesorios com
   page,
 }) => {
   await page.goto('/tienda')
-  const initialCount = await page.locator('main .product-card').count()
+  const resultCount = page.locator('.catalog-toolbar p[role="status"]')
+  await expect(resultCount).toContainText(/\d+ productos?/)
+  const initialCount = Number.parseInt((await resultCount.textContent())!, 10)
   expect(await seedAccessory(page)).toBe('saved')
   await page.goto('/tienda?tipo=perfume&tipo=complemento&orden=precio-asc')
-  await expect(page.locator('main .product-card')).toHaveCount(initialCount + 1)
+  await expect(resultCount).toHaveText(`${initialCount + 1} productos`)
+  await expect(page.locator('main .product-card')).toHaveCount(
+    Math.min(12, initialCount + 1),
+  )
   await expect(page.locator('main .product-card').first()).toContainText(
     'Complemento de prueba',
   )
@@ -319,7 +324,10 @@ test('Tipos múltiples, precio y marca se combinan sin clasificar accesorios com
   await page
     .getByRole('button', { name: 'Quitar Complementos', exact: true })
     .click()
-  await expect(page.locator('main .product-card')).toHaveCount(initialCount)
+  await expect(resultCount).toHaveText(`${initialCount} productos`)
+  await expect(page.locator('main .product-card')).toHaveCount(
+    Math.min(12, initialCount),
+  )
   await page.goto('/tienda?tipo=complemento&marca=atelier-01')
   await expect(page.locator('main .product-card')).toHaveCount(0)
   await page.goto('/tienda?tipo=perfume&tipo=complemento&familia=amaderado')

@@ -281,7 +281,16 @@ test('Móvil: todos los grupos, foco y anclas desde otra página', async ({
   await expect(page).toHaveURL('/tienda?marca=atelier-01')
   await expect(dialog).not.toBeVisible()
   await expect(page.locator('main')).toBeFocused()
-  await expect(page.locator('.product-card')).toHaveCount(2)
+  const resultCount = page.locator('.catalog-toolbar p[role="status"]')
+  await expect(resultCount).toHaveText(/\d+ productos?/)
+  const total = Number.parseInt((await resultCount.textContent())!, 10)
+  expect(total).toBeGreaterThan(0)
+  await expect(page.locator('.catalog-listing .product-card')).toHaveCount(
+    Math.min(12, total),
+  )
+  await expect(
+    page.locator('.catalog-listing .product-card .brand-label'),
+  ).toHaveText(Array(Math.min(12, total)).fill('Atelier 01'))
   await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
 })
 

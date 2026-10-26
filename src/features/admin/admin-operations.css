@@ -1,4 +1,17 @@
 /* Operation screens keep the same panel surfaces while using the space available. */
+.admin-promotions-codes .admin-promotion-form .admin-inline-actions {
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .admin-promotions-codes
+    .admin-promotion-form
+    .admin-inline-actions
+    > .button {
+    width: 100%;
+  }
+}
+
 .admin-order-summary > a[aria-current='page'] {
   background: var(--admin-accent-soft);
   box-shadow: inset 0 -3px var(--admin-accent);

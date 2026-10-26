@@ -208,6 +208,13 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: 'productos/:id/fotos',
+        lazy: async () => {
+          const module = await import('../features/admin/AdminProductPhotoPage')
+          return { Component: module.AdminProductPhotoPage }
+        },
+      },
+      {
         path: 'productos/:id',
         lazy: async () => {
           const module = await import('../features/admin/AdminProducts')

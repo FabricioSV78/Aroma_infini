@@ -29,7 +29,7 @@ Se utilizaron las skills instaladas de diseño frontend, accesibilidad, React y 
 | Productos e inventario | Diferencia entre catálogo sin productos, filtros sin resultados y borradores pendientes de fotos. | Guardado del formulario y activación/desactivación esperan la escritura; fallo conservado y reintento sin volver a modificar el producto. Preparación de fotos mantiene controles y prevención de cargas simultáneas. |
 | Importación Excel | Se conservan archivo inválido, filas con errores, duplicados, filtros vacíos y borradores pendientes de imágenes. | Lectura y generación de plantilla con estado real. Importación conserva bloqueo inmediato, conteos reales y reintento de persistencia sin reimportar. |
 | Marcas, cupones y ofertas | Mensajes reutilizables y acción de creación. Ofertas distingue productos sin promoción de una vista filtrada sin coincidencias. | Formularios conservados ante fallo; botones «Guardando…», controles inertes/deshabilitados y confirmación después de `flush()`. |
-| Pedidos, detalle y lotes | Vacío total, filtros sin resultados y lote sin pedidos conservan acciones pertinentes. | Estados individuales, masivos y datos de entrega informan mientras guardan. Se conservan confirmaciones, resultados parciales, historial y separación entre pago y preparación. |
+| Pedidos, detalle y PDF | Vacío total y filtros sin resultados conservan acciones pertinentes; exportar requiere pedidos seleccionados. | Estados individuales, masivos y datos de entrega informan mientras guardan. Se conservan confirmaciones, resultados parciales, historial y separación entre pago y preparación. |
 | Clientes | No hay registros y búsqueda sin coincidencias tienen mensajes distintos. | «Limpiar búsqueda» recupera la lista, sin spinner para un filtro síncrono. |
 | Gestión del Home | No se añaden secciones nuevas. | Preparación real de imagen/vídeo con indicador, bloqueo de edición durante preparación/guardado y reintento del mismo borrador. |
 | Configuración de envíos | Se conservan tarifas, cobertura y controles provinciales actuales. | Formulario protegido durante escritura; fallo conserva los datos y permite reintentar antes de salir. |
@@ -59,7 +59,7 @@ Los originales del trabajo están preservados. La copia comparativa y sus hashes
 
 ## Validación funcional
 
-Las pruebas nuevas cubren lecturas pendientes, errores/reintentos, conservación del contenido, cargas iniciales, guardado fallido en IndexedDB, doble submit, reintento sin duplicar revisiones, visibilidad de productos, teclado, tacto y movimiento reducido. Se mantiene la suite existente para precios, descuentos, variantes, filtros, inventario, importación, pedidos y lotes de 10/50/100 pedidos.
+Las pruebas nuevas cubren lecturas pendientes, errores/reintentos, conservación del contenido, cargas iniciales, guardado fallido en IndexedDB, doble submit, reintento sin duplicar revisiones, visibilidad de productos, teclado, tacto y movimiento reducido. Se mantiene la suite existente para precios, descuentos, variantes, filtros, inventario, importación, pedidos y selecciones de 10/50/100 pedidos.
 
 | Comprobación | Resultado |
 | --- | --- |

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { persistedAdminState } from './product-import-fixtures'
 
 test('el editor facilita crear la URL y evita tamaños de presentación duplicados', async ({
   page,
@@ -46,9 +47,12 @@ test('las familias para filtros permiten selección múltiple y dejar el product
     page.getByText('Las familias seleccionadas no coinciden'),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Guardar producto' }).click()
-  await expect(page.locator('#admin-product-save-error')).toContainText(
+  await expect(page.locator('.admin-notice-dialog')).toContainText(
     'no coincide con el perfil aromático breve',
   )
+  await page
+    .getByRole('button', { name: 'Volver a editar', exact: true })
+    .click()
   await profile.fill('Floral · fresco')
   await page.getByRole('button', { name: 'Guardar producto' }).click()
   await expect(page).toHaveURL(/guardado=1/)
@@ -83,7 +87,7 @@ test('cambiar la foto principal conserva las fotos secundarias subidas', async (
   await expect(secondPhoto).toHaveAttribute('src', secondarySource!)
 })
 
-test('una vista nueva sin foto se identifica antes de guardar', async ({
+test('los espacios vacíos permiten guardar el progreso de fotografías como borrador', async ({
   page,
 }) => {
   await page.goto('/admin/productos/nuevo')
@@ -99,15 +103,18 @@ test('una vista nueva sin foto se identifica antes de guardar', async ({
   await expect(
     page.locator('.admin-product-upload-item > img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
-  await page.getByRole('button', { name: 'Añadir otra foto' }).click()
+  await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
   await expect(page.locator('.admin-product-upload-item').last()).toContainText(
     'Sin imagen',
   )
   await page.getByRole('button', { name: 'Guardar producto' }).click()
-  await expect(page.getByRole('alert')).toContainText(
-    'Sube una foto para cada vista añadida',
-  )
-  await expect(page).toHaveURL(/\/admin\/productos\/nuevo$/)
+  await expect(page).toHaveURL(/guardado=1/)
+  const saved = (await persistedAdminState(page)).products.find(
+    ({ product }) => product.slug === 'rosa-clara',
+  )!
+  expect(saved.detail.gallery).toHaveLength(1)
+  expect(saved.active).toBe(false)
+  expect(saved.detail.olfactoryImage).toBeNull()
 })
 
 test('La vista previa no tapa las notas editables en escritorio', async ({

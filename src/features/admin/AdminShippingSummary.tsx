@@ -27,12 +27,9 @@ export function AdminShippingSummary({
 
   return (
     <details className="admin-shipping-summary-panel">
-      <summary>Resumen de envío</summary>
+      <summary>Ficha de envío</summary>
       <div className="admin-shipping-summary-content">
-        <div
-          className="admin-shipping-sheet"
-          aria-label="Resumen para el envío"
-        >
+        <div className="admin-shipping-sheet" aria-label="Ficha de envío">
           <header className="admin-shipping-sheet-heading">
             <strong>AROMA INFINI</strong>
             <span>Pedido {order.reference}</span>
@@ -84,7 +81,7 @@ export function AdminShippingSummary({
             disabled={!ready}
             onClick={() => window.print()}
           >
-            Imprimir resumen
+            Imprimir ficha
           </button>
           {!ready ? (
             <p role="status">

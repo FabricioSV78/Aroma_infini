@@ -361,9 +361,7 @@ test('importar, subir y gestionar fotografías, previsualizar y publicar conserv
     /^data:image\/webp;base64,/,
   )
   const principal = await gallery.first().locator('img').getAttribute('src')
-  await page
-    .getByRole('button', { name: 'Añadir otra foto', exact: true })
-    .click()
+  await expect(gallery).toHaveCount(4)
   await page
     .getByLabel('Subir vista 2 del producto', { exact: true })
     .setInputFiles('public/images/cedre-960.webp')
@@ -398,10 +396,8 @@ test('importar, subir y gestionar fotografías, previsualizar y publicar conserv
     .nth(1)
     .getByRole('button', { name: 'Quitar', exact: true })
     .click()
-  await expect(gallery).toHaveCount(1)
-  await page
-    .getByRole('button', { name: 'Añadir otra foto', exact: true })
-    .click()
+  await expect(gallery).toHaveCount(4)
+  await expect(gallery.locator(':scope > img')).toHaveCount(1)
   await page
     .getByLabel('Subir vista 2 del producto', { exact: true })
     .setInputFiles('public/images/cedre-960.webp')
@@ -413,23 +409,20 @@ test('importar, subir y gestionar fotografías, previsualizar y publicar conserv
     .getByLabel('Subir imagen del perfil olfativo', { exact: true })
     .setInputFiles('public/images/ambre-960.webp')
   await expect(
-    page.getByRole('img', {
-      name: 'Vista previa de la imagen del perfil olfativo',
-    }),
+    page.locator('.admin-product-olfactory-slot > img'),
   ).toHaveAttribute('src', /^data:image\/webp;base64,/)
-  await page.getByRole('button', { name: 'Quitar imagen', exact: true }).click()
-  await expect(
-    page.getByRole('img', {
-      name: 'Vista previa de la imagen del perfil olfativo',
-    }),
-  ).toHaveCount(0)
+  await page
+    .locator('.admin-product-olfactory-slot')
+    .getByRole('button', { name: 'Quitar', exact: true })
+    .click()
+  await expect(page.locator('.admin-product-olfactory-slot > img')).toHaveCount(
+    0,
+  )
   await page
     .getByLabel('Subir imagen del perfil olfativo', { exact: true })
     .setInputFiles('public/images/petale-960.webp')
   await expect(
-    page.getByRole('img', {
-      name: 'Vista previa de la imagen del perfil olfativo',
-    }),
+    page.locator('.admin-product-olfactory-slot > img'),
   ).toBeVisible()
   for (const viewport of importViewports) {
     await page.setViewportSize(viewport)

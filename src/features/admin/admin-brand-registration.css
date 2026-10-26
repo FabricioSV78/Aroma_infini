@@ -1,0 +1,209 @@
+.admin-brand-registration {
+  max-width: 920px;
+  margin-bottom: 24px;
+  padding: clamp(18px, 3vw, 28px);
+  display: grid;
+  gap: 14px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.admin-brand-registration header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.admin-brand-registration header p,
+.admin-brand-registration-policy,
+.admin-brand-registration-count,
+.admin-brand-registration-totals {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.admin-brand-registration header p {
+  margin-top: 6px;
+}
+.admin-brand-registration label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.admin-brand-registration textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 180px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.admin-brand-registration-count {
+  margin-top: -8px;
+  font-variant-numeric: tabular-nums;
+}
+.admin-brand-registration-review {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.admin-brand-registration-review h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.admin-brand-registration-table {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+.admin-brand-registration-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  text-align: left;
+}
+.admin-brand-registration-table :is(th, td) {
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--admin-border);
+  overflow-wrap: anywhere;
+}
+.admin-brand-registration-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--admin-surface-muted);
+}
+.admin-brand-registration-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.admin-brand-registration-table td:first-child {
+  width: 56px;
+  color: var(--admin-muted);
+}
+
+.admin-brand-registration-table :is(th, td):first-child {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.admin-brand-registration-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+.admin-brand-registration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.admin-brand-registration-actions > button:not(.button) {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--admin-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.admin-brand-registration :is(textarea, button, [tabindex='0']):focus-visible,
+.admin-brand-registration-result summary:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 3px;
+}
+.admin-brand-registration-result {
+  max-width: 920px;
+  margin: 0 0 20px;
+  padding: 14px 0;
+  border-block: 1px solid var(--admin-border);
+}
+.admin-brand-registration-result p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.admin-brand-registration-result summary {
+  width: fit-content;
+  min-height: 44px;
+  padding-block: 10px;
+  color: var(--admin-accent);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.admin-brand-registration-result ul {
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+.admin-brand-registration-result li {
+  padding: 8px 0;
+  display: grid;
+  gap: 3px;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+.admin-brand-registration-result li span {
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .admin-brand-registration-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .admin-brand-registration-table tbody tr {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 10px;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .admin-brand-registration-table tbody :is(th, td) {
+    padding: 0;
+    border: 0;
+  }
+
+  .admin-brand-registration-table tbody td:first-child {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    width: auto;
+  }
+
+  .admin-brand-registration-table tbody th {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-brand-registration-table tbody td:last-child {
+    grid-column: 2;
+    grid-row: 2;
+    padding-top: 8px;
+  }
+  .admin-brand-registration-actions > .button {
+    width: 100%;
+  }
+}

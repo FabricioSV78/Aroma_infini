@@ -1,0 +1,156 @@
+.admin-order-pdf-dialog {
+  width: min(660px, calc(100vw - 32px));
+  max-height: 92dvh;
+  border-radius: var(--admin-radius, 12px);
+  color: var(--admin-text);
+}
+.admin-order-pdf-dialog .dialog-inner {
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding: 24px;
+}
+.admin-order-pdf-dialog .dialog-heading {
+  margin-bottom: 12px;
+}
+.admin-order-pdf-dialog .dialog-heading h2 {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 22px;
+}
+.admin-order-pdf-form {
+  display: grid;
+  gap: 18px;
+}
+.admin-order-pdf-selected {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+.admin-order-pdf-formats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.admin-order-pdf-formats legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-order-pdf-formats > label {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 16px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.admin-order-pdf-formats > label.is-selected {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+}
+.admin-order-pdf-formats > label:focus-within {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 3px;
+}
+.admin-order-pdf-formats input {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin: 2px 0 0;
+  accent-color: var(--admin-accent);
+}
+.admin-order-pdf-formats span {
+  display: grid;
+  gap: 6px;
+}
+.admin-order-pdf-formats strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-order-pdf-formats small {
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.admin-order-pdf-count {
+  margin: 0;
+  font-size: 13px;
+}
+.admin-order-pdf-issues {
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-left: 3px solid #a36c1d;
+  border-radius: 6px;
+  background: var(--admin-surface-muted);
+  font-size: 12px;
+}
+.admin-order-pdf-issues > p {
+  margin: 0 0 10px;
+}
+.admin-order-pdf-issues ul {
+  display: grid;
+  gap: 12px;
+  max-height: 190px;
+  overflow-y: auto;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.admin-order-pdf-issues li {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-order-pdf-issues li > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-order-pdf-issues a {
+  padding: 4px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.admin-order-pdf-issues .admin-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-order-pdf-progress {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+.admin-order-pdf-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--admin-accent);
+}
+.admin-order-pdf-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--admin-border);
+}
+.admin-order-pdf-actions .button {
+  min-height: 44px;
+}
+@media (max-width: 560px) {
+  .admin-order-pdf-formats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-order-pdf-dialog .dialog-inner {
+    padding: 20px 16px;
+  }
+  .admin-order-pdf-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

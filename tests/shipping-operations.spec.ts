@@ -192,7 +192,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   await expect(
     page.getByText('Recibe: Luis Prueba · DNI 12345678'),
   ).toBeVisible()
-  await page.getByText('Resumen de envío', { exact: true }).click()
+  await page.getByText('Ficha de envío', { exact: true }).click()
   const sheet = page.locator('.admin-shipping-sheet')
   await expect(sheet).toContainText('Luis Prueba')
   await expect(sheet).toContainText('DNI: 12345678')
@@ -201,7 +201,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   await expect(sheet).toContainText('Lima · Lima')
   await expect(sheet).toContainText('Frente al parque')
   await expect(
-    page.getByRole('button', { name: 'Imprimir resumen' }),
+    page.getByRole('button', { name: 'Imprimir ficha' }),
   ).toBeEnabled()
 
   await page.setViewportSize({ width: 390, height: 844 })
@@ -267,7 +267,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   await expect(updatedCustomer).toContainText('San Isidro')
 
   await page.goto(`/admin/pedidos/${reference}`)
-  await page.getByText('Resumen de envío', { exact: true }).click()
+  await page.getByText('Ficha de envío', { exact: true }).click()
   await expect(page.locator('.admin-shipping-sheet')).toContainText(
     'Cel.: 912345678',
   )
@@ -276,7 +276,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   )
 
   await page.goto(`/admin/pedidos/${secondReference}`)
-  await page.getByText('Resumen de envío', { exact: true }).click()
+  await page.getByText('Ficha de envío', { exact: true }).click()
   const longSheet = page.locator('.admin-shipping-sheet')
   await expect(longSheet).toContainText('Cel.: 923456789')
   await expect(longSheet).toContainText(longStreet)
@@ -293,11 +293,11 @@ test('El comprador puede dejar el receptor desactivado y los pedidos antiguos no
   page,
 }) => {
   await page.goto('/admin/pedidos/AI-210926-01')
-  await page.getByText('Resumen de envío', { exact: true }).click()
+  await page.getByText('Ficha de envío', { exact: true }).click()
   await expect(page.locator('.admin-shipping-sheet')).toContainText(
     'Por completar',
   )
   await expect(
-    page.getByRole('button', { name: 'Imprimir resumen' }),
+    page.getByRole('button', { name: 'Imprimir ficha' }),
   ).toBeDisabled()
 })

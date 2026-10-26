@@ -200,8 +200,13 @@
   flex-wrap: wrap;
 }
 
-.admin-offers-actions .admin-offers-remove {
+.admin-offers-actions .admin-offers-remove,
+.admin-offers-list-actions .admin-offers-delete {
   color: var(--admin-danger);
+}
+
+.admin-offers-actions {
+  gap: 12px;
 }
 
 .admin-offers-list {
@@ -306,6 +311,10 @@
   }
 
   .admin-offers-toolbar .button {
+    width: 100%;
+  }
+
+  .admin-offers-actions > .button {
     width: 100%;
   }
 }

@@ -1,12 +1,3 @@
-.admin-order-operator {
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  margin-bottom: 18px;
-}
-
-.admin-order-operator label,
 .admin-order-action-form > label {
   display: grid;
   gap: 7px;
@@ -16,32 +7,13 @@
   font-weight: 600;
 }
 
-.admin-order-operator label {
-  width: min(100%, 310px);
-}
-
-.admin-order-operator small {
-  padding-bottom: 13px;
-  color: var(--admin-muted);
-  font-size: 0.6875rem;
-}
-
-.admin-order-action-form > .admin-order-operator {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-}
-
-.admin-order-action-form > .admin-order-operator label {
-  width: 100%;
-}
-
-.admin-order-action-form > .admin-order-operator small {
-  padding: 0;
-}
-
 .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-order-workspace .admin-order-filter-bar .admin-order-search-field,
+.admin-order-workspace .admin-order-filter-bar .admin-filter-fields .button {
+  grid-column: 1 / -1;
 }
 
 .admin-order-filter-actions {
@@ -53,28 +25,6 @@
 
 .admin-order-workspace .admin-order-filter-actions > button {
   min-height: 44px;
-}
-
-.admin-order-workspace .admin-order-delete-batch {
-  color: var(--admin-muted);
-  text-decoration: none;
-}
-
-.admin-order-workspace .admin-order-delete-batch:hover {
-  color: var(--admin-danger);
-  text-decoration: underline;
-}
-
-.admin-order-action-dialog .admin-order-delete-confirm {
-  background: var(--admin-danger);
-  border-color: var(--admin-danger);
-  color: #fff;
-}
-
-.admin-order-action-dialog .admin-order-delete-confirm:hover {
-  background: var(--admin-danger);
-  border-color: var(--admin-danger);
-  filter: brightness(0.92);
 }
 
 .admin-order-check-label,
@@ -325,11 +275,17 @@
   outline-offset: 3px;
 }
 
-@media (min-width: 1500px) {
+@media (min-width: 1280px) {
   .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
-    grid-template-columns:
-      minmax(230px, 1.5fr) 1fr 1fr minmax(130px, 0.8fr)
-      minmax(130px, 0.8fr) auto;
+    grid-template-columns: minmax(180px, 1.4fr) minmax(145px, 1fr) repeat(
+        2,
+        minmax(125px, 0.8fr)
+      ) auto;
+  }
+
+  .admin-order-workspace .admin-order-filter-bar .admin-order-search-field,
+  .admin-order-workspace .admin-order-filter-bar .admin-filter-fields .button {
+    grid-column: auto;
   }
 }
 
@@ -433,6 +389,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .admin-order-workspace .admin-order-filter-bar .admin-order-search-field,
+  .admin-order-workspace .admin-order-filter-bar label:has(select),
   .admin-order-workspace .admin-order-filter-bar .admin-filter-fields .button {
     grid-column: 1 / -1;
   }
@@ -455,17 +412,11 @@
   .admin-order-selection-actions > .admin-order-text-button {
     width: 100%;
   }
-  .admin-order-operator small {
-    padding: 0;
-  }
 }
 
 @media (max-width: 479px) {
   .admin-order-workspace .admin-work-order-table tbody {
     grid-template-columns: 1fr;
-  }
-  .admin-order-operator label {
-    width: 100%;
   }
   .admin-order-action-dialog .dialog-inner {
     padding: 20px;

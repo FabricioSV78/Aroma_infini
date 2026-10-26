@@ -14,8 +14,9 @@ import {
   type AdminOrderStatus,
 } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
-import type { OrderActionIssue, OrderBatch } from '../../types/order-workflow'
+import type { OrderActionIssue } from '../../types/order-workflow'
 import { AdminPagination } from './AdminPagination'
+import { AdminOrderPdfExport } from './AdminOrderPdfExport'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { AdminBadge, AdminPageHeader } from './AdminShared'
@@ -27,8 +28,6 @@ import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
 import { orderSearchText } from './OrderWorkspaceUtils'
-import { OrderOperatorControl } from './OrderOperatorControl'
-import { useOrderOperator } from './useOrderOperator'
 import './admin-operations.css'
 import './admin-order-workspace.css'
 
@@ -70,7 +69,6 @@ export function AdminOrdersPage() {
   const state = useAdminStore()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const { operator, name, setName } = useOrderOperator()
   const selectionScopeParams = new URLSearchParams(params)
   selectionScopeParams.delete('page')
   selectionScopeParams.sort()
@@ -117,10 +115,9 @@ export function AdminOrdersPage() {
     useState<AdminOrderStatus>('preparing')
   const [deliveryConfirmed, setDeliveryConfirmed] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [creatingBatch, setCreatingBatch] = useState<OrderStatusAction | null>(
+  const [exportReferences, setExportReferences] = useState<string[] | null>(
     null,
   )
-  const [batchName, setBatchName] = useState('')
   const search = params.get('q') ?? ''
   const customerFilter = params.get('cliente') ?? ''
   const preparationParameter = params.get('preparacion') ?? ''
@@ -131,23 +128,12 @@ export function AdminOrdersPage() {
     : 'all'
   const from = params.get('desde') ?? ''
   const until = params.get('hasta') ?? ''
-  const batchFilter = params.get('lote') ?? ''
   const customerById = useMemo(
     () => new Map(state.customers.map((customer) => [customer.id, customer])),
     [state.customers],
   )
   const selectedCustomer = customerById.get(customerFilter)
   const normalizedSearch = orderSearchText(search)
-  const selectedBatch = state.orderBatches.find(
-    (batch) => batch.id === batchFilter,
-  )
-  const batchByReference = new Map(
-    state.orderBatches
-      .filter((batch) => !batch.archived)
-      .flatMap((batch) =>
-        batch.orderReferences.map((reference) => [reference, batch] as const),
-      ),
-  )
   const orders = useMemo(
     () =>
       [...state.orders]
@@ -168,17 +154,7 @@ export function AdminOrdersPage() {
             matchesPreparation &&
             (!customerFilter || order.customerId === customerFilter) &&
             (!from || day >= from) &&
-            (!until || day <= until) &&
-            (!batchFilter ||
-              (batchFilter === 'sin-lote'
-                ? !state.orderBatches.some(
-                    (batch) =>
-                      !batch.archived &&
-                      batch.orderReferences.includes(order.reference),
-                  )
-                : Boolean(
-                    selectedBatch?.orderReferences.includes(order.reference),
-                  )))
+            (!until || day <= until)
           )
         })
         .sort(
@@ -189,14 +165,11 @@ export function AdminOrdersPage() {
         ),
     [
       state.orders,
-      state.orderBatches,
       normalizedSearch,
       preparationFilter,
       customerFilter,
       from,
       until,
-      batchFilter,
-      selectedBatch,
       reviewReferences,
     ],
   )
@@ -206,7 +179,6 @@ export function AdminOrdersPage() {
     customerFilter ||
     from ||
     until ||
-    batchFilter ||
     reviewReferences ||
     preparationFilter !== 'all',
   )
@@ -256,17 +228,6 @@ export function AdminOrdersPage() {
     return `/admin/pedidos?${next.toString()}`
   }
 
-  function requireOperator() {
-    if (operator.name.length >= 2 && operator.name.length <= 80) return true
-    setActionError('Indica el nombre del responsable (de 2 a 80 caracteres).')
-    document
-      .querySelector<HTMLInputElement>(
-        'dialog[open] input[name="orderOperator"]',
-      )
-      ?.focus()
-    return false
-  }
-
   async function saveFeedback(nextMessage: string, onSaved?: () => void) {
     setError('')
     await persistence.save(
@@ -305,7 +266,6 @@ export function AdminOrdersPage() {
   async function changeStatuses(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!statusAction || busyRef.current || persistenceFailed) return
-    if (!requireOperator()) return
     if (
       (targetStatus === 'shipped' || targetStatus === 'delivered') &&
       !deliveryConfirmed
@@ -328,11 +288,7 @@ export function AdminOrdersPage() {
           )
           return
         }
-        const result = adminService.setOrderStatus(
-          reference,
-          targetStatus,
-          operator,
-        )
+        const result = adminService.setOrderStatus(reference, targetStatus)
         if (result.kind === 'validation') {
           setActionError(result.message)
           return
@@ -345,7 +301,7 @@ export function AdminOrdersPage() {
         const result = adminService.bulkSetOrderStatus(
           statusAction.references,
           targetStatus,
-          operator,
+          undefined,
           statusAction.expected,
         )
         if (result.kind === 'validation') {
@@ -395,82 +351,6 @@ export function AdminOrdersPage() {
     }
   }
 
-  function openBatchCreation() {
-    if (busyRef.current || persistenceFailed || !selection.size) return
-    setCreatingBatch(selectedAction())
-    setBatchName('')
-    setActionError('')
-  }
-
-  async function createBatch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!creatingBatch || busyRef.current || persistenceFailed) return
-    if (!requireOperator()) return
-    busyRef.current = true
-    setBusy(true)
-    clearNotices()
-    try {
-      const result = adminService.createOrderBatch(
-        batchName,
-        creatingBatch.references,
-        operator,
-      )
-      if (result.kind === 'validation') {
-        setActionError(result.message)
-        return
-      }
-      setCreatingBatch(null)
-      setSelection(new Map())
-      await saveFeedback(
-        `Lote «${result.batch.name}» creado con ${result.batch.orderReferences.length} pedidos.`,
-      )
-    } catch (cause) {
-      notice.error(cause, 'orders')
-    } finally {
-      busyRef.current = false
-      setBusy(false)
-    }
-  }
-
-  async function requestBatchDeletion(batch: OrderBatch) {
-    if (busyRef.current || persistenceFailed) return
-    const confirmed = await notice.confirm({
-      title: 'Eliminar lote',
-      description: `¿Eliminar el lote «${batch.name}»? Los pedidos, sus estados y su historial se conservan.`,
-      confirmLabel: 'Eliminar lote',
-      destructive: true,
-    })
-    if (!confirmed || busyRef.current || persistenceFailed) return
-    busyRef.current = true
-    clearNotices()
-    try {
-      const result = adminService.deleteOrderBatch(batch.id)
-      if (result.kind === 'validation') {
-        notice.show({
-          kind: 'warning',
-          title: 'No se pudo eliminar el lote',
-          description: result.message,
-        })
-        return
-      }
-      const next = new URLSearchParams(params)
-      next.delete('lote')
-      next.delete('page')
-      setSelection(new Map())
-      // Clear our own filter before guarding navigation during the storage write.
-      setParams(next, { replace: true })
-      setBusy(true)
-      await saveFeedback(
-        `Lote «${batch.name}» eliminado. Los pedidos se conservan.`,
-      )
-    } catch (cause) {
-      notice.error(cause, 'orders')
-    } finally {
-      busyRef.current = false
-      setBusy(false)
-    }
-  }
-
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
@@ -481,14 +361,7 @@ export function AdminOrdersPage() {
       return
     }
     const next = new URLSearchParams()
-    for (const key of [
-      'q',
-      'cliente',
-      'preparacion',
-      'desde',
-      'hasta',
-      'lote',
-    ]) {
+    for (const key of ['q', 'cliente', 'preparacion', 'desde', 'hasta']) {
       const value = data.get(key)?.toString().trim()
       if (value && value !== 'all') next.set(key, value)
     }
@@ -503,7 +376,11 @@ export function AdminOrdersPage() {
         description="Organiza el trabajo y gestiona cada pedido hasta su entrega."
       />
       <AdminSaveFeedback {...persistence} />
-      {busy ? <InlineStatus busy>Guardando cambios…</InlineStatus> : null}
+      {busy ? (
+        <InlineStatus busy>
+          {exportReferences ? 'Generando PDF…' : 'Guardando cambios…'}
+        </InlineStatus>
+      ) : null}
       {error ? (
         <p className="admin-form-error" role="alert">
           {error}
@@ -619,19 +496,6 @@ export function AdminOrdersPage() {
             </select>
           </label>
           <label>
-            Lote de trabajo
-            <select name="lote" key={batchFilter} defaultValue={batchFilter}>
-              <option value="">Todos</option>
-              <option value="sin-lote">Sin lote activo</option>
-              {state.orderBatches.map((batch) => (
-                <option value={batch.id} key={batch.id}>
-                  {batch.name} · {batch.code}
-                  {batch.archived ? ' (archivado)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             Desde
             <input type="date" name="desde" key={from} defaultValue={from} />
           </label>
@@ -651,26 +515,10 @@ export function AdminOrdersPage() {
           <span>
             {orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'}
             {selectedCustomer ? ` de ${selectedCustomer.name}` : ''}
-            {selectedBatch ? ` · ${selectedBatch.code}` : ''}
             {reviewReferences ? ' · Solo pedidos no actualizados' : ''}
           </span>
           {hasFilters ? (
             <div className="admin-order-filter-actions">
-              {selectedBatch ? (
-                <button
-                  type="button"
-                  className="admin-order-delete-batch"
-                  aria-label={`Eliminar lote ${selectedBatch.name}`}
-                  disabled={busy || persistenceFailed}
-                  onClick={() => {
-                    if (busyRef.current) return
-                    setActionError('')
-                    void requestBatchDeletion(selectedBatch)
-                  }}
-                >
-                  Eliminar lote
-                </button>
-              ) : null}
               <button
                 type="button"
                 onClick={() => updateFilters(new URLSearchParams())}
@@ -726,9 +574,9 @@ export function AdminOrdersPage() {
               type="button"
               className="button button--secondary"
               disabled={busy}
-              onClick={openBatchCreation}
+              onClick={() => setExportReferences([...selection.keys()])}
             >
-              Crear lote
+              Exportar PDF
             </button>
             <button
               type="button"
@@ -796,7 +644,6 @@ export function AdminOrdersPage() {
                 const canAdvance =
                   nextStatus &&
                   !getOrderTransitionError(order, nextStatus, customer?.phone)
-                const batch = batchByReference.get(order.reference)
                 return (
                   <tr
                     key={order.reference}
@@ -831,7 +678,6 @@ export function AdminOrdersPage() {
                       </strong>
                       <small className="admin-order-date">
                         {shortDateFormatter.format(new Date(order.placedAt))}
-                        {batch ? ` · ${batch.code}` : ''}
                       </small>
                       <small className="admin-order-contents">
                         {order.lines
@@ -957,14 +803,6 @@ export function AdminOrdersPage() {
               ? 'pedido seleccionado'
               : 'pedidos seleccionados'}
           </p>
-          {statusAction ? (
-            <OrderOperatorControl
-              name={name}
-              onChange={setName}
-              disabled={busy}
-              required
-            />
-          ) : null}
           <label>
             Nuevo estado
             <select
@@ -1030,66 +868,17 @@ export function AdminOrdersPage() {
           </div>
         </form>
       </Dialog>
-      <Dialog
-        open={creatingBatch !== null}
-        onClose={() => {
-          if (!busyRef.current) setCreatingBatch(null)
-        }}
-        title="Crear lote de trabajo"
-        id="create-order-batch"
-        className="admin-order-action-dialog"
-      >
-        <form
-          className="admin-order-action-form"
-          onSubmit={(event) => void createBatch(event)}
-        >
-          <p className="admin-order-dialog-intro">
-            Agrupa {creatingBatch?.references.length ?? 0} pedidos para
-            encontrarlos con el filtro de lotes. Sus estados no cambian.
-          </p>
-          <label>
-            Nombre del lote
-            <input
-              value={batchName}
-              onChange={(event) => setBatchName(event.target.value)}
-              required
-              maxLength={80}
-              placeholder="Ej. Preparación del lunes"
-              disabled={busy}
-            />
-          </label>
-          {creatingBatch ? (
-            <OrderOperatorControl
-              name={name}
-              onChange={setName}
-              disabled={busy}
-              required
-            />
-          ) : null}
-          {actionError ? (
-            <p className="admin-form-error" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-          <div className="admin-order-dialog-actions">
-            <button
-              type="submit"
-              className="button button--primary"
-              disabled={busy}
-            >
-              {busy ? 'Creando…' : 'Crear lote'}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              disabled={busy}
-              onClick={() => setCreatingBatch(null)}
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </Dialog>
+      {exportReferences !== null ? (
+        <AdminOrderPdfExport
+          open
+          references={exportReferences}
+          onClose={() => setExportReferences(null)}
+          onProcessingChange={(processing) => {
+            busyRef.current = processing
+            setBusy(processing)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

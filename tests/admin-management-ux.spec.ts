@@ -40,7 +40,7 @@ test('La edición del Home muestra la experiencia de perfume y comunica el guard
   await expect(savebar).toContainText('Cambios sin guardar')
   await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
   await expect(savebar).toContainText('Todo guardado')
-  await expect(savebar).toContainText('Cambios guardados')
+  await expect(page.locator('.admin-toast')).toContainText('Cambios guardados')
 })
 
 test('El editor de envíos mantiene el importe vacío, permite deshacer y comunica el guardado', async ({
@@ -70,7 +70,9 @@ test('El editor de envíos mantiene el importe vacío, permite deshacer y comuni
 
   await page.getByRole('button', { name: 'Guardar configuración' }).click()
   await expect(footer).toContainText('Todo guardado')
-  await expect(footer).toContainText('Configuración aplicada a la tienda.')
+  await expect(page.locator('.admin-toast')).toContainText(
+    'Configuración aplicada a la tienda.',
+  )
 })
 
 test('Las pantallas de gestión no desbordan en anchos de escritorio, laptop, tablet y móvil', async ({

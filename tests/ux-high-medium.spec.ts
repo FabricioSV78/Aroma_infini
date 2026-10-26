@@ -131,10 +131,8 @@ test('Un pedido con datos incompletos se puede completar antes de enviarlo', asy
   await page.getByLabel('Dirección exacta').fill('Calle Los Olivos 123')
   await page.getByRole('button', { name: 'Guardar datos de entrega' }).click()
   await expect(page.getByText('Datos de entrega guardados.')).toBeVisible()
-  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
-  await page
-    .getByRole('combobox', { name: 'Preparación del pedido' })
-    .selectOption('shipped')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'Enviado', exact: true }).check()
   await expect(
     page.getByRole('button', { name: 'Guardar estado' }),
   ).toBeEnabled()

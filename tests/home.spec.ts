@@ -35,6 +35,9 @@ for (const width of widths) {
       }).observe({ type: 'layout-shift', buffered: true })
     })
     await page.goto('/')
+    // The route skeleton also has an h1; wait for the actual Home before
+    // enumerating sections so every lazy image is scrolled into view.
+    await expect(page.locator('.home .hero')).toBeVisible()
     await page.getByRole('heading', { level: 1 }).waitFor()
     await page.evaluate(() => document.fonts.ready)
     for (const section of await page.locator('[data-home-section]').all()) {
@@ -74,6 +77,7 @@ test('Menú móvil: teclado, foco contenido y retorno con Escape', async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
+  await expect(page.locator('.home .hero')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await page.keyboard.press('Tab')
   await expect(page.getByText('Saltar al contenido')).toBeFocused()

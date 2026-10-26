@@ -415,10 +415,8 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
   await orderRow
     .getByRole('link', { name: new RegExp(`Ver ${reference}`) })
     .click()
-  await page.getByLabel('Responsable de los cambios').fill('Ana Operaciones')
-  await page
-    .getByRole('combobox', { name: /Preparación del pedido/ })
-    .selectOption('preparing')
+  await expect(page.getByLabel('Responsable de los cambios')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'En preparación', exact: true }).check()
   await page.getByRole('button', { name: 'Guardar estado' }).click()
 
   await page.evaluate((path) => {
@@ -471,7 +469,7 @@ test('Un pago rechazado no crea pedido ni cliente en administración', async ({
     window.history.pushState(null, '', '/admin/pedidos')
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
-  await expect(page.locator('.admin-table tbody tr')).toHaveCount(4)
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(20)
   await expect(page.getByText('Pago Rechazado')).toHaveCount(0)
   await page.getByRole('link', { name: 'Clientes' }).click()
   await expect(page.getByText('rechazado@ejemplo.invalid')).toHaveCount(0)

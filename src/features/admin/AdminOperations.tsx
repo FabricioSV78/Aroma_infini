@@ -41,24 +41,24 @@ import { useUnsavedChanges } from './useUnsavedChanges'
 import { AdminShippingSummary } from './AdminShippingSummary'
 import { isShippingDestinationEnabled } from '../../services/shipping-rates'
 import { AdminProductOffers } from './AdminProductOffers'
-import { OrderOperatorControl } from './OrderOperatorControl'
-import { useOrderOperator } from './useOrderOperator'
 import { OrderHistory } from './OrderHistory'
-import { ORDER_STATUSES } from '../../domain/order-workflow'
+import {
+  ORDER_STATUSES,
+  getOrderTransitionError,
+} from '../../domain/order-workflow'
+import { OrderStatusPicker } from './OrderStatusPicker'
+import { Icon } from '../../components/ui/Icon'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useAdminSave } from './useAdminSave'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { useAdminNotice } from './AdminNoticeProvider'
-
-function brandSlug(name: string) {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
+import { brandSlug } from '../../domain/brand-registration'
+import {
+  AdminBrandRegistration,
+  AdminBrandRegistrationResult,
+  type BrandRegistrationSummary,
+} from './AdminBrandRegistration'
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat('es-PE', {
@@ -116,26 +116,46 @@ export function AdminBrandsPage() {
   const state = useAdminStore()
   const [form, setForm] = useState<AdminBrand | null>(null)
   const [originalForm, setOriginalForm] = useState<AdminBrand | null>(null)
+  const [registrationText, setRegistrationText] = useState<string | null>(null)
+  const [registrationSummary, setRegistrationSummary] =
+    useState<BrandRegistrationSummary | null>(null)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const editorHeadingRef = useRef<HTMLHeadingElement>(null)
   const persistence = useAdminSave()
   const pagination = useAdminPagination(state.brands, 12)
   const dirty = Boolean(
-    form &&
-    originalForm &&
-    JSON.stringify(form) !== JSON.stringify(originalForm),
+    registrationText?.trim() ||
+    (form &&
+      originalForm &&
+      JSON.stringify(form) !== JSON.stringify(originalForm)),
   )
   useUnsavedChanges(
     dirty || persistence.saving || persistence.persistenceFailed,
   )
 
   function openEditor(brand: AdminBrand) {
+    setRegistrationText(null)
     setError('')
     setActionError('')
     setForm(brand)
     setOriginalForm(brand)
     window.requestAnimationFrame(() => editorHeadingRef.current?.focus())
+  }
+
+  async function closeRegistration() {
+    if (
+      registrationText?.trim() &&
+      !(await notice.confirm({
+        title: '¿Descartar la lista de marcas?',
+        description: 'Las marcas de esta lista todavía no se han guardado.',
+        confirmLabel: 'Descartar lista',
+        cancelLabel: 'Seguir revisando',
+        destructive: true,
+      }))
+    )
+      return
+    setRegistrationText(null)
   }
 
   async function closeEditor() {
@@ -202,7 +222,7 @@ export function AdminBrandsPage() {
         title="Marcas"
         description="Gestiona las marcas visibles en la tienda."
       />
-      {!form ? (
+      {!form && registrationText === null ? (
         <div className="admin-list-toolbar">
           <p>
             {state.brands.length}{' '}
@@ -213,17 +233,34 @@ export function AdminBrandsPage() {
             type="button"
             disabled={persistence.saving || persistence.persistenceFailed}
             onClick={() => {
-              openEditor({
-                id: `brand-${crypto.randomUUID().slice(0, 8)}`,
-                name: '',
-                slug: '',
-                active: true,
-              })
+              setRegistrationText('')
+              setRegistrationSummary(null)
+              setActionError('')
             }}
           >
-            Nueva marca
+            Registrar marcas
           </button>
         </div>
+      ) : null}
+      {registrationText !== null ? (
+        <AdminBrandRegistration
+          text={registrationText}
+          onTextChange={setRegistrationText}
+          brands={state.brands}
+          revision={state.revision}
+          persistence={persistence}
+          onCancel={() => void closeRegistration()}
+          onSaved={(summary) => {
+            setRegistrationText(null)
+            setRegistrationSummary(summary)
+            notice.toast(
+              `${summary.created.length} ${summary.created.length === 1 ? 'marca creada' : 'marcas creadas'}.`,
+            )
+          }}
+        />
+      ) : null}
+      {registrationSummary && registrationText === null ? (
+        <AdminBrandRegistrationResult summary={registrationSummary} />
       ) : null}
       {form ? (
         <form
@@ -345,7 +382,9 @@ export function AdminBrandsPage() {
                         type="button"
                         aria-label={`Editar ${brand.name}`}
                         disabled={
-                          persistence.saving || persistence.persistenceFailed
+                          persistence.saving ||
+                          persistence.persistenceFailed ||
+                          registrationText !== null
                         }
                         onClick={() => openEditor({ ...brand })}
                       >
@@ -357,7 +396,9 @@ export function AdminBrandsPage() {
                           brand.active ? 'admin-action-danger' : undefined
                         }
                         disabled={
-                          persistence.saving || persistence.persistenceFailed
+                          persistence.saving ||
+                          persistence.persistenceFailed ||
+                          registrationText !== null
                         }
                         onClick={() => void toggle(brand)}
                         aria-label={`${brand.active ? 'Desactivar' : 'Activar'} ${brand.name}`}
@@ -372,7 +413,7 @@ export function AdminBrandsPage() {
           </table>
         </div>
       ) : null}
-      {!state.brands.length && !form ? (
+      {!state.brands.length && !form && registrationText === null ? (
         <EmptyState
           className="admin-empty admin-operations-empty"
           icon="tag"
@@ -419,11 +460,6 @@ export function AdminOrderDetailPage() {
   const statusBusy = statusPersistence.saving
   const statusPersistenceError = statusPersistence.persistenceFailed
   const statusAction = useRef(false)
-  const {
-    operator,
-    name: operatorName,
-    setName: setOperatorName,
-  } = useOrderOperator()
   const [editingDelivery, setEditingDelivery] = useState(false)
   const [deliveryError, setDeliveryError] = useState('')
   const deliveryPersistence = useAdminSave()
@@ -476,9 +512,11 @@ export function AdminOrderDetailPage() {
   const persistedStatus = order.status
   const currentStatusIndex = orderStatusOrder.indexOf(order.status)
   const selectedStatusIndex = orderStatusOrder.indexOf(status)
-  const canChangeStatus =
-    order.paymentStatus === 'approved' &&
-    (status !== 'shipped' || deliveryReady)
+  const canChangeStatus = !getOrderTransitionError(
+    order,
+    status,
+    customer?.phone,
+  )
   const deliveryMethod =
     order.deliveryMethod === 'motorizado' ? 'Motorizado' : 'Courier'
   const draftArea = getDeliveryArea(deliveryDraft.department)
@@ -506,15 +544,6 @@ export function AdminOrderDetailPage() {
       status === persistedStatus
     )
       return
-    if (operator.name.length < 2 || operator.name.length > 80) {
-      setStatusError(
-        'Escribe el nombre del responsable para registrar el cambio.',
-      )
-      document
-        .querySelector<HTMLInputElement>('[name="orderOperator"]')
-        ?.focus()
-      return
-    }
     statusAction.current = true
     try {
       if (
@@ -543,7 +572,7 @@ export function AdminOrderDetailPage() {
         return
       setStatusError('')
       const result = await statusPersistence.save(
-        () => adminService.setOrderStatus(orderReference, status, operator),
+        () => adminService.setOrderStatus(orderReference, status),
         () => notice.toast('Estado actualizado.'),
       )
       if (result?.kind === 'validation') {
@@ -618,41 +647,26 @@ export function AdminOrderDetailPage() {
       {!deliveryReady ? (
         <p className="admin-inline-warning" role="status">
           Faltan datos de contacto o ubicación. Complétalos antes de marcar el
-          pedido como enviado o imprimir el resumen.
+          pedido como enviado.
         </p>
       ) : null}
       <div className="admin-order-layout">
         <aside>
-          <form onSubmit={saveStatus}>
-            <OrderOperatorControl
-              name={operatorName}
-              onChange={setOperatorName}
+          <form
+            className="admin-order-state-form"
+            onSubmit={saveStatus}
+            aria-busy={statusBusy}
+          >
+            <OrderStatusPicker
+              order={order}
+              value={status}
+              onChange={(next) => {
+                setStatusError('')
+                setStatus(next)
+              }}
               disabled={statusBusy || statusPersistenceError}
+              legacyPhone={customer?.phone}
             />
-            <label>
-              Preparación del pedido
-              <select
-                value={status}
-                disabled={statusBusy || statusPersistenceError}
-                onChange={(event) => {
-                  setStatusError('')
-                  setStatus(event.target.value as AdminOrderStatus)
-                }}
-              >
-                {orderStatusOrder
-                  .filter(
-                    (value) =>
-                      Math.abs(
-                        orderStatusOrder.indexOf(value) - currentStatusIndex,
-                      ) <= 1,
-                  )
-                  .map((value) => (
-                    <option key={value} value={value}>
-                      {adminOrderStatusMeta[value].label}
-                    </option>
-                  ))}
-              </select>
-            </label>
             <button
               className="button button--primary"
               type="submit"
@@ -663,15 +677,9 @@ export function AdminOrderDetailPage() {
                 status === order.status
               }
             >
+              <Icon name="check" />
               {statusBusy ? 'Guardando…' : 'Guardar estado'}
             </button>
-            {!canChangeStatus ? (
-              <p className="admin-data-note">
-                {order.paymentStatus !== 'approved'
-                  ? 'El pedido debe tener el pago aprobado antes de avanzar.'
-                  : 'Faltan datos de contacto y entrega para marcar el pedido como enviado.'}
-              </p>
-            ) : null}
             {statusBusy ? (
               <InlineStatus busy>Guardando estado…</InlineStatus>
             ) : null}
@@ -1183,7 +1191,7 @@ export function AdminCustomersPage() {
 
 function createPromotionDraft(): AdminPromotion {
   return {
-    id: `promo-${crypto.randomUUID().slice(0, 8)}`,
+    id: `promo-${crypto.randomUUID()}`,
     code: '',
     active: false,
     type: 'percent',
@@ -1202,8 +1210,32 @@ function AdminPromotionCodesPage() {
   const [form, setForm] = useState<AdminPromotion | null>(null)
   const [originalForm, setOriginalForm] = useState<AdminPromotion | null>(null)
   const [error, setError] = useState('')
+  const [editingExisting, setEditingExisting] = useState(false)
+  const [saveAction, setSaveAction] = useState<'finish' | 'create-another'>(
+    'finish',
+  )
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const editorHeadingRef = useRef<HTMLHeadingElement>(null)
+  const codeRef = useRef<HTMLInputElement>(null)
+  const codesSectionRef = useRef<HTMLElement>(null)
+  const focusCodeAfterSave = useRef(false)
+  const deletingRef = useRef(false)
   const persistence = useAdminSave()
+  const formId = form?.id
+  useEffect(() => {
+    if (
+      !formId ||
+      persistence.saving ||
+      persistence.persistenceFailed ||
+      !focusCodeAfterSave.current
+    )
+      return
+    const frame = window.requestAnimationFrame(() => {
+      codeRef.current?.focus()
+      focusCodeAfterSave.current = false
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [formId, persistence.saving, persistence.persistenceFailed])
   const promotions = [...state.promotions].sort((first, second) =>
     first.code.localeCompare(second.code),
   )
@@ -1218,6 +1250,8 @@ function AdminPromotionCodesPage() {
   )
 
   function openEditor(nextForm: AdminPromotion) {
+    setEditingExisting(state.promotions.some((item) => item.id === nextForm.id))
+    focusCodeAfterSave.current = false
     setError('')
     setForm(nextForm)
     setOriginalForm(nextForm)
@@ -1243,14 +1277,27 @@ function AdminPromotionCodesPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form) return
+    if (!form || persistence.saving || persistence.persistenceFailed) return
+    const createAnother =
+      !editingExisting &&
+      (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') ===
+        'create-another'
+    setSaveAction(createAnother ? 'create-another' : 'finish')
     setError('')
     const result = await persistence.save(
       () => adminService.savePromotion(form),
       () => {
         notice.toast('Promoción guardada.')
-        setForm(null)
-        setOriginalForm(null)
+        if (createAnother) {
+          const next = createPromotionDraft()
+          setForm(next)
+          setOriginalForm({ ...next })
+          setError('')
+          focusCodeAfterSave.current = true
+        } else {
+          setForm(null)
+          setOriginalForm(null)
+        }
       },
     )
     if (!result) return
@@ -1284,8 +1331,49 @@ function AdminPromotionCodesPage() {
     if (result?.kind === 'validation') setError(result.message)
   }
 
+  async function deletePromotion(promotion: AdminPromotion) {
+    if (
+      form ||
+      persistence.saving ||
+      persistence.persistenceFailed ||
+      deletingRef.current
+    )
+      return
+    deletingRef.current = true
+    try {
+      if (
+        !(await notice.confirm({
+          title: `¿Eliminar el cupón ${promotion.code}?`,
+          description:
+            'El código dejará de estar disponible para nuevas compras. Los pedidos anteriores se conservarán.',
+          confirmLabel: 'Eliminar cupón',
+          destructive: true,
+        }))
+      )
+        return
+      setError('')
+      setDeletingId(promotion.id)
+      const result = await persistence.save(
+        () => adminService.deletePromotion(promotion.id),
+        () => {
+          notice.toast(`Cupón ${promotion.code} eliminado.`)
+          window.requestAnimationFrame(() => codesSectionRef.current?.focus())
+        },
+      )
+      if (result?.kind === 'validation') setError(result.message)
+    } finally {
+      setDeletingId(null)
+      deletingRef.current = false
+    }
+  }
+
   return (
-    <section className="admin-promotions-codes" aria-label="Cupones">
+    <section
+      className="admin-promotions-codes"
+      aria-label="Cupones"
+      ref={codesSectionRef}
+      tabIndex={-1}
+    >
       {!form ? (
         <div className="admin-list-toolbar">
           <p>
@@ -1318,9 +1406,7 @@ function AdminPromotionCodesPage() {
                   ref={editorHeadingRef}
                   tabIndex={-1}
                 >
-                  {state.promotions.some((item) => item.id === form.id)
-                    ? 'Editar promoción'
-                    : 'Nueva promoción'}
+                  {editingExisting ? 'Editar promoción' : 'Nueva promoción'}
                 </h2>
                 <p>Las fechas son opcionales si la vigencia no tiene límite.</p>
               </div>
@@ -1329,6 +1415,7 @@ function AdminPromotionCodesPage() {
               <label>
                 Código
                 <input
+                  ref={codeRef}
                   value={form.code}
                   autoCapitalize="characters"
                   autoComplete="off"
@@ -1477,11 +1564,31 @@ function AdminPromotionCodesPage() {
               <button
                 className="button button--primary"
                 type="submit"
+                name="afterSave"
+                value="finish"
                 disabled={persistence.saving || persistence.persistenceFailed}
-                aria-busy={persistence.saving}
+                aria-busy={persistence.saving && saveAction === 'finish'}
               >
-                {persistence.saving ? 'Guardando…' : 'Guardar promoción'}
+                {persistence.saving && saveAction === 'finish'
+                  ? 'Guardando…'
+                  : 'Guardar promoción'}
               </button>
+              {!editingExisting ? (
+                <button
+                  className="button button--secondary"
+                  type="submit"
+                  name="afterSave"
+                  value="create-another"
+                  disabled={persistence.saving || persistence.persistenceFailed}
+                  aria-busy={
+                    persistence.saving && saveAction === 'create-another'
+                  }
+                >
+                  {persistence.saving && saveAction === 'create-another'
+                    ? 'Guardando…'
+                    : 'Guardar y crear otra'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void closeEditor()}
@@ -1494,6 +1601,11 @@ function AdminPromotionCodesPage() {
         </form>
       ) : null}
       <AdminSaveFeedback {...persistence} />
+      {error && !form ? (
+        <p className="admin-form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {!promotions.length && !form ? (
         <EmptyState
           className="admin-empty admin-operations-empty"
@@ -1557,6 +1669,22 @@ function AdminPromotionCodesPage() {
                   aria-label={`${promotion.active ? 'Desactivar' : 'Activar'} ${promotion.code}`}
                 >
                   {promotion.active ? 'Desactivar' : 'Activar'}
+                </button>
+                <button
+                  type="button"
+                  className="admin-action-danger"
+                  disabled={
+                    Boolean(form) ||
+                    persistence.saving ||
+                    persistence.persistenceFailed
+                  }
+                  onClick={() => void deletePromotion(promotion)}
+                  aria-label={`Eliminar cupón ${promotion.code}`}
+                  aria-busy={persistence.saving && deletingId === promotion.id}
+                >
+                  {persistence.saving && deletingId === promotion.id
+                    ? 'Eliminando…'
+                    : 'Eliminar cupón'}
                 </button>
               </div>
             </li>
