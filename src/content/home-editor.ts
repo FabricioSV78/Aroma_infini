@@ -5,12 +5,15 @@ import type {
   HomeFinderContent,
 } from '../types/home'
 import type { FinderResult, FinderStep } from '../types/fragrance-finder'
+import { isManagedMediaSource, parseManagedVideoPath } from '../domain/media'
+import { HERO_MAX_CAMPAIGNS, isHeroDestination } from '../domain/hero-content'
 export type {
   HomeAnnouncementContent,
   HomeContent,
   HomeFilmContent,
   HomeFinderContent,
   HomeHeroContent,
+  HomeHeroDestination,
 } from '../types/home'
 
 const defaultFilm: HomeFilmContent = {
@@ -21,6 +24,8 @@ const defaultFilm: HomeFilmContent = {
   cta: 'Encuentra tu perfume',
   video: null,
   poster: null,
+  mobileVideo: null,
+  mobilePoster: null,
 }
 
 const previousSilenceAlt =
@@ -65,7 +70,18 @@ function isWebpDataUri(value: unknown): value is string {
 }
 
 function webpOrNull(value: unknown): string | null {
-  return isWebpDataUri(value) ? value : null
+  return typeof value === 'string' &&
+    (isWebpDataUri(value) || isManagedMediaSource(value))
+    ? value
+    : null
+}
+
+function isHomeVideo(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    (value.startsWith('data:video/mp4;base64,') ||
+      parseManagedVideoPath(value) !== null)
+  )
 }
 
 function isStableFinderValue(value: unknown): value is string {
@@ -196,7 +212,10 @@ export function createDefaultFinderContent(): HomeFinderContent {
   }
 }
 
-function normalizeFinderContent(value: unknown): HomeFinderContent {
+function normalizeFinderContent(
+  value: unknown,
+  preserveRemoteContent = false,
+): HomeFinderContent {
   const defaults = createDefaultFinderContent()
   if (!isRecord(value)) return defaults
   const steps = isRecord(value.steps) ? value.steps : {}
@@ -259,7 +278,7 @@ function normalizeFinderContent(value: unknown): HomeFinderContent {
     familyVisuals: Object.fromEntries(
       [
         ...new Set([
-          ...Object.keys(defaults.familyVisuals),
+          ...Object.keys(preserveRemoteContent ? {} : defaults.familyVisuals),
           ...Object.keys(familyVisuals),
         ]),
       ]
@@ -308,8 +327,43 @@ function normalizeFinderContent(value: unknown): HomeFinderContent {
   }
 }
 
-function visibleCampaignNumber(sourceIndex: number) {
-  return heroDisplayOrder.findIndex((index) => index === sourceIndex) + 1
+const legacyHeroKeys = [
+  'alt',
+  'cta',
+  'description',
+  'desktopImage',
+  'eyebrow',
+  'mobileImage',
+  'title',
+]
+
+/** Only the exact old seven-field contract is upgraded; unknown fields remain errors. */
+export function upgradeLegacyHeroContent(value: unknown): unknown {
+  if (
+    !Array.isArray(value) ||
+    value.length !== heroSlides.length ||
+    !value.every(
+      (slide) =>
+        isRecord(slide) &&
+        Object.keys(slide).sort().join(',') === legacyHeroKeys.join(','),
+    )
+  )
+    return value
+  return value.map((slide, index) => ({
+    ...slide,
+    id: `campaign-${index}`,
+    fallbackIndex: index,
+    order: heroDisplayOrder.findIndex((sourceIndex) => sourceIndex === index),
+    mediaType: 'image',
+    video: null,
+    mobileVideo: null,
+    poster: null,
+    mobilePoster: null,
+    showText: true,
+    showButton: true,
+    published: true,
+    destination: { type: 'shop' },
+  }))
 }
 
 export function createDefaultHomeContent(): HomeContent {
@@ -319,7 +373,19 @@ export function createDefaultHomeContent(): HomeContent {
       deliveryText: 'Envíos en Lima y Callao',
       freeShippingLabel: 'Gratis desde',
     },
-    hero: heroSlides.map((slide) => ({
+    hero: heroSlides.map((slide, index) => ({
+      id: `campaign-${index}`,
+      fallbackIndex: index,
+      order: heroDisplayOrder.findIndex((sourceIndex) => sourceIndex === index),
+      mediaType: 'image',
+      video: null,
+      mobileVideo: null,
+      poster: null,
+      mobilePoster: null,
+      showText: true,
+      showButton: true,
+      published: true,
+      destination: { type: 'shop' },
       eyebrow: slide.eyebrow,
       title: slide.title.join('\n'),
       description: slide.description,
@@ -333,7 +399,10 @@ export function createDefaultHomeContent(): HomeContent {
   }
 }
 
-export function normalizeHomeContent(value: unknown): HomeContent {
+export function normalizeHomeContent(
+  value: unknown,
+  { preserveRemoteContent = false }: { preserveRemoteContent?: boolean } = {},
+): HomeContent {
   const defaults = createDefaultHomeContent()
   if (!value || typeof value !== 'object') return defaults
   const content = value as Partial<HomeContent>
@@ -355,43 +424,72 @@ export function normalizeHomeContent(value: unknown): HomeContent {
           ? content.announcement.freeShippingLabel
           : defaults.announcement.freeShippingLabel,
     },
-    hero: defaults.hero.map((slide, index) => {
-      const candidate = sourceHero[index]
-      if (!candidate || typeof candidate !== 'object') return slide
-      return {
-        eyebrow:
-          typeof candidate.eyebrow === 'string'
-            ? candidate.eyebrow
-            : slide.eyebrow,
-        title:
-          typeof candidate.title === 'string' ? candidate.title : slide.title,
-        description:
-          typeof candidate.description === 'string'
-            ? candidate.description
-            : slide.description,
-        cta:
-          typeof candidate.cta === 'string' &&
-          candidate.cta.trim().toLocaleLowerCase('es') !== 'ver destacados'
-            ? candidate.cta
-            : slide.cta,
-        alt:
-          index === 1 && candidate.alt === previousSilenceAlt
-            ? slide.alt
-            : typeof candidate.alt === 'string'
-              ? candidate.alt
-              : slide.alt,
-        desktopImage:
-          typeof candidate.desktopImage === 'string' &&
-          candidate.desktopImage.startsWith('data:image/webp;base64,')
-            ? candidate.desktopImage
+    hero: (Array.isArray(content.hero) ? sourceHero : defaults.hero).map(
+      (candidate, index) => {
+        const fallback =
+          isRecord(candidate) && typeof candidate.fallbackIndex === 'number'
+            ? candidate.fallbackIndex
+            : index
+        const slide = defaults.hero[fallback] ?? defaults.hero[0]
+        if (!candidate || typeof candidate !== 'object') return slide
+        return {
+          id:
+            typeof candidate.id === 'string'
+              ? candidate.id
+              : `campaign-${index}`,
+          fallbackIndex:
+            candidate.fallbackIndex === null ||
+            typeof candidate.fallbackIndex === 'number'
+              ? candidate.fallbackIndex
+              : index,
+          order:
+            typeof candidate.order === 'number'
+              ? candidate.order
+              : heroDisplayOrder.findIndex(
+                  (sourceIndex) => sourceIndex === index,
+                ),
+          mediaType: candidate.mediaType === 'video' ? 'video' : 'image',
+          video: isHomeVideo(candidate.video) ? candidate.video : null,
+          mobileVideo: isHomeVideo(candidate.mobileVideo)
+            ? candidate.mobileVideo
             : null,
-        mobileImage:
-          typeof candidate.mobileImage === 'string' &&
-          candidate.mobileImage.startsWith('data:image/webp;base64,')
-            ? candidate.mobileImage
-            : null,
-      }
-    }),
+          poster: webpOrNull(candidate.poster),
+          mobilePoster: webpOrNull(candidate.mobilePoster),
+          showText: candidate.showText !== false,
+          showButton: candidate.showButton !== false,
+          published: candidate.published !== false,
+          destination: isHeroDestination(candidate.destination)
+            ? candidate.destination
+            : { type: 'shop' },
+          eyebrow:
+            typeof candidate.eyebrow === 'string'
+              ? candidate.eyebrow
+              : slide.eyebrow,
+          title:
+            typeof candidate.title === 'string' ? candidate.title : slide.title,
+          description:
+            typeof candidate.description === 'string'
+              ? candidate.description
+              : slide.description,
+          cta:
+            typeof candidate.cta === 'string' &&
+            (preserveRemoteContent ||
+              candidate.cta.trim().toLocaleLowerCase('es') !== 'ver destacados')
+              ? candidate.cta
+              : slide.cta,
+          alt:
+            !preserveRemoteContent &&
+            fallback === 1 &&
+            candidate.alt === previousSilenceAlt
+              ? slide.alt
+              : typeof candidate.alt === 'string'
+                ? candidate.alt
+                : slide.alt,
+          desktopImage: webpOrNull(candidate.desktopImage),
+          mobileImage: webpOrNull(candidate.mobileImage),
+        }
+      },
+    ),
     film: {
       eyebrow:
         typeof content.film?.eyebrow === 'string'
@@ -409,52 +507,104 @@ export function normalizeHomeContent(value: unknown): HomeContent {
         typeof content.film?.cta === 'string'
           ? content.film.cta
           : defaults.film.cta,
-      video:
-        typeof content.film?.video === 'string' &&
-        content.film.video.startsWith('data:video/mp4;base64,')
-          ? content.film.video
-          : null,
-      poster:
-        typeof content.film?.poster === 'string' &&
-        content.film.poster.startsWith('data:image/webp;base64,')
-          ? content.film.poster
-          : null,
+      video: isHomeVideo(content.film?.video) ? content.film.video : null,
+      poster: webpOrNull(content.film?.poster),
+      mobileVideo: isHomeVideo(content.film?.mobileVideo)
+        ? content.film.mobileVideo
+        : null,
+      mobilePoster: webpOrNull(content.film?.mobilePoster),
     },
-    finder: normalizeFinderContent(content.finder),
+    finder: normalizeFinderContent(content.finder, preserveRemoteContent),
   }
 }
 
-export function validateHomeContent(content: HomeContent): string | null {
-  if (content.hero.length !== heroSlides.length)
-    return 'El carrusel debe conservar sus cinco campañas.'
+export function validateHomeContent(
+  content: HomeContent,
+  { allowEmptyHero = false }: { allowEmptyHero?: boolean } = {},
+): string | null {
+  if (
+    content.hero.length < (allowEmptyHero ? 0 : 1) ||
+    content.hero.length > HERO_MAX_CAMPAIGNS
+  )
+    return 'El carrusel admite entre una y diez campañas.'
+  if (
+    new Set(content.hero.map((slide) => slide.id)).size !==
+      content.hero.length ||
+    new Set(content.hero.map((slide) => slide.order)).size !==
+      content.hero.length
+  )
+    return 'Las campañas deben tener identificadores y posiciones únicos.'
+  for (const slide of content.hero) {
+    const number = slide.order + 1
+    if (
+      !/^[a-zA-Z0-9][a-zA-Z0-9-]{0,99}$/.test(slide.id) ||
+      !Number.isSafeInteger(slide.order) ||
+      slide.order < 0 ||
+      slide.order >= HERO_MAX_CAMPAIGNS ||
+      (slide.fallbackIndex !== null &&
+        (!Number.isSafeInteger(slide.fallbackIndex) ||
+          slide.fallbackIndex < 0 ||
+          slide.fallbackIndex >= heroSlides.length)) ||
+      !['image', 'video'].includes(slide.mediaType) ||
+      [slide.showText, slide.showButton, slide.published].some(
+        (value) => typeof value !== 'boolean',
+      ) ||
+      !isHeroDestination(slide.destination)
+    )
+      return `Campaña ${number}: revisa su configuración y destino.`
+    for (const [name, value, max, required] of [
+      ['Etiqueta', slide.eyebrow, 60, false],
+      ['Título', slide.title, 90, slide.published && slide.showText],
+      ['Descripción', slide.description, 180, false],
+      ['Botón', slide.cta, 45, slide.published && slide.showButton],
+      [
+        'Descripción de imagen',
+        slide.alt,
+        160,
+        slide.published && slide.mediaType === 'image',
+      ],
+    ] as const) {
+      if (typeof value !== 'string' || (required && !value.trim()))
+        return `${name} de campaña ${number}: completa este campo.`
+      if (value.length > max)
+        return `${name} de campaña ${number}: máximo ${max} caracteres.`
+    }
+    if (
+      slide.title &&
+      (slide.title.split('\n').length > 3 ||
+        slide.title.split('\n').some((line) => !line.trim()))
+    )
+      return `Título de campaña ${number}: admite de una a tres líneas con texto.`
+    if (
+      slide.published &&
+      slide.mediaType === 'video' &&
+      (!slide.video || !slide.poster)
+    )
+      return `Campaña ${number}: selecciona un video y su portada antes de publicarla.`
+    if (
+      slide.published &&
+      slide.mediaType === 'image' &&
+      slide.fallbackIndex === null &&
+      !slide.desktopImage
+    )
+      return `Campaña ${number}: selecciona una imagen antes de publicarla.`
+    if (slide.mobileVideo && !slide.mobilePoster)
+      return `Campaña ${number}: el video móvil necesita su portada.`
+    if (
+      [slide.video, slide.mobileVideo].some(
+        (video) => video !== null && !isHomeVideo(video),
+      )
+    )
+      return `Campaña ${number}: el video debe ser MP4.`
+    if (
+      [slide.poster, slide.mobilePoster].some(
+        (poster) => poster !== null && webpOrNull(poster) === null,
+      )
+    )
+      return `Campaña ${number}: la portada no tiene un formato válido.`
+  }
 
-  const fields = content.hero.flatMap((slide, index) => [
-    {
-      name: `Etiqueta de campaña ${visibleCampaignNumber(index)}`,
-      value: slide.eyebrow,
-      max: 60,
-    },
-    {
-      name: `Título de campaña ${visibleCampaignNumber(index)}`,
-      value: slide.title,
-      max: 90,
-    },
-    {
-      name: `Descripción de campaña ${visibleCampaignNumber(index)}`,
-      value: slide.description,
-      max: 180,
-    },
-    {
-      name: `Botón de campaña ${visibleCampaignNumber(index)}`,
-      value: slide.cta,
-      max: 45,
-    },
-    {
-      name: `Descripción de imagen ${visibleCampaignNumber(index)}`,
-      value: slide.alt,
-      max: 160,
-    },
-  ])
+  const fields: { name: string; value: string; max: number }[] = []
   fields.push(
     {
       name: 'Mensaje de entrega de la franja superior',
@@ -533,14 +683,6 @@ export function validateHomeContent(content: HomeContent): string | null {
     if (value.length > max) return `${name}: máximo ${max} caracteres.`
   }
   if (
-    content.hero.some(
-      (slide) =>
-        slide.title.split('\n').length > 3 ||
-        slide.title.split('\n').some((line) => !line.trim()),
-    )
-  )
-    return 'Cada título del carrusel admite de una a tres líneas con texto.'
-  if (
     content.film.title.split('\n').length > 2 ||
     content.film.title.split('\n').some((line) => !line.trim())
   )
@@ -555,25 +697,26 @@ export function validateHomeContent(content: HomeContent): string | null {
   if (
     content.hero.some((slide) =>
       [slide.desktopImage, slide.mobileImage].some(
-        (image) =>
-          image !== null && !image.startsWith('data:image/webp;base64,'),
+        (image) => image !== null && webpOrNull(image) === null,
       ),
     )
   )
     return 'Una imagen del carrusel no tiene un formato válido.'
   if (
-    content.film.video &&
-    !content.film.video.startsWith('data:video/mp4;base64,')
+    [content.film.video, content.film.mobileVideo].some(
+      (video) => video != null && !isHomeVideo(video),
+    )
   )
     return 'El video editorial debe ser MP4.'
   if (
-    content.film.poster &&
-    !content.film.poster.startsWith('data:image/webp;base64,')
+    [content.film.poster, content.film.mobilePoster].some(
+      (poster) => poster != null && webpOrNull(poster) === null,
+    )
   )
     return 'La vista previa del video no tiene un formato válido.'
   if (
     [content.finder.desktopImage, content.finder.mobileImage].some(
-      (image) => image !== null && !isWebpDataUri(image),
+      (image) => image !== null && webpOrNull(image) === null,
     )
   )
     return 'Una imagen del recomendador no tiene un formato WebP válido.'
@@ -582,7 +725,7 @@ export function validateHomeContent(content: HomeContent): string | null {
       return 'Una familia aromática tiene una clave inválida.'
     if (visual.description.length > 90)
       return `Texto de apoyo de ${family}: máximo 90 caracteres.`
-    if (visual.image !== null && !isWebpDataUri(visual.image))
+    if (visual.image !== null && webpOrNull(visual.image) === null)
       return `Imagen de ${family}: el archivo debe ser WebP válido.`
   }
   for (const key of finderOptionKeys) {

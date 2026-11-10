@@ -5,9 +5,10 @@ import {
 } from '../../services/admin-service'
 import { getAdminErrorMessage } from '../../services/admin-messages'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { isRemoteCatalog } from '../../services/catalog-source'
 
 /** Keeps a committed local change separate from its pending browser write. */
-export function useAdminSave() {
+export function useAdminSave(options?: { catalog?: boolean }) {
   const notice = useAdminNotice()
   const inFlight = useRef(false)
   const pendingSuccess = useRef<(() => void) | null>(null)
@@ -38,17 +39,17 @@ export function useAdminSave() {
   }
 
   async function save(
-    change: () => AdminSaveResult | void,
+    change: () => AdminSaveResult | void | Promise<AdminSaveResult | void>,
     onSaved: () => void,
   ): Promise<AdminSaveResult | undefined> {
     if (inFlight.current || pendingSuccess.current) return
     inFlight.current = true
     setSaving(true)
     try {
-      const result = change()
+      const result = await change()
       if (result?.kind === 'validation') return result
       pendingSuccess.current = onSaved
-      await adminService.flush()
+      if (!(options?.catalog && isRemoteCatalog)) await adminService.flush()
       complete()
       return { kind: 'saved' }
     } catch (error) {

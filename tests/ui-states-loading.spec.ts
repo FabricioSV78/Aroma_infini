@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 test('la navegación del panel indica la carga del módulo sin vaciar la pantalla actual', async ({
   page,
@@ -263,6 +263,9 @@ test('una escritura de checkout pendiente bloquea duplicados y se recupera de un
     ).__checkoutWrite.release(),
   )
   await expect(page.getByRole('alert')).toContainText('Ocurrió un error')
+  await expect(page.getByRole('alert')).not.toContainText(
+    'Controlled write error',
+  )
   await expect(
     page.getByRole('button', { name: 'Reintentar', exact: true }),
   ).toBeEnabled()

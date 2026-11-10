@@ -2,15 +2,6 @@ import { rm, writeFile } from 'node:fs/promises'
 import indexablePaths from '../src/seo/indexable-paths.json' with { type: 'json' }
 import { readSeoEnvironment } from './seo-environment.mjs'
 
-function escapeXml(value) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;')
-}
-
 const env = await readSeoEnvironment()
 const indexingEnabled = env.VITE_ALLOW_INDEXING === 'true'
 const catalogIsReal = env.VITE_CATALOG_IS_REAL === 'true'
@@ -50,27 +41,12 @@ const robots = [
 ].join('\n')
 await writeFile('public/robots.txt', robots)
 
-if (indexingEnabled && origin) {
-  const urls = indexablePaths
-    .map(
-      (path) =>
-        `  <url><loc>${escapeXml(new URL(path, `${origin}/`).toString())}</loc></url>`,
-    )
-    .join('\n')
-  const sitemap = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    urls,
-    '</urlset>',
-    '',
-  ].join('\n')
-  await writeFile('public/sitemap.xml', sitemap)
-} else {
-  await rm('public/sitemap.xml', { force: true })
-}
+// The Worker owns the live index and catalog shards. Never publish a stale
+// build-time snapshot that omits products created later in the admin panel.
+await rm('public/sitemap.xml', { force: true })
 
 console.log(
   indexingEnabled
-    ? `SEO público preparado para ${origin}.`
+    ? `Robots preparado para ${origin}; el Worker controla el sitemap dinámico.`
     : 'SEO protegido: noindex activo y sitemap público omitido.',
 )

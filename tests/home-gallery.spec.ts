@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './test'
 
 for (const { width, height } of [
   { width: 390, height: 844 },

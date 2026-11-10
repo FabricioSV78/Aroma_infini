@@ -277,10 +277,9 @@
 
 @media (min-width: 1280px) {
   .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
-    grid-template-columns: minmax(180px, 1.4fr) minmax(145px, 1fr) repeat(
-        2,
-        minmax(125px, 0.8fr)
-      ) auto;
+    grid-template-columns:
+      minmax(180px, 1.4fr) minmax(145px, 1fr) repeat(2, minmax(125px, 0.8fr))
+      auto;
   }
 
   .admin-order-workspace .admin-order-filter-bar .admin-order-search-field,
@@ -301,6 +300,13 @@
 }
 
 @media (max-width: 1199px) {
+  /* The table headings remain available to assistive technology. Its clipped
+     desktop selection control must not receive an invisible keyboard focus;
+     cards retain their visible row selection and select-filtered action. */
+  .admin-work-order-table thead .admin-order-checkbox-target {
+    display: none;
+  }
+
   .admin-order-workspace .admin-work-order-table tr {
     position: relative;
   }

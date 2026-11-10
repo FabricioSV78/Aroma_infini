@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 const viewports = [
   { width: 320, height: 700 },
@@ -164,11 +164,13 @@ for (const viewport of [
 ]) {
   test(`La cuenta activa mantiene su pedido dentro de ${viewport.width}px`, async ({
     page,
+    authFixture,
   }) => {
     await page.setViewportSize(viewport)
     await page.emulateMedia({ reducedMotion: 'reduce' })
+    authFixture.setMode('customer')
     await page.goto('/cuenta')
-    await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
+    await expect(page.locator('.account-page')).toBeVisible()
 
     for (const route of [
       '/cuenta',

@@ -1,7 +1,7 @@
 import { expectImportSuccess } from './admin-notice-fixtures'
 import { mkdir } from 'node:fs/promises'
 import ExcelJS from 'exceljs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import {
   importFile,
   importHeaders,

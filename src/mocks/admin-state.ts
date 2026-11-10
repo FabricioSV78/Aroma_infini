@@ -1,0 +1,226 @@
+import { brands as fixtureBrands } from './home'
+import {
+  createAdditionalDemoOrders,
+  DEMO_ORDERS_VERSION,
+} from '../content/demo-orders'
+import { createDefaultHomeContent } from '../content/home-editor'
+import { normalizeStoreFeatures } from '../domain/store-features'
+import { CALLAO_DEPARTMENT, CALLAO_PROVINCE } from '../content/peru'
+import type { AdminProduct, AdminState } from '../types/admin'
+
+/** Local demonstration seed; never a production data source or remote migration. */
+export function createDemoAdminState(
+  products: AdminProduct[],
+  nextProductSku: number,
+): AdminState {
+  const initial: AdminState = {
+    catalogVersion: 1,
+    nextProductSku,
+    products,
+    brands: fixtureBrands.map((brand) => ({ ...brand, active: true })),
+    orders: [
+      {
+        reference: 'AI-210926-01',
+        customerId: 'customer-demo-2',
+        customerName: 'Cliente 02',
+        customerEmail: '—',
+        placedAt: '2026-09-21T15:15:00.000Z',
+        status: 'received',
+        paymentStatus: 'approved',
+        lines: [
+          {
+            variantId: 'cedre-50',
+            brand: 'Atelier 01',
+            name: 'Bois Clair',
+            ml: 50,
+            quantity: 1,
+            unitPriceCents: 39000,
+          },
+        ],
+        subtotalCents: 39000,
+        discountCents: 0,
+        shippingCents: 2000,
+        totalCents: 41000,
+        promotionCode: null,
+        paymentProvider: 'mercado-pago',
+        deliveryMethod: 'courier',
+        address: {
+          department: 'Lima',
+          province: 'Lima',
+          district: 'San Isidro',
+          street: 'Dirección registrada',
+        },
+      },
+      {
+        reference: 'AI-200926-01',
+        customerId: 'customer-demo-4',
+        customerName: 'Cliente 03',
+        customerEmail: '—',
+        placedAt: '2026-09-20T21:15:00.000Z',
+        status: 'preparing',
+        paymentStatus: 'approved',
+        lines: [
+          {
+            variantId: 'petale-100',
+            brand: 'Forme',
+            name: 'Pétale Nu',
+            ml: 100,
+            quantity: 1,
+            unitPriceCents: 62000,
+          },
+        ],
+        subtotalCents: 62000,
+        discountCents: 0,
+        shippingCents: 0,
+        totalCents: 62000,
+        promotionCode: null,
+        paymentProvider: 'mercado-pago',
+        deliveryMethod: 'courier',
+        address: {
+          department: 'Lima',
+          province: 'Lima',
+          district: 'Miraflores',
+          street: 'Dirección registrada',
+        },
+      },
+      {
+        reference: 'AI-A1B2C3D4E5F60708',
+        customerId: 'customer-demo-1',
+        customerName: 'Cliente 01',
+        customerEmail: '—',
+        placedAt: '2026-09-09T15:30:00.000Z',
+        status: 'shipped',
+        paymentStatus: 'approved',
+        lines: [
+          {
+            variantId: 'petale-50',
+            brand: 'Forme',
+            name: 'Pétale Nu',
+            ml: 50,
+            quantity: 1,
+            unitPriceCents: 42000,
+          },
+        ],
+        subtotalCents: 42000,
+        discountCents: 0,
+        shippingCents: 1500,
+        totalCents: 43500,
+        promotionCode: null,
+        paymentProvider: 'mercado-pago',
+        deliveryMethod: 'motorizado',
+        address: {
+          department: 'Lima',
+          province: 'Lima',
+          district: 'Miraflores',
+          street: 'Dirección registrada',
+        },
+      },
+      {
+        reference: 'AI-150926-01',
+        customerId: 'customer-demo-2',
+        customerName: 'Cliente 02',
+        customerEmail: '—',
+        placedAt: '2026-09-15T17:00:00.000Z',
+        status: 'delivered',
+        paymentStatus: 'approved',
+        lines: [
+          {
+            variantId: 'sillage-75',
+            brand: 'Studio sillage',
+            name: 'Vert Silence',
+            ml: 75,
+            quantity: 1,
+            unitPriceCents: 48000,
+          },
+        ],
+        subtotalCents: 48000,
+        discountCents: 0,
+        shippingCents: 2000,
+        totalCents: 50000,
+        promotionCode: null,
+        paymentProvider: 'mercado-pago',
+        deliveryMethod: 'courier',
+        address: {
+          department: 'Arequipa',
+          province: 'Arequipa',
+          district: 'Cayma',
+          street: 'Dirección registrada',
+        },
+      },
+    ],
+    customers: [
+      {
+        id: 'customer-demo-1',
+        name: 'Cliente 01',
+        email: '—',
+        phone: '—',
+      },
+      {
+        id: 'customer-demo-2',
+        name: 'Cliente 02',
+        email: '—',
+        phone: '—',
+      },
+      {
+        id: 'customer-demo-4',
+        name: 'Cliente 03',
+        email: '—',
+        phone: '—',
+      },
+    ],
+    promotions: [],
+    shipping: {
+      freeThresholdCents: 45000,
+      provinceShippingEnabled: false,
+      nationalCourierFeeCents: 3500,
+      nationalEstimate: 'Hasta 5 días',
+      zones: [
+        {
+          id: 'zone-lima',
+          name: 'Lima',
+          department: 'lima',
+          province: '1501',
+          district: null,
+          courierFeeCents: 2000,
+          motorizadoFeeCents: 1500,
+          estimate: 'Hasta 48 horas',
+          active: true,
+        },
+        {
+          id: 'zone-callao',
+          name: 'Callao',
+          department: CALLAO_DEPARTMENT,
+          province: CALLAO_PROVINCE,
+          district: null,
+          courierFeeCents: 2000,
+          motorizadoFeeCents: 1500,
+          estimate: 'Hasta 48 horas',
+          active: true,
+        },
+      ],
+    },
+    homeMedia: {
+      hombre: null,
+      mujer: null,
+      unisex: null,
+      complementos: null,
+    },
+    homeContent: createDefaultHomeContent(),
+    features: normalizeStoreFeatures(),
+    orderHistory: [],
+    revision: 0,
+  }
+  const additions = createAdditionalDemoOrders(
+    initial.orders,
+    initial.customers,
+    initial.products,
+    initial.brands,
+    initial.shipping,
+  )
+  return {
+    ...initial,
+    demoOrdersVersion: DEMO_ORDERS_VERSION,
+    orders: [...initial.orders, ...additions.orders],
+    customers: [...initial.customers, ...additions.customers],
+  }
+}

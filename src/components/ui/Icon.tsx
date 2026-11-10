@@ -1,6 +1,11 @@
 import type { SVGProps } from 'react'
 
 const paths = {
+  bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4M12 2v1',
+  mapPin:
+    'M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0ZM15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  locate:
+    'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 2v4M12 18v4M2 12h4M18 12h4M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   botanical:
     'M12 21V10M12 15C5 15 3 11 3 6c6 0 9 3 9 9Zm0-4c0-6 3-9 9-9 0 6-3 9-9 9Z',
   dayNight:

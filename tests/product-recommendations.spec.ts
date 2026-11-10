@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { getProductRecommendations } from '../src/services/product-recommendations'
 import type { Product } from '../src/types/catalog'
 

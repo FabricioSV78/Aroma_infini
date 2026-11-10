@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('El hero cambia automáticamente cada 3,8 segundos cuando está visible', async ({
   page,

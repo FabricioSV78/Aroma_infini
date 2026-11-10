@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { seedWorkflowOrders, workflowSnapshot } from './order-workflow-fixtures'
 
 test('retirar agrupaciones antiguas conserva pedidos, historial operativo e inventario', async ({

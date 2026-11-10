@@ -461,8 +461,10 @@
 @media (max-width: 767px) {
   .editorial-film-inner {
     grid-template-columns: minmax(0, 1fr);
-    min-height: 620px;
-    padding-block: 240px 88px;
+    /* The mobile film is a 4:5 crop of the desktop footage. */
+    min-height: clamp(450px, 125vw, 620px);
+    height: auto;
+    padding-block: clamp(100px, 35vw, 180px) 64px;
   }
   .editorial-film-media::after {
     background: linear-gradient(

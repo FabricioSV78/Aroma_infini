@@ -2,135 +2,126 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
-  useSyncExternalStore,
   type ReactNode,
 } from 'react'
+import { accountAdapter } from '../../services/account-adapter'
 import {
-  accountOrderFromCheckout,
-  createDemoAddress,
-  createDemoOrders,
-  createDemoProfile,
+  emptyAccountProfile,
+  type AccountData,
   type AccountAddress,
-  type AccountOrder,
   type AccountProfile,
 } from '../../services/account-service'
-import type { MockOrder } from '../../services/checkout-service'
+import { AuthError, authErrorMessage } from '../../services/auth-errors'
 import { AccountContext, type AccountContextValue } from './account-context'
-import { orderStatusService } from '../../services/order-status-service'
-
-interface AccountState {
-  active: boolean
-  profile: AccountProfile
-  address: AccountAddress | null
-  orders: AccountOrder[]
-}
-
-function createAccountState(): AccountState {
-  return {
-    active: false,
-    profile: createDemoProfile(),
-    address: createDemoAddress(),
-    orders: createDemoOrders(),
-  }
-}
-
-const accountStorageKey = 'aroma-infini-account-session-v1'
-
-function restoreAccountState(): AccountState {
-  const initial = createAccountState()
-  try {
-    const stored = sessionStorage.getItem(accountStorageKey)
-    if (!stored) return initial
-    const parsed: unknown = JSON.parse(stored)
-    if (!parsed || typeof parsed !== 'object') return initial
-    const value = parsed as Partial<AccountState>
-    if (value.active !== true || !value.profile || !Array.isArray(value.orders))
-      return initial
-    return {
-      active: true,
-      profile: value.profile,
-      address: value.address ?? null,
-      orders: value.orders,
-    }
-  } catch {
-    return initial
-  }
-}
+import { useAuth } from '../auth/useAuth'
 
 export function AccountProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AccountState>(restoreAccountState)
+  const auth = useAuth()
+  const userId =
+    auth.status === 'authenticated' && auth.session?.intent === 'account'
+      ? auth.session.user.id
+      : null
+  const currentUser = useRef(userId)
+  const [data, setData] = useState<AccountData | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState('')
+  const [revision, setRevision] = useState(0)
+  const owned = data?.userId === userId ? data : null
   useEffect(() => {
-    try {
-      if (state.active)
-        sessionStorage.setItem(accountStorageKey, JSON.stringify(state))
-      else sessionStorage.removeItem(accountStorageKey)
-    } catch {
-      // La cuenta sigue disponible durante esta visita si el almacenamiento falla.
+    currentUser.current = userId
+    let live = true
+    if (!userId) return
+    void accountAdapter
+      .load(userId)
+      .then((result) => {
+        if (!live || currentUser.current !== userId) return
+        if (
+          result.userId !== userId ||
+          result.orders.some((order) => order.userId !== userId)
+        )
+          throw new AuthError('permission')
+        setData(structuredClone(result))
+        setStatus('ready')
+        setError('')
+      })
+      .catch((reason) => {
+        if (live && currentUser.current === userId) {
+          setData(null)
+          setStatus('error')
+          setError(authErrorMessage(reason))
+        }
+      })
+    return () => {
+      live = false
     }
-  }, [state])
-  const adminOrders = useSyncExternalStore(
-    orderStatusService.subscribe,
-    orderStatusService.getSnapshot,
-  )
-
-  const activateDemo = useCallback(() => {
-    setState((current) => ({ ...current, active: true }))
+  }, [userId, revision])
+  const reload = useCallback(() => {
+    setStatus('loading')
+    setError('')
+    setRevision((current) => current + 1)
   }, [])
-  const leaveDemo = useCallback(() => setState(createAccountState()), [])
-  const updateProfile = useCallback((profile: AccountProfile) => {
-    setState((current) => ({ ...current, profile }))
-  }, [])
-  const saveAddress = useCallback((address: AccountAddress) => {
-    setState((current) => ({ ...current, address }))
-  }, [])
-  const removeAddress = useCallback(() => {
-    setState((current) => ({ ...current, address: null }))
-  }, [])
-  const addCheckoutOrder = useCallback((order: MockOrder) => {
-    const accountOrder = accountOrderFromCheckout(order)
-    if (!accountOrder) return
-    setState((current) => ({
-      ...current,
-      orders: [
-        accountOrder,
-        ...current.orders.filter(
-          (item) => item.reference !== accountOrder.reference,
-        ),
-      ],
-    }))
-  }, [])
-
-  const value = useMemo<AccountContextValue>(() => {
-    const orders = state.orders.map((order) => {
-      const adminOrder = adminOrders.find(
-        (item) => item.reference === order.reference,
+  const updateProfile = useCallback(
+    async (profile: AccountProfile) => {
+      if (!userId) throw new AuthError('permission')
+      const result = await accountAdapter.updateProfile(userId, profile)
+      if (currentUser.current !== userId) return
+      setData((current) =>
+        current?.userId === userId ? { ...current, profile: result } : current,
       )
-      return adminOrder ? { ...order, status: adminOrder.status } : order
-    })
-    return {
-      active: state.active,
-      profile: state.profile,
-      address: state.address,
-      orders,
-      activateDemo,
-      leaveDemo,
+    },
+    [userId],
+  )
+  const saveAddress = useCallback(
+    async (address: AccountAddress) => {
+      if (!userId) throw new AuthError('permission')
+      const result = await accountAdapter.saveAddress(userId, address)
+      if (currentUser.current !== userId) return
+      setData((current) =>
+        current?.userId === userId ? { ...current, address: result } : current,
+      )
+    },
+    [userId],
+  )
+  const removeAddress = useCallback(async () => {
+    if (!userId) throw new AuthError('permission')
+    await accountAdapter.removeAddress(userId)
+    if (currentUser.current !== userId) return
+    setData((current) =>
+      current?.userId === userId ? { ...current, address: null } : current,
+    )
+  }, [userId])
+  const value = useMemo<AccountContextValue>(
+    () => ({
+      active: Boolean(userId),
+      profile: owned?.profile ?? emptyAccountProfile(),
+      address: owned?.address ?? null,
+      orders: owned?.orders ?? [],
+      ordersAvailable: owned?.ordersAvailable !== false,
+      status: !userId || (!owned && status !== 'error') ? 'loading' : status,
+      error,
+      reload,
       updateProfile,
       saveAddress,
       removeAddress,
-      addCheckoutOrder,
-    }
-  }, [
-    activateDemo,
-    addCheckoutOrder,
-    adminOrders,
-    leaveDemo,
-    removeAddress,
-    saveAddress,
-    state,
-    updateProfile,
-  ])
-
+      // Guest checkout never fabricates ownership. A future order API associates
+      // an authenticated user atomically; this only re-queries that user's data.
+      addCheckoutOrder: () => {
+        if (userId) reload()
+      },
+    }),
+    [
+      userId,
+      owned,
+      status,
+      error,
+      reload,
+      updateProfile,
+      saveAddress,
+      removeAddress,
+    ],
+  )
   return (
     <AccountContext.Provider value={value}>{children}</AccountContext.Provider>
   )

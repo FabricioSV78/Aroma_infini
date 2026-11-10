@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { isPerfume } from '../../domain/product-type'
-import { adminService } from '../../services/admin-service'
+import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
 import { useAdminNotice } from './AdminNoticeProvider'
@@ -177,7 +177,7 @@ export function AdminProductImport() {
     try {
       // Yield before validating a large batch so the progress state can render.
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
-      const result = adminService.saveProductsBatch(
+      const result = await adminService.saveProductsBatch(
         preview.products,
         preview.revision,
       )

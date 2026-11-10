@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('la familia guardada en el panel se refleja en la tienda y la ficha', async ({
   page,

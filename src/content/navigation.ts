@@ -26,8 +26,17 @@ export const supportLinks: NavigationLink[] = [
   { label: 'Envíos y entregas', to: '/envios' },
   { label: 'Cambios y devoluciones', to: '/devoluciones' },
 ]
-// Tres puertas de entrada breves: producto, marcas y relación con la tienda.
-export function getNavigationGroups(featuredBrand?: Brand): NavigationGroup[] {
+const brandNameOrder = new Intl.Collator('es', {
+  sensitivity: 'base',
+  numeric: true,
+})
+
+// Public brands are already filtered by the storefront repository. Never fill
+// an empty remote catalogue with demonstration brands.
+export function getNavigationGroups(
+  brands: readonly Brand[] = [],
+  featuredBrand?: Brand,
+): NavigationGroup[] {
   return [
     {
       id: 'perfumes',
@@ -36,7 +45,7 @@ export function getNavigationGroups(featuredBrand?: Brand): NavigationGroup[] {
       columns: [
         { title: 'Explorar', links: [navigation[0], ...navigation.slice(3)] },
         {
-          title: 'Nuestra selección',
+          title: 'Descubrir',
           links: [
             navigation[2],
             {
@@ -53,13 +62,15 @@ export function getNavigationGroups(featuredBrand?: Brand): NavigationGroup[] {
       title: 'Casas con carácter',
       columns: [
         {
-          title: 'Nuestra selección',
-          links: [
-            { label: 'Atelier 01', to: brandStorePath('atelier-01') },
-            { label: 'Forme', to: brandStorePath('forme') },
-            { label: 'Studio sillage', to: brandStorePath('studio-sillage') },
-            { label: 'Matière 04', to: brandStorePath('matiere-04') },
-          ],
+          title: 'Nuestras marcas',
+          links: [...brands]
+            .sort((first, second) =>
+              brandNameOrder.compare(first.name, second.name),
+            )
+            .map((brand) => ({
+              label: brand.name,
+              to: brandStorePath(brand.slug),
+            })),
         },
         {
           title: 'Descubrir las casas',

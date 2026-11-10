@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import type { AdminState } from '../src/services/admin-service'
 
 async function snapshot(page: Page) {

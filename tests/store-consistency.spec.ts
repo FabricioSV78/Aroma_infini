@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const breadcrumbRoutes = [
   ['/tienda', '.catalog-breadcrumb'],
   ['/marcas', '.catalog-breadcrumb'],
   ['/producto/petale-nu', '.product-breadcrumb'],
-  ['/cuenta', '.account-breadcrumb'],
+  ['/iniciar-sesion', '.auth-breadcrumb'],
   ['/seguir-pedido', '.institutional-breadcrumb'],
   ['/nosotros', '.institutional-breadcrumb'],
   ['/contacto', '.institutional-breadcrumb'],

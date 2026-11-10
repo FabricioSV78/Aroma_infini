@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('Los indicadores visibles permiten elegir una campaña en móvil', async ({
   page,

@@ -1,0 +1,84 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Confirmo publicar el commit seleccionado de main en producción cerrada'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+      - name: Validate explicit production authorization
+        run: node scripts/github-deployment.mjs request production
+        env:
+          PRODUCTION_DEPLOY_ENABLED: ${{ vars.PRODUCTION_DEPLOY_ENABLED }}
+
+  quality:
+    needs: request
+    uses: ./.github/workflows/quality.yml
+    # The exact selected main commit is tested without deployment credentials.
+
+  deploy:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Configure main-only deployment branches and required reviewers in GitHub.
+    environment: production
+    env:
+      DO_NOT_TRACK: '1'
+      WRANGLER_SEND_METRICS: 'false'
+      WRANGLER_WRITE_LOGS: 'false'
+      PRODUCTION_DEPLOY_ENABLED: ${{ vars.PRODUCTION_DEPLOY_ENABLED }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Configure the closed production frontend
+        run: node scripts/github-deployment.mjs configure production
+        env:
+          DEPLOY_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          DEPLOY_ADDRESS_MAP_TILE_URL: ${{ vars.ADDRESS_MAP_TILE_URL }}
+          DEPLOY_ADDRESS_MAP_ATTRIBUTION: ${{ vars.ADDRESS_MAP_ATTRIBUTION }}
+          PRODUCTION_DEPLOY_ENABLED: ${{ vars.PRODUCTION_DEPLOY_ENABLED }}
+      - run: npm run build
+      - run: node --experimental-strip-types scripts/worker-build.mjs check production
+      - name: Reject a superseded main revision
+        run: node scripts/github-deployment.mjs check-head production
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PRODUCTION_DEPLOY_ENABLED: ${{ vars.PRODUCTION_DEPLOY_ENABLED }}
+      - name: Deploy the verified closed production package
+        run: |
+          node scripts/github-deployment.mjs credentials production
+          npx --no-install wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Record the deployed revision
+        run: node scripts/github-deployment.mjs summary production

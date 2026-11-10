@@ -8,6 +8,7 @@ import {
 } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { getProductPhotoStatus } from '../../domain/product-photos'
+import { variantSkuSummary } from '../../domain/product-identity'
 import {
   adminService,
   getStoreProducts,
@@ -41,7 +42,7 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
   const location = useLocation()
   const navigate = useNavigate()
   const notice = useAdminNotice()
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const [draft, setDraft] = useState<AdminProduct>(() =>
     structuredClone(record),
   )
@@ -118,7 +119,7 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
       submitter instanceof HTMLButtonElement && submitter.value === 'continue'
     setError('')
     const result = await persistence.save(
-      () => saveProductPhotos(record.product.id, draft.detail),
+      () => saveProductPhotos(record.product.id, draft.detail, draft.version),
       () => {
         allowNavigation.current = true
         const currentIndex = queue.indexOf(record.product.id)
@@ -157,7 +158,7 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
       <AdminPageHeader
         eyebrow="Fotografías de producto"
         title={`Fotografías de ${record.product.name}`}
-        description={`SKU ${record.product.sku ?? 'pendiente'} · ${photoStatus.count}/${photoStatus.expected} fotos · ${record.active ? 'Activo' : 'Desactivado'}`}
+        description={`${variantSkuSummary(record.product.variants)} · ${photoStatus.count}/${photoStatus.expected} fotos · ${record.active ? 'Activo' : 'Desactivado'}`}
       />
       <form
         className="admin-editor"

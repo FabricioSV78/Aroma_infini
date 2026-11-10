@@ -1,8 +1,14 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ChangeEvent,
+} from 'react'
 import '../../styles/home-categories.css'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
-import { categories, heroDisplayOrder, heroSlides } from '../../content/home'
+import { categories } from '../../content/home'
 import { editorialFilm } from '../../content/editorial-film'
 import { familyVisuals, finderSteps } from '../../content/fragrance-finder'
 import type {
@@ -10,19 +16,14 @@ import type {
   HomeContent,
   HomeFilmContent,
   HomeFinderContent,
-  HomeHeroContent,
 } from '../../content/home-editor'
-import {
-  adminService,
-  type HomeMedia,
-  type HomeMediaKey,
-} from '../../services/admin-service'
+import { type HomeMedia, type HomeMediaKey } from '../../services/admin-service'
+import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { imageSource } from '../../services/image-source'
 import { assetSource } from '../../services/asset-source'
-import { heroImageSource } from '../../services/hero-image-source'
 import { formatPEN } from '../../services/currency'
 import { getFinderOptions } from '../../services/fragrance-matching'
-import { localStorefrontRepository } from '../../services/storefront-repository'
+import { storefrontRepository } from '../../services/storefront-repository'
 import type { FinderResult, FinderStep } from '../../types/fragrance-finder'
 import type { StoreFeatures } from '../../domain/store-features'
 import { AdminNotice, AdminPageHeader } from './AdminShared'
@@ -35,6 +36,7 @@ import { useAdminSave } from './useAdminSave'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { AdminHeroEditor } from './AdminHeroEditor'
 
 type HomeTab =
   'hero' | 'announcement' | 'categories' | 'brands' | 'film' | 'finder'
@@ -141,7 +143,14 @@ function sameHomeContent(left: HomeContent, right: HomeContent) {
   return (
     left.featuredBrandId === right.featuredBrandId &&
     left.hero.length === right.hero.length &&
-    left.hero.every((slide, index) => sameFields(slide, right.hero[index])) &&
+    left.hero.every((slide, index) => {
+      const { destination, ...fields } = slide
+      const { destination: nextDestination, ...nextFields } = right.hero[index]
+      return (
+        sameFields(fields, nextFields) &&
+        JSON.stringify(destination) === JSON.stringify(nextDestination)
+      )
+    }) &&
     sameFields(left.announcement, right.announcement) &&
     sameFields(left.film, right.film) &&
     sameFinderContent(left.finder, right.finder)
@@ -150,18 +159,26 @@ function sameHomeContent(left: HomeContent, right: HomeContent) {
 
 export function AdminHomePage() {
   const state = useAdminStore()
+  const finderSnapshot = useSyncExternalStore(
+    storefrontRepository.subscribe,
+    storefrontRepository.peekSnapshot,
+    storefrontRepository.peekSnapshot,
+  )
   const notice = useAdminNotice()
   const [tab, setTab] = useState<HomeTab>('hero')
+  useEffect(() => {
+    // Only the fragrance editor needs the public eligibility/options snapshot.
+    // Opening Hero, categories or video must not download the public catalog.
+    if (tab === 'finder')
+      void storefrontRepository.readSnapshot().catch(() => {})
+  }, [tab])
   const [previewOpen, setPreviewOpen] = useState(false)
   const [media, setMedia] = useState<HomeMedia>(() => ({ ...state.homeMedia }))
   const [content, setContent] = useState<HomeContent>(() => state.homeContent)
   const [features, setFeatures] = useState<StoreFeatures>(() => ({
     ...state.features,
   }))
-  const [selectedSlide, setSelectedSlide] = useState<number>(
-    heroDisplayOrder[0],
-  )
-  const [heroPreview, setHeroPreview] = useState<'desktop' | 'mobile'>(
+  const [filmPreview, setFilmPreview] = useState<'desktop' | 'mobile'>(
     'desktop',
   )
   const [finderView, setFinderView] = useState<FinderView>('presentation')
@@ -177,10 +194,12 @@ export function AdminHomePage() {
     useState<FinderResult['kind']>('matches')
   const [message, setMessage] = useState('')
   const [messageIsError, setMessageIsError] = useState(false)
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const saving = persistence.saving
   const mediaPreparationRef = useRef(false)
   const [preparingMedia, setPreparingMedia] = useState(false)
+  const homeVersionRef = useRef(state.homeVersion)
+  const homeSettingsVersionRef = useRef(state.homeSettingsVersion)
   const [savedDraft, setSavedDraft] = useState(() => ({
     media,
     content,
@@ -201,9 +220,7 @@ export function AdminHomePage() {
   const visibleCategories = categories.filter(
     (category) => category.id !== 'complementos' || features.complementsEnabled,
   )
-  const finderOptions = getFinderOptions(
-    localStorefrontRepository.peekSnapshot(),
-  )
+  const finderOptions = getFinderOptions(finderSnapshot)
   const finderStep = content.finder.steps[selectedFinderStep]
   const catalogFinderOptions =
     selectedFinderStep === 'family'
@@ -239,47 +256,14 @@ export function AdminHomePage() {
           '/images/olfactory-cedre.webp')
       : (content.finder.desktopImage ?? '/images/olfactory-cedre.webp'),
   )
-  const currentSlide = content.hero[selectedSlide]
-  const defaultSlide = heroSlides[selectedSlide]
-  const displayOrder: readonly number[] = heroDisplayOrder
-  const selectedSlideNumber = displayOrder.indexOf(selectedSlide) + 1
-  const heroPreviewImage = assetSource(
-    heroPreview === 'mobile'
-      ? (currentSlide.mobileImage ??
-          currentSlide.desktopImage ??
-          heroImageSource(defaultSlide.image, 'mobile', 780))
-      : (currentSlide.desktopImage ??
-          heroImageSource(defaultSlide.image, 'desktop', 1536)),
-  )
-
-  function updateHero(index: number, patch: Partial<HomeHeroContent>) {
-    setContent((current) => ({
-      ...current,
-      hero: current.hero.map((slide, slideIndex) => {
-        if (slideIndex !== index) return slide
-        const next = { ...slide, ...patch }
-        if (
-          patch.title !== undefined ||
-          patch.desktopImage !== undefined ||
-          patch.mobileImage !== undefined
-        ) {
-          const defaultAlt = heroSlides[index].alt
-          const generatedAlt = 'Imagen de la campaña «'
-          const title = next.title.replace(/\s+/g, ' ').trim()
-          next.alt =
-            next.desktopImage || next.mobileImage
-              ? `${generatedAlt}${title || `Campaña ${index + 1}`}»`.slice(
-                  0,
-                  160,
-                )
-              : defaultAlt
-        }
-        return next
-      }),
-    }))
-    setMessage('')
-    setMessageIsError(false)
-  }
+  const filmPreviewVideo =
+    filmPreview === 'mobile'
+      ? (content.film.mobileVideo ?? content.film.video)
+      : content.film.video
+  const filmPreviewPoster =
+    filmPreview === 'mobile' && content.film.mobileVideo
+      ? content.film.mobilePoster
+      : content.film.poster
 
   function updateAnnouncement(patch: Partial<HomeAnnouncementContent>) {
     setContent((current) => ({
@@ -443,42 +427,15 @@ export function AdminHomePage() {
     setPreparingMedia(false)
   }
 
-  async function uploadHeroImage(
-    index: number,
-    kind: 'desktopImage' | 'mobileImage',
-    file: File,
-  ) {
-    if (!beginMediaPreparation()) return
-    try {
-      const preset =
-        kind === 'desktopImage'
-          ? homeImagePresets.heroDesktop
-          : homeImagePresets.heroMobile
-      const image = await prepareImageFile(file, preset)
-      updateHero(index, { [kind]: image })
-      notice.toast('Imagen preparada. Guarda los cambios para publicarla.')
-    } catch (error) {
-      notice.error(error, 'image')
-    } finally {
-      endMediaPreparation()
-    }
-  }
-
-  function heroFileChanged(
-    index: number,
-    kind: 'desktopImage' | 'mobileImage',
-    event: ChangeEvent<HTMLInputElement>,
-  ) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (file) void uploadHeroImage(index, kind, file)
-  }
-
-  async function uploadFilm(file: File) {
+  async function uploadFilm(file: File, mobile = false) {
     if (!beginMediaPreparation()) return
     try {
       const prepared = await prepareVideoFile(file)
-      updateFilm(prepared)
+      updateFilm(
+        mobile
+          ? { mobileVideo: prepared.video, mobilePoster: prepared.poster }
+          : prepared,
+      )
       notice.toast('Video preparado. Guarda los cambios para publicarlo.')
     } catch (error) {
       notice.error(error, 'video')
@@ -604,12 +561,28 @@ export function AdminHomePage() {
     setMessage('')
     setMessageIsError(false)
     const result = await persistence.save(
-      () => adminService.saveHome(media, content, features),
+      () =>
+        adminService.saveHome(
+          media,
+          content,
+          features,
+          homeVersionRef.current,
+          homeSettingsVersionRef.current,
+        ),
       () => {
-        setSavedDraft({ media, content, features })
-        notice.toast(
-          'Cambios guardados y visibles en el Home de este navegador.',
-        )
+        const canonical = adminService.getSnapshot()
+        const saved = {
+          media: { ...canonical.homeMedia },
+          content: canonical.homeContent,
+          features: { ...canonical.features },
+        }
+        setMedia(saved.media)
+        setContent(saved.content)
+        setFeatures(saved.features)
+        setSavedDraft(saved)
+        homeVersionRef.current = canonical.homeVersion
+        homeSettingsVersionRef.current = canonical.homeSettingsVersion
+        notice.toast('Cambios guardados en el Home.')
       },
     )
     if (result?.kind === 'validation') {
@@ -847,208 +820,26 @@ export function AdminHomePage() {
             </section>
           </div>
         ) : tab === 'hero' ? (
-          <div className="admin-home-workspace admin-home-workspace--modal">
-            <Dialog
-              open={previewOpen}
-              onClose={() => setPreviewOpen(false)}
-              id="admin-home-preview"
-              title="Vista previa · Carrusel principal"
-              className="admin-home-preview-dialog"
-            >
-              <section
-                className="admin-home-stage"
-                aria-label="Vista previa del carrusel principal"
-              >
-                <div className="admin-home-stage-toolbar">
-                  <div>
-                    <span className="eyebrow">Carrusel principal</span>
-                    <h2>
-                      Campaña {selectedSlideNumber} de {displayOrder.length}
-                    </h2>
-                  </div>
-                  <div
-                    className="admin-home-preview-switch"
-                    role="group"
-                    aria-label="Formato de vista previa"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={heroPreview === 'desktop'}
-                      onClick={() => setHeroPreview('desktop')}
-                    >
-                      Escritorio
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={heroPreview === 'mobile'}
-                      onClick={() => setHeroPreview('mobile')}
-                    >
-                      Móvil
-                    </button>
-                  </div>
-                </div>
-                <div
-                  className={`admin-home-hero-preview admin-home-hero-preview--${heroPreview}`}
-                  data-tone={defaultSlide.tone}
-                  data-layout={defaultSlide.layout}
-                  data-default-image={!currentSlide.desktopImage}
-                >
-                  <img src={heroPreviewImage} alt="" />
-                  <div className="admin-home-hero-preview-copy">
-                    <div className="admin-home-hero-preview-heading">
-                      <span>{currentSlide.eyebrow || 'Etiqueta'}</span>
-                      <strong>
-                        {currentSlide.title || 'Título de campaña'}
-                      </strong>
-                    </div>
-                    <div className="admin-home-hero-preview-details">
-                      <p>
-                        {currentSlide.description || 'Descripción de campaña'}
-                      </p>
-                      <span className="admin-home-hero-preview-cta">
-                        {currentSlide.cta || 'Botón'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <p className="admin-home-preview-note">
-                  {defaultSlide.layout === 'right' && heroPreview === 'desktop'
-                    ? 'En escritorio el mensaje se ubica a la derecha. Al subir una imagen propia, deja espacio libre en ese lado.'
-                    : 'La vista previa muestra el encuadre y texto.'}{' '}
-                  El Home conserva las flechas y cambia cada 3,8 segundos.
-                </p>
-              </section>
-            </Dialog>
-            <section
-              className="admin-home-controls"
-              aria-labelledby="admin-home-hero-title"
-            >
-              <h2 id="admin-home-hero-title">Editar campaña</h2>
-              <div
-                className="admin-home-slide-picker"
-                role="group"
-                aria-label="Campañas del carrusel"
-              >
-                {displayOrder.map((slideIndex, displayIndex) => (
-                  <button
-                    type="button"
-                    key={slideIndex}
-                    aria-pressed={selectedSlide === slideIndex}
-                    onClick={() => setSelectedSlide(slideIndex)}
-                  >
-                    <small>0{displayIndex + 1}</small>
-                    <span>
-                      {content.hero[slideIndex].title.split('\n')[0] ||
-                        `Campaña ${displayIndex + 1}`}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <label className="admin-home-field">
-                Etiqueta superior
-                <input
-                  value={currentSlide.eyebrow}
-                  maxLength={60}
-                  onChange={(event) =>
-                    updateHero(selectedSlide, { eyebrow: event.target.value })
-                  }
-                />
-              </label>
-              <label className="admin-home-field">
-                Título <small>Una línea por renglón; máximo 3</small>
-                <textarea
-                  value={currentSlide.title}
-                  maxLength={90}
-                  rows={3}
-                  onChange={(event) =>
-                    updateHero(selectedSlide, { title: event.target.value })
-                  }
-                />
-              </label>
-              <label className="admin-home-field">
-                Descripción
-                <textarea
-                  value={currentSlide.description}
-                  maxLength={180}
-                  rows={3}
-                  onChange={(event) =>
-                    updateHero(selectedSlide, {
-                      description: event.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label className="admin-home-field">
-                Texto del botón
-                <input
-                  value={currentSlide.cta}
-                  maxLength={45}
-                  onChange={(event) =>
-                    updateHero(selectedSlide, { cta: event.target.value })
-                  }
-                />
-              </label>
-              <div className="admin-home-image-control">
-                <div>
-                  <strong>Fotografía de escritorio</strong>
-                  <small>{homeImagePresets.heroDesktop.label}</small>
-                </div>
-                <label className="admin-home-file-button">
-                  Cambiar imagen
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/avif"
-                    aria-label={`Subir imagen de escritorio de campaña ${selectedSlideNumber}`}
-                    onChange={(event) =>
-                      heroFileChanged(selectedSlide, 'desktopImage', event)
-                    }
-                  />
-                </label>
-                {currentSlide.desktopImage && (
-                  <button
-                    className="admin-home-reset"
-                    type="button"
-                    onClick={() =>
-                      updateHero(selectedSlide, { desktopImage: null })
-                    }
-                  >
-                    Usar original
-                  </button>
-                )}
-              </div>
-              <div className="admin-home-image-control">
-                <div>
-                  <strong>Fotografía de móvil</strong>
-                  <small>
-                    {homeImagePresets.heroMobile.label}. Opcional; sin ella se
-                    usa la imagen de escritorio.
-                  </small>
-                </div>
-                <label className="admin-home-file-button">
-                  Cambiar imagen
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/avif"
-                    aria-label={`Subir imagen móvil de campaña ${selectedSlideNumber}`}
-                    onChange={(event) =>
-                      heroFileChanged(selectedSlide, 'mobileImage', event)
-                    }
-                  />
-                </label>
-                {currentSlide.mobileImage && (
-                  <button
-                    className="admin-home-reset"
-                    type="button"
-                    onClick={() =>
-                      updateHero(selectedSlide, { mobileImage: null })
-                    }
-                  >
-                    Usar imagen de escritorio
-                  </button>
-                )}
-              </div>
-            </section>
-          </div>
+          <AdminHeroEditor
+            slides={content.hero}
+            products={state.products}
+            publicProducts={finderSnapshot.products.map(
+              (record) => record.product,
+            )}
+            complementsEnabled={features.complementsEnabled}
+            previewOpen={previewOpen}
+            onClosePreview={() => setPreviewOpen(false)}
+            onChange={(update) => {
+              setContent((current) => ({
+                ...current,
+                hero: update(current.hero),
+              }))
+              setMessage('')
+              setMessageIsError(false)
+            }}
+            beginMediaPreparation={beginMediaPreparation}
+            endMediaPreparation={endMediaPreparation}
+          />
         ) : tab === 'categories' ? (
           <div className="admin-home-workspace admin-home-workspace--modal">
             <Dialog
@@ -1175,6 +966,29 @@ export function AdminHomePage() {
                 className="admin-home-stage"
                 aria-label="Vista previa de la sección audiovisual"
               >
+                <div className="admin-home-stage-toolbar">
+                  <h2>Video editorial</h2>
+                  <div
+                    className="admin-home-preview-switch"
+                    role="group"
+                    aria-label="Formato de vista previa del video"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={filmPreview === 'desktop'}
+                      onClick={() => setFilmPreview('desktop')}
+                    >
+                      Escritorio
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={filmPreview === 'mobile'}
+                      onClick={() => setFilmPreview('mobile')}
+                    >
+                      Móvil
+                    </button>
+                  </div>
+                </div>
                 <div className="admin-home-film-preview">
                   <div className="admin-home-film-preview-copy">
                     <span className="eyebrow">
@@ -1193,10 +1007,34 @@ export function AdminHomePage() {
                     muted
                     playsInline
                     preload="metadata"
-                    src={assetSource(content.film.video ?? editorialFilm.src)}
-                    poster={assetSource(
-                      content.film.poster ?? editorialFilm.poster,
+                    style={
+                      filmPreview === 'mobile'
+                        ? {
+                            aspectRatio: '4 / 5',
+                            objectFit: 'contain',
+                            maxWidth: 320,
+                            maxHeight: '60vh',
+                            justifySelf: 'center',
+                          }
+                        : undefined
+                    }
+                    src={assetSource(
+                      filmPreviewVideo ??
+                        (filmPreview === 'mobile'
+                          ? editorialFilm.mobileSrc
+                          : editorialFilm.src),
                     )}
+                    poster={
+                      filmPreviewVideo
+                        ? filmPreviewPoster
+                          ? assetSource(filmPreviewPoster)
+                          : undefined
+                        : assetSource(
+                            filmPreview === 'mobile'
+                              ? editorialFilm.mobilePoster
+                              : editorialFilm.poster,
+                          )
+                    }
                     aria-label="Vista previa del video editorial"
                   />
                 </div>
@@ -1275,6 +1113,40 @@ export function AdminHomePage() {
                     onClick={() => updateFilm({ video: null, poster: null })}
                   >
                     Usar video original
+                  </button>
+                )}
+              </div>
+              <div className="admin-home-image-control">
+                <div>
+                  <strong>Versión para celular (opcional)</strong>
+                  <small>
+                    El mismo clip adaptado a móvil. MP4 · 2 a 60 s · hasta 10 MB
+                  </small>
+                </div>
+                <label className="admin-home-file-button">
+                  {content.film.mobileVideo
+                    ? 'Cambiar versión'
+                    : 'Subir versión'}
+                  <input
+                    type="file"
+                    accept="video/mp4"
+                    aria-label="Subir video editorial para celular"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) void uploadFilm(file, true)
+                    }}
+                  />
+                </label>
+                {content.film.mobileVideo && (
+                  <button
+                    className="admin-home-reset"
+                    type="button"
+                    onClick={() =>
+                      updateFilm({ mobileVideo: null, mobilePoster: null })
+                    }
+                  >
+                    Usar el video principal
                   </button>
                 )}
               </div>

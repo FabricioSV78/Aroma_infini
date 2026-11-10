@@ -19,6 +19,9 @@ import {
 import { useCheckout } from './checkout-context'
 import { shippingService } from '../../services/shipping-service'
 import { isShippingDestinationEnabled } from '../../services/shipping-rates'
+import { useAccount } from '../account/account-context'
+import { authPath } from '../../domain/auth-navigation'
+import { isRemoteCatalog } from '../../services/catalog-source'
 
 interface ContactFormProps {
   onNext: () => void
@@ -40,7 +43,8 @@ function reportTrimmedValidity(form: HTMLFormElement) {
 }
 
 export function CheckoutContactForm({ onNext }: ContactFormProps) {
-  const { draft, setDraft } = useCheckout()
+  const { draft, setDraft, setContactField } = useCheckout()
+  const { active } = useAccount()
 
   function chooseMode(mode: CheckoutMode) {
     setDraft((current) => ({
@@ -51,10 +55,7 @@ export function CheckoutContactForm({ onNext }: ContactFormProps) {
   }
 
   function updateContact(field: keyof CheckoutContact, value: string) {
-    setDraft((current) => ({
-      ...current,
-      contact: { ...current.contact, [field]: value },
-    }))
+    setContactField(field, value)
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -96,19 +97,32 @@ export function CheckoutContactForm({ onNext }: ContactFormProps) {
             <small>Sin crear una cuenta</small>
           </span>
         </label>
-        <label className="checkout-option">
-          <input
-            type="radio"
-            name="checkout-mode"
-            value="demo-account"
-            checked={draft.mode === 'demo-account'}
-            onChange={() => chooseMode('demo-account')}
-          />
-          <span>
-            <strong>Con mi cuenta</strong>
-            <small>Guarda la selección en Mis pedidos</small>
-          </span>
-        </label>
+        {active ? (
+          <label className="checkout-option">
+            <input
+              type="radio"
+              name="checkout-mode"
+              value="demo-account"
+              checked={draft.mode === 'demo-account'}
+              onChange={() => chooseMode('demo-account')}
+            />
+            <span>
+              <strong>Con mi cuenta</strong>
+              <small>Utiliza tus datos de cuenta disponibles</small>
+            </span>
+          </label>
+        ) : (
+          <Link
+            className="checkout-option"
+            to={authPath('customer', 'login', '/checkout')}
+          >
+            <Icon name="user" />
+            <span>
+              <strong>Con mi cuenta</strong>
+              <small>Inicia sesión para acceder a tus datos</small>
+            </span>
+          </Link>
+        )}
       </fieldset>
 
       <div className="checkout-fields">
@@ -201,7 +215,7 @@ export function CheckoutDeliveryForm({
   onNext,
   onBack,
 }: DeliveryFormProps) {
-  const { draft, setDraft } = useCheckout()
+  const { draft, setDraft, serverQuote } = useCheckout()
   const shipping = useSyncExternalStore(
     shippingService.subscribe,
     shippingService.getSnapshot,
@@ -217,13 +231,16 @@ export function CheckoutDeliveryForm({
     : area
       ? getPeruDistrictOptions(area.province)
       : []
-  const quote = quoteShipping(
+  const localQuote = quoteShipping(
     draft.address.department,
     draft.deliveryMethod,
     subtotalCents,
     draft.address.province,
     draft.address.district,
   )
+  const quote = isRemoteCatalog
+    ? (serverQuote?.shipping ?? { kind: 'pending' as const })
+    : localQuote
   const motorizadoUnavailable =
     quoteShipping(
       draft.address.department,

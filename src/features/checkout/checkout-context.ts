@@ -5,13 +5,24 @@ import {
   type SetStateAction,
 } from 'react'
 import type { ResolvedCart } from '../../services/commerce-service'
-import type { CheckoutDraft, MockOrder } from '../../services/checkout-service'
+import type {
+  CheckoutContact,
+  CheckoutDraft,
+  MockOrder,
+} from '../../services/checkout-service'
+import type { ServerCheckoutQuote } from '../../services/checkout-server'
 
 export interface CheckoutContextValue {
   draft: CheckoutDraft
   setDraft: Dispatch<SetStateAction<CheckoutDraft>>
+  setContactField: (field: keyof CheckoutContact, value: string) => void
   order: MockOrder | null
   completeOrder: (cart: ResolvedCart) => Promise<MockOrder | null>
+  serverQuote: ServerCheckoutQuote | null
+  quoteLoading: boolean
+  quoteError: string
+  pendingConfirmation: boolean
+  refreshQuote: () => void
 }
 
 export const CheckoutContext = createContext<CheckoutContextValue | null>(null)

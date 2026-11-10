@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { parseStoredCart } from '../src/features/cart/cart-storage'
 import { parseStoredFavorites } from '../src/features/favorites/favorites-storage'
 import { resolveCart } from '../src/services/commerce-service'

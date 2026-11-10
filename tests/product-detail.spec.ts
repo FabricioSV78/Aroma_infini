@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './test'
 import { productLoader } from '../src/features/product/product-loader'
 import { catalogService } from '../src/services/catalog-service'
 
@@ -351,7 +351,7 @@ test('Las reseñas se despliegan como tercer detalle antes de los productos suge
   const notice = page.locator('.product-popularity-preview')
   await scrollPastGallery(page)
   await expect(notice).toBeVisible()
-  await expect(notice).toContainText('Entre los más vendidos')
+  await expect(notice).toContainText('Selección Aroma Infini')
   await expect(notice).not.toContainText(/personas|visitas|compras recientes/i)
   await notice.getByRole('button', { name: /Cerrar aviso/ }).click()
   await expect(notice).toHaveCount(0)

@@ -5,7 +5,8 @@ import {
   previewBrandRegistration,
   type BrandRegistrationPreview,
 } from '../../domain/brand-registration'
-import { adminService, type AdminBrand } from '../../services/admin-service'
+import type { AdminBrand } from '../../services/admin-service'
+import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { AdminBadge } from './AdminShared'
 import type { useAdminSave } from './useAdminSave'
 import './admin-brand-registration.css'
@@ -65,8 +66,11 @@ export function AdminBrandRegistration({
     if (!review.preview.valid || review.preview.limitExceeded) return
     let summary: BrandRegistrationSummary | undefined
     const result = await persistence.save(
-      () => {
-        const saved = adminService.saveBrandsBatch(review.text, review.revision)
+      async () => {
+        const saved = await adminService.saveBrandsBatch(
+          review.text,
+          review.revision,
+        )
         if (saved.kind === 'saved') summary = saved
         return saved
       },

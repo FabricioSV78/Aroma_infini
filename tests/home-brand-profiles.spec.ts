@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { adminService } from '../src/services/admin-service'
 import { homeService } from '../src/services/home-service'
 

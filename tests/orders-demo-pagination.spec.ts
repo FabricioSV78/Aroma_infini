@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { createAdditionalDemoOrders } from '../src/content/demo-orders'
 import { adminService } from '../src/services/admin-service'
 import { persistedAdminState } from './product-import-fixtures'
@@ -77,6 +77,11 @@ test('el listado normal pagina 20, 20 y 10 pedidos y conserva la selección entr
   await page.getByRole('checkbox', { name: first!, exact: true }).check()
   const references: string[] = []
   for (let index = 0; index < 3; index++) {
+    // Adjacent pages can both contain twenty rows. Wait for the committed
+    // page, not a count that the previous page already satisfies.
+    await expect(pagination.locator('[aria-current="page"]')).toHaveText(
+      `Página ${index + 1} de 3`,
+    )
     await expect(rows).toHaveCount(index === 2 ? 10 : 20)
     references.push(
       ...(await rows

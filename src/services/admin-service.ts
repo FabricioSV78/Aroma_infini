@@ -1,7 +1,40 @@
-import {
-  brands as fixtureBrands,
-  products as fixtureProducts,
-} from '../mocks/home'
+import type {
+  AdminBrand,
+  AdminProduct,
+  AdminOrder,
+  AdminCustomer,
+  AdminOrderStatus,
+  AdminPromotion,
+  AdminShippingZone,
+  AdminShippingSettings,
+  AdminState,
+  AdminSaveResult,
+  HomeMedia,
+  ApprovedCheckoutOrderInput,
+  BatchBrandSaveResult,
+} from '../types/admin'
+export type {
+  AdminGender,
+  HomeMediaKey,
+  HomeMedia,
+  AdminOrderStatus,
+  AdminOrderPaymentStatus,
+  AdminPromotionType,
+  AdminBrand,
+  BatchBrandSaveResult,
+  AdminProduct,
+  AdminOrderLine,
+  AdminOrder,
+  ApprovedCheckoutOrderInput,
+  AdminCustomer,
+  AdminPromotion,
+  AdminShippingZone,
+  AdminShippingSettings,
+  AdminState,
+  AdminSaveResult,
+} from '../types/admin'
+import { products as fixtureProducts } from '../mocks/home'
+import { createDemoAdminState } from '../mocks/admin-state'
 import { getProductDetail } from '../mocks/product-details'
 import {
   createAdditionalDemoOrders,
@@ -12,28 +45,35 @@ import {
   registeredCatalogIds,
 } from '../content/catalog-products'
 import {
-  createDefaultHomeContent,
   normalizeHomeContent,
   validateHomeContent,
 } from '../content/home-editor'
 import { localAdminStateRepository } from './admin-persistence'
+import { isRemoteCatalog } from './catalog-source'
 import { getVariantPrice, validateProductDiscount } from './product-discounts'
 import { productImageAlt, withGeneratedGalleryAlts } from './product-image-alt'
-import {
-  isValidAlternateRecipient,
-  type AlternateRecipient,
-} from './shipping-recipient'
+import { isValidAlternateRecipient } from './shipping-recipient'
 import {
   brandNameKey,
   normalizeBrandName,
   previewBrandRegistration,
-  type BrandRegistrationPreview,
 } from '../domain/brand-registration'
-import { validateProductOlfactoryClassification } from '../domain/olfactory-family'
+import {
+  DEFAULT_OLFACTORY_FAMILIES,
+  MAX_OLFACTORY_FAMILIES,
+  getProductOlfactoryFamilies,
+  olfactoryFamilyCode,
+  parseOlfactoryFamilyDefinitions,
+  replaceOlfactoryFamilies,
+  validateOlfactoryFamilyName,
+  validateProductOlfactoryClassification,
+  type OlfactoryFamilyDefinition,
+} from '../domain/olfactory-family'
 import {
   normalizeSku,
   isValidSku,
   planProductSkus,
+  planVariantSkus,
 } from '../domain/product-identity'
 import {
   hasProductMainImage,
@@ -70,62 +110,22 @@ import {
 import {
   getAreaBaseShipping,
   isShippingDestinationEnabled,
+  emptyShippingSettings,
 } from './shipping-rates'
 import type {
-  Brand,
   Product,
   ProductDiscount,
-  ProductAudience,
   ProductDetail,
   ProductVariant,
 } from '../types/catalog'
-import type {
-  CustomerContact,
-  CustomerRecord,
-  DeliveryAddress,
-  DeliveryMethod,
-  OrderStatus,
-  OrderTotals,
-  PaymentProvider,
-  PaymentStatus,
-  PurchasedLine,
-} from '../types/commerce'
-import type {
-  HomeContent,
-  HomeMedia as SharedHomeMedia,
-  HomeMediaKey as SharedHomeMediaKey,
-} from '../types/home'
-import type { ShippingSettings, ShippingZone } from '../types/shipping'
+import type { OrderStatus } from '../types/commerce'
+import type { HomeContent } from '../types/home'
+import type { StorefrontSnapshot } from './storefront-repository'
 import type {
   BulkOrderStatusResult,
   OrderHistoryEntry,
   OrderOperator,
 } from '../types/order-workflow'
-
-export type AdminGender = ProductAudience
-export type HomeMediaKey = SharedHomeMediaKey
-export type HomeMedia = SharedHomeMedia
-export type AdminOrderStatus = OrderStatus
-export type AdminOrderPaymentStatus = PaymentStatus
-export type AdminPromotionType = 'percent' | 'fixed'
-
-export interface AdminBrand extends Brand {
-  active: boolean
-}
-
-export type BatchBrandSaveResult =
-  | { kind: 'saved'; created: AdminBrand[]; preview: BrandRegistrationPreview }
-  | { kind: 'validation'; message: string }
-
-export interface AdminProduct {
-  product: Product
-  detail: ProductDetail
-  active: boolean
-  gender: AdminGender | null
-  popularity: number
-  newest: number
-  lowStockThreshold: number
-}
 
 function withStockVisibility(record: AdminProduct): AdminProduct {
   return record.active && !hasProductStock(record.product)
@@ -179,78 +179,6 @@ function normalizeProductType(record: AdminProduct): AdminProduct {
     },
   }
 }
-
-export type AdminOrderLine = PurchasedLine
-
-export interface AdminOrder extends OrderTotals {
-  reference: string
-  customerId: string
-  customerName: string
-  customerEmail: string
-  contactPhone?: string
-  alternateRecipient?: AlternateRecipient | null
-  placedAt: string
-  status: AdminOrderStatus
-  paymentStatus: AdminOrderPaymentStatus
-  lines: AdminOrderLine[]
-  promotionCode: string | null
-  paymentProvider: PaymentProvider
-  deliveryMethod: DeliveryMethod
-  address: DeliveryAddress
-}
-
-export interface ApprovedCheckoutOrderInput extends OrderTotals {
-  reference: string
-  placedAt: string
-  lines: AdminOrderLine[]
-  contact: CustomerContact
-  address: DeliveryAddress
-  alternateRecipient?: AlternateRecipient | null
-  deliveryMethod: DeliveryMethod
-  paymentProvider: PaymentProvider
-  promotionCode: string | null
-}
-
-export type AdminCustomer = CustomerRecord
-
-export interface AdminPromotion {
-  id: string
-  code: string
-  active: boolean
-  type: AdminPromotionType
-  value: number
-  minimumCents: number
-  startsAt: string
-  endsAt: string
-  usageLimit: number | null
-  used: number
-}
-
-export type AdminShippingZone = ShippingZone
-export type AdminShippingSettings = ShippingSettings
-
-export interface AdminState {
-  /** One-time catalog registration, independent of later merchant edits. */
-  catalogVersion?: number
-  /** One-time local demonstration data, independent of later order edits. */
-  demoOrdersVersion?: number
-  /** Next automatic product code; persisted atomically to avoid reusing codes. */
-  nextProductSku?: number
-  products: AdminProduct[]
-  brands: AdminBrand[]
-  orders: AdminOrder[]
-  orderHistory: OrderHistoryEntry[]
-  customers: AdminCustomer[]
-  promotions: AdminPromotion[]
-  shipping: AdminShippingSettings
-  homeMedia: HomeMedia
-  homeContent: HomeContent
-  features: StoreFeatures
-  revision: number
-}
-
-export type AdminSaveResult =
-  { kind: 'saved' } | { kind: 'validation'; message: string }
 
 const metadata: Record<
   string,
@@ -367,6 +295,29 @@ export function createAdminProductDetail(
 }
 
 function createInitialState(): AdminState {
+  if (isRemoteCatalog)
+    return {
+      products: [],
+      brands: [],
+      orders: [],
+      orderHistory: [],
+      customers: [],
+      promotions: [],
+      olfactoryFamilies: [],
+      shipping: emptyShippingSettings(),
+      homeMedia: {
+        hombre: null,
+        mujer: null,
+        unisex: null,
+        complementos: null,
+      },
+      homeContent: {
+        ...normalizeHomeContent(undefined),
+        featuredBrandId: null,
+      },
+      features: normalizeStoreFeatures(),
+      revision: 0,
+    }
   const productRecords = fixtureProducts.map<AdminProduct>((product) => {
     const detail =
       getProductDetail(product) ?? createAdminProductDetail(product)
@@ -386,220 +337,19 @@ function createInitialState(): AdminState {
     ...createRegisteredCatalogProducts(productRecords),
   ]
   const skuPlan = planProductSkus(products.map((record) => record.product))
-  if (!skuPlan) throw new Error('No quedan códigos SKU de cinco dígitos.')
-  const initial: AdminState = {
-    catalogVersion: 1,
-    nextProductSku: skuPlan.nextProductSku,
-    products: products.map((record, index) => ({
+  if (!skuPlan) throw new Error('No quedan códigos internos de producto.')
+  const initial = createDemoAdminState(
+    products.map((record, index) => ({
       ...record,
       product: { ...record.product, sku: skuPlan.skus[index] },
     })),
-    brands: fixtureBrands.map((brand) => ({ ...brand, active: true })),
-    orders: [
-      {
-        reference: 'AI-210926-01',
-        customerId: 'customer-demo-2',
-        customerName: 'Cliente 02',
-        customerEmail: '—',
-        placedAt: '2026-09-21T15:15:00.000Z',
-        status: 'received',
-        paymentStatus: 'approved',
-        lines: [
-          {
-            variantId: 'cedre-50',
-            brand: 'Atelier 01',
-            name: 'Bois Clair',
-            ml: 50,
-            quantity: 1,
-            unitPriceCents: 39000,
-          },
-        ],
-        subtotalCents: 39000,
-        discountCents: 0,
-        shippingCents: 2000,
-        totalCents: 41000,
-        promotionCode: null,
-        paymentProvider: 'mercado-pago',
-        deliveryMethod: 'courier',
-        address: {
-          department: 'Lima',
-          province: 'Lima',
-          district: 'San Isidro',
-          street: 'Dirección registrada',
-        },
-      },
-      {
-        reference: 'AI-200926-01',
-        customerId: 'customer-demo-4',
-        customerName: 'Cliente 03',
-        customerEmail: '—',
-        placedAt: '2026-09-20T21:15:00.000Z',
-        status: 'preparing',
-        paymentStatus: 'approved',
-        lines: [
-          {
-            variantId: 'petale-100',
-            brand: 'Forme',
-            name: 'Pétale Nu',
-            ml: 100,
-            quantity: 1,
-            unitPriceCents: 62000,
-          },
-        ],
-        subtotalCents: 62000,
-        discountCents: 0,
-        shippingCents: 0,
-        totalCents: 62000,
-        promotionCode: null,
-        paymentProvider: 'mercado-pago',
-        deliveryMethod: 'courier',
-        address: {
-          department: 'Lima',
-          province: 'Lima',
-          district: 'Miraflores',
-          street: 'Dirección registrada',
-        },
-      },
-      {
-        reference: 'AI-A1B2C3D4E5F60708',
-        customerId: 'customer-demo-1',
-        customerName: 'Cliente 01',
-        customerEmail: '—',
-        placedAt: '2026-09-09T15:30:00.000Z',
-        status: 'shipped',
-        paymentStatus: 'approved',
-        lines: [
-          {
-            variantId: 'petale-50',
-            brand: 'Forme',
-            name: 'Pétale Nu',
-            ml: 50,
-            quantity: 1,
-            unitPriceCents: 42000,
-          },
-        ],
-        subtotalCents: 42000,
-        discountCents: 0,
-        shippingCents: 1500,
-        totalCents: 43500,
-        promotionCode: null,
-        paymentProvider: 'mercado-pago',
-        deliveryMethod: 'motorizado',
-        address: {
-          department: 'Lima',
-          province: 'Lima',
-          district: 'Miraflores',
-          street: 'Dirección registrada',
-        },
-      },
-      {
-        reference: 'AI-150926-01',
-        customerId: 'customer-demo-2',
-        customerName: 'Cliente 02',
-        customerEmail: '—',
-        placedAt: '2026-09-15T17:00:00.000Z',
-        status: 'delivered',
-        paymentStatus: 'approved',
-        lines: [
-          {
-            variantId: 'sillage-75',
-            brand: 'Studio sillage',
-            name: 'Vert Silence',
-            ml: 75,
-            quantity: 1,
-            unitPriceCents: 48000,
-          },
-        ],
-        subtotalCents: 48000,
-        discountCents: 0,
-        shippingCents: 2000,
-        totalCents: 50000,
-        promotionCode: null,
-        paymentProvider: 'mercado-pago',
-        deliveryMethod: 'courier',
-        address: {
-          department: 'Arequipa',
-          province: 'Arequipa',
-          district: 'Cayma',
-          street: 'Dirección registrada',
-        },
-      },
-    ],
-    customers: [
-      {
-        id: 'customer-demo-1',
-        name: 'Cliente 01',
-        email: '—',
-        phone: '—',
-      },
-      {
-        id: 'customer-demo-2',
-        name: 'Cliente 02',
-        email: '—',
-        phone: '—',
-      },
-      {
-        id: 'customer-demo-4',
-        name: 'Cliente 03',
-        email: '—',
-        phone: '—',
-      },
-    ],
-    promotions: [],
-    shipping: {
-      freeThresholdCents: 45000,
-      provinceShippingEnabled: false,
-      nationalCourierFeeCents: 3500,
-      nationalEstimate: 'Hasta 5 días',
-      zones: [
-        {
-          id: 'zone-lima',
-          name: 'Lima',
-          department: 'lima',
-          province: '1501',
-          district: null,
-          courierFeeCents: 2000,
-          motorizadoFeeCents: 1500,
-          estimate: 'Hasta 48 horas',
-          active: true,
-        },
-        {
-          id: 'zone-callao',
-          name: 'Callao',
-          department: CALLAO_DEPARTMENT,
-          province: CALLAO_PROVINCE,
-          district: null,
-          courierFeeCents: 2000,
-          motorizadoFeeCents: 1500,
-          estimate: 'Hasta 48 horas',
-          active: true,
-        },
-      ],
-    },
-    homeMedia: {
-      hombre: null,
-      mujer: null,
-      unisex: null,
-      complementos: null,
-    },
-    homeContent: createDefaultHomeContent(),
-    features: normalizeStoreFeatures(),
-    orderHistory: [],
-    revision: 0,
-  }
-  const additions = createAdditionalDemoOrders(
-    initial.orders,
-    initial.customers,
-    initial.products,
-    initial.brands,
-    initial.shipping,
+    skuPlan.nextProductSku,
   )
-  return {
-    ...initial,
-    demoOrdersVersion: DEMO_ORDERS_VERSION,
-    orders: [...initial.orders, ...additions.orders],
-    customers: [...initial.customers, ...additions.customers],
-  }
+  initial.olfactoryFamilies = DEFAULT_OLFACTORY_FAMILIES.map((family) => ({
+    ...family,
+    aliases: [...family.aliases],
+  }))
+  return initial
 }
 
 let state = createInitialState()
@@ -618,6 +368,11 @@ function withoutRetiredSelection<T extends object>(value: T): T {
 
 export function hydrateAdminStore() {
   hydrationPromise ??= (async () => {
+    if (isRemoteCatalog) {
+      // Remote modules load their confirmed commands/projections. An old
+      // IndexedDB snapshot must never become a fallback for commercial data.
+      return
+    }
     try {
       const saved = await localAdminStateRepository.read()
       if (!saved || !Array.isArray(saved.products)) {
@@ -626,14 +381,20 @@ export function hydrateAdminStore() {
         return
       }
       const initial = createInitialState()
+      const savedFamilies =
+        saved.olfactoryFamilies === undefined
+          ? initial.olfactoryFamilies!
+          : parseOlfactoryFamilyDefinitions(saved.olfactoryFamilies, true)
+      replaceOlfactoryFamilies(savedFamilies)
       const skuPlan = planProductSkus(
         saved.products.map((record) => record.product),
         saved.nextProductSku,
       )
-      if (!skuPlan) throw new Error('No quedan códigos SKU de cinco dígitos.')
+      if (!skuPlan) throw new Error('No quedan códigos internos de producto.')
       state = {
         ...initial,
         ...withoutRetiredSelection(saved),
+        olfactoryFamilies: savedFamilies,
         catalogVersion: saved.catalogVersion ?? 0,
         demoOrdersVersion: saved.demoOrdersVersion ?? 0,
         nextProductSku: skuPlan.nextProductSku,
@@ -778,6 +539,7 @@ export function hydrateAdminStore() {
 }
 
 async function completeDemoOrdersRegistration() {
+  if (isRemoteCatalog) return
   if ((state.demoOrdersVersion ?? 0) >= DEMO_ORDERS_VERSION) return
   const additions = createAdditionalDemoOrders(
     state.orders,
@@ -796,6 +558,7 @@ async function completeDemoOrdersRegistration() {
 }
 
 async function completeCatalogRegistration() {
+  if (isRemoteCatalog) return
   if ((state.catalogVersion ?? 0) >= 1) return
   const existing = state.products.filter(
     ({ product }) => !/^pagination-sample-\d+$/.test(product.id),
@@ -856,7 +619,105 @@ async function completeCatalogRegistration() {
 function persist(snapshot: AdminState) {
   persistenceQueue = persistenceQueue
     .catch(() => undefined)
-    .then(() => localAdminStateRepository.write(snapshot))
+    .then(async () => {
+      if (!isRemoteCatalog) return localAdminStateRepository.write(snapshot)
+      // Preserve the previous local catalog for an explicit future review.
+      // Confirmed remote records are not persisted in the browser as a fallback.
+      const previous = await localAdminStateRepository.read()
+      return localAdminStateRepository.write({
+        ...snapshot,
+        products: previous?.products ?? [],
+        brands: previous?.brands ?? [],
+        nextProductSku: previous?.nextProductSku,
+        catalogVersion: previous?.catalogVersion,
+        homeMedia: previous?.homeMedia ?? {
+          hombre: null,
+          mujer: null,
+          unisex: null,
+          complementos: null,
+        },
+        homeContent: previous?.homeContent ?? normalizeHomeContent(null),
+        homeVersion: undefined,
+        homeSettingsVersion: undefined,
+        orders: previous?.orders ?? [],
+        orderHistory: previous?.orderHistory ?? [],
+        customers: previous?.customers ?? [],
+        shipping: previous?.shipping ?? emptyShippingSettings(),
+        promotions: previous?.promotions ?? [],
+        shippingVersion: undefined,
+      })
+    })
+}
+
+/** Apply only a canonical, authorized remote response; no browser persistence. */
+export function applyRemoteCommerceSettings(settings: {
+  shipping: AdminShippingSettings
+  shippingVersion: number
+  promotions: AdminPromotion[]
+}) {
+  state = { ...state, ...settings, revision: state.revision + 1 }
+  listeners.forEach((listener) => listener())
+}
+
+/** Apply only a canonical, authorized remote response; no browser persistence. */
+export function applyRemoteOrders(
+  orders: AdminOrder[],
+  orderHistory: OrderHistoryEntry[],
+) {
+  const customers = new Map<string, AdminCustomer>()
+  for (const order of orders) {
+    if (!customers.has(order.customerId))
+      customers.set(order.customerId, {
+        id: order.customerId,
+        name: order.customerName,
+        email: order.customerEmail,
+        phone: order.contactPhone ?? '',
+      })
+  }
+  state = {
+    ...state,
+    orders,
+    orderHistory,
+    customers: [...customers.values()],
+    revision: state.revision + 1,
+  }
+  listeners.forEach((listener) => listener())
+}
+
+/** Apply only a canonical, authorized remote response; no browser persistence. */
+export function applyRemoteHome(
+  home: { media: HomeMedia; content: HomeContent; version: number },
+  settingsVersion?: number,
+) {
+  state = {
+    ...state,
+    homeMedia: home.media,
+    homeContent: home.content,
+    homeVersion: home.version,
+    homeSettingsVersion: settingsVersion,
+    revision: state.revision + 1,
+  }
+  listeners.forEach((listener) => listener())
+}
+
+export function applyRemoteCatalog(
+  catalog: Pick<AdminState, 'products' | 'brands' | 'features'> & {
+    featuredBrandId?: string | null
+    olfactoryFamilies?: OlfactoryFamilyDefinition[]
+  },
+) {
+  const { featuredBrandId, ...records } = catalog
+  if (records.olfactoryFamilies)
+    replaceOlfactoryFamilies(records.olfactoryFamilies)
+  state = {
+    ...state,
+    ...records,
+    ...(featuredBrandId !== undefined
+      ? { homeContent: { ...state.homeContent, featuredBrandId } }
+      : {}),
+    revision: state.revision + 1,
+  }
+  listeners.forEach((listener) => listener())
 }
 
 function commit(update: (current: AdminState) => AdminState) {
@@ -866,6 +727,7 @@ function commit(update: (current: AdminState) => AdminState) {
     products: deactivateSoldOutProducts(next.products),
     revision: state.revision + 1,
   }
+  if (state.olfactoryFamilies) replaceOlfactoryFamilies(state.olfactoryFamilies)
   persist(state)
   listeners.forEach((listener) => listener())
 }
@@ -894,7 +756,7 @@ function normalizeKey(value: string) {
     .toLowerCase()
 }
 
-function resolveShippingZone(
+export function resolveShippingZone(
   shipping: AdminShippingSettings,
   department: string,
   province = '',
@@ -1009,6 +871,74 @@ function createOrderHistory(
 }
 
 export const adminService = {
+  saveOlfactoryFamily(input: {
+    label: string
+    code?: string
+    active: boolean
+    version?: number
+  }): AdminSaveResult {
+    const label = input.label.trim().replace(/\s+/g, ' ')
+    const error = validateOlfactoryFamilyName(label, input.code)
+    if (error) return { kind: 'validation', message: error }
+    const families = state.olfactoryFamilies ?? [...DEFAULT_OLFACTORY_FAMILIES]
+    const existing = families.find((family) => family.value === input.code)
+    if (input.code && (!existing || existing.version !== input.version))
+      return {
+        kind: 'validation',
+        message: 'La familia cambió. Vuelve a cargarla antes de editar.',
+      }
+    if (!existing && families.length >= MAX_OLFACTORY_FAMILIES)
+      return {
+        kind: 'validation',
+        message: 'Se alcanzó el límite de familias registradas.',
+      }
+    const family: OlfactoryFamilyDefinition = {
+      value: existing?.value ?? olfactoryFamilyCode(label),
+      label,
+      aromaLabel: existing?.label === label ? existing.aromaLabel : label,
+      active: input.active,
+      aliases: [
+        ...new Set([
+          ...(existing?.aliases ?? []),
+          ...(existing && existing.label !== label
+            ? [existing.label, existing.aromaLabel]
+            : []),
+        ]),
+      ],
+      version: (existing?.version ?? 0) + 1,
+      productCount: existing?.productCount ?? 0,
+    }
+    commit((current) => ({
+      ...current,
+      olfactoryFamilies: existing
+        ? families.map((item) => (item.value === family.value ? family : item))
+        : [...families, family],
+    }))
+    return { kind: 'saved' }
+  },
+  deleteOlfactoryFamily(code: string, version: number): AdminSaveResult {
+    const families = state.olfactoryFamilies ?? [...DEFAULT_OLFACTORY_FAMILIES]
+    const family = families.find((item) => item.value === code)
+    if (!family || family.version !== version)
+      return {
+        kind: 'validation',
+        message: 'La familia cambió. Vuelve a cargarla.',
+      }
+    if (
+      state.products.some(({ product }) =>
+        getProductOlfactoryFamilies(product).includes(code),
+      )
+    )
+      return {
+        kind: 'validation',
+        message: 'Esta familia está asignada a productos. Puedes desactivarla.',
+      }
+    commit((current) => ({
+      ...current,
+      olfactoryFamilies: families.filter((item) => item.value !== code),
+    }))
+    return { kind: 'saved' }
+  },
   getSnapshot() {
     return state
   },
@@ -1075,6 +1005,22 @@ export const adminService = {
     const previousRecord = state.products.find(
       (item) => item.product.id === product.id,
     )
+    if (
+      getProductOlfactoryFamilies(product).some(
+        (code) =>
+          !state.olfactoryFamilies?.find((family) => family.value === code)
+            ?.active &&
+          !(
+            previousRecord &&
+            getProductOlfactoryFamilies(previousRecord.product).includes(code)
+          ),
+      )
+    )
+      return {
+        kind: 'validation',
+        message:
+          'Selecciona familias activas. Las desactivadas solo se conservan en productos ya clasificados.',
+      }
     const recommendationIds = record.detail.recommendationIds
     if (
       !Array.isArray(recommendationIds) ||
@@ -1184,7 +1130,17 @@ export const adminService = {
     if (!previousRecord && !skuPlan)
       return {
         kind: 'validation',
-        message: 'Se agotaron los códigos SKU de cinco dígitos disponibles.',
+        message: 'Se agotaron los códigos internos de producto disponibles.',
+      }
+    const variantSkuPlan = planVariantSkus(
+      product.variants,
+      state.products.flatMap((item) => item.product.variants),
+      state.nextVariantSku,
+    )
+    if (!variantSkuPlan)
+      return {
+        kind: 'validation',
+        message: 'No pudimos asignar SKU únicos. Revisa las presentaciones.',
       }
     const saved: AdminProduct = {
       ...record,
@@ -1194,6 +1150,10 @@ export const adminService = {
         name: product.name.trim(),
         slug: product.slug.trim(),
         family: product.family.trim(),
+        variants: product.variants.map((variant, index) => ({
+          ...variant,
+          sku: variantSkuPlan.skus[index],
+        })),
       }),
       detail: cloneDetail({
         ...record.detail,
@@ -1219,6 +1179,7 @@ export const adminService = {
       return {
         ...current,
         nextProductSku: skuPlan?.nextProductSku ?? current.nextProductSku,
+        nextVariantSku: variantSkuPlan.nextVariantSku,
         products: exists
           ? current.products.map((item) =>
               item.product.id === product.id ? saved : item,
@@ -1371,6 +1332,17 @@ export const adminService = {
           message: `Revisa el umbral y las presentaciones de ${product.name}.`,
         }
       const sizes = new Set<string>()
+      if (
+        getProductOlfactoryFamilies(product).some(
+          (code) =>
+            !state.olfactoryFamilies?.find((family) => family.value === code)
+              ?.active,
+        )
+      )
+        return {
+          kind: 'validation',
+          message: `Selecciona familias activas para ${product.name}.`,
+        }
       for (const variant of product.variants) {
         const sku = normalizeSku(variant.sku ?? '')
         if (sku && (!isValidSku(sku) || skus.has(sku)))
@@ -1407,13 +1379,28 @@ export const adminService = {
     if (!skuPlan)
       return {
         kind: 'validation',
-        message: 'No hay suficientes códigos SKU de cinco dígitos disponibles.',
+        message: 'No hay suficientes códigos internos de producto disponibles.',
       }
+    const variantSkuPlan = planVariantSkus(
+      records.flatMap((record) => record.product.variants),
+      state.products.flatMap((record) => record.product.variants),
+      state.nextVariantSku,
+    )
+    if (!variantSkuPlan)
+      return {
+        kind: 'validation',
+        message: 'No pudimos asignar SKU únicos. Revisa las presentaciones.',
+      }
+    let variantIndex = 0
     const saved = records.map((record, index) => ({
       ...record,
       product: cloneProduct({
         ...record.product,
         sku: skuPlan.skus[state.products.length + index],
+        variants: record.product.variants.map((variant) => ({
+          ...variant,
+          sku: variantSkuPlan.skus[variantIndex++],
+        })),
       }),
       detail: cloneDetail({
         ...record.detail,
@@ -1428,6 +1415,7 @@ export const adminService = {
     commit((current) => ({
       ...current,
       nextProductSku: skuPlan.nextProductSku,
+      nextVariantSku: variantSkuPlan.nextVariantSku,
       products: [...current.products, ...saved],
     }))
     return { kind: 'saved' }
@@ -1580,9 +1568,30 @@ export const adminService = {
     }))
     return { kind: 'saved' }
   },
-  recordApprovedCheckout(order: ApprovedCheckoutOrderInput): AdminSaveResult {
+  recordApprovedCheckout(
+    order: ApprovedCheckoutOrderInput,
+    publicCatalog?: Pick<
+      StorefrontSnapshot,
+      'products' | 'brands' | 'features'
+    >,
+  ): AdminSaveResult {
+    if (isRemoteCatalog)
+      return {
+        kind: 'validation',
+        message:
+          'El pedido debe confirmarse mediante el checkout del servidor.',
+      }
     if (state.orders.some((item) => item.reference === order.reference))
       return { kind: 'saved' }
+
+    // Isolated local adapter only. Remote orders are created by the Worker.
+    const catalogProducts = publicCatalog
+      ? publicCatalog.products.map((record) => ({ ...record, active: true }))
+      : state.products
+    const catalogBrands = publicCatalog
+      ? publicCatalog.brands.map((brand) => ({ ...brand, active: true }))
+      : state.brands
+    const catalogFeatures = publicCatalog?.features ?? state.features
 
     const customerEmail = normalizeEmail(order.contact.email)
     const customerName =
@@ -1620,18 +1629,18 @@ export const adminService = {
       }
 
     const activeBrandIds = new Set(
-      state.brands.filter((brand) => brand.active).map((brand) => brand.id),
+      catalogBrands.filter((brand) => brand.active).map((brand) => brand.id),
     )
     const now = Date.now()
     const resolvedLines = order.lines.map((line) => {
-      const record = state.products.find((item) =>
+      const record = catalogProducts.find((item) =>
         item.product.variants.some((variant) => variant.id === line.variantId),
       )
       const variant = record?.product.variants.find(
         (item) => item.id === line.variantId,
       )
       const brand = record
-        ? state.brands.find((item) => item.id === record.product.brandId)
+        ? catalogBrands.find((item) => item.id === record.product.brandId)
         : undefined
       const price =
         record && variant
@@ -1646,7 +1655,7 @@ export const adminService = {
         ({ line, record, variant, brand, price }) =>
           !record ||
           !record.active ||
-          (!isPerfume(record.product) && !state.features.complementsEnabled) ||
+          (!isPerfume(record.product) && !catalogFeatures.complementsEnabled) ||
           ((isPerfume(record.product) || record.product.brandId) &&
             !activeBrandIds.has(record.product.brandId)) ||
           !variant ||
@@ -1750,7 +1759,8 @@ export const adminService = {
         : null,
       placedAt: order.placedAt,
       status: 'received',
-      paymentStatus: 'approved',
+      paymentStatus: order.simulation ? 'pending' : 'approved',
+      simulation: order.simulation === true,
       lines: order.lines.map((line) => ({ ...line })),
       subtotalCents: order.subtotalCents,
       discountCents: order.discountCents,
@@ -1770,20 +1780,23 @@ export const adminService = {
 
     commit((current) => ({
       ...current,
-      products: current.products.map((record) => ({
-        ...record,
-        product: {
-          ...record.product,
-          variants: record.product.variants.map((variant) => {
-            const line = order.lines.find(
-              (item) => item.variantId === variant.id,
-            )
-            return line
-              ? { ...variant, stock: variant.stock - line.quantity }
-              : variant
-          }),
-        },
-      })),
+      products:
+        publicCatalog || order.simulation
+          ? current.products
+          : current.products.map((record) => ({
+              ...record,
+              product: {
+                ...record.product,
+                variants: record.product.variants.map((variant) => {
+                  const line = order.lines.find(
+                    (item) => item.variantId === variant.id,
+                  )
+                  return line
+                    ? { ...variant, stock: variant.stock - line.quantity }
+                    : variant
+                }),
+              },
+            })),
       orders: [savedOrder, ...current.orders],
       customers: existingCustomer
         ? current.customers.map((customer) =>
@@ -1805,11 +1818,14 @@ export const adminService = {
             },
             ...current.customers,
           ],
-      promotions: promotion
-        ? current.promotions.map((item) =>
-            item.id === promotion.id ? { ...item, used: item.used + 1 } : item,
-          )
-        : current.promotions,
+      promotions:
+        promotion && !order.simulation
+          ? current.promotions.map((item) =>
+              item.id === promotion.id
+                ? { ...item, used: item.used + 1 }
+                : item,
+            )
+          : current.promotions,
     }))
     return { kind: 'saved' }
   },

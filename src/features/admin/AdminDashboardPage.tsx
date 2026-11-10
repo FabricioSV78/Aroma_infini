@@ -7,6 +7,7 @@ import {
   adminOrderStatusMeta,
   adminPaymentStatusMeta,
   getInventoryAlerts,
+  getCommercialOrders,
   getProductInventory,
   type AdminTone,
 } from './admin-utils'
@@ -25,6 +26,7 @@ interface DashboardMetric {
 
 export function AdminDashboardPage() {
   const state = useAdminStore()
+  const commercialOrders = getCommercialOrders(state.orders)
   const activeBrandIds = new Set(
     state.brands.filter((brand) => brand.active).map((brand) => brand.id),
   )
@@ -36,15 +38,15 @@ export function AdminDashboardPage() {
     (total, record) => total + getProductInventory(record).totalStock,
     0,
   )
-  const ordersToPrepare = state.orders.filter(
+  const ordersToPrepare = commercialOrders.filter(
     (order) =>
       order.paymentStatus === 'approved' &&
       ['received', 'preparing'].includes(order.status),
   )
-  const shipmentsInProgress = state.orders.filter(
+  const shipmentsInProgress = commercialOrders.filter(
     (order) => order.status === 'shipped',
   )
-  const recentOrders = [...state.orders]
+  const recentOrders = [...commercialOrders]
     .sort(
       (first, second) =>
         new Date(second.placedAt).getTime() -
@@ -98,12 +100,13 @@ export function AdminDashboardPage() {
   ]
 
   const orderCounts = {
-    received: state.orders.filter((order) => order.status === 'received')
+    received: commercialOrders.filter((order) => order.status === 'received')
       .length,
-    preparing: state.orders.filter((order) => order.status === 'preparing')
+    preparing: commercialOrders.filter((order) => order.status === 'preparing')
       .length,
-    shipped: state.orders.filter((order) => order.status === 'shipped').length,
-    delivered: state.orders.filter((order) => order.status === 'delivered')
+    shipped: commercialOrders.filter((order) => order.status === 'shipped')
+      .length,
+    delivered: commercialOrders.filter((order) => order.status === 'delivered')
       .length,
   }
 
@@ -342,7 +345,9 @@ export function AdminDashboardPage() {
             })}
           </ul>
         ) : (
-          <p className="admin-dashboard-empty">Todavía no hay pedidos.</p>
+          <p className="admin-dashboard-empty">
+            Todavía no hay pedidos comerciales.
+          </p>
         )}
       </section>
     </div>

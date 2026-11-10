@@ -3,6 +3,7 @@ import {
   useRef,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { IconButton } from './IconButton'
 
@@ -14,6 +15,8 @@ interface DialogProps {
   children: ReactNode
   className?: string
   closeDisabled?: boolean
+  descriptionId?: string
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 export function Dialog({
   open,
@@ -23,6 +26,8 @@ export function Dialog({
   children,
   className = '',
   closeDisabled = false,
+  descriptionId,
+  returnFocusRef,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   function keepFocusInside(event: KeyboardEvent<HTMLDialogElement>) {
@@ -50,29 +55,32 @@ export function Dialog({
       document.body.style.overflow = 'hidden'
       const scrollX = window.scrollX
       const scrollY = window.scrollY
+      const returnFocus = returnFocusRef?.current
       dialog.showModal()
       if (window.scrollX !== scrollX || window.scrollY !== scrollY)
         window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' })
       return () => {
         dialog.close()
         document.body.style.overflow = previousOverflow
+        if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
       }
     },
-    [open],
+    [open, returnFocusRef],
   )
   return (
     <dialog
       id={id}
       ref={ref}
       aria-labelledby={`${id}-title`}
+      aria-describedby={descriptionId}
       className={`dialog ${className}`}
       onKeyDown={keepFocusInside}
       onCancel={(event) => {
         event.preventDefault()
-        onClose()
+        if (!closeDisabled) onClose()
       }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (!closeDisabled && event.target === event.currentTarget) onClose()
       }}
     >
       <div className="dialog-inner">

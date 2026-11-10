@@ -92,6 +92,7 @@ export function Bestsellers({
   brands,
   bestsellers,
 }: Pick<HomeData, 'brands' | 'bestsellers'>) {
+  if (bestsellers.length === 0) return null
   return (
     <section
       className="section container bestsellers-section"
@@ -105,7 +106,7 @@ export function Bestsellers({
         title="Más vendidos"
         action={
           <Link className="text-link" to="/tienda?orden=mas-vendidos">
-            Ver selección
+            Ver más vendidos
             <Icon name="arrow" />
           </Link>
         }

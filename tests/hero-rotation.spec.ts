@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 async function prepare(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 })

@@ -20,7 +20,7 @@ const selectors = {
     '.section-heading h2',
     '.brand-intro h2',
     '.editorial-copy h2',
-    '.featured-intro h2',
+    '#finder-title',
     '.product-meta h3',
   ],
   catalog: ['.catalog-heading h1', '.product-meta h3', '.catalog-heading > p'],

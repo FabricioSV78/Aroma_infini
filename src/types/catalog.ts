@@ -2,12 +2,14 @@ import type { OlfactoryFamily } from '../domain/olfactory-family'
 
 export interface ProductVariant {
   id: string
-  /** Optional merchant SKU, unique across the catalog when provided. */
+  /** Unique presentation SKU; generated on save when omitted from a draft. */
   sku?: string
   /** null for non-volumetric presentations, such as accessories. */
   ml: number | null
   label?: string
   priceCents: number
+  /** Read-only public quotation calculated by SQL; never an administrative input. */
+  readonly finalPriceCents?: number
   stock: number
   active?: boolean
 }
@@ -41,7 +43,7 @@ export interface Product {
   /** Missing on legacy records; interpreted as perfume at the domain boundary. */
   productType?: ProductType
   id: string
-  /** Automatic five-digit product code; absent only on legacy/unsaved records. */
+  /** Legacy DTO key for the internal product code, NOT a presentation SKU. */
   sku?: string
   slug: string
   name: string

@@ -1,4 +1,4 @@
-import type { Product, ProductVariant } from '../types/catalog'
+import type { Product, ProductDetail, ProductVariant } from '../types/catalog'
 import { isPerfume } from '../domain/product-type'
 import type {
   FinderAnswers,
@@ -16,6 +16,7 @@ import { getVariantPrice } from './product-discounts'
 import {
   getOlfactoryAromaLabel,
   getProductOlfactoryFamilies,
+  isActiveOlfactoryFamily,
 } from '../domain/olfactory-family'
 
 export const finderWeights = { family: 5, occasion: 3, intensity: 2 } as const
@@ -102,7 +103,18 @@ function availableRecords(
 }
 
 export function getFinderOptions(snapshot: StorefrontSnapshot): FinderOptions {
-  const records = availableRecords(snapshot)
+  return getFinderOptionsFromProfiles(availableRecords(snapshot))
+}
+
+/** Eligible public profiles use the same labels and ordering as full records. */
+export interface FinderProfile {
+  product: Pick<Product, 'family' | 'olfactoryFamily' | 'olfactoryFamilies'>
+  detail: Pick<ProductDetail, 'occasion' | 'intensity'>
+}
+
+export function getFinderOptionsFromProfiles(
+  records: readonly FinderProfile[],
+): FinderOptions {
   function unique(options: FinderOption[]): FinderOption[] {
     return [
       ...new Map(options.map((option) => [option.value, option])).values(),
@@ -111,10 +123,12 @@ export function getFinderOptions(snapshot: StorefrontSnapshot): FinderOptions {
   return {
     families: unique(
       records.flatMap(({ product }) =>
-        getProductOlfactoryFamilies(product).map((family) => ({
-          value: family,
-          label: getOlfactoryAromaLabel(family),
-        })),
+        getProductOlfactoryFamilies(product)
+          .filter(isActiveOlfactoryFamily)
+          .map((family) => ({
+            value: family,
+            label: getOlfactoryAromaLabel(family),
+          })),
       ),
     ),
     occasions: unique(

@@ -76,6 +76,63 @@
   white-space: nowrap;
 }
 
+.contact-social {
+  max-width: 100%;
+  padding-top: 6px;
+}
+
+.contact-social h3 {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.contact-social ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #c5d0c9;
+  color: var(--color-brand);
+  background: var(--color-canvas);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.contact-social-link svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.contact-social-link:is(:hover, :focus-visible) {
+  border-color: var(--color-brand);
+  background: var(--color-sage);
+}
+
+.contact-social-link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
 .contact-help {
   padding: 5px 0 5px clamp(24px, 3vw, 48px);
   border-left: 1px solid #d9dbd2;
@@ -460,6 +517,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .contact-social-link,
   .contact-help a > svg:last-child,
   .delivery-help-link > svg:last-child {
     transition: none;

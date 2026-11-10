@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 test('La ayuda no tapa el resumen del carrito en móvil y tablet', async ({
   page,

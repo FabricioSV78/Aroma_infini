@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('el borrador muestra la ficha completa sin publicar cambios y luego se refleja al guardar', async ({
   page,

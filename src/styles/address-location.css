@@ -1,0 +1,302 @@
+.address-location {
+  margin-top: 28px;
+  padding-block: 24px;
+  border-block: 1px solid var(--color-line);
+}
+
+.address-location-heading h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.address-location-heading h2 span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.address-location-heading p {
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.address-location-actions,
+.address-location-selected,
+.address-location-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+
+.address-location-actions {
+  margin-top: 18px;
+}
+.address-location-actions .button {
+  gap: 9px;
+  min-height: 46px;
+  padding: 10px 18px;
+}
+.address-location-actions .text-link {
+  min-height: 44px;
+}
+.address-location-actions svg {
+  width: 19px;
+  height: 19px;
+}
+.address-location-selected {
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.address-location-selected > div {
+  display: grid;
+  gap: 6px;
+}
+.address-location-selected strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-brand);
+  font-size: 13px;
+  font-weight: 500;
+}
+.address-location-selected strong svg {
+  width: 16px;
+  height: 16px;
+}
+.address-location-selected :is(a, button) {
+  width: fit-content;
+  padding-block: 8px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.address-location-selected button {
+  color: var(--color-muted);
+  min-height: 44px;
+}
+
+.address-location-dialog {
+  width: min(720px, calc(100% - 32px));
+  max-width: none;
+  background: #fff;
+}
+.address-location-dialog .dialog-inner {
+  padding: 28px;
+}
+.address-location-dialog .dialog-heading {
+  margin-bottom: 14px;
+}
+.address-location-dialog .dialog-heading h2 {
+  font-size: clamp(21px, 4vw, 27px);
+  line-height: 1.2;
+}
+.address-location-instructions {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.address-location-gps {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 12px;
+  color: var(--color-brand);
+  font-size: 13px;
+  font-weight: 500;
+}
+.address-location-gps svg {
+  width: 19px;
+  height: 19px;
+}
+.address-location-gps:disabled {
+  color: var(--color-muted);
+  cursor: wait;
+}
+.address-location-feedback {
+  min-height: 42px;
+  margin: 4px 0 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.address-location-feedback[role='alert'] {
+  color: #a02d36;
+}
+.address-location-privacy {
+  margin-top: 12px;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.address-location-dialog-actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+  gap: 12px;
+}
+.address-location-dialog-actions .button {
+  min-height: 46px;
+  padding: 12px 18px;
+}
+
+.delivery-map,
+.delivery-map-loading {
+  position: relative;
+  height: clamp(240px, 38vh, 340px);
+  min-height: 240px;
+  background: #eef0e9;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+}
+.delivery-map-loading {
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.delivery-map-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.delivery-map-viewport:active {
+  cursor: grabbing;
+}
+.delivery-map-viewport:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+.delivery-map-viewport > img {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+  max-width: none;
+  pointer-events: none;
+}
+.delivery-map-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: 38px;
+  height: 44px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px #0004);
+  color: #68756b;
+}
+.delivery-map-pin.is-selected {
+  color: var(--color-brand);
+}
+.delivery-map-pin svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 1.4;
+}
+.delivery-map-zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #a1aaa3;
+  border-radius: 4px;
+  background: #fff;
+}
+.delivery-map-zoom button {
+  width: 44px;
+  height: 44px;
+  color: var(--color-brand);
+  background: #fff;
+  font-size: 24px;
+  font-weight: 500;
+}
+.delivery-map-zoom button + button {
+  border-top: 1px solid var(--color-line);
+}
+.delivery-map-zoom button:hover {
+  background: #f0f4f1;
+}
+.delivery-map-zoom button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -3px;
+}
+.delivery-map-zoom button:disabled {
+  color: #88918b;
+  cursor: default;
+}
+.delivery-map-credit {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  max-width: 100%;
+  padding: 3px 6px;
+  color: #27392e;
+  background: #fffffff0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.delivery-map-credit a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.delivery-map-error {
+  position: absolute;
+  left: 10px;
+  right: 68px;
+  bottom: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  color: var(--color-ink);
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.delivery-map-error button {
+  min-height: 44px;
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 479px) {
+  .address-location-dialog {
+    width: calc(100% - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .address-location-dialog .dialog-inner {
+    padding: 20px 16px;
+  }
+  .address-location-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+  }
+  .address-location-dialog-actions .button {
+    min-width: 0;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+  .address-location-actions {
+    gap: 12px 18px;
+  }
+}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { answerAdminNotice } from './admin-notice-fixtures'
 import {
   getInventoryAlerts,
@@ -29,7 +29,7 @@ async function deactivateProduct(page: Page, name: string) {
   await answerAdminNotice(page, 'accept')
 }
 
-test('Una compra aprobada registra pedido, cliente, promoción y stock una sola vez', () => {
+test('Un checkout simulado registra el pedido una sola vez sin aprobar el pago ni consumir stock o cupón', () => {
   expect(
     adminService.savePromotion({
       id: 'promo-aroma10',
@@ -69,18 +69,19 @@ test('Una compra aprobada registra pedido, cliente, promoción y stock una sola 
   expect(afterCheckout.orders[0]).toMatchObject({
     reference: order!.reference,
     status: 'received',
-    paymentStatus: 'approved',
+    paymentStatus: 'pending',
+    simulation: true,
     promotionCode: 'AROMA10',
   })
   expect(
     afterCheckout.products
       .find((record) => record.product.id === 'cedre')
       ?.product.variants.find((variant) => variant.id === 'cedre-50')?.stock,
-  ).toBe(4)
+  ).toBe(5)
   expect(
     afterCheckout.promotions.find((promotion) => promotion.code === 'AROMA10')
       ?.used,
-  ).toBe(1)
+  ).toBe(0)
   expect(
     afterCheckout.customers.find(
       (customer) => customer.email === 'ana@ejemplo.invalid',
@@ -93,7 +94,7 @@ test('Una compra aprobada registra pedido, cliente, promoción y stock una sola 
       .getSnapshot()
       .products.find((record) => record.product.id === 'cedre')
       ?.product.variants.find((variant) => variant.id === 'cedre-50')?.stock,
-  ).toBe(4)
+  ).toBe(5)
 })
 
 function cloneAdminProduct(record: AdminProduct): AdminProduct {
@@ -501,7 +502,8 @@ test('Desactivar un producto conserva sus datos y retira su visibilidad', () => 
     .getSnapshot()
     .products.find((record) => record.product.id === 'sillage')
   expect(saved?.active).toBe(false)
-  expect(saved?.product.variants).toEqual(product.product.variants)
+  expect(saved?.product.variants).toMatchObject(product.product.variants)
+  expect(saved?.product.variants[0].sku).toMatch(/^\d{4,}$/)
   expect(saved).not.toHaveProperty('featured')
 })
 
@@ -1133,7 +1135,7 @@ test('Promociones comunica su estado efectivo y lleva el foco al editar', async 
   await expect(page.getByLabel('Código')).toHaveValue('AROMA10')
 })
 
-for (const width of [360, 375, 390, 430, 768, 1024, 1280, 1440]) {
+for (const width of [320, 360, 375, 390, 430, 768, 1024, 1280, 1440]) {
   test(`Panel ${width}px: tablas adaptadas y sin overflow horizontal`, async ({
     page,
   }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('el editor conserva controles utilizables en cuatro tamaños', async ({
   page,

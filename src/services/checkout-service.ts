@@ -4,6 +4,7 @@ import {
   getPromotionByCode,
   getShippingSettings,
   getShippingZoneForAddress,
+  resolveShippingZone,
 } from './admin-service'
 import {
   getPeruDepartmentLabel,
@@ -13,6 +14,9 @@ import {
   peruDepartments,
 } from '../content/peru'
 import { isShippingDestinationEnabled } from './shipping-rates'
+import { isRemoteCatalog } from './catalog-source'
+import { shippingService } from './shipping-service'
+import { canSimulateCheckout } from './runtime-environment'
 import {
   isValidAlternateRecipient,
   type AlternateRecipient,
@@ -55,6 +59,8 @@ export interface MockOrderLine extends PurchasedLine {
 }
 
 export interface MockOrder extends OrderTotals {
+  simulation?: boolean
+  trackingToken?: string
   reference: string
   mode: CheckoutMode
   placedAt: string
@@ -139,7 +145,10 @@ export function quoteShipping(
 ): ShippingQuote {
   const normalized = normalizeDepartment(department)
   if (!normalized) return { kind: 'pending' }
-  const shipping = getShippingSettings()
+  const shipping = isRemoteCatalog
+    ? shippingService.getSnapshot()
+    : getShippingSettings()
+  if (shipping.configured === false) return { kind: 'unavailable' }
   const area = getDeliveryArea(normalized)
   if (
     !shipping.provinceShippingEnabled &&
@@ -151,7 +160,9 @@ export function quoteShipping(
     return { kind: 'unavailable' }
   const isCapital = isCoveredDeliveryLocation(normalized, province, district)
   if (!isCapital && method === 'motorizado') return { kind: 'unavailable' }
-  const zone = getShippingZoneForAddress(normalized, province, district)
+  const zone = isRemoteCatalog
+    ? resolveShippingZone(shipping, normalized, province, district)
+    : getShippingZoneForAddress(normalized, province, district)
   if (!zone) return { kind: 'unavailable' }
   if (method === 'motorizado' && zone.motorizadoFeeCents === null)
     return { kind: 'unavailable' }
@@ -174,7 +185,10 @@ export function quoteShipping(
 }
 
 export function getDeliveryZoneOptions(): DeliveryZoneOption[] {
-  return getShippingSettings().provinceShippingEnabled
+  return (isRemoteCatalog
+    ? shippingService.getSnapshot()
+    : getShippingSettings()
+  ).provinceShippingEnabled
     ? peruDepartments
     : deliveryAreas.map((area) => ({
         value: area.department,
@@ -279,6 +293,7 @@ export function createMockOrder(
   cart: ResolvedCart,
   draft: CheckoutDraft,
 ): MockOrder | null {
+  if (!canSimulateCheckout) return null
   if (!cart.lines.length || cart.needsAttention) return null
   if (draft.appliedPromotion && cart.productDiscountCents > 0) return null
   if (
@@ -291,6 +306,7 @@ export function createMockOrder(
     return null
   return {
     reference: `AI-${crypto.randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`,
+    simulation: true,
     mode: draft.mode,
     placedAt: new Date().toISOString(),
     lines: cart.lines.flatMap((line) =>
@@ -333,6 +349,8 @@ export function createMockOrder(
 
 /** Demo-only order write boundary; a verified server workflow replaces this later. */
 export async function persistDemoCheckout(order: MockOrder): Promise<boolean> {
+  if (!canSimulateCheckout) return false
+  if (isRemoteCatalog) return false
   const registration = adminService.recordApprovedCheckout(order)
   if (registration.kind === 'validation') return false
   // The in-memory order remains usable if private browsing blocks IndexedDB.
@@ -341,5 +359,6 @@ export async function persistDemoCheckout(order: MockOrder): Promise<boolean> {
 }
 
 export function simulatePayment(scenario: PaymentScenario) {
+  if (!canSimulateCheckout) return Promise.resolve('error' as const)
   return Promise.resolve(scenario)
 }

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { buildWhatsAppUrl } from '../src/utils/whatsapp'
 
 const helpName = 'Abrir WhatsApp para recibir ayuda'

@@ -363,16 +363,6 @@
   border-top: 2px solid var(--color-brand);
   background: var(--color-surface);
 }
-.store-layout .account-overview-grid {
-  gap: 12px;
-  border-top: 0;
-}
-.store-layout .account-overview-grid > section {
-  min-height: 205px;
-  padding: 24px;
-  border: 1px solid var(--color-line);
-  background: var(--color-surface);
-}
 .store-layout .institutional-about-approach {
   padding: clamp(20px, 3vw, 36px);
   border-top: 2px solid var(--color-brand);

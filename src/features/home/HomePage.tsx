@@ -20,7 +20,13 @@ const sectionOrder = [
 export function HomePage() {
   const data = useLoaderData<HomeData>()
   const sections = {
-    hero: <Hero content={data.content.hero} />,
+    hero: (
+      <Hero
+        content={data.content.hero}
+        products={data.heroProducts}
+        complementsEnabled={data.features.complementsEnabled}
+      />
+    ),
     brands: data.brands.length ? (
       <BrandGallery brands={data.brands} brandProfiles={data.brandProfiles} />
     ) : null,

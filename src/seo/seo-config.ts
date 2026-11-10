@@ -1,5 +1,10 @@
 import type { Brand, Product, ProductDetail } from '../types/catalog'
 import { isPerfume } from '../domain/product-type'
+import {
+  brandPageMetadata,
+  productPageMetadata,
+  shareableProductImage,
+} from './catalog-metadata'
 
 export interface SeoBreadcrumb {
   name: string
@@ -37,15 +42,8 @@ export interface SeoRouteData {
   detail?: ProductDetail
 }
 
-function shareableProductImage(image: string): string | undefined {
-  if (/^https:\/\//i.test(image)) return image
-  if (/^\/images\/[a-z0-9-]+\.webp$/i.test(image)) return image
-  if (/^[a-z0-9-]+$/i.test(image)) return `/images/${image}-960.webp`
-  return undefined
-}
-
 const homeDescription =
-  'Descubre Aroma Infini, una propuesta peruana de perfumería de autor con una selección cuidada y una experiencia de compra clara.'
+  'Descubre perfumes de distintas marcas en Aroma Infini. Compara perfiles olfativos, presentaciones y disponibilidad para encontrar tu próxima fragancia.'
 
 const privatePage = (title: string, description: string): SeoPageConfig => ({
   title,
@@ -75,7 +73,7 @@ export function resolveSeoPage(
 
   if (path === '/')
     return {
-      title: 'Aroma Infini | Perfumería de autor en Perú',
+      title: 'Aroma Infini | Perfumería multimarca en Perú',
       description: homeDescription,
       canonicalPath: '/',
       indexable: true,
@@ -94,9 +92,7 @@ export function resolveSeoPage(
         : undefined
     if (brand)
       return {
-        title: `${brand.name}: perfumes | Aroma Infini`,
-        description: `Conoce los perfumes de ${brand.name} y sus presentaciones en Aroma Infini.`,
-        canonicalPath: `/marcas/${brand.slug}`,
+        ...brandPageMetadata(brand),
         indexable: false,
         follow: true,
         breadcrumbs: [
@@ -106,7 +102,7 @@ export function resolveSeoPage(
         ],
       }
     return {
-      title: 'Perfumes de autor | Aroma Infini',
+      title: 'Perfumes | Aroma Infini',
       description:
         'Explora la selección de perfumes de Aroma Infini por marca, familia y presentación.',
       canonicalPath: '/tienda',
@@ -123,7 +119,7 @@ export function resolveSeoPage(
 
   if (path === '/marcas')
     return {
-      title: 'Marcas de perfumería de autor | Aroma Infini',
+      title: 'Marcas de perfumes | Aroma Infini',
       description:
         'Conoce las firmas que forman la selección de Aroma Infini y descubre sus perfumes.',
       canonicalPath: '/marcas',
@@ -142,15 +138,14 @@ export function resolveSeoPage(
     const brand = routeData?.brand?.slug === slug ? routeData.brand : undefined
     if (brand)
       return {
-        title: `${brand.name}: perfumes | Aroma Infini`,
-        description: `Conoce los perfumes de ${brand.name} y sus presentaciones en Aroma Infini.`,
-        canonicalPath: `/marcas/${brand.slug}`,
+        ...brandPageMetadata({
+          ...brand,
+          imagePath: routeData?.items?.[0]
+            ? shareableProductImage(routeData.items[0].image)
+            : undefined,
+        }),
         indexable: !hasQuery,
         follow: true,
-        imagePath: routeData?.items?.[0]
-          ? shareableProductImage(routeData.items[0].image)
-          : undefined,
-        imageAlt: `Perfume de ${brand.name} en Aroma Infini`,
         breadcrumbs: [
           { name: 'Inicio', path: '/' },
           { name: 'Marcas', path: '/marcas' },
@@ -168,14 +163,15 @@ export function resolveSeoPage(
     const imagePath = product ? shareableProductImage(product.image) : undefined
     if (product && detail)
       return {
-        title: `${product.name}${brand ? ` de ${brand.name}` : ''} | Aroma Infini`,
-        description: detail.shortDescription,
-        canonicalPath: `/producto/${product.slug}`,
+        ...productPageMetadata({
+          name: product.name,
+          brandName: brand?.name,
+          slug: product.slug,
+          description: detail.shortDescription,
+          imagePath,
+        }),
         indexable: !hasQuery,
         follow: true,
-        type: 'product',
-        imagePath,
-        imageAlt: `${product.name}${brand ? ` de ${brand.name}` : ''}`,
         product: {
           source: product,
           id: product.id,
@@ -235,6 +231,19 @@ export function resolveSeoPage(
     return privatePage(
       'Mi cuenta | Aroma Infini',
       'Consulta el resumen privado de tu cuenta de Aroma Infini.',
+    )
+  if (
+    [
+      '/iniciar-sesion',
+      '/crear-cuenta',
+      '/recuperar-contrasena',
+      '/restablecer-contrasena',
+      '/auth/callback',
+    ].includes(path)
+  )
+    return privatePage(
+      `${path === '/crear-cuenta' ? 'Crear cuenta' : path.includes('contrasena') ? 'Recuperar acceso' : 'Iniciar sesión'} | Aroma Infini`,
+      'Accede a tu espacio personal de Aroma Infini.',
     )
   if (path === '/cuenta/datos')
     return privatePage(

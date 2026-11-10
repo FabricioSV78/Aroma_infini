@@ -3,7 +3,11 @@ import { createContext, useContext } from 'react'
 export interface FavoritesContextValue {
   favoriteIds: ReadonlySet<string>
   favoriteCount: number
-  persistence: 'local' | 'session'
+  persistence: 'local' | 'session' | 'account'
+  loading: boolean
+  pendingIds: ReadonlySet<string>
+  error: string
+  refreshFavorites: () => void
   toggleFavorite: (id: string) => void
   removeFavorite: (id: string) => void
 }

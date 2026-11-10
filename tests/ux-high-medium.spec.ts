@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 for (const width of [320, 768]) {
   test(`El acceso principal del Home cabe en la primera vista de ${width}px`, async ({
@@ -53,12 +53,19 @@ test('Las páginas informativas tienen acciones legibles y muestran la tarifa vi
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const path of ['/privacidad', '/terminos', '/libro-de-reclamaciones']) {
+  for (const path of ['/privacidad', '/terminos']) {
     await page.goto(path)
-    const action = page.locator('.institutional-legal-sections .button')
-    await expect(action).toHaveText(/Escríbenos/)
+    const action = page.getByRole('link', {
+      name: 'Consultar con la tienda',
+      exact: true,
+    })
+    await expect(action).toHaveAttribute('href', '/contacto')
     expect((await action.boundingBox())?.width).toBeGreaterThanOrEqual(140)
   }
+  await page.goto('/libro-de-reclamaciones')
+  await expect(
+    page.getByRole('button', { name: 'Registrar solicitud', exact: true }),
+  ).toBeEnabled()
   await page.goto('/envios')
   await expect(page.locator('.delivery-rates')).toContainText('S/ 20')
   await expect(page.locator('.delivery-free')).toContainText('S/ 450')
@@ -166,5 +173,9 @@ test('El editor de excepciones se trae a la vista y la lista de productos usa p�
     )
     .toBeLessThan(844)
   await page.goto('/admin/productos')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Productos',
+    { timeout: 15000 },
+  )
   await expect(page.locator('.admin-table--products tbody tr')).toHaveCount(4)
 })

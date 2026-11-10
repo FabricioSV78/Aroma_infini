@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { resolveCart } from '../src/services/commerce-service'
 import {
   createCheckoutDraft,
@@ -141,7 +141,7 @@ test('El pedido conserva el contacto y la dirección históricos aunque el clien
   ).toBe('923456789')
 })
 
-test('El checkout opcional llega a Clientes y al resumen de envío tras recarga', async ({
+test('El checkout simulado conserva los destinatarios históricos sin crear clientes comerciales', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -227,8 +227,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
 
   await page.goto('/admin/clientes')
   const customer = page.locator('tr', { hasText: 'ana@ejemplo.invalid' })
-  await expect(customer).toContainText('Lima')
-  await expect(customer).toContainText('Miraflores')
+  await expect(customer).toHaveCount(0)
 
   await page.goto('/checkout')
   await page.getByLabel('Nombre', { exact: true }).fill('Ana')
@@ -263,8 +262,7 @@ test('El checkout opcional llega a Clientes y al resumen de envío tras recarga'
   const updatedCustomer = page.locator('tr', {
     hasText: 'ana@ejemplo.invalid',
   })
-  await expect(updatedCustomer).toContainText('Lima')
-  await expect(updatedCustomer).toContainText('San Isidro')
+  await expect(updatedCustomer).toHaveCount(0)
 
   await page.goto(`/admin/pedidos/${reference}`)
   await page.getByText('Ficha de envío', { exact: true }).click()

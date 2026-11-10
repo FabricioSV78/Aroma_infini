@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import {
   adminService,
   getStoreProductBySlug,
@@ -161,8 +161,11 @@ test('la última unidad se descuenta y desactiva en una sola operación; un rein
     draft,
   )
   expect(order).not.toBeNull()
+  // Explicit approved-payment fixture for the isolated local adapter. The
+  // normal createMockOrder result remains a simulation that never spends stock.
+  const approvedOrder = { ...order!, simulation: false }
   const before = adminService.getSnapshot()
-  expect(adminService.recordApprovedCheckout(order!).kind).toBe('saved')
+  expect(adminService.recordApprovedCheckout(approvedOrder).kind).toBe('saved')
   const saved = adminService.getSnapshot()
   expect(saved.revision).toBe(before.revision + 1)
   expect(
@@ -180,7 +183,7 @@ test('la última unidad se descuenta y desactiva en una sola operación; un rein
     },
   })
   expect(getStoreProductBySlug('bois-clair')).toBeUndefined()
-  expect(adminService.recordApprovedCheckout(order!).kind).toBe('saved')
+  expect(adminService.recordApprovedCheckout(approvedOrder).kind).toBe('saved')
   expect(adminService.getSnapshot()).toEqual(saved)
   expect(
     adminService
@@ -269,20 +272,29 @@ for (const viewport of [
       fullPage: true,
     })
     await page.goto('/tienda?q=Bois+Clair')
+    await expect(
+      page.getByRole('heading', {
+        name: 'No encontramos coincidencias',
+        exact: true,
+      }),
+    ).toBeVisible()
     await expect(page.locator('.product-card')).toHaveCount(0)
     await page.screenshot({
       path: `artifacts/stock-visibility/catalog-${viewport.width}.png`,
       fullPage: true,
     })
-    await page.evaluate(() =>
+    // Seed before the next document mounts CartProvider, whose initial effect
+    // persists its own state. Writing while that provider mounts can lose data.
+    await page.addInitScript(() => {
+      if (window.location.pathname !== '/carrito') return
       localStorage.setItem(
         'aroma-infini:cart:v1',
         JSON.stringify({
           version: 1,
           items: [{ variantId: 'cedre-50', quantity: 1 }],
         }),
-      ),
-    )
+      )
+    })
     await page.goto('/carrito')
     const main = page.getByRole('main')
     await expect(

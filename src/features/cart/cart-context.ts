@@ -15,6 +15,7 @@ export interface CartContextValue {
   addItem: (variantId: string, stock: number, productName: string) => void
   setQuantity: (variantId: string, quantity: number, stock: number) => void
   removeItem: (variantId: string) => void
+  consumeItems: (purchased: readonly CartItem[]) => void
   clearCart: () => void
   openCart: () => void
   closeCart: () => void

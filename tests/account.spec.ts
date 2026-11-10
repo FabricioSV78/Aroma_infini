@@ -1,52 +1,54 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
+
+test.use({ authMode: 'customer' })
 
 const demoOrderReference = 'AI-A1B2C3D4E5F60708'
 
 async function activateDemoAccount(page: Page, path = '/cuenta') {
   await page.goto(path)
-  const accessButton = page.getByRole('button', {
-    name: 'Ver mi cuenta',
-  })
-  await expect(accessButton).toBeVisible()
-  await accessButton.focus()
-  await page.keyboard.press('Enter')
-  await expect(page.getByText(/Los cambios en tu cuenta/).first()).toBeVisible()
+  await expect(page.locator('.account-page')).toBeVisible()
+  await expect(
+    page.getByText('Cargando tu cuenta…', { exact: true }),
+  ).toHaveCount(0)
 }
 
-test('La cuenta diferencia el acceso futuro de la demostración sin pedir credenciales', async ({
+test('La cuenta exige una identidad verificada y cerrar sesion retira el acceso', async ({
   page,
+  authFixture,
 }) => {
+  authFixture.setMode('anonymous')
   await page.goto('/cuenta')
-
+  await expect(page).toHaveURL(/iniciar-sesion/)
   await expect(
-    page.getByRole('heading', { name: 'Tu universo, siempre cerca' }),
+    page.getByRole('heading', { name: 'Mi cuenta', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('input')).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
+  await expect(page.getByRole('button', { name: 'Ver mi cuenta' })).toHaveCount(
+    0,
+  )
+  authFixture.setMode('customer')
+  await activateDemoAccount(page)
   await expect(
     page.getByRole('heading', { name: 'Hola, Camila' }),
   ).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Resumen' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  )
-
   await page.getByRole('button', { name: 'Salir de mi cuenta' }).click()
-  await expect(
-    page.getByRole('heading', { name: 'Tu universo, siempre cerca' }),
-  ).toBeVisible()
+  await expect(page).toHaveURL(/iniciar-sesion/)
+  await expect(page.getByRole('heading', { name: 'Hola, Camila' })).toHaveCount(
+    0,
+  )
 })
 
 test('Favoritos conserva el formato de cuenta activa y la vista independiente queda para invitados', async ({
   page,
+  authFixture,
 }) => {
+  authFixture.setMode('anonymous')
   await page.goto('/favoritos')
   await expect(
     page.getByRole('heading', { name: 'Tus favoritos' }),
   ).toBeVisible()
   await expect(page.locator('.account-page')).toHaveCount(0)
 
+  authFixture.setMode('customer')
   await activateDemoAccount(page)
   await page
     .locator('.account-sidebar')
@@ -88,12 +90,15 @@ test('Los datos y la dirección se conservan al recargar durante la sesión de l
 
   await page.getByRole('link', { name: 'Mis datos' }).click()
   await page.getByLabel('Nombre').fill('Ariana')
-  await page.getByLabel('Correo electrónico').fill('ariana@example.invalid')
+  await expect(page.getByLabel('Correo electrónico')).toHaveAttribute(
+    'readonly',
+    '',
+  )
   await page.getByLabel('Celular').fill('912345678')
   await page.getByRole('button', { name: 'Guardar cambios' }).click()
-  await expect(page.getByRole('status').last()).toContainText(
-    'Cambios guardados durante esta sesión.',
-  )
+  await expect(
+    page.locator('.account-form-actions [role="status"]'),
+  ).toContainText('Cambios guardados.')
   await page.getByRole('link', { name: 'Resumen' }).click()
   await expect(
     page.getByRole('heading', { name: 'Hola, Ariana' }),
@@ -109,7 +114,18 @@ test('Los datos y la dirección se conservan al recargar durante la sesión de l
     page.getByRole('heading', { name: 'No hay una dirección guardada' }),
   ).toBeVisible()
   await page.getByRole('button', { name: 'Añadir dirección' }).click()
-  await expect(page.getByLabel('Distrito')).toHaveValue('150122')
+  await expect(page.getByLabel('Distrito')).toHaveValue('')
+  await page.getByLabel('Etiqueta de la dirección').fill('Casa')
+  await page.getByLabel('Nombre de quien recibe').fill('Ariana Torres')
+  await page.getByLabel('Zona de entrega').selectOption('lima')
+  await page.getByLabel('Distrito').selectOption('150122')
+  await page
+    .getByRole('textbox', { name: 'Dirección', exact: true })
+    .fill('Calle propia 123')
+  await page.getByRole('button', { name: 'Guardar dirección' }).click()
+  await expect(
+    page.getByText('Dirección guardada.', { exact: true }),
+  ).toBeVisible()
 
   const stored = await page.evaluate(() => JSON.stringify(localStorage))
   expect(stored).not.toContain('Ariana')
@@ -118,7 +134,7 @@ test('Los datos y la dirección se conservan al recargar durante la sesión de l
   await page.reload()
   await expect(
     page.getByRole('textbox', { name: 'Dirección', exact: true }),
-  ).toHaveValue('Dirección registrada')
+  ).toHaveValue('Calle propia 123')
   await page.getByRole('link', { name: 'Resumen' }).click()
   await expect(
     page.getByRole('heading', { name: 'Hola, Ariana' }),
@@ -159,7 +175,9 @@ test('El historial conecta pedido, estado, entrega y pago simulado', async ({
 
 test('La cuenta contempla historial vacío y pedido inexistente', async ({
   page,
+  authFixture,
 }) => {
+  authFixture.setAccountMode('empty')
   await activateDemoAccount(page, '/cuenta/pedidos?demo=empty')
   await expect(
     page.getByRole('heading', { name: 'Aún no hay pedidos' }),

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import type { AdminState } from '../src/services/admin-service'
 
 const messageDialog = (page: Page) => page.locator('.admin-notice-dialog')
@@ -56,7 +56,7 @@ for (const upload of [
         .click()
     const before = await readAdmin(page)
     const input = upload.video
-      ? page.getByLabel('Subir video editorial')
+      ? page.getByLabel('Subir video editorial', { exact: true })
       : page.getByLabel('Subir imagen de escritorio de campaña 1')
     await input.setInputFiles(upload.file)
     const modal = messageDialog(page)
@@ -102,7 +102,7 @@ test('Home: un campo incompleto se valida sin modal y el éxito aparece solo com
     page
       .getByRole('status')
       .filter({
-        hasText: 'Cambios guardados y visibles en el Home de este navegador.',
+        hasText: 'Cambios guardados en el Home.',
       }),
   ).toBeVisible()
   await expect(page.locator('.admin-home-savebar')).toContainText(

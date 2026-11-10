@@ -8,6 +8,8 @@ import {
 import { formatPEN } from '../../services/currency'
 import { imageSource } from '../../services/image-source'
 import { PriceDisplay } from '../../components/ui/PriceDisplay'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { useCheckout } from './checkout-context'
 
 interface CheckoutSummaryProps {
   cart: ResolvedCart
@@ -15,7 +17,15 @@ interface CheckoutSummaryProps {
 }
 
 export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
-  const amount = calculateCheckout(cart, draft)
+  const { serverQuote, pendingConfirmation } = useCheckout()
+  const amount = isRemoteCatalog
+    ? (serverQuote ?? {
+        subtotalCents: cart.subtotalCents,
+        discountCents: 0,
+        totalCents: null,
+        shipping: { kind: 'pending' as const },
+      })
+    : calculateCheckout(cart, draft)
   return (
     <aside
       className="checkout-summary"
@@ -23,7 +33,14 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
     >
       <div className="checkout-summary-heading">
         <h2 id="checkout-summary-title">Tu selección</h2>
-        <Link className="text-link" to="/carrito">
+        <Link
+          className="text-link"
+          to="/carrito"
+          aria-disabled={pendingConfirmation || undefined}
+          onClick={(event) => {
+            if (pendingConfirmation) event.preventDefault()
+          }}
+        >
           Editar
         </Link>
       </div>
@@ -49,9 +66,20 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
               <span className="checkout-line-price">
                 <PriceDisplay
                   originalCents={
-                    line.originalUnitPriceCents * line.item.quantity
+                    (serverQuote?.lines.find(
+                      (item) => item.variantId === line.item.variantId,
+                    )?.originalUnitPriceCents ??
+                      serverQuote?.lines.find(
+                        (item) => item.variantId === line.item.variantId,
+                      )?.unitPriceCents ??
+                      line.originalUnitPriceCents) * line.item.quantity
                   }
-                  finalCents={line.subtotalCents}
+                  finalCents={
+                    (serverQuote?.lines.find(
+                      (item) => item.variantId === line.item.variantId,
+                    )?.unitPriceCents ?? line.unitPriceCents) *
+                    line.item.quantity
+                  }
                 />
               </span>
             </li>

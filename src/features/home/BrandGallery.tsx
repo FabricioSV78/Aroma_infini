@@ -15,6 +15,7 @@ export function BrandGallery({
   const viewportRef = useBrandRail(looping, paused, brands.length)
   // Enough repeated groups to fill a wide viewport even with only two brands.
   const groupCount = looping ? Math.ceil(4 / brands.length) + 1 : 1
+  if (brands.length === 0) return null
 
   return (
     <section

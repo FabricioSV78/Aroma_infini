@@ -62,6 +62,7 @@ export function AdminOrderPdfExport({
     ...inspection.issues,
   ]
   const canExport = inspection.valid.length > 0 && (!issues.length || onlyValid)
+  const hasSimulatedOrders = orders.some((order) => order.simulation)
 
   useEffect(() => {
     alive.current = true
@@ -139,6 +140,12 @@ export function AdminOrderPdfExport({
             ? 'pedido seleccionado'
             : 'pedidos seleccionados'}
         </p>
+        {hasSimulatedOrders ? (
+          <p className="admin-inline-warning" role="status">
+            Incluye pedidos de prueba. Sus documentos se identificarán como
+            prueba y no acreditan un pago ni autorizan un despacho.
+          </p>
+        ) : null}
         <fieldset disabled={busy} className="admin-order-pdf-formats">
           <legend>Tipo de documento</legend>
           {(

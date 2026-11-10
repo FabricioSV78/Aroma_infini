@@ -1,18 +1,28 @@
 import type { Brand, Product } from '../types/catalog'
 import type { HomeContent, HomeMedia } from '../types/home'
 import type { ShippingSettings } from '../types/shipping'
+import { isPerfume } from '../domain/product-type'
 import type { FinderOptions } from '../types/fragrance-finder'
 import type { StoreFeatures } from '../domain/store-features'
 import { getFinderOptions } from './fragrance-matching'
 import {
-  localStorefrontRepository,
+  storefrontRepository,
   type StorefrontProductRecord,
 } from './storefront-repository'
+import { isRemoteCatalog } from './catalog-source'
+import { readPublicHome } from './home-content-service'
+import {
+  getHomeBrandProfiles,
+  readRemoteHomeCatalog,
+} from './public-home-catalog'
+import { readRemoteProductsByIds } from './remote-catalog-queries'
 
 export interface HomeData {
   brands: Brand[]
   brandProfiles: Record<string, string[]>
   bestsellers: Product[]
+  /** Only currently public products referenced by Hero campaigns. */
+  heroProducts: Product[]
   shipping: ShippingSettings
   media: HomeMedia
   content: HomeContent
@@ -26,44 +36,66 @@ export interface HomeService {
 
 function bestsellersFromRecords(records: StorefrontProductRecord[]): Product[] {
   return [...records]
+    .filter((record) => isPerfume(record.product))
     .sort((a, b) => a.popularity - b.popularity)
     .slice(0, 4)
     .map((record) => record.product)
 }
 
 export function getBestsellingProducts(): Product[] {
-  return bestsellersFromRecords(
-    localStorefrontRepository.peekSnapshot().products,
-  )
+  return bestsellersFromRecords(storefrontRepository.peekSnapshot().products)
 }
 
 export const homeService: HomeService = {
   async getHome() {
-    const snapshot = await localStorefrontRepository.readSnapshot()
+    if (isRemoteCatalog) {
+      const catalog = await readRemoteHomeCatalog()
+      const home = await readPublicHome(catalog.settings.featuredBrandId)
+      const heroProductIds = home.content.hero.flatMap((slide) =>
+        slide.destination?.type === 'product'
+          ? [slide.destination.productId]
+          : [],
+      )
+      const heroRecords = await readRemoteProductsByIds(heroProductIds)
+      return {
+        brands: catalog.brands,
+        brandProfiles: catalog.brandProfiles,
+        // The bounded SQL projection already applies confirmed-sales ranking.
+        // Reapplying the editorial fallback here would undo that public order.
+        bestsellers: catalog.records
+          .filter((record) => isPerfume(record.product))
+          .slice(0, 4)
+          .map((record) => record.product),
+        heroProducts: heroRecords.map((record) => record.product),
+        shipping: storefrontRepository.peekSnapshot().shipping,
+        media: { ...home.media },
+        content: home.content,
+        finderOptions: catalog.finderOptions,
+        features: catalog.settings.features,
+      }
+    }
+    const snapshot = await storefrontRepository.readSnapshot()
+    const content = snapshot.content
+    const heroProductIds = new Set(
+      content.hero.flatMap((slide) =>
+        slide.destination?.type === 'product'
+          ? [slide.destination.productId]
+          : [],
+      ),
+    )
     return {
       brands: snapshot.brands,
-      brandProfiles: Object.fromEntries(
-        snapshot.brands.map((brand) => [
-          brand.id,
-          [
-            ...new Set(
-              snapshot.products
-                .filter(({ product }) => product.brandId === brand.id)
-                .flatMap(({ product }) =>
-                  product.family.split('·').map((part) => part.trim()),
-                )
-                .filter(
-                  (family) =>
-                    family && !/^(por definir|pendiente|—)$/i.test(family),
-                ),
-            ),
-          ].slice(0, 3),
-        ]),
+      brandProfiles: getHomeBrandProfiles(
+        snapshot.brands,
+        snapshot.products.map(({ product }) => product),
       ),
       bestsellers: bestsellersFromRecords(snapshot.products),
+      heroProducts: snapshot.products
+        .filter(({ product }) => heroProductIds.has(product.id))
+        .map(({ product }) => product),
       shipping: snapshot.shipping,
       media: { ...snapshot.media },
-      content: snapshot.content,
+      content,
       finderOptions: getFinderOptions(snapshot),
       features: snapshot.features,
     }

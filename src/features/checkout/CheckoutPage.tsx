@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { Spinner } from '../../components/ui/Spinner'
+import { canSimulateCheckout } from '../../services/runtime-environment'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
 import { resolveCart } from '../../services/commerce-service'
 import { useOfferPriceRevision } from '../../services/offer-price-clock'
@@ -19,6 +20,9 @@ import { useCart } from '../cart/cart-context'
 import { CheckoutContactForm, CheckoutDeliveryForm } from './CheckoutForms'
 import { CheckoutSummary } from './CheckoutSummary'
 import { useCheckout } from './checkout-context'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { requestCheckoutQuote } from '../../services/checkout-server'
+import { UserFacingError } from '../../services/admin-messages'
 
 type CheckoutStep = 'datos' | 'entrega' | 'revision'
 type PaymentStatus = 'ready' | 'processing' | 'rejected' | 'error'
@@ -58,19 +62,36 @@ function initialStep(
 
 export function CheckoutPage() {
   useOfferPriceRevision()
-  const { items, clearCart } = useCart()
-  const { draft, setDraft, completeOrder } = useCheckout()
+  const { items, clearCart, consumeItems } = useCart()
+  const {
+    draft,
+    setDraft,
+    completeOrder,
+    serverQuote,
+    quoteLoading,
+    quoteError,
+    refreshQuote,
+    pendingConfirmation,
+  } = useCheckout()
   const cart = resolveCart(items)
-  const amount = calculateCheckout(cart, draft)
+  const amount = isRemoteCatalog
+    ? (serverQuote ?? {
+        subtotalCents: cart.subtotalCents,
+        discountCents: 0,
+        totalCents: null,
+        shipping: { kind: 'pending' as const },
+      })
+    : calculateCheckout(cart, draft)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const showTestControls = searchParams.get('demo') === '1'
+  const showTestControls =
+    canSimulateCheckout && searchParams.get('demo') === '1'
   const [step, setStep] = useState<CheckoutStep>(() =>
     initialStep(draft.contact, draft.address),
   )
   const [promotionState, setPromotionState] = useState<PromotionState | null>(
     () =>
-      draft.appliedPromotion
+      draft.appliedPromotion && !isRemoteCatalog
         ? evaluatePromotion(
             draft.appliedPromotion,
             cart.subtotalCents,
@@ -84,12 +105,15 @@ export function CheckoutPage() {
   const [paymentScenario, setPaymentScenario] =
     useState<PaymentScenario>('approved')
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('ready')
+  const [paymentError, setPaymentError] = useState('')
+  const [promotionBusy, setPromotionBusy] = useState(false)
   const promotionRequest = useRef(0)
   const paymentRequest = useRef(0)
   const finalized = useRef(false)
   const paymentInFlight = useRef(false)
-  const shownPromotionState =
-    draft.appliedPromotion && cart.productDiscountCents > 0
+  const shownPromotionState = isRemoteCatalog
+    ? (serverQuote?.promotion ?? promotionState)
+    : draft.appliedPromotion && cart.productDiscountCents > 0
       ? evaluatePromotion(draft.appliedPromotion, cart.subtotalCents, true)
       : promotionState
 
@@ -111,15 +135,45 @@ export function CheckoutPage() {
   }, [])
 
   function goToStep(next: CheckoutStep) {
-    if (paymentInFlight.current) return
+    if (paymentInFlight.current || promotionBusy || pendingConfirmation) return
     paymentRequest.current += 1
     setPaymentStatus('ready')
     setStep(next)
   }
 
-  function applyPromotion(event: FormEvent<HTMLFormElement>) {
+  async function applyPromotion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (paymentInFlight.current) return
+    if (paymentInFlight.current || promotionBusy || pendingConfirmation) return
+    if (isRemoteCatalog) {
+      const request = ++promotionRequest.current
+      setPromotionBusy(true)
+      try {
+        const quote = await requestCheckoutQuote(
+          items,
+          draft,
+          draft.promotionInput,
+        )
+        if (request !== promotionRequest.current) return
+        const result = quote.promotion ?? {
+          kind: 'empty' as const,
+          message: 'Escribe un código de descuento.',
+        }
+        setPromotionState(result)
+        setDraft((current) => ({
+          ...current,
+          appliedPromotion: result.kind === 'applied' ? result.code : null,
+        }))
+      } catch {
+        if (request === promotionRequest.current)
+          setPromotionState({
+            kind: 'error',
+            message: 'No pudimos validar el código. Vuelve a intentar.',
+          })
+      } finally {
+        setPromotionBusy(false)
+      }
+      return
+    }
     const result = evaluatePromotion(
       draft.promotionInput,
       cart.subtotalCents,
@@ -133,8 +187,13 @@ export function CheckoutPage() {
   }
 
   async function runPayment() {
+    if (!canSimulateCheckout) return
     if (paymentInFlight.current || finalized.current) return
-    if (draft.appliedPromotion && cart.productDiscountCents > 0) {
+    if (
+      !isRemoteCatalog &&
+      draft.appliedPromotion &&
+      cart.productDiscountCents > 0
+    ) {
       setPromotionState(
         evaluatePromotion(draft.appliedPromotion, cart.subtotalCents, true),
       )
@@ -145,13 +204,14 @@ export function CheckoutPage() {
       paymentStatus === 'processing' ||
       paymentInFlight.current ||
       finalized.current ||
-      cart.needsAttention ||
-      amount.totalCents === null
+      (!pendingConfirmation &&
+        (cart.needsAttention || amount.totalCents === null))
     )
       return
     const request = ++paymentRequest.current
     paymentInFlight.current = true
     setPaymentStatus('processing')
+    setPaymentError('')
     try {
       const outcome = await simulatePayment(paymentScenario)
       if (request !== paymentRequest.current || finalized.current) return
@@ -166,17 +226,42 @@ export function CheckoutPage() {
         return
       }
       finalized.current = true
-      clearCart()
+      if (isRemoteCatalog) {
+        consumeItems(order.lines)
+      } else clearCart()
       navigate('/checkout/confirmacion')
-    } catch {
-      if (request === paymentRequest.current) setPaymentStatus('error')
+    } catch (error) {
+      if (request === paymentRequest.current) {
+        setPaymentError(
+          error instanceof UserFacingError
+            ? error.message
+            : 'Ocurrió un error al guardar tu selección. Conserva tus datos y vuelve a intentar.',
+        )
+        setPaymentStatus('error')
+      }
     } finally {
       paymentInFlight.current = false
     }
   }
 
+  if (!canSimulateCheckout)
+    return (
+      <section className="store-page checkout-page checkout-unavailable container">
+        <p className="eyebrow">Checkout</p>
+        <h1>El pago en línea aún no está disponible</h1>
+        <p>
+          Tu selección permanece en el carrito. Puedes seguir explorando la
+          tienda.
+        </p>
+        <Link className="button button--primary" to="/carrito">
+          Volver al carrito <Icon name="arrow" />
+        </Link>
+      </section>
+    )
+
   if (
     paymentStatus !== 'processing' &&
+    !pendingConfirmation &&
     (!cart.lines.length || cart.needsAttention)
   )
     return (
@@ -220,6 +305,17 @@ export function CheckoutPage() {
         <h1>Finaliza tu selección</h1>
         <p>Revisa tus datos y la entrega antes de continuar.</p>
       </header>
+      {isRemoteCatalog && quoteLoading ? (
+        <InlineStatus busy>Actualizando importes…</InlineStatus>
+      ) : null}
+      {quoteError ? (
+        <div role="alert">
+          <p>{quoteError}</p>
+          <button className="text-link" type="button" onClick={refreshQuote}>
+            Actualizar resumen
+          </button>
+        </div>
+      ) : null}
 
       <ol
         className="checkout-progress"
@@ -273,7 +369,9 @@ export function CheckoutPage() {
                   <button
                     className="text-link"
                     type="button"
-                    disabled={paymentStatus === 'processing'}
+                    disabled={
+                      paymentStatus === 'processing' || pendingConfirmation
+                    }
                     onClick={() => goToStep('datos')}
                   >
                     Editar datos
@@ -310,7 +408,9 @@ export function CheckoutPage() {
                   <button
                     className="text-link"
                     type="button"
-                    disabled={paymentStatus === 'processing'}
+                    disabled={
+                      paymentStatus === 'processing' || pendingConfirmation
+                    }
                     onClick={() => goToStep('entrega')}
                   >
                     Editar entrega
@@ -326,7 +426,7 @@ export function CheckoutPage() {
                 }
               >
                 <summary>¿Tienes un código de descuento?</summary>
-                <form onSubmit={applyPromotion}>
+                <form onSubmit={(event) => void applyPromotion(event)}>
                   <label className="sr-only" htmlFor="checkout-promotion-code">
                     Código de descuento
                   </label>
@@ -336,7 +436,9 @@ export function CheckoutPage() {
                     autoComplete="off"
                     maxLength={30}
                     placeholder="Código de descuento"
-                    disabled={paymentStatus === 'processing'}
+                    disabled={
+                      paymentStatus === 'processing' || pendingConfirmation
+                    }
                     value={draft.promotionInput}
                     onChange={(event) => {
                       promotionRequest.current += 1
@@ -356,9 +458,13 @@ export function CheckoutPage() {
                   <button
                     className="button button--secondary"
                     type="submit"
-                    disabled={paymentStatus === 'processing'}
+                    disabled={
+                      paymentStatus === 'processing' ||
+                      promotionBusy ||
+                      pendingConfirmation
+                    }
                   >
-                    Aplicar
+                    {promotionBusy ? 'Validando…' : 'Aplicar'}
                   </button>
                 </form>
                 {shownPromotionState ? (
@@ -390,8 +496,9 @@ export function CheckoutPage() {
               >
                 <h3 id="checkout-gateway-title">Resumen de tu selección</h3>
                 <p>
-                  Al continuar, la selección se guardará en este navegador. No
-                  se realizará ningún cobro.
+                  {isRemoteCatalog
+                    ? 'Registrarás un pedido de prueba. No se realizará ningún cobro ni se reservarán unidades.'
+                    : 'Al continuar, la selección se guardará en este navegador. No se realizará ningún cobro.'}
                 </p>
               </section>
 
@@ -408,7 +515,9 @@ export function CheckoutPage() {
                       setPaymentScenario(event.target.value as PaymentScenario)
                       setPaymentStatus('ready')
                     }}
-                    disabled={paymentStatus === 'processing'}
+                    disabled={
+                      paymentStatus === 'processing' || pendingConfirmation
+                    }
                   >
                     <option value="approved">Aprobado</option>
                     <option value="rejected">Rechazado</option>
@@ -430,7 +539,9 @@ export function CheckoutPage() {
               ) : null}
               {paymentStatus === 'error' ? (
                 <p className="checkout-payment-message" role="alert">
-                  Ocurrió un error. Vuelve a intentarlo.
+                  {pendingConfirmation
+                    ? 'No pudimos confirmar la respuesta. Pulsa Reintentar para comprobar el mismo pedido sin duplicarlo.'
+                    : paymentError || 'Ocurrió un error. Vuelve a intentarlo.'}
                 </p>
               ) : null}
               <div className="checkout-payment-action">
@@ -446,7 +557,8 @@ export function CheckoutPage() {
                   className="button button--primary"
                   type="button"
                   disabled={
-                    paymentStatus === 'processing' || amount.totalCents === null
+                    paymentStatus === 'processing' ||
+                    (!pendingConfirmation && amount.totalCents === null)
                   }
                   onClick={() => void runPayment()}
                   aria-busy={paymentStatus === 'processing'}

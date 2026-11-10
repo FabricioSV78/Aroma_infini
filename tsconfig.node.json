@@ -7,9 +7,10 @@
     "moduleResolution": "bundler",
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "playwright.config.ts"]
+  "include": ["vite.config.ts", "playwright*.config.ts"]
 }

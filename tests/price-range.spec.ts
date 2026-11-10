@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 for (const width of [320, 390, 768, 1024, 1440]) {
   test(`Precio: campos, aplicación y limpieza a ${width}px`, async ({

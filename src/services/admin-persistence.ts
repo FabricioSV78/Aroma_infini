@@ -1,4 +1,4 @@
-import type { AdminState } from './admin-service'
+import type { AdminState } from '../types/admin'
 
 /** Persistence contract for the current browser-local demo snapshot. */
 export interface AdminStateRepository {

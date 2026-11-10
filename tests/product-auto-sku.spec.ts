@@ -1,8 +1,8 @@
-﻿import { expect, test } from '@playwright/test'
+﻿import { expect, test } from './test'
 import { isProductSku, planProductSkus } from '../src/domain/product-identity'
 import { importFile, importRecord } from './product-import-fixtures'
 
-test('Los SKU de producto empiezan en 10000 y conservan códigos válidos al migrar', () => {
+test('Los códigos internos de producto conservan su rango independiente y códigos válidos al migrar', () => {
   expect(planProductSkus([{}, {}, {}])).toEqual({
     skus: ['10000', '10001', '10002'],
     nextProductSku: 10003,
@@ -29,7 +29,7 @@ test('Los SKU de producto empiezan en 10000 y conservan códigos válidos al mig
 })
 
 for (const count of [10, 50, 100]) {
-  test(`Excel de ${count} productos asigna un SKU automático único por producto y conserva sus presentaciones`, async ({
+  test(`Excel de ${count} productos asigna un código interno único por producto y conserva sus presentaciones`, async ({
     page,
   }) => {
     const rows = Array.from({ length: count }, (_, index) =>
@@ -124,7 +124,7 @@ for (const count of [10, 50, 100]) {
   })
 }
 
-test('Crear y editar conserva el SKU automático y no consume códigos si falla la validación', async ({
+test('Crear y editar conserva el código interno y no consume códigos si falla la validación local', async ({
   page,
 }) => {
   await page.goto('/admin/productos')
@@ -181,7 +181,7 @@ test('Crear y editar conserva el SKU automático y no consume códigos si falla 
   expect(result.nextAfter).toBe(result.nextBefore! + 1)
 })
 
-test('La migración local repara SKU ausentes o duplicados una vez y persiste sin alterar variantes', async ({
+test('La migración local repara códigos internos ausentes o duplicados sin alterar variantes', async ({
   page,
 }) => {
   await page.goto('/admin/productos')

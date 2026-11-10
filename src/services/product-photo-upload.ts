@@ -1,13 +1,11 @@
-import {
-  prepareImageFile,
-  productImagePreset,
-} from '../features/admin/prepareImageFile'
+import { prepareImageFile, productImagePreset } from './prepare-image-file'
+import { PRODUCT_MEDIA_PROFILES } from '../domain/media'
 
 export type ProductPhotoRole = 'gallery' | 'olfactory'
 
-/** Draft preparation is separate from the AdminStateRepository that commits it.
- * Sources are durable data URLs within the local IndexedDB snapshot, never blob URLs.
- * A future authenticated media adapter can return a public asset key at this seam.
+/** Preparing a preview never publishes or uploads a photograph. Remote media
+ * transfer happens only when the administrator saves the complete product.
+ * Local/demo persistence may still retain prepared data URLs in IndexedDB.
  */
 export interface ProductPhotoUploadAdapter {
   prepare(file: File, role: ProductPhotoRole): Promise<string>
@@ -19,13 +17,15 @@ const localProductPhotoUpload: ProductPhotoUploadAdapter = {
       file,
       role === 'olfactory'
         ? {
-            width: 960,
-            height: 1200,
-            maxWidth: 1600,
+            ...PRODUCT_MEDIA_PROFILES['product-olfactory'],
             quality: 0.9,
             label: '4:5 · mínimo 960 × 1200 px',
           }
-        : { ...productImagePreset, maxWidth: 1600, quality: 0.9 },
+        : {
+            ...productImagePreset,
+            maxWidth: PRODUCT_MEDIA_PROFILES['product-gallery'].maxWidth,
+            quality: 0.9,
+          },
     )
   },
 }

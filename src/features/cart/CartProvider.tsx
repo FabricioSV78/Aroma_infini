@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { CartItem } from '../../types/catalog'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { loadSelectionProducts } from '../../services/selection-catalog-service'
 import {
   CartContext,
   type CartContextValue,
@@ -22,13 +24,24 @@ interface CartState {
   items: CartItem[]
   persistence: 'local' | 'session'
   notice: CartNotice | null
+  writeToStorage: boolean
 }
 
 function readInitialState(): CartState {
   try {
-    return { items: readCart(), persistence: 'local', notice: null }
+    return {
+      items: readCart(),
+      persistence: 'local',
+      notice: null,
+      writeToStorage: false,
+    }
   } catch {
-    return { items: [], persistence: 'session', notice: null }
+    return {
+      items: [],
+      persistence: 'session',
+      notice: null,
+      writeToStorage: false,
+    }
   }
 }
 
@@ -37,12 +50,34 @@ function nextCartState(
   items: CartItem[],
   notice: CartNotice | null = current.notice,
 ): CartState {
-  return { ...current, items, notice }
+  return { ...current, items, notice, writeToStorage: true }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CartState>(readInitialState)
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isRemoteCatalog || !state.items.length) return
+    let current = true
+    void loadSelectionProducts(
+      'cart',
+      state.items.map((item) => item.variantId),
+    ).catch(() => {
+      if (current)
+        setState((value) => ({
+          ...value,
+          notice: {
+            id: Date.now(),
+            message:
+              'No pudimos actualizar tu carrito. Revisa tu conexión y vuelve a abrirlo.',
+          },
+        }))
+    })
+    return () => {
+      current = false
+    }
+  }, [state.items, drawerOpen])
 
   useEffect(function synchronizeCart() {
     function handleStorage(event: StorageEvent) {
@@ -50,6 +85,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setState((current) => ({
         ...current,
         items: parseStoredCart(event.newValue),
+        writeToStorage: false,
       }))
     }
     window.addEventListener('storage', handleStorage)
@@ -58,7 +94,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(
     function persistCart() {
-      if (state.persistence === 'session') return
+      // Initial hydration and external storage events already reflect a stored
+      // value. Echoing them can overwrite a newer edit from another tab.
+      if (state.persistence === 'session' || !state.writeToStorage) return
       let fallbackTimer: number | undefined
       try {
         writeCart(state.items)
@@ -69,7 +107,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       return () => window.clearTimeout(fallbackTimer)
     },
-    [state.items, state.persistence],
+    [state.items, state.persistence, state.writeToStorage],
   )
 
   const addItem = useCallback(
@@ -141,6 +179,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setState((current) => nextCartState(current, [], null))
   }, [])
 
+  const consumeItems = useCallback((purchased: readonly CartItem[]) => {
+    const quantities = new Map<string, number>()
+    for (const item of purchased) {
+      if (!Number.isSafeInteger(item.quantity) || item.quantity < 1) continue
+      quantities.set(
+        item.variantId,
+        (quantities.get(item.variantId) ?? 0) + item.quantity,
+      )
+    }
+    // Reconcile against the current cart: another tab may have added units
+    // while the server was confirming the submitted selection.
+    setState((current) =>
+      nextCartState(
+        current,
+        current.items.flatMap((item) => {
+          const quantity = item.quantity - (quantities.get(item.variantId) ?? 0)
+          return quantity > 0 ? [{ ...item, quantity }] : []
+        }),
+        null,
+      ),
+    )
+  }, [])
+
   const openCart = useCallback(() => setDrawerOpen(true), [])
   const closeCart = useCallback(() => setDrawerOpen(false), [])
   const dismissNotice = useCallback(
@@ -158,6 +219,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       setQuantity,
       removeItem,
+      consumeItems,
       clearCart,
       openCart,
       closeCart,
@@ -167,6 +229,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       clearCart,
       closeCart,
+      consumeItems,
       dismissNotice,
       drawerOpen,
       openCart,

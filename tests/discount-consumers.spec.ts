@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { brands, products } from '../src/mocks/home'
 import { getProductDetail } from '../src/mocks/product-details'
 import { resolveSeoPage } from '../src/seo/seo-config'

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('Los enlaces antiguos abren la tienda sin una selección retirada y conservan los demás filtros', async ({
   page,

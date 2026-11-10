@@ -7,6 +7,8 @@ import { formatPEN } from '../../services/currency'
 import { trackingPath } from '../../services/order-tracking-service'
 import { getDeliveryZoneLabel } from '../../services/checkout-service'
 import { useCheckout } from './checkout-context'
+import { useAccount } from '../account/account-context'
+import { canSimulateCheckout } from '../../services/runtime-environment'
 
 const dateFormatter = new Intl.DateTimeFormat('es-PE', {
   day: 'numeric',
@@ -16,8 +18,12 @@ const dateFormatter = new Intl.DateTimeFormat('es-PE', {
 
 export function CheckoutConfirmationPage() {
   const { order } = useCheckout()
+  const { orders } = useAccount()
+  const belongsToAccount = Boolean(
+    order && orders.some((item) => item.reference === order.reference),
+  )
 
-  if (!order)
+  if (!order || !canSimulateCheckout)
     return (
       <section
         className="store-page checkout-page checkout-unavailable container"
@@ -50,8 +56,9 @@ export function CheckoutConfirmationPage() {
         <p className="eyebrow">Selección · {order.reference}</p>
         <h1>Tu selección quedó guardada</h1>
         <p>
-          La información está disponible durante esta sesión. No se realizó
-          ningún cobro.
+          {order.simulation
+            ? 'Tu pedido de prueba quedó guardado. No se realizó ningún cobro ni se reservaron unidades.'
+            : 'La información está disponible durante esta sesión. No se realizó ningún cobro.'}
         </p>
         <div className="checkout-confirmation-tracking">
           <span>Código de pedido</span>
@@ -59,14 +66,12 @@ export function CheckoutConfirmationPage() {
           <Link
             className="button button--primary"
             to={
-              order.mode === 'demo-account'
+              belongsToAccount
                 ? '/cuenta/pedidos'
                 : trackingPath(order.reference)
             }
           >
-            {order.mode === 'demo-account'
-              ? 'Ver en Mis pedidos'
-              : 'Ver estado del pedido'}{' '}
+            {belongsToAccount ? 'Ver en Mis pedidos' : 'Ver estado del pedido'}{' '}
             <Icon name="arrow" />
           </Link>
         </div>

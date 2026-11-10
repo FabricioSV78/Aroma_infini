@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs } from 'react-router'
 import { redirect } from 'react-router'
-import { getStoreFeatures } from '../../services/admin-service'
+import { storefrontRepository } from '../../services/storefront-repository'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { loadRemoteCatalog } from '../../services/remote-catalog-queries'
 import {
   catalogService,
   readCatalogQuery,
@@ -12,15 +14,28 @@ export async function catalogLoader({ request, params }: LoaderFunctionArgs) {
     throw redirect(`${url.pathname}${url.search}`)
   }
   try {
-    const brands = await catalogService.getBrands()
-    if (
-      !getStoreFeatures().complementsEnabled &&
-      url.searchParams.has('tipo')
-    ) {
+    if (isRemoteCatalog) {
+      const result = await loadRemoteCatalog(url.searchParams, params.slug)
+      if (
+        result.kind === 'ready' &&
+        !result.features.complementsEnabled &&
+        url.searchParams.has('tipo')
+      ) {
+        url.searchParams.delete('tipo')
+        throw redirect(`${url.pathname}${url.search}`)
+      }
+      return result
+    }
+    const { brands, features } = await storefrontRepository.readSnapshot()
+    if (!features.complementsEnabled && url.searchParams.has('tipo')) {
       url.searchParams.delete('tipo')
       throw redirect(`${url.pathname}${url.search}`)
     }
-    const query = readCatalogQuery(new URL(request.url).searchParams, brands)
+    const query = readCatalogQuery(
+      new URL(request.url).searchParams,
+      brands,
+      features,
+    )
     const brand = params.slug
       ? brands.find((item) => item.slug === params.slug)
       : undefined

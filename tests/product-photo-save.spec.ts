@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { getProductPhotoStatus } from '../src/domain/product-photos'
 import { adminService } from '../src/services/admin-service'
 import { saveProductPhotos } from '../src/services/product-photos'
@@ -147,12 +147,12 @@ test('Guardar fotos usa el producto más reciente y conserva stock, oferta, text
   expect(after.revision).toBe(beforePhotoSave.revision + 1)
 })
 
-test('Quitar la principal de un producto visible se rechaza sin cambiar datos', () => {
+test('Quitar la principal de un producto visible se rechaza sin cambiar datos', async () => {
   const current = adminService
     .getSnapshot()
     .products.find((item) => item.active)!
   const before = structuredClone(adminService.getSnapshot())
-  const result = saveProductPhotos(current.product.id, {
+  const result = await saveProductPhotos(current.product.id, {
     gallery: [],
     olfactoryImage: current.detail.olfactoryImage,
   })

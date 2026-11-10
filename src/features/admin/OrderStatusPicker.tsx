@@ -33,7 +33,7 @@ export function OrderStatusPicker({
   const id = useId()
   const currentIndex = ORDER_STATUSES.indexOf(order.status)
   const changed = value !== order.status
-  const paymentBlocked = order.paymentStatus !== 'approved'
+  const paymentBlocked = order.paymentStatus !== 'approved' && !order.simulation
   return (
     <>
       <fieldset className="admin-order-state-picker" disabled={disabled}>

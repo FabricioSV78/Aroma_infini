@@ -1,10 +1,11 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './test'
 import {
   queryCatalog,
   readCatalogQuery,
   catalogService,
 } from '../src/services/catalog-service'
 import { products } from '../src/mocks/home'
+import { storefrontRepository } from '../src/services/storefront-repository'
 import {
   catalogLoader,
   brandsLoader,
@@ -133,10 +134,10 @@ test('Loaders: marca inexistente y fallos recuperables', async () => {
     context: {},
   }
   expect((await catalogLoader(args)).kind).toBe('missing')
-  const original = catalogService.getBrands
+  const original = storefrontRepository.readSnapshot
   const originalPreviews = catalogService.getBrandPreviews
   try {
-    catalogService.getBrands = async () => {
+    storefrontRepository.readSnapshot = async () => {
       throw new Error('test')
     }
     expect((await catalogLoader(args)).kind).toBe('error')
@@ -145,7 +146,7 @@ test('Loaders: marca inexistente y fallos recuperables', async () => {
     }
     expect((await brandsLoader()).kind).toBe('error')
   } finally {
-    catalogService.getBrands = original
+    storefrontRepository.readSnapshot = original
     catalogService.getBrandPreviews = originalPreviews
   }
 })

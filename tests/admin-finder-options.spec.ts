@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('El administrador quita y añade opciones reales, y gestiona importes del cuestionario', async ({
   page,

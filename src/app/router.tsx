@@ -4,20 +4,31 @@ import { HomePage } from '../features/home/HomePage'
 import { PendingPage } from '../pages/PendingPage'
 import { RouteErrorPage } from '../pages/RouteErrorPage'
 import { homeService } from '../services/home-service'
-import { CatalogPage } from '../features/catalog/CatalogPage'
-import { BrandsPage } from '../features/catalog/BrandsPage'
-import { ProductPage } from '../features/product/ProductPage'
 import { productLoader } from '../features/product/product-loader'
-import { FavoritesPage } from '../features/favorites/FavoritesPage'
-import { CartPage } from '../features/cart/CartPage'
-import { CheckoutPage } from '../features/checkout/CheckoutPage'
-import { CheckoutConfirmationPage } from '../features/checkout/CheckoutConfirmationPage'
-import { OrderTrackingPage } from '../features/checkout/OrderTrackingPage'
 import { PageLoadingState } from '../components/ui/PageLoadingState'
+import {
+  adminDataLoader,
+  requireAuthLoader,
+} from '../features/auth/auth-loaders'
+import { RequireAuth } from '../features/auth/RequireAuth'
+import {
+  loadAdminCatalog,
+  loadAdminHome,
+} from '../services/catalog-admin-service'
+import { loadSelectionProducts } from '../services/selection-catalog-service'
+import { loadAdminCommerceSettings } from '../services/commerce-settings-service'
+import { adminRouteModules } from '../features/admin/admin-route-modules'
+import { loadAdminOrders } from '../services/order-admin-service'
+import { isProductionEnvironment } from '../services/runtime-environment'
 import {
   catalogLoader,
   brandsLoader,
 } from '../features/catalog/catalog-loaders'
+
+const loadCatalogPage = async () => {
+  const module = await import('../features/catalog/CatalogPage')
+  return { Component: module.CatalogPage }
+}
 
 export const router = createBrowserRouter([
   {
@@ -27,8 +38,36 @@ export const router = createBrowserRouter([
       <PageLoadingState pathname={window.location.pathname} />
     ),
     children: [
+      ...(
+        [
+          'iniciar-sesion',
+          'crear-cuenta',
+          'recuperar-contrasena',
+          'restablecer-contrasena',
+        ] as const
+      ).map((path, index) => ({
+        path,
+        lazy: async () => {
+          if (index >= 2) {
+            const { OfflineRecoveryPage } =
+              await import('../features/auth/OfflineRecoveryPage')
+            return { Component: OfflineRecoveryPage }
+          }
+          const { AuthPage } = await import('../features/auth/AuthPage')
+          const view = (['login', 'register'] as const)[index]
+          return { Component: () => <AuthPage view={view} /> }
+        },
+      })),
+      {
+        path: 'auth/callback',
+        lazy: async () => {
+          const { AuthCallbackPage } = await import('../features/auth/AuthPage')
+          return { Component: AuthCallbackPage }
+        },
+      },
       {
         path: 'fuente',
+        loader: () => (isProductionEnvironment ? redirect('/') : null),
         lazy: async () => {
           const module = await import('../pages/FontPreviewPage')
           return { Component: module.FontPreviewPage }
@@ -39,7 +78,7 @@ export const router = createBrowserRouter([
         loader: () => homeService.getHome(),
         Component: HomePage,
       },
-      { path: 'tienda', loader: catalogLoader, Component: CatalogPage },
+      { path: 'tienda', loader: catalogLoader, lazy: loadCatalogPage },
       {
         path: 'catalogo',
         loader: ({ request }) => {
@@ -47,19 +86,63 @@ export const router = createBrowserRouter([
           return redirect(`/tienda${url.search}${url.hash}`)
         },
       },
-      { path: 'buscar', loader: catalogLoader, Component: CatalogPage },
-      { path: 'marcas', loader: brandsLoader, Component: BrandsPage },
-      { path: 'marcas/:slug', loader: catalogLoader, Component: CatalogPage },
+      { path: 'buscar', loader: catalogLoader, lazy: loadCatalogPage },
+      {
+        path: 'marcas',
+        loader: brandsLoader,
+        lazy: async () => {
+          const module = await import('../features/catalog/BrandsPage')
+          return { Component: module.BrandsPage }
+        },
+      },
+      { path: 'marcas/:slug', loader: catalogLoader, lazy: loadCatalogPage },
       {
         path: 'producto/:slug',
         loader: productLoader,
-        Component: ProductPage,
+        lazy: async () => {
+          const module = await import('../features/product/ProductPage')
+          return { Component: module.ProductPage }
+        },
       },
-      { path: 'favoritos', Component: FavoritesPage },
-      { path: 'carrito', Component: CartPage },
-      { path: 'checkout', Component: CheckoutPage },
-      { path: 'checkout/confirmacion', Component: CheckoutConfirmationPage },
-      { path: 'seguir-pedido', Component: OrderTrackingPage },
+      {
+        path: 'favoritos',
+        loader: () => loadSelectionProducts('favorites').then(() => null),
+        lazy: async () => {
+          const module = await import('../features/favorites/FavoritesPage')
+          return { Component: module.FavoritesPage }
+        },
+      },
+      {
+        path: 'carrito',
+        loader: () => loadSelectionProducts('cart').then(() => null),
+        lazy: async () => {
+          const module = await import('../features/cart/CartPage')
+          return { Component: module.CartPage }
+        },
+      },
+      {
+        path: 'checkout',
+        loader: () => loadSelectionProducts('cart').then(() => null),
+        lazy: async () => {
+          const module = await import('../features/checkout/CheckoutPage')
+          return { Component: module.CheckoutPage }
+        },
+      },
+      {
+        path: 'checkout/confirmacion',
+        lazy: async () => {
+          const module =
+            await import('../features/checkout/CheckoutConfirmationPage')
+          return { Component: module.CheckoutConfirmationPage }
+        },
+      },
+      {
+        path: 'seguir-pedido',
+        lazy: async () => {
+          const module = await import('../features/checkout/OrderTrackingPage')
+          return { Component: module.OrderTrackingPage }
+        },
+      },
       {
         path: 'nosotros',
         lazy: async () => {
@@ -110,15 +193,22 @@ export const router = createBrowserRouter([
         path: 'libro-de-reclamaciones',
         lazy: async () => {
           const module =
-            await import('../features/institutional/InstitutionalPages')
-          return { Component: module.ComplaintsBookPage }
+            await import('../features/institutional/ComplaintsPage')
+          return { Component: module.ComplaintsPage }
         },
       },
       {
         path: 'cuenta',
+        loader: requireAuthLoader('customer'),
         lazy: async () => {
           const module = await import('../features/account/AccountLayout')
-          return { Component: module.AccountLayout }
+          return {
+            Component: () => (
+              <RequireAuth audience="customer">
+                <module.AccountLayout />
+              </RequireAuth>
+            ),
+          }
         },
         children: [
           {
@@ -165,6 +255,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'favoritos',
+            loader: () => loadSelectionProducts('favorites').then(() => null),
             lazy: async () => {
               const module = await import('../features/account/AccountPages')
               return { Component: module.AccountFavoritesPage }
@@ -175,99 +266,165 @@ export const router = createBrowserRouter([
       { path: '*', Component: PendingPage },
     ],
   },
+  ...(['admin/login', 'admin/recuperar', 'admin/restablecer'] as const).map(
+    (path, index) => ({
+      path,
+      errorElement: <RouteErrorPage />,
+      hydrateFallbackElement: (
+        <PageLoadingState pathname={window.location.pathname} />
+      ),
+      lazy: async () => {
+        if (index > 0) {
+          const { OfflineRecoveryPage } =
+            await import('../features/auth/OfflineRecoveryPage')
+          return { Component: () => <OfflineRecoveryPage audience="admin" /> }
+        }
+        const { AuthPage } = await import('../features/auth/AuthPage')
+        return {
+          Component: () => <AuthPage audience="admin" view="login" />,
+        }
+      },
+    }),
+  ),
   {
     path: 'admin',
+    loader: async (args) => {
+      await requireAuthLoader('admin')(args)
+      await loadAdminCatalog()
+      return null
+    },
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: (
       <PageLoadingState pathname={window.location.pathname} />
     ),
     lazy: async () => {
       const module = await import('../features/admin/AdminLayout')
-      return { Component: module.AdminLayout }
+      return {
+        Component: () => (
+          <RequireAuth audience="admin">
+            <module.AdminLayout />
+          </RequireAuth>
+        ),
+      }
     },
     children: [
       {
         index: true,
+        loader: adminDataLoader(loadAdminOrders),
         lazy: async () => {
-          const module = await import('../features/admin/AdminDashboardPage')
+          const module = await adminRouteModules.dashboard()
           return { Component: module.AdminDashboardPage }
         },
       },
       {
         path: 'productos',
         lazy: async () => {
-          const module = await import('../features/admin/AdminProducts')
+          const module = await adminRouteModules.products()
           return { Component: module.AdminProductsPage }
         },
       },
       {
         path: 'productos/nuevo',
         lazy: async () => {
-          const module = await import('../features/admin/AdminProducts')
+          const module = await adminRouteModules.products()
           return { Component: module.AdminProductFormPage }
         },
       },
       {
         path: 'productos/:id/fotos',
         lazy: async () => {
-          const module = await import('../features/admin/AdminProductPhotoPage')
+          const module = await adminRouteModules.productPhotos()
           return { Component: module.AdminProductPhotoPage }
         },
       },
       {
         path: 'productos/:id',
         lazy: async () => {
-          const module = await import('../features/admin/AdminProducts')
+          const module = await adminRouteModules.products()
           return { Component: module.AdminProductFormPage }
+        },
+      },
+      {
+        path: 'familias-olfativas',
+        lazy: async () => {
+          const module = await adminRouteModules.families()
+          return { Component: module.AdminOlfactoryFamilies }
+        },
+      },
+      {
+        path: 'notificaciones',
+        lazy: async () => {
+          const module = await adminRouteModules.notifications()
+          return { Component: module.AdminNotificationsPage }
         },
       },
       {
         path: 'marcas',
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await adminRouteModules.operations()
           return { Component: module.AdminBrandsPage }
         },
       },
       {
         path: 'pedidos',
+        loader: adminDataLoader(loadAdminOrders),
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await adminRouteModules.orders()
           return { Component: module.AdminOrdersPage }
         },
       },
       {
         path: 'pedidos/:reference',
+        loader: adminDataLoader(loadAdminOrders),
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await adminRouteModules.operations()
           return { Component: module.AdminOrderDetailPage }
         },
       },
       {
         path: 'clientes',
+        loader: adminDataLoader(loadAdminOrders),
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await adminRouteModules.operations()
           return { Component: module.AdminCustomersPage }
         },
       },
       {
         path: 'promociones',
+        loader: adminDataLoader(loadAdminCommerceSettings),
         lazy: async () => {
-          const module = await import('../features/admin/AdminOperations')
+          const module = await adminRouteModules.operations()
           return { Component: module.AdminPromotionsPage }
         },
       },
       {
         path: 'envios',
+        loader: adminDataLoader(loadAdminCommerceSettings),
         lazy: async () => {
-          const module = await import('../features/admin/AdminShippingPage')
+          const module = await adminRouteModules.shipping()
           return { Component: module.AdminShippingPage }
         },
       },
       {
         path: 'home',
+        loader: adminDataLoader(loadAdminHome),
         lazy: async () => {
-          const module = await import('../features/admin/AdminHomePage')
+          const module = await adminRouteModules.home()
           return { Component: module.AdminHomePage }
+        },
+      },
+      {
+        path: 'configuracion',
+        lazy: async () => {
+          const module = await adminRouteModules.settings()
+          return { Component: module.AdminSiteSettings }
+        },
+      },
+      {
+        path: 'reclamaciones',
+        lazy: async () => {
+          const module = await adminRouteModules.complaints()
+          return { Component: module.AdminComplaints }
         },
       },
     ],

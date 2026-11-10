@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 async function openQuiz(page: Page) {
   await page.goto('/')
@@ -285,14 +285,15 @@ test('Catalog error is recoverable and empty stock has a useful state', async ({
   ).toBeVisible()
 })
 
-test('The quiz works with touch input', async ({ browser }) => {
+test('The quiz works with touch input', async ({ browser, baseURL }) => {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    baseURL,
   })
   const page = await context.newPage()
-  await page.goto('http://127.0.0.1:5173')
+  await page.goto('/')
   await page
     .getByRole('button', { name: 'Encontrar mi perfume', exact: true })
     .tap()

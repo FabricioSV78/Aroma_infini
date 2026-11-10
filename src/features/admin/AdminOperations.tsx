@@ -1,4 +1,6 @@
 import { variantLabel } from '../../domain/product-type'
+import { commerceSettingsService } from '../../services/commerce-settings-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import { formatBrandName } from '../../utils/brand-name'
 import './admin-operations.css'
 import {
@@ -34,6 +36,8 @@ import {
   adminOrderStatusMeta,
   adminPaymentStatusMeta,
   getPromotionStatus,
+  getCommercialOrders,
+  getCommercialCustomerRecords,
 } from './admin-utils'
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
@@ -54,6 +58,8 @@ import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { useAdminNotice } from './AdminNoticeProvider'
 import { brandSlug } from '../../domain/brand-registration'
+import { catalogAdminService } from '../../services/catalog-admin-service'
+import { orderAdminService } from '../../services/order-admin-service'
 import {
   AdminBrandRegistration,
   AdminBrandRegistrationResult,
@@ -122,7 +128,7 @@ export function AdminBrandsPage() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const editorHeadingRef = useRef<HTMLHeadingElement>(null)
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const pagination = useAdminPagination(state.brands, 12)
   const dirty = Boolean(
     registrationText?.trim() ||
@@ -180,7 +186,7 @@ export function AdminBrandsPage() {
     if (!form) return
     setError('')
     const result = await persistence.save(
-      () => adminService.saveBrand(form),
+      () => catalogAdminService.saveBrand(form),
       () => {
         setForm(null)
         setOriginalForm(null)
@@ -209,7 +215,7 @@ export function AdminBrandsPage() {
       return
     setActionError('')
     const result = await persistence.save(
-      () => adminService.setBrandActive(brand.id, !brand.active),
+      () => catalogAdminService.setBrandActive(brand.id, !brand.active),
       () => notice.toast(`Marca ${brand.active ? 'desactivada' : 'activada'}.`),
     )
     if (result?.kind === 'validation') setActionError(result.message)
@@ -436,8 +442,6 @@ export function AdminBrandsPage() {
 
 const orderStatusOrder = ORDER_STATUSES
 
-export { AdminOrdersPage } from './AdminOrdersPage'
-
 export function AdminOrderDetailPage() {
   const notice = useAdminNotice()
   const { reference = '' } = useParams()
@@ -456,13 +460,16 @@ export function AdminOrderDetailPage() {
     order?.status ?? 'received',
   )
   const [statusError, setStatusError] = useState('')
-  const statusPersistence = useAdminSave()
+  const statusPersistence = useAdminSave({ catalog: true })
   const statusBusy = statusPersistence.saving
   const statusPersistenceError = statusPersistence.persistenceFailed
   const statusAction = useRef(false)
+  const statusVersion = useRef(order?.version)
+  const statusOperation = useRef<string | null>(null)
   const [editingDelivery, setEditingDelivery] = useState(false)
   const [deliveryError, setDeliveryError] = useState('')
-  const deliveryPersistence = useAdminSave()
+  const deliveryPersistence = useAdminSave({ catalog: true })
+  const deliveryVersion = useRef(order?.version)
   const [deliveryDraft, setDeliveryDraft] = useState(() => {
     const customer = state.customers.find(
       (item) => item.id === order?.customerId,
@@ -572,8 +579,19 @@ export function AdminOrderDetailPage() {
         return
       setStatusError('')
       const result = await statusPersistence.save(
-        () => adminService.setOrderStatus(orderReference, status),
-        () => notice.toast('Estado actualizado.'),
+        () =>
+          orderAdminService.setOrderStatus(orderReference, status, {
+            deliveryConfirmed: status === 'shipped' || status === 'delivered',
+            expectedVersions: { [orderReference]: statusVersion.current ?? 0 },
+            operationId: statusOperation.current ?? undefined,
+          }),
+        () => {
+          statusVersion.current = adminService
+            .getSnapshot()
+            .orders.find((item) => item.reference === orderReference)?.version
+          statusOperation.current = null
+          notice.toast('Estado actualizado.')
+        },
       )
       if (result?.kind === 'validation') {
         setStatusError(result.message)
@@ -588,7 +606,7 @@ export function AdminOrderDetailPage() {
     setDeliveryError('')
     const result = await deliveryPersistence.save(
       () =>
-        adminService.saveOrderDelivery(
+        orderAdminService.saveOrderDelivery(
           orderReference,
           historicDestination
             ? {
@@ -598,11 +616,15 @@ export function AdminOrderDetailPage() {
                 district: originalAddress.district,
               }
             : deliveryDraft,
+          deliveryVersion.current,
         ),
       () => {
         notice.toast('Datos de entrega guardados.')
         setSavedDeliveryDraft(deliveryDraft)
         setEditingDelivery(false)
+        deliveryVersion.current = adminService
+          .getSnapshot()
+          .orders.find((item) => item.reference === orderReference)?.version
       },
     )
     if (result?.kind === 'validation') setDeliveryError(result.message)
@@ -618,6 +640,12 @@ export function AdminOrderDetailPage() {
         title="Detalle del pedido"
         description="Consulta la compra y actualiza su preparación."
       />
+      {order.simulation ? (
+        <p className="admin-data-note">
+          Modo prueba: este pedido no representa un cobro real ni descuenta
+          inventario.
+        </p>
+      ) : null}
       <dl className="admin-order-highlights" aria-label="Resumen del pedido">
         <div>
           <dt>Preparación</dt>
@@ -661,6 +689,10 @@ export function AdminOrderDetailPage() {
               order={order}
               value={status}
               onChange={(next) => {
+                if (status === order.status) {
+                  statusVersion.current = order.version
+                  statusOperation.current = crypto.randomUUID()
+                }
                 setStatusError('')
                 setStatus(next)
               }}
@@ -805,6 +837,7 @@ export function AdminOrderDetailPage() {
                     return
                   setDeliveryDraft(savedDeliveryDraft)
                 }
+                if (!editingDelivery) deliveryVersion.current = order.version
                 setEditingDelivery((open) => !open)
                 setDeliveryError('')
               }}
@@ -831,6 +864,7 @@ export function AdminOrderDetailPage() {
                     required
                     minLength={2}
                     value={deliveryDraft.customerName}
+                    readOnly={isRemoteCatalog}
                     onChange={(event) =>
                       setDeliveryDraft((current) => ({
                         ...current,
@@ -845,6 +879,7 @@ export function AdminOrderDetailPage() {
                     required
                     type="email"
                     value={deliveryDraft.customerEmail}
+                    readOnly={isRemoteCatalog}
                     onChange={(event) =>
                       setDeliveryDraft((current) => ({
                         ...current,
@@ -1038,7 +1073,7 @@ export function AdminCustomersPage() {
   const [search, setSearch] = useState('')
   const orderCountByCustomer = new Map<string, number>()
   const latestOrderByCustomer = new Map<string, AdminOrder>()
-  state.orders.forEach((order) => {
+  getCommercialOrders(state.orders).forEach((order) => {
     orderCountByCustomer.set(
       order.customerId,
       (orderCountByCustomer.get(order.customerId) ?? 0) + 1,
@@ -1048,7 +1083,7 @@ export function AdminCustomersPage() {
       latestOrderByCustomer.set(order.customerId, order)
   })
   const query = searchText(search)
-  const customers = [...state.customers]
+  const customers = getCommercialCustomerRecords(state.customers, state.orders)
     .filter((customer) => {
       const address = latestOrderByCustomer.get(customer.id)?.address
       return (
@@ -1191,7 +1226,7 @@ export function AdminCustomersPage() {
 
 function createPromotionDraft(): AdminPromotion {
   return {
-    id: `promo-${crypto.randomUUID()}`,
+    id: isRemoteCatalog ? crypto.randomUUID() : `promo-${crypto.randomUUID()}`,
     code: '',
     active: false,
     type: 'percent',
@@ -1202,6 +1237,15 @@ function createPromotionDraft(): AdminPromotion {
     usageLimit: null,
     used: 0,
   }
+}
+
+function promotionDatetimeLocal(value: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return value
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16)
 }
 
 function AdminPromotionCodesPage() {
@@ -1220,7 +1264,7 @@ function AdminPromotionCodesPage() {
   const codesSectionRef = useRef<HTMLElement>(null)
   const focusCodeAfterSave = useRef(false)
   const deletingRef = useRef(false)
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const formId = form?.id
   useEffect(() => {
     if (
@@ -1253,8 +1297,15 @@ function AdminPromotionCodesPage() {
     setEditingExisting(state.promotions.some((item) => item.id === nextForm.id))
     focusCodeAfterSave.current = false
     setError('')
-    setForm(nextForm)
-    setOriginalForm(nextForm)
+    const draft = isRemoteCatalog
+      ? {
+          ...nextForm,
+          startsAt: promotionDatetimeLocal(nextForm.startsAt),
+          endsAt: promotionDatetimeLocal(nextForm.endsAt),
+        }
+      : nextForm
+    setForm(draft)
+    setOriginalForm(draft)
     window.requestAnimationFrame(() => editorHeadingRef.current?.focus())
   }
 
@@ -1285,7 +1336,7 @@ function AdminPromotionCodesPage() {
     setSaveAction(createAnother ? 'create-another' : 'finish')
     setError('')
     const result = await persistence.save(
-      () => adminService.savePromotion(form),
+      () => commerceSettingsService.savePromotion(form),
       () => {
         notice.toast('Promoción guardada.')
         if (createAnother) {
@@ -1322,7 +1373,12 @@ function AdminPromotionCodesPage() {
       return
     setError('')
     const result = await persistence.save(
-      () => adminService.setPromotionActive(promotion.id, !promotion.active),
+      () =>
+        commerceSettingsService.setPromotionActive(
+          promotion.id,
+          !promotion.active,
+          promotion.version,
+        ),
       () =>
         notice.toast(
           `Promoción ${promotion.code} ${promotion.active ? 'desactivada' : 'activada'}.`,
@@ -1354,7 +1410,11 @@ function AdminPromotionCodesPage() {
       setError('')
       setDeletingId(promotion.id)
       const result = await persistence.save(
-        () => adminService.deletePromotion(promotion.id),
+        () =>
+          commerceSettingsService.deletePromotion(
+            promotion.id,
+            promotion.version ?? 0,
+          ),
         () => {
           notice.toast(`Cupón ${promotion.code} eliminado.`)
           window.requestAnimationFrame(() => codesSectionRef.current?.focus())

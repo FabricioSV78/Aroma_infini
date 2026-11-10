@@ -1,11 +1,17 @@
 node_modules/
 dist/
 .wrangler/
+supabase/.temp/
+supabase/.branches/
 worker-configuration.d.ts
 .dev.vars*
+!.dev.vars.example
 *.tsbuildinfo
 .env*
 !.env.example
 artifacts/
 *.log
 repomix-output.*
+# Local source exports; keep source files instead of committing generated dumps.
+AROMAINFINI.xml
+ECCOMERCE.xml

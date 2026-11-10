@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { answerAdminNotice } from './admin-notice-fixtures'
 
 test('El panel publica cinco campañas editables y el video editorial tras guardar y recargar', async ({
@@ -67,14 +67,14 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
     .getByRole('textbox', { name: 'Descripción', exact: true })
     .fill('Un momento para elegir tu fragancia.')
   await page
-    .getByLabel('Subir video editorial')
+    .getByLabel('Subir video editorial', { exact: true })
     .setInputFiles('public/videos/README.md')
   await expect(page.locator('.admin-notice-dialog')).toContainText(
     'Elige un video MP4',
   )
   await answerAdminNotice(page, 'dismiss')
   await page
-    .getByLabel('Subir video editorial')
+    .getByLabel('Subir video editorial', { exact: true })
     .setInputFiles('public/videos/perfume-editorial-wide.mp4')
   await page.getByRole('button', { name: 'Abrir vista previa' }).click()
   await expect(page.locator('.admin-home-film-preview video')).toHaveAttribute(
@@ -285,6 +285,8 @@ test('El administrador edita portada, pregunta, opción y resultado sin alterar 
     /^data:image\/webp;base64,/,
   )
   await page.setViewportSize({ width: 390, height: 844 })
+  // A lazy image only resolves the responsive source once it enters the viewport.
+  await finder.scrollIntoViewIfNeeded()
   await expect(finder.locator('picture source')).toHaveAttribute(
     'srcset',
     /^data:image\/webp;base64,/,

@@ -1,14 +1,16 @@
 import { getProductReviews } from '../mocks/product-reviews'
 import type { ProductReview } from '../types/review'
+import { canUseLocalFixtures } from './runtime-environment'
 
 /** Temporary published-review fixture behind the same service boundary as local drafts. */
 export function getPublishedReviews(productId: string): ProductReview[] {
-  return getProductReviews(productId)
+  return canUseLocalFixtures ? getProductReviews(productId) : []
 }
 
 const key = (productId: string) => `aroma-infini:reviews:${productId}`
 
 export function readLocalReviews(productId: string): ProductReview[] {
+  if (!canUseLocalFixtures) return []
   try {
     const value: unknown = JSON.parse(
       localStorage.getItem(key(productId)) ?? '[]',
@@ -37,6 +39,8 @@ export function readLocalReviews(productId: string): ProductReview[] {
 }
 
 export function saveLocalReview(productId: string, review: ProductReview) {
+  if (!canUseLocalFixtures)
+    throw new Error('Las reseñas no están disponibles para publicación.')
   // This frontend stores personal reviews locally; replace this boundary with an API to publish them.
   localStorage.setItem(
     key(productId),

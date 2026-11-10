@@ -739,7 +739,7 @@ export async function createProductTemplateWorkbook(
     listNumber: number,
     customInput?: { title: string; message: string },
   ) => {
-    if (!templateColumns.includes(column)) return
+    if (!templateColumns.includes(column) || !choices.length) return
     choices.forEach((choice, index) => {
       options.getCell(index + 1, listNumber).value = choice
     })
@@ -794,7 +794,9 @@ export async function createProductTemplateWorkbook(
     )
   addList(
     'familia_olfativa',
-    OLFACTORY_FAMILIES.map((family) => family.label),
+    OLFACTORY_FAMILIES.filter((family) => family.active).map(
+      (family) => family.label,
+    ),
     7,
     {
       title: 'Familias olfativas',
@@ -913,7 +915,7 @@ export async function createProductTemplateWorkbook(
     ],
     [
       'sku',
-      'Código opcional de la presentación. Si lo utilizas, debe ser único, de hasta 64 letras, números, puntos, guiones o guiones bajos. El SKU numérico de cinco dígitos del producto se asigna automáticamente al importar; no se escribe en el Excel.',
+      'SKU de esta presentación. Puedes escribir un código único de hasta 64 letras, números, puntos, guiones o guiones bajos. Si lo dejas vacío, se asigna automáticamente desde 1000 o el siguiente número disponible al importar. El código interno del producto es independiente y no se escribe en el Excel.',
     ],
     [
       'Duplicados',

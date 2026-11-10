@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import ExcelJS from 'exceljs'
 import sharp from 'sharp'
 import { seedAccessory, setComplementsEnabled } from './complements-fixtures'
@@ -179,7 +179,11 @@ test('Filtros, descuento, favoritos y carrito usan el tipo y la presentación de
     variantLabel: 'Negro',
     unitPriceCents: 7200,
   })
-  expect(purchase?.stock).toBe(3)
+  expect(purchase?.order).toMatchObject({
+    simulation: true,
+    paymentStatus: 'pending',
+  })
+  expect(purchase?.stock).toBe(4)
 })
 
 test('Excel importa complementos con variantes nominales y admite las plantillas antiguas de perfumes', async ({

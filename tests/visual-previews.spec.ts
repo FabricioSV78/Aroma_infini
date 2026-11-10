@@ -1,6 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
-test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) => {
+test('Capturas de revisión de portada, ficha y ubicación', async ({
+  page,
+  authFixture,
+}) => {
   test.setTimeout(120_000)
   for (const { width, height } of [
     { width: 390, height: 844 },
@@ -76,17 +79,17 @@ test('Capturas de revisión de portada, ficha y ubicación', async ({ page }) =>
       path: `artifacts/review-product-recommendations-${width}.png`,
     })
 
+    authFixture.setMode('customer')
     await page.goto('/cuenta/pedidos/AI-A1B2C3D4E5F60708')
-    const enterAccount = page.getByRole('button', { name: 'Ver mi cuenta' })
     const orderProducts = page.locator('.account-order-lines')
-    await expect(enterAccount.or(orderProducts).first()).toBeVisible()
-    if (await enterAccount.isVisible()) await enterAccount.click()
+    await expect(orderProducts).toBeVisible()
     await orderProducts.scrollIntoViewIfNeeded()
     await expect(orderProducts).toBeVisible()
     await page.screenshot({
       path: `artifacts/review-account-order-${width}.png`,
     })
 
+    authFixture.setMode('legacy-admin')
     await page.goto('/admin/envios')
     await expect(
       page.getByRole('heading', { name: 'Lima', exact: true }),

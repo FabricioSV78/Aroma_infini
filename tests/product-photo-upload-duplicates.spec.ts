@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { persistedAdminState } from './product-import-fixtures'
 
 test('las fotos repetidas se rechazan sin cambios parciales y la vista previa funciona con teclado', async ({

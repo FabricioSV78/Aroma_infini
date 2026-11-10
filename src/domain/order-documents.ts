@@ -1,4 +1,4 @@
-import type { AdminOrder } from '../services/admin-service'
+import type { AdminOrder } from '../types/admin'
 import type { CustomerRecord } from '../types/commerce'
 import {
   getPeruDepartmentLabel,
@@ -8,6 +8,16 @@ import {
 import { ORDER_STATUSES } from './order-workflow'
 
 export type OrderDocumentType = 'shipping' | 'summary'
+
+export function orderDocumentPaymentLabel(order: AdminOrder): string {
+  if (order.simulation) return 'Prueba · sin cobro real'
+  return {
+    pending: 'Pago pendiente',
+    approved: 'Pagado',
+    rejected: 'Pago rechazado',
+    refunded: 'Reembolsado',
+  }[order.paymentStatus]
+}
 
 export interface OrderDocumentIssue {
   reference: string

@@ -2,11 +2,30 @@ import { variantLabel } from '../../domain/product-type'
 import type {
   AdminOrderPaymentStatus,
   AdminOrderStatus,
+  AdminOrder,
+  AdminCustomer,
   AdminProduct,
   AdminPromotion,
 } from '../../services/admin-service'
 
 export type AdminTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+
+/** Test orders remain manageable in Pedidos, never commercial indicators. */
+export function getCommercialOrders(orders: readonly AdminOrder[]) {
+  return orders.filter((order) => order.simulation !== true)
+}
+
+export function getCommercialCustomerRecords(
+  customers: readonly AdminCustomer[],
+  orders: readonly AdminOrder[],
+) {
+  const simulationOnly = new Set(
+    orders.filter((order) => order.simulation).map((order) => order.customerId),
+  )
+  for (const order of getCommercialOrders(orders))
+    simulationOnly.delete(order.customerId)
+  return customers.filter((customer) => !simulationOnly.has(customer.id))
+}
 
 export const adminOrderStatusMeta: Record<
   AdminOrderStatus,

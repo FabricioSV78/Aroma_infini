@@ -4,7 +4,7 @@ import type {
   AdminOrder,
   AdminProduct,
   AdminShippingSettings,
-} from '../services/admin-service'
+} from '../types/admin'
 import { getAreaBaseShipping } from '../services/shipping-rates'
 
 export const DEMO_ORDERS_VERSION = 1

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import {
   createDefaultHomeContent,
   normalizeHomeContent,
@@ -20,8 +20,10 @@ test('Las campañas conservan su texto al cambiar el orden visual', () => {
 
 test('Los errores del editor usan el número visible de la campaña', () => {
   const content = createDefaultHomeContent()
-  content.hero[3].eyebrow = ''
-  expect(validateHomeContent(content)).toContain('Etiqueta de campaña 3')
+  content.hero[3].title = ''
+  expect(validateHomeContent(content)).toContain(
+    `Título de campaña ${content.hero[3].order + 1}`,
+  )
 })
 
 test('La franja conserva un texto local al recuperar datos antiguos y valida su contenido', () => {

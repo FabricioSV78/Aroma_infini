@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createCanvas } from '@napi-rs/canvas'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { seedWorkflowOrders, workflowSnapshot } from './order-workflow-fixtures'
 

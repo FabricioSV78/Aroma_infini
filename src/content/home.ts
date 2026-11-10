@@ -1,5 +1,3 @@
-import { brandStorePath } from '../utils/brand-store-path'
-
 // Textos editoriales predeterminados; el administrador puede personalizar cada campaña.
 export const heroSlides = [
   {
@@ -25,15 +23,15 @@ export const heroSlides = [
     alt: 'Frasco verde sobre vidrio ante piedra cálida y hojas de olivo',
   },
   {
-    eyebrow: 'La firma Forme',
+    eyebrow: 'Facetas florales',
     title: ['Tu esencia', 'A tu manera'],
     description: 'Flores suaves y composiciones para llevar cerca de la piel.',
-    cta: 'Ver Forme',
-    to: brandStorePath('forme'),
+    cta: 'Explorar perfumes',
+    to: '/tienda',
     image: 'hero-v3-petale',
     layout: 'left',
     tone: 'light',
-    alt: 'Frasco rosado de Forme sobre piedra clara y seda blanca',
+    alt: 'Frasco rosado sobre piedra clara y seda blanca',
   },
   {
     eyebrow: 'Facetas cálidas',

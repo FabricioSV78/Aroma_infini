@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { adminService } from '../src/services/admin-service'
 
 test('cada perfume conserva su propia imagen olfativa al editar notas y volver a guardar', () => {

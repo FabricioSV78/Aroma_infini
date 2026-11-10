@@ -1,7 +1,7 @@
 import { expectImportSuccess } from './admin-notice-fixtures'
 import { mkdir } from 'node:fs/promises'
 import ExcelJS from 'exceljs'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { OLFACTORY_FAMILIES } from '../src/domain/olfactory-family'
 import {
   importFile,
@@ -185,8 +185,8 @@ test('dejar slug y SKU vacíos agrupa las presentaciones y conserva las familias
   expect(saved).toBeDefined()
   expect(saved.product.variants).toHaveLength(2)
   expect(saved.product.variants.map((variant) => variant.sku)).toEqual([
-    undefined,
-    undefined,
+    '1000',
+    '1001',
   ])
   expect(saved.product.olfactoryFamilies).toEqual(['amaderado', 'fresco'])
   expect(saved.detail).not.toHaveProperty('type')

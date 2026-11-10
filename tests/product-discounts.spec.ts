@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import type { ProductDiscount } from '../src/types/catalog'
 import { adminService } from '../src/services/admin-service'
 import { resolveCart } from '../src/services/commerce-service'
@@ -150,7 +150,11 @@ test('Carrito y pedido usan precio final; el pedido conserva base y revalida cam
     unitPriceCents: 31200,
     originalUnitPriceCents: 39000,
   })
-  expect(product().variants[0].stock).toBe(3)
+  expect(adminService.getSnapshot().orders[0]).toMatchObject({
+    simulation: true,
+    paymentStatus: 'pending',
+  })
+  expect(product().variants[0].stock).toBe(5)
 
   const staleCart = resolveCart([{ variantId: 'cedre-100', quantity: 1 }])
   const staleOrder = createMockOrder(staleCart, checkoutDraft())!

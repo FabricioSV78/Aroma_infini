@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { Outlet, useLocation } from 'react-router'
+import { Outlet, useLocation, useRevalidator } from 'react-router'
 import { Header } from './Header'
 import { Footer } from './Footer'
 import { Icon } from '../ui/Icon'
@@ -11,56 +11,88 @@ import { CheckoutProvider } from '../../features/checkout/CheckoutProvider'
 import { SeoManager } from '../../seo/SeoManager'
 import { AccountProvider } from '../../features/account/AccountProvider'
 import { useStoreReveal } from './useStoreReveal'
-import { contactDetails } from '../../content/institutional'
+import { useSiteSettings } from '../../services/site-settings-service'
 import { buildWhatsAppUrl } from '../../utils/whatsapp'
-import { localStorefrontRepository } from '../../services/storefront-repository'
+import {
+  invalidateSupabaseStorefront,
+  storefrontRepository,
+  readStorefrontMetadata,
+} from '../../services/storefront-repository'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import { OfferPriceClockContext } from '../../services/offer-price-clock'
+import { getNextProductDiscountChange } from '../../services/product-discounts'
+import { isCustomerAuthModeSwitch } from '../../domain/auth-navigation'
 
 function StoreFrame() {
   const [helpOffset, setHelpOffset] = useState(16)
   const [offerPriceRevision, refreshOfferPrices] = useState(() => Date.now())
   const location = useLocation()
+  const revalidator = useRevalidator()
+  const revalidateRef = useRef(revalidator.revalidate)
+  useEffect(() => {
+    revalidateRef.current = revalidator.revalidate
+  }, [revalidator.revalidate])
   const helpTriggerRef = useRef<HTMLAnchorElement>(null)
-  const whatsappUrl = buildWhatsAppUrl(contactDetails.whatsappNumber)
+  const siteSettings = useSiteSettings()
+  const whatsappUrl = buildWhatsAppUrl(siteSettings.contact.whatsapp)
   const previousKey = useRef(location.key)
   const previousPath = useRef(location.pathname)
   const storeRef = useRef<HTMLDivElement>(null)
   useStoreReveal(storeRef, location.key)
   useEffect(() => {
+    // Navigation also needs public brands/settings on non-catalog pages.
+    // A failed background read keeps the confirmed cache empty; route loaders
+    // present their existing retry states rather than substituting local data.
+    void readStorefrontMetadata().catch(() => {})
+  }, [location.key])
+  useEffect(() => {
     let timer: number | undefined
+    let active = true
+    async function refreshOfferSource() {
+      if (isRemoteCatalog) {
+        invalidateSupabaseStorefront()
+        try {
+          await readStorefrontMetadata()
+          void revalidateRef.current()
+        } catch {
+          // Public cache reports its empty failed state to subscribers. A
+          // route loader keeps ownership of its existing error/retry screen.
+        }
+      }
+      if (!active) return
+      refreshOfferPrices(Date.now())
+      scheduleNextOfferChange()
+    }
     function scheduleNextOfferChange() {
       window.clearTimeout(timer)
+      if (isRemoteCatalog && document.visibilityState !== 'visible') return
       const now = Date.now()
-      const next = localStorefrontRepository
-        .peekSnapshot()
-        .products.flatMap(({ product }) => {
-          const offer = product.discount
-          return offer?.active ? [offer.startsAt, offer.endsAt] : []
-        })
-        .filter(Boolean)
-        .map((value) => Date.parse(value))
-        .filter((value) => Number.isFinite(value) && value > now)
-        .sort((first, second) => first - second)[0]
-      if (next === undefined) return
+      const next = getNextProductDiscountChange(
+        storefrontRepository
+          .peekSnapshot()
+          .products.map(({ product }) => product),
+        now,
+      )
+      if (next === undefined && !isRemoteCatalog) return
       timer = window.setTimeout(
-        () => {
-          refreshOfferPrices(Date.now())
-          scheduleNextOfferChange()
-        },
-        Math.min(next - now + 1, 2_147_483_647),
+        () => void refreshOfferSource(),
+        // SQL hides scheduled offers until their start. Refresh a visible remote
+        // catalog at most once a minute even when its next change is unknown or
+        // the device clock is incorrect. Local offers keep their exact timer.
+        isRemoteCatalog
+          ? Math.min(next === undefined ? 60000 : next - now + 1, 60000)
+          : Math.min(next! - now + 1, 2_147_483_647),
       )
     }
     function refreshWhenVisible() {
       if (document.visibilityState !== 'visible') return
-      refreshOfferPrices(Date.now())
-      scheduleNextOfferChange()
+      void refreshOfferSource()
     }
-    const unsubscribe = localStorefrontRepository.subscribe(
-      scheduleNextOfferChange,
-    )
+    const unsubscribe = storefrontRepository.subscribe(scheduleNextOfferChange)
     document.addEventListener('visibilitychange', refreshWhenVisible)
     scheduleNextOfferChange()
     return () => {
+      active = false
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
       unsubscribe()
@@ -170,7 +202,16 @@ function StoreFrame() {
     if (previousKey.current === location.key) return
     previousKey.current = location.key
     if (previousPath.current === location.pathname && !location.hash) return
+    const switchingAuthMode =
+      !location.hash &&
+      isCustomerAuthModeSwitch(previousPath.current, location.pathname)
     previousPath.current = location.pathname
+    if (switchingAuthMode) {
+      document
+        .querySelector<HTMLElement>('.auth-tabs [aria-current="page"]')
+        ?.focus({ preventScroll: true })
+      return
+    }
     const target = location.hash
       ? document.getElementById(location.hash.slice(1))
       : document.getElementById('contenido')

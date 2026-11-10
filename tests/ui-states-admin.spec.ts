@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import type { AdminState } from '../src/services/admin-service'
 import { persistedAdminState } from './product-import-fixtures'
 import { seedWorkflowOrders } from './order-workflow-fixtures'

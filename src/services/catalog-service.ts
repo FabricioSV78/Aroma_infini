@@ -1,127 +1,57 @@
-import type {
-  Brand,
-  Product,
-  ProductAudience,
-  ProductGalleryView,
-  ProductType,
-} from '../types/catalog'
+import {
+  getCatalogGenders,
+  PAGE_SIZE,
+  parseCatalogQuery,
+  type CatalogQuery,
+} from '../domain/catalog-query'
+export {
+  getCatalogGenders,
+  orders,
+  PAGE_SIZE,
+  type CatalogGender,
+  type CatalogOrder,
+  type CatalogQuery,
+} from '../domain/catalog-query'
+import type { Brand, Product, ProductGalleryView } from '../types/catalog'
 import {
   OLFACTORY_FAMILIES,
   getProductOlfactoryFamilies,
-  isOlfactoryFamily,
-  type OlfactoryFamily,
 } from '../domain/olfactory-family'
 import { getProductPresentation } from './product-presentation'
-import {
-  getProductType,
-  isPerfume,
-  isProductType,
-} from '../domain/product-type'
+import { getProductType, isPerfume } from '../domain/product-type'
 import { getVariantPrice } from './product-discounts'
 import { getProductRecommendations } from './product-recommendations'
 import type { StoreFeatures } from '../domain/store-features'
+import { isRemoteCatalog } from './catalog-source'
 import {
-  localStorefrontRepository,
+  readRemoteCatalog,
+  readRemoteProductContext,
+} from './remote-catalog-queries'
+import { readRemoteBrandPreviews } from './public-home-catalog'
+import {
+  storefrontRepository,
+  readStorefrontMetadata,
   type StorefrontProductRecord,
 } from './storefront-repository'
-
-export type CatalogGender = ProductAudience
-
-const catalogGenders: ReadonlyArray<{
-  value: CatalogGender
-  label: string
-}> = [
-  { value: 'hombre', label: 'Para él' },
-  { value: 'mujer', label: 'Para ella' },
-  { value: 'unisex', label: 'Unisex' },
-]
-
-export function getCatalogGenders() {
-  return catalogGenders
-}
 
 /** Synchronous card view backed by the same published records as catalogue pages. */
 export function getCatalogProductGallery(
   productId: string,
 ): ProductGalleryView[] {
   return (
-    localStorefrontRepository
+    storefrontRepository
       .peekSnapshot()
       .products.find((record) => record.product.id === productId)?.detail
       .gallery ?? []
   )
 }
-export const orders = [
-  { value: 'mas-vendidos', label: 'Más vendidos' },
-  { value: 'precio-asc', label: 'Precio: menor a mayor' },
-  { value: 'precio-desc', label: 'Precio: mayor a menor' },
-] as const
-export type CatalogOrder = (typeof orders)[number]['value']
-export const PAGE_SIZE = 12
-export interface CatalogQuery {
-  productTypes: ProductType[]
-  brands: string[]
-  genders: CatalogGender[]
-  families: OlfactoryFamily[]
-  min: string
-  max: string
-  order: CatalogOrder
-  page: number
-  search: string
-}
-function priceParam(value: string | null) {
-  return value && /^\d+(\.\d{1,2})?$/.test(value) && Number(value) <= 1000000
-    ? value
-    : ''
-}
+/** Read the current vocabulary only at the local adapter boundary. */
 export function readCatalogQuery(
   params: URLSearchParams,
-  brands: readonly Brand[] = localStorefrontRepository.peekSnapshot().brands,
-  features: StoreFeatures = localStorefrontRepository.peekSnapshot().features,
+  brands: readonly Brand[] = storefrontRepository.peekSnapshot().brands,
+  features: StoreFeatures = storefrontRepository.peekSnapshot().features,
 ): CatalogQuery {
-  const genders = getCatalogGenders()
-  let min = priceParam(params.get('min'))
-  let max = priceParam(params.get('max'))
-  const rawOrder = params.get('orden')
-  const productTypes = features.complementsEnabled
-    ? [...new Set(params.getAll('tipo').filter(isProductType))]
-    : []
-  const complementsOnly =
-    productTypes.length === 1 && productTypes[0] === 'complemento'
-  if (min && max && Number(min) > Number(max)) [min, max] = [max, min]
-  return {
-    productTypes,
-    brands: [
-      ...new Set(
-        params
-          .getAll('marca')
-          .filter((slug) => brands.some((brand) => brand.slug === slug)),
-      ),
-    ],
-    genders: complementsOnly
-      ? []
-      : [
-          ...new Set(
-            params
-              .getAll('genero')
-              .filter((value): value is CatalogGender =>
-                genders.some((gender) => gender.value === value),
-              ),
-          ),
-        ],
-    families: complementsOnly
-      ? []
-      : [...new Set(params.getAll('familia').filter(isOlfactoryFamily))],
-    min,
-    max,
-    order:
-      orders.find((order) => order.value === rawOrder)?.value ?? 'mas-vendidos',
-    page: Math.max(
-      1,
-      Math.min(100000, Number.parseInt(params.get('pagina') ?? '1', 10) || 1),
-    ),
-    search: (params.get('q') ?? '').trim().slice(0, 100),
-  }
+  return parseCatalogQuery(params, brands, features)
 }
 export function normalizeText(value: string) {
   return value
@@ -131,12 +61,12 @@ export function normalizeText(value: string) {
 }
 export function queryCatalog(
   query: CatalogQuery,
-  source: Product[] = localStorefrontRepository
+  source: Product[] = storefrontRepository
     .peekSnapshot()
     .products.map((record) => record.product),
-  records: StorefrontProductRecord[] = localStorefrontRepository.peekSnapshot()
+  records: StorefrontProductRecord[] = storefrontRepository.peekSnapshot()
     .products,
-  brands: Brand[] = localStorefrontRepository.peekSnapshot().brands,
+  brands: Brand[] = storefrontRepository.peekSnapshot().brands,
 ) {
   const recordsById = new Map(
     records.map((record) => [record.product.id, record]),
@@ -253,7 +183,8 @@ export interface CatalogReadService {
 
 export const catalogService: CatalogReadService = {
   async getCatalog(query: CatalogQuery) {
-    const snapshot = await localStorefrontRepository.readSnapshot()
+    if (isRemoteCatalog) return readRemoteCatalog(query)
+    const snapshot = await storefrontRepository.readSnapshot()
     const publishedFamilies = new Set(
       snapshot.products.flatMap((record) =>
         getProductOlfactoryFamilies(record.product),
@@ -270,16 +201,17 @@ export const catalogService: CatalogReadService = {
       availableTotal: snapshot.products.length,
       features: snapshot.features,
       genders: getCatalogGenders(),
-      families: OLFACTORY_FAMILIES.filter((family) =>
-        publishedFamilies.has(family.value),
+      families: OLFACTORY_FAMILIES.filter(
+        (family) => family.active && publishedFamilies.has(family.value),
       ),
     }
   },
   async getBrands() {
-    return (await localStorefrontRepository.readSnapshot()).brands
+    return (await readStorefrontMetadata()).brands
   },
   async getBrandPreviews() {
-    const snapshot = await localStorefrontRepository.readSnapshot()
+    if (isRemoteCatalog) return readRemoteBrandPreviews()
+    const snapshot = await storefrontRepository.readSnapshot()
     return snapshot.brands.map((brand) => ({
       ...brand,
       previewImage: snapshot.products.find(
@@ -288,7 +220,8 @@ export const catalogService: CatalogReadService = {
     }))
   },
   async getProduct(slug: string) {
-    const snapshot = await localStorefrontRepository.readSnapshot()
+    if (isRemoteCatalog) return readRemoteProductContext(slug)
+    const snapshot = await storefrontRepository.readSnapshot()
     const record = snapshot.products.find((item) => item.product.slug === slug)
     if (!record) return undefined
     const { product, detail } = record
@@ -307,7 +240,25 @@ export const catalogService: CatalogReadService = {
     }
   },
   async suggest(search: string) {
-    const snapshot = await localStorefrontRepository.readSnapshot()
+    if (isRemoteCatalog) {
+      const query: CatalogQuery = {
+        productTypes: [],
+        brands: [],
+        genders: [],
+        families: [],
+        min: '',
+        max: '',
+        order: 'mas-vendidos',
+        page: 1,
+        search: search.trim().slice(0, 100),
+      }
+      const result = await readRemoteCatalog(query, 5)
+      return result.items.map((product) => ({
+        ...product,
+        brand: result.brands.find((brand) => brand.id === product.brandId),
+      }))
+    }
+    const snapshot = await storefrontRepository.readSnapshot()
     const brands = snapshot.brands
     const query = readCatalogQuery(new URLSearchParams({ q: search }), brands)
     return queryCatalog(

@@ -54,7 +54,7 @@ export function BrandsPage() {
             className="catalog-empty"
             icon="store"
             title="No hay marcas disponibles"
-            description="La selección de marcas está en preparación."
+            description="Vuelve al inicio para seguir explorando la tienda."
           >
             <Link className="text-link" to="/">
               Volver al inicio <Icon name="arrow" />

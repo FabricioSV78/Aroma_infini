@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { persistedAdminState } from './product-import-fixtures'
 
 async function openCoupon(page: Page) {

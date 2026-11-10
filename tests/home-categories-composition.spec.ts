@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { setComplementsEnabled } from './complements-fixtures'
 
 test.beforeEach(async ({ page }) => {

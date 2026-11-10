@@ -16,6 +16,7 @@ export default tseslint.config(
     ],
   },
   js.configs.recommended,
+  { files: ['public/admin/sw.js'], languageOptions: { globals: globals.serviceworker } },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
@@ -30,7 +31,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.config.js', 'scripts/*.mjs'],
+    files: ['*.config.js', 'scripts/*.mjs', 'tests/*.test.mjs'],
     languageOptions: { globals: globals.node },
   },
 )

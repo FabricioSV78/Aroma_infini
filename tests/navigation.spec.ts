@@ -1,6 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { footerGroups, navigationGroups } from '../src/content/navigation'
-import { footerSocialProfiles } from '../src/content/social'
 
 test('El footer conserva soporte, seguimiento e información legal', async ({
   page,
@@ -44,12 +43,9 @@ test('El footer muestra las mismas redes y estilos en Home y las demás páginas
       await page.goto(path)
       const footer = page.locator('.site-footer')
       const social = footer.locator('.footer-social')
-      await expect(social.locator('.footer-social-placeholder')).toHaveCount(
-        footerSocialProfiles.filter((profile) => !profile.url).length,
-      )
-      await expect(social.locator('a')).toHaveCount(
-        footerSocialProfiles.filter((profile) => profile.url).length,
-      )
+      // Unconfigured profiles stay hidden; the admin owns the shared URLs.
+      await expect(social.locator('.footer-social-placeholder')).toHaveCount(0)
+      await expect(social.locator('a')).toHaveCount(0)
 
       const snapshot = {
         headings: await footer.locator('.footer-top h2').allInnerTexts(),

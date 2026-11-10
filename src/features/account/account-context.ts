@@ -11,11 +11,13 @@ export interface AccountContextValue {
   profile: AccountProfile
   address: AccountAddress | null
   orders: AccountOrder[]
-  activateDemo: () => void
-  leaveDemo: () => void
-  updateProfile: (profile: AccountProfile) => void
-  saveAddress: (address: AccountAddress) => void
-  removeAddress: () => void
+  ordersAvailable: boolean
+  status: 'loading' | 'ready' | 'error'
+  error: string
+  reload: () => void
+  updateProfile: (profile: AccountProfile) => Promise<void>
+  saveAddress: (address: AccountAddress) => Promise<void>
+  removeAddress: () => Promise<void>
   addCheckoutOrder: (order: MockOrder) => void
 }
 

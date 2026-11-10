@@ -33,6 +33,7 @@ export function AdminShippingSummary({
           <header className="admin-shipping-sheet-heading">
             <strong>AROMA INFINI</strong>
             <span>Pedido {order.reference}</span>
+            {order.simulation ? <span>Prueba · no despachar</span> : null}
           </header>
           <div className="admin-shipping-sheet-recipient">
             <span className="admin-shipping-sheet-label">Destinatario</span>

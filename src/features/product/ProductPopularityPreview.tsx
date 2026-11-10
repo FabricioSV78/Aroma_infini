@@ -5,14 +5,12 @@ interface ProductPopularityPreviewProps {
   productImage: string
   productName: string
   description: string
-  bestseller: boolean
 }
 
 export function ProductPopularityPreview({
   productImage,
   productName,
   description,
-  bestseller,
 }: ProductPopularityPreviewProps) {
   const [ready, setReady] = useState(false)
   const [galleryPassed, setGalleryPassed] = useState(false)
@@ -95,7 +93,7 @@ export function ProductPopularityPreview({
           <i aria-hidden="true" /> Selección{' '}
           <span className="brand-label">Aroma Infini</span>
         </span>
-        <p>{bestseller ? 'Entre los más vendidos' : productName}</p>
+        <p>{productName}</p>
         <p>{description}</p>
       </div>
       <button

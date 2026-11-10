@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { getProductReviews } from '../src/mocks/product-reviews'
 import { products } from '../src/mocks/home'
 
@@ -24,7 +24,7 @@ test('Los ocho perfumes incluyen 50 opiniones coherentes con sus presentaciones'
   }
 })
 
-test('El video usa un archivo panorámico en escritorio y uno vertical en móvil', async ({
+test('El mismo video utiliza una versión panorámica en escritorio y un encuadre vertical 4:5 en móvil', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
@@ -39,15 +39,68 @@ test('El video usa un archivo panorámico en escritorio y uno vertical en móvil
   await expect
     .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoWidth))
     .toBe(1920)
-  expect(
-    await video.evaluate((node: HTMLVideoElement) => node.duration),
-  ).toBeLessThan(16)
+  const desktopDuration = await video.evaluate(
+    (node: HTMLVideoElement) => node.duration,
+  )
+  expect(desktopDuration).toBeLessThan(16)
   await page.setViewportSize({ width: 390, height: 844 })
   await video.scrollIntoViewIfNeeded()
-  await expect(video).toHaveAttribute('src', '/videos/perfume-ritual.mp4')
+  await expect(video).toHaveAttribute(
+    'src',
+    '/videos/perfume-editorial-mobile.mp4',
+  )
+  await expect
+    .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoWidth))
+    .toBe(720)
   await expect
     .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoHeight))
-    .toBe(1280)
+    .toBe(900)
+  const mobileDuration = await video.evaluate(
+    (node: HTMLVideoElement) => node.duration,
+  )
+  expect(Math.abs(mobileDuration - desktopDuration)).toBeLessThanOrEqual(0.5)
+})
+
+test('En móvil solo se descarga el video adaptado y movimiento reducido espera una reproducción voluntaria', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  const requestedVideos: string[] = []
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname
+    if (pathname.startsWith('/videos/') && pathname.endsWith('.mp4'))
+      requestedVideos.push(pathname)
+  })
+  await page.goto('/')
+  const video = page.locator('.editorial-film video')
+  await expect(video).not.toHaveAttribute('src')
+  await page.locator('.editorial-film').scrollIntoViewIfNeeded()
+  await expect
+    .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+    .toBeGreaterThanOrEqual(2)
+  expect([...new Set(requestedVideos)]).toEqual([
+    '/videos/perfume-editorial-mobile.mp4',
+  ])
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  requestedVideos.length = 0
+  await page.reload()
+  await page.locator('.editorial-film').scrollIntoViewIfNeeded()
+  await page.waitForLoadState('networkidle')
+  await expect(video).not.toHaveAttribute('src')
+  await expect(video).toHaveAttribute(
+    'poster',
+    '/videos/perfume-editorial-mobile.webp',
+  )
+  expect(requestedVideos).toEqual([])
+  await page.getByRole('button', { name: 'Reproducir video editorial' }).click()
+  await expect
+    .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused))
+    .toBe(false)
+  expect([...new Set(requestedVideos)]).toEqual([
+    '/videos/perfume-editorial-mobile.mp4',
+  ])
 })
 
 for (const viewport of [
@@ -102,9 +155,9 @@ test('Un visitante debe acceder a su cuenta antes de escribir', async ({
   await expect(trigger).toBeFocused()
   await trigger.click()
   await dialog.getByRole('link', { name: 'Iniciar sesión' }).click()
-  await expect(page).toHaveURL('/cuenta')
+  await expect(page).toHaveURL(/iniciar-sesion/)
   await expect(
-    page.getByRole('button', { name: 'Ver mi cuenta' }),
+    page.getByRole('heading', { name: 'Mi cuenta', exact: true }),
   ).toBeVisible()
 })
 
@@ -165,9 +218,11 @@ test('El video respeta movimiento reducido, ofrece control manual y se pausa fue
 test('El video fallido conserva imagen y acceso a la tienda', async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/videos/*.mp4', (route) => route.abort())
   await page.goto('/')
   await page.locator('.editorial-film').scrollIntoViewIfNeeded()
+  await page.getByRole('button', { name: 'Reproducir video editorial' }).click()
   await expect(page.locator('.editorial-film-fallback')).toBeVisible()
   await expect(page.locator('.editorial-film img')).toBeVisible()
   await expect(page.locator('.editorial-film a')).toHaveAttribute(
@@ -178,10 +233,12 @@ test('El video fallido conserva imagen y acceso a la tienda', async ({
 
 test('Reseñas: filtrar, ordenar, añadir y conservar una opinión local', async ({
   page,
+  authFixture,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
+  authFixture.setMode('customer')
   await page.goto('/cuenta')
-  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
+  await expect(page.locator('.account-page')).toBeVisible()
   await page.goto('/producto/petale-nu')
   await openReviews(page)
   const section = page.locator('.product-reviews-preview')
@@ -225,11 +282,13 @@ test('Reseñas: filtrar, ordenar, añadir y conservar una opinión local', async
 for (const width of [320, 390, 768, 1440]) {
   test(`Editorial y reseñas sin desbordamiento a ${width}px`, async ({
     page,
+    authFixture,
   }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.emulateMedia({ reducedMotion: 'reduce' })
+    authFixture.setMode('customer')
     await page.goto('/cuenta')
-    await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
+    await expect(page.locator('.account-page')).toBeVisible()
     for (const route of ['/', '/producto/petale-nu']) {
       await page.goto(route)
       if (route !== '/') await openReviews(page)

@@ -14,12 +14,19 @@ export interface CustomerContact {
   phone: string
 }
 
+export interface DeliveryLocation {
+  latitude: number
+  longitude: number
+}
+
 export interface DeliveryAddress {
   department: string
   province: string
   district: string
   street: string
   reference?: string
+  /** Optional customer-confirmed point; it does not determine shipping rates. */
+  location?: DeliveryLocation | null
 }
 
 export interface PurchasedLine {

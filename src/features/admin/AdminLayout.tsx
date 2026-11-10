@@ -8,6 +8,13 @@ import { NavigationStatus } from '../../components/ui/NavigationStatus'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { AdminNoticeProvider, useAdminNotice } from './AdminNoticeProvider'
 import { AdminFieldValidation } from './AdminFieldValidation'
+import { authService } from '../../services/auth-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { isProductionEnvironment } from '../../services/runtime-environment'
+import { mountAdminPwa } from '../../services/admin-pwa'
+import { AdminNotificationBell } from './AdminNotificationBell'
+import { disableAdminPushOnSignOut } from '../../services/admin-notifications'
+import { preloadAdminRoute } from './admin-route-modules'
 
 const adminGroups = [
   {
@@ -21,6 +28,7 @@ const adminGroups = [
     sections: [
       { to: '/admin/pedidos', label: 'Pedidos', icon: 'orders' },
       { to: '/admin/clientes', label: 'Clientes', icon: 'user' },
+      { to: '/admin/reclamaciones', label: 'Reclamaciones', icon: 'chat' },
     ],
   },
   {
@@ -28,6 +36,11 @@ const adminGroups = [
     sections: [
       { to: '/admin/productos', label: 'Productos', icon: 'package' },
       { to: '/admin/marcas', label: 'Marcas', icon: 'tag' },
+      {
+        to: '/admin/familias-olfativas',
+        label: 'Familias olfativas',
+        icon: 'tag',
+      },
     ],
   },
   {
@@ -40,7 +53,13 @@ const adminGroups = [
   {
     label: 'Configuración',
     sections: [
+      { to: '/admin/notificaciones', label: 'Notificaciones', icon: 'bell' },
       { to: '/admin/envios', label: 'Tarifas de envío', icon: 'truck' },
+      {
+        to: '/admin/configuracion',
+        label: 'Datos de la tienda',
+        icon: 'store',
+      },
     ],
   },
 ] as const satisfies ReadonlyArray<{
@@ -62,6 +81,7 @@ export function AdminLayout() {
 }
 
 function AdminLayoutContent() {
+  useEffect(mountAdminPwa, [])
   const notice = useAdminNotice()
   const location = useLocation()
   const navigate = useNavigate()
@@ -98,9 +118,18 @@ function AdminLayoutContent() {
     if (!navigationOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    window.requestAnimationFrame(() =>
-      menuCloseButtonRef.current?.focus({ preventScroll: true }),
-    )
+    // The drawer can still inherit its hidden style on the first frame after
+    // opening (especially with reduced motion). Focus only once it is rendered;
+    // focusing an invisible button otherwise silently leaves focus on body.
+    let focusFrame = window.requestAnimationFrame(function focusVisibleDrawer() {
+      const button = menuCloseButtonRef.current
+      if (!button) return
+      if (window.getComputedStyle(button).visibility !== 'visible') {
+        focusFrame = window.requestAnimationFrame(focusVisibleDrawer)
+        return
+      }
+      button.focus({ preventScroll: true })
+    })
     const handleDrawerKeys = (event: KeyboardEvent) => {
       if (document.querySelector('.admin-notice-dialog[open]')) return
       if (event.key === 'Escape') {
@@ -127,6 +156,7 @@ function AdminLayoutContent() {
     }
     document.addEventListener('keydown', handleDrawerKeys)
     return () => {
+      window.cancelAnimationFrame(focusFrame)
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', handleDrawerKeys)
     }
@@ -182,7 +212,28 @@ function AdminLayoutContent() {
           <strong>{currentSection?.label ?? 'Resumen'}</strong>
         </div>
         <div className="admin-header-actions">
+          <AdminNotificationBell />
           <Link to="/">Ver tienda</Link>
+          <button
+            className="admin-signout"
+            type="button"
+            aria-label="Cerrar sesión"
+            onClick={() => {
+              void disableAdminPushOnSignOut().catch(() => {})
+              void authService
+                .signOut()
+                .catch(() =>
+                  notice.toast(
+                    'El acceso local se cerró. Revisa la conexión para cerrar también la sesión del proveedor.',
+                  ),
+                )
+            }}
+          >
+            <span className="admin-signout-label">Cerrar sesión</span>
+            <span className="admin-signout-short" aria-hidden="true">
+              Salir
+            </span>
+          </button>
           <button
             ref={menuButtonRef}
             className="admin-menu-toggle"
@@ -248,6 +299,12 @@ function AdminLayoutContent() {
                     <NavLink
                       to={section.to}
                       end={'end' in section && section.end}
+                      className={({ isPending }) =>
+                        isPending ? 'is-pending' : undefined
+                      }
+                      onPointerEnter={() => preloadAdminRoute(section.to)}
+                      onFocus={() => preloadAdminRoute(section.to)}
+                      onTouchStart={() => preloadAdminRoute(section.to)}
                       onClick={() => setNavigationOpen(false)}
                     >
                       <Icon name={section.icon} />
@@ -260,19 +317,24 @@ function AdminLayoutContent() {
           ))}
         </nav>
         <div className="admin-sidebar-footer">
-          <button
-            className="admin-reset"
-            type="button"
-            disabled={
-              resetPersistence.saving || resetPersistence.persistenceFailed
-            }
-            onClick={() => void resetDemo()}
-          >
-            Borrar datos de este navegador
-          </button>
-          <AdminSaveFeedback {...resetPersistence} />
+          {!isRemoteCatalog ? (
+            <button
+              className="admin-reset"
+              type="button"
+              disabled={
+                resetPersistence.saving || resetPersistence.persistenceFailed
+              }
+              onClick={() => void resetDemo()}
+            >
+              Borrar datos de este navegador
+            </button>
+          ) : null}
+          {!isRemoteCatalog ? (
+            <AdminSaveFeedback {...resetPersistence} />
+          ) : null}
           <span className="admin-side-status">
-            <span aria-hidden="true" /> Datos locales
+            <span aria-hidden="true" />{' '}
+            {isRemoteCatalog ? 'Catálogo en Supabase' : 'Datos locales'}
           </span>
         </div>
       </aside>
@@ -292,9 +354,13 @@ function AdminLayoutContent() {
         tabIndex={-1}
         inert={navigationOpen}
       >
-        <div className="admin-demo-banner">
-          Los cambios de este panel se guardan en este navegador.
-        </div>
+        {!isProductionEnvironment && (
+          <div className="admin-demo-banner">
+            {isRemoteCatalog
+              ? 'Entorno de pruebas · Los pedidos de prueba no representan cobros ni reservas de stock.'
+              : 'Los cambios de este panel se guardan en este navegador.'}
+          </div>
+        )}
         <AdminFieldValidation key={location.pathname}>
           <Outlet />
         </AdminFieldValidation>

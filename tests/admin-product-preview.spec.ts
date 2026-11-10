@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { persistedAdminState } from './product-import-fixtures'
 
 test('el editor facilita crear la URL y evita tamaños de presentación duplicados', async ({

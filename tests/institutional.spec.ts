@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const institutionalRoutes = [
   ['/nosotros', 'Distintas casas. Un perfume que sientas tuyo'],
@@ -54,8 +54,13 @@ test('Las rutas institucionales tienen contenido propio y contacto funcional', a
   await expect(page.locator('main a[href="/marcas"]')).toHaveCount(1)
 
   await page.goto('/libro-de-reclamaciones')
-  await expect(page.getByRole('link', { name: 'Escríbenos' })).toBeVisible()
-  await expect(page.locator('form')).toHaveCount(0)
+  await expect(page.locator('form')).toHaveCount(1)
+  await expect(
+    page.getByLabel('Nombres y apellidos', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Registrar solicitud', exact: true }),
+  ).toBeEnabled()
 })
 
 for (const width of [390, 1440]) {

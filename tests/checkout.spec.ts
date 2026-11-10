@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { resolveCart } from '../src/services/commerce-service'
 import {
   calculateCheckout,
@@ -206,7 +206,7 @@ test('El seguimiento descarta registros locales dañados', async ({ page }) => {
   await expect(page.getByText(/No encontramos ese pedido/)).toBeVisible()
   await page.goto('/cuenta/pedidos')
   await expect(
-    page.getByRole('heading', { name: 'Todo en un mismo lugar' }),
+    page.getByRole('heading', { name: 'Mi cuenta', exact: true }),
   ).toBeVisible()
 })
 
@@ -223,7 +223,9 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
     )
   })
   await page.goto('/checkout')
-  await page.getByRole('radio', { name: /Con mi cuenta/ }).check()
+  await expect(
+    page.getByRole('link', { name: /Con mi cuenta/ }),
+  ).toHaveAttribute('href', /iniciar-sesion/)
   await page.getByLabel('Nombre', { exact: true }).fill('Ana')
   await page.getByLabel('Apellido').fill('Torres')
   await page.getByLabel('Correo electrónico').fill('ana@example.invalid')
@@ -249,14 +251,11 @@ test('El recorrido normal muestra solo Mercado Pago y mantiene las pruebas fuera
   await expect(
     page.getByRole('heading', { name: 'Tu selección quedó guardada' }),
   ).toBeVisible()
-  await page.getByRole('link', { name: 'Ver en Mis pedidos' }).click()
-  await expect(page).toHaveURL('/cuenta/pedidos')
-  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
-  await expect(page.locator('.account-order-list > li')).toHaveCount(2)
-  await page.getByRole('link', { name: 'Ver pedido' }).first().click()
-  await expect(page.getByRole('heading', { name: 'Recibido' })).toBeVisible()
-  await page.reload()
-  await expect(page.getByRole('heading', { name: 'Recibido' })).toBeVisible()
+  await page.getByRole('link', { name: 'Ver estado del pedido' }).click()
+  await expect(page).toHaveURL(/seguir-pedido/)
+  await expect(
+    page.getByRole('heading', { name: 'Estado: recibido' }),
+  ).toBeVisible()
 })
 
 test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confirmación', async ({
@@ -366,12 +365,12 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await page.getByRole('button', { name: 'Consultar' }).click()
   await expect(page.getByText(/No encontramos ese pedido/)).toBeVisible()
   await page.goto('/cuenta/pedidos')
-  await page.getByRole('button', { name: 'Ver mi cuenta' }).click()
-  await expect(page.locator('.account-order-list > li')).toHaveCount(1)
+  await expect(page).toHaveURL(/iniciar-sesion/)
+  await expect(page.locator('.account-order-list > li')).toHaveCount(0)
   await expect(page.getByText(trackingHref!.split('codigo=')[1])).toHaveCount(0)
 })
 
-test('La compra aprobada se refleja en pedidos, inventario y seguimiento administrativo', async ({
+test('El pedido simulado se refleja en administración y seguimiento sin aprobar pago ni consumir inventario', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -410,7 +409,8 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
   const orderRow = page.locator('.admin-table tbody tr')
   await expect(orderRow).toHaveCount(1)
   await expect(orderRow).toContainText('Lucía Compradora')
-  await expect(orderRow).toContainText('Pagado')
+  await expect(orderRow).toContainText('Pago pendiente')
+  await expect(orderRow).toContainText('Modo prueba')
 
   await orderRow
     .getByRole('link', { name: new RegExp(`Ver ${reference}`) })
@@ -423,7 +423,7 @@ test('La compra aprobada se refleja en pedidos, inventario y seguimiento adminis
     window.history.pushState(null, '', path)
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, '/admin/productos/cedre')
-  await expect(page.getByLabel('Stock de presentación 50 ml')).toHaveValue('4')
+  await expect(page.getByLabel('Stock de presentación 50 ml')).toHaveValue('5')
 
   await page.evaluate((path) => {
     window.history.pushState(null, '', path)
@@ -481,7 +481,9 @@ test('La cuenta de ejemplo no autentica y el borrador se conserva al editar el c
   await page.goto('/producto/bois-clair')
   await page.getByRole('button', { name: 'Añadir al carrito' }).click()
   await page.goto('/checkout')
-  await page.getByRole('radio', { name: /Con mi cuenta/ }).check()
+  await expect(
+    page.getByRole('link', { name: /Con mi cuenta/ }),
+  ).toHaveAttribute('href', /iniciar-sesion/)
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Correo electrónico')).toHaveValue('')
   await page.getByLabel('Nombre', { exact: true }).fill('Camila')

@@ -1,7 +1,15 @@
 import { variantLabel } from '../../domain/product-type'
+import { RecoveryCodeSettings } from './RecoveryCodeSettings'
+import { authFeatures } from '../../domain/auth-policy'
 import { formatBrandName } from '../../utils/brand-name'
-import { useState, useSyncExternalStore, type FormEvent } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import {
+  useCallback,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from 'react'
+import { Link, useParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
@@ -16,7 +24,7 @@ import {
 } from '../../content/peru'
 import {
   accountStatusLabels,
-  createDemoAddress,
+  emptyAccountAddress,
   type AccountAddress,
   type AccountProfile,
 } from '../../services/account-service'
@@ -28,6 +36,11 @@ import { useFavorites } from '../favorites/favorites-context'
 import { FavoritesCollection } from '../favorites/FavoritesCollection'
 import { AccountOrderTimeline } from './AccountOrderTimeline'
 import { useAccount } from './account-context'
+import { AuthError, authErrorMessage } from '../../services/auth-errors'
+import { Dialog } from '../../components/ui/Dialog'
+import { ChangeEmailDialog } from './ChangeEmailDialog'
+import { useAuth } from '../auth/useAuth'
+import { AddressLocationPicker } from './AddressLocationPicker'
 
 const dateFormatter = new Intl.DateTimeFormat('es-PE', {
   day: 'numeric',
@@ -44,24 +57,33 @@ function reportTrimmedValidity(form: HTMLFormElement) {
 }
 
 export function AccountOverviewPage() {
-  const { profile, address, orders } = useAccount()
-  const { favoriteCount } = useFavorites()
+  const auth = useAuth()
+  const { profile, address, orders, ordersAvailable } = useAccount()
+  const { favoriteCount, persistence: favoritesPersistence } = useFavorites()
   const latestOrder = orders[0]
   return (
     <section className="account-section" aria-labelledby="account-title">
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Resumen</p>
-        <h1 id="account-title">Hola, {profile.firstName}</h1>
+        <h1 id="account-title">
+          {profile.firstName.trim()
+            ? `Hola, ${profile.firstName}`
+            : 'Mi cuenta'}
+        </h1>
         <p>Todo lo necesario para continuar descubriendo.</p>
       </header>
       <div className="account-overview-grid" data-scroll-reveal="stagger">
         <section aria-labelledby="overview-orders-title">
-          <span>{String(orders.length).padStart(2, '0')}</span>
+          <span>
+            {ordersAvailable ? String(orders.length).padStart(2, '0') : '—'}
+          </span>
           <h2 id="overview-orders-title">Mis pedidos</h2>
           <p className={latestOrder ? 'account-overview-status' : undefined}>
-            {latestOrder
-              ? `Último estado: ${accountStatusLabels[latestOrder.status]}.`
-              : 'Todavía no hay pedidos.'}
+            {!ordersAvailable
+              ? 'El historial no está disponible por el momento.'
+              : latestOrder
+                ? `Último estado: ${accountStatusLabels[latestOrder.status]}.`
+                : 'Todavía no hay pedidos.'}
           </p>
           <Link className="text-link" to="/cuenta/pedidos">
             Ver mis pedidos <Icon name="arrow" />
@@ -82,17 +104,30 @@ export function AccountOverviewPage() {
         <section aria-labelledby="overview-favorites-title">
           <span>{String(favoriteCount).padStart(2, '0')}</span>
           <h2 id="overview-favorites-title">Favoritos</h2>
-          <p>Aromas guardados en este navegador.</p>
+          <p>
+            {favoritesPersistence === 'account'
+              ? 'Productos guardados en tu cuenta.'
+              : 'Aromas guardados en este navegador.'}
+          </p>
           <Link className="text-link" to="/cuenta/favoritos">
             Ver favoritos <Icon name="arrow" />
           </Link>
         </section>
       </div>
+      {auth.session?.user.role === 'customer' && (
+        <p className="account-recovery-reminder">
+          Protege tu acceso sin correos.{' '}
+          <Link to="/cuenta/datos#recuperacion" className="text-link">
+            Guarda tu código de recuperación <Icon name="arrow" />
+          </Link>
+        </p>
+      )}
     </section>
   )
 }
 
 export function AccountFavoritesPage() {
+  const { persistence } = useFavorites()
   return (
     <section
       className="account-section"
@@ -101,7 +136,11 @@ export function AccountFavoritesPage() {
       <header className="account-heading" data-scroll-reveal="copy">
         <p className="eyebrow">Tu selección personal</p>
         <h1 id="account-favorites-title">Favoritos</h1>
-        <p>Aromas guardados en este navegador.</p>
+        <p>
+          {persistence === 'account'
+            ? 'Productos guardados en tu cuenta.'
+            : 'Aromas guardados en este navegador.'}
+        </p>
       </header>
       <FavoritesCollection />
     </section>
@@ -109,24 +148,50 @@ export function AccountFavoritesPage() {
 }
 
 export function AccountDataPage() {
-  const { profile, updateProfile } = useAccount()
+  const { profile, updateProfile, reload } = useAccount()
   const [form, setForm] = useState<AccountProfile>(profile)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [changingEmail, setChangingEmail] = useState(false)
+  const changeEmailTrigger = useRef<HTMLButtonElement>(null)
+  const closeEmailChange = useCallback(() => setChangingEmail(false), [])
+  const profileHasChanges =
+    form.firstName.trim() !== profile.firstName ||
+    form.lastName.trim() !== profile.lastName ||
+    form.phone.trim() !== profile.phone
 
   function update(field: keyof AccountProfile, value: string) {
     setSaved(false)
+    if (field === 'email') setEmailError('')
     setForm((current) => ({ ...current, [field]: value }))
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!reportTrimmedValidity(event.currentTarget)) return
-    updateProfile({
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-    })
-    setSaved(true)
+    if (saving || !reportTrimmedValidity(event.currentTarget)) return
+    setSaving(true)
+    setSaveError('')
+    setEmailError('')
+    try {
+      await updateProfile({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: profile.email,
+        phone: form.phone.trim(),
+      })
+      setSaved(true)
+    } catch (error) {
+      if (
+        error instanceof AuthError &&
+        ['email', 'email-change'].includes(error.code)
+      ) {
+        setEmailError(authErrorMessage(error))
+        document.getElementById('account-email')?.focus()
+      } else setSaveError(authErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -138,7 +203,7 @@ export function AccountDataPage() {
       </header>
       <form
         className="account-form"
-        onSubmit={submit}
+        onSubmit={(event) => void submit(event)}
         onInput={(event) => {
           if (event.target instanceof HTMLInputElement)
             event.target.setCustomValidity('')
@@ -150,6 +215,8 @@ export function AccountDataPage() {
             <label htmlFor="account-first-name">Nombre</label>
             <input
               id="account-first-name"
+              autoComplete="given-name"
+              maxLength={80}
               value={form.firstName}
               onChange={(event) => update('firstName', event.target.value)}
               required
@@ -160,6 +227,8 @@ export function AccountDataPage() {
             <label htmlFor="account-last-name">Apellido</label>
             <input
               id="account-last-name"
+              autoComplete="family-name"
+              maxLength={80}
               value={form.lastName}
               onChange={(event) => update('lastName', event.target.value)}
               required
@@ -170,17 +239,52 @@ export function AccountDataPage() {
             <label htmlFor="account-email">Correo electrónico</label>
             <input
               id="account-email"
+              autoComplete="email"
               type="email"
-              value={form.email}
-              onChange={(event) => update('email', event.target.value)}
+              maxLength={254}
+              readOnly
+              aria-invalid={Boolean(emailError)}
+              aria-describedby={emailError ? 'account-email-error' : undefined}
+              value={profile.email}
               required
             />
+            {emailError && (
+              <p id="account-email-error" className="auth-field-error">
+                {emailError}
+              </p>
+            )}
+            {authFeatures.emailChange && (
+              <>
+                <button
+                  ref={changeEmailTrigger}
+                  className="text-link"
+                  type="button"
+                  disabled={saving || profileHasChanges}
+                  onClick={() => setChangingEmail(true)}
+                  aria-describedby={
+                    profileHasChanges ? 'account-email-save-first' : undefined
+                  }
+                >
+                  Cambiar correo
+                </button>
+                {profileHasChanges && (
+                  <p
+                    id="account-email-save-first"
+                    className="account-field-help"
+                  >
+                    Guarda tus cambios antes de cambiar el correo.
+                  </p>
+                )}
+              </>
+            )}
           </div>
           <div className="account-field">
             <label htmlFor="account-phone">Celular</label>
             <input
               id="account-phone"
+              autoComplete="tel"
               type="tel"
+              maxLength={20}
               inputMode="tel"
               value={form.phone}
               onChange={(event) => update('phone', event.target.value)}
@@ -190,14 +294,44 @@ export function AccountDataPage() {
           </div>
         </div>
         <div className="account-form-actions">
-          <button className="button button--primary" type="submit">
-            Guardar cambios
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={saving}
+          >
+            {saving ? 'Guardando…' : 'Guardar cambios'}
           </button>
           <p role="status" aria-live="polite">
-            {saved ? 'Cambios guardados durante esta sesión.' : ''}
+            {saved ? 'Cambios guardados.' : ''}
           </p>
         </div>
       </form>
+      <RecoveryCodeSettings />
+      {changingEmail && (
+        <ChangeEmailDialog
+          currentEmail={profile.email}
+          onClose={closeEmailChange}
+          onChanged={reload}
+          returnFocusRef={changeEmailTrigger}
+        />
+      )}
+      {saveError && (
+        <Dialog
+          open
+          id="account-save-error"
+          title="No pudimos guardar"
+          onClose={() => setSaveError('')}
+        >
+          <p role="alert">{saveError}</p>
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={() => setSaveError('')}
+          >
+            Entendido
+          </button>
+        </Dialog>
+      )}
     </section>
   )
 }
@@ -210,10 +344,13 @@ export function AccountAddressesPage() {
   )
   const provincesEnabled = shipping.provinceShippingEnabled
   const [form, setForm] = useState<AccountAddress>(
-    address ?? createDemoAddress(),
+    address ?? emptyAccountAddress(),
   )
+  const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [addressError, setAddressError] = useState(false)
+  const [locationNeedsReview, setLocationNeedsReview] = useState(false)
   const savedArea = getDeliveryArea(form.department)
   const area = savedArea?.province === form.province ? savedArea : undefined
   const departmentValue = provincesEnabled
@@ -239,32 +376,50 @@ export function AccountAddressesPage() {
     : ''
 
   function update(
-    field: Exclude<keyof AccountAddress, 'department' | 'province'>,
+    field: Exclude<
+      keyof AccountAddress,
+      'department' | 'province' | 'location'
+    >,
     value: string,
   ) {
     setMessage('')
     setAddressError(false)
-    setForm((current) => ({ ...current, [field]: value }))
+    const destinationChanged =
+      (field === 'district' || field === 'street') && form[field] !== value
+    if (destinationChanged && form.location) setLocationNeedsReview(true)
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      location: destinationChanged ? null : current.location,
+    }))
   }
   function updateArea(department: string) {
     const selected = provincesEnabled ? undefined : getDeliveryArea(department)
+    if (form.location) setLocationNeedsReview(true)
     setForm((current) => ({
       ...current,
       department: provincesEnabled ? department : (selected?.department ?? ''),
       province: selected?.province ?? '',
       district: '',
+      location: null,
     }))
     setMessage('')
     setAddressError(false)
   }
   function updateProvince(province: string) {
-    setForm((current) => ({ ...current, province, district: '' }))
+    if (form.location) setLocationNeedsReview(true)
+    setForm((current) => ({
+      ...current,
+      province,
+      district: '',
+      location: null,
+    }))
     setMessage('')
     setAddressError(false)
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!reportTrimmedValidity(event.currentTarget)) return
+    if (saving || !reportTrimmedValidity(event.currentTarget)) return
     if (
       !isShippingDestinationEnabled(
         shipping,
@@ -281,30 +436,51 @@ export function AccountAddressesPage() {
       )
       return
     }
-    saveAddress({
-      id: form.id,
-      label: form.label.trim(),
-      recipient: form.recipient.trim(),
-      department: form.department,
-      province: form.province,
-      district: form.district.trim(),
-      street: form.street.trim(),
-      reference: form.reference.trim(),
-    })
-    setAddressError(false)
-    setMessage('Dirección guardada durante esta sesión.')
+    setSaving(true)
+    try {
+      await saveAddress({
+        id: form.id,
+        label: form.label.trim(),
+        recipient: form.recipient.trim(),
+        department: form.department,
+        province: form.province,
+        district: form.district.trim(),
+        street: form.street.trim(),
+        reference: form.reference.trim(),
+        location: form.location ?? null,
+      })
+      setAddressError(false)
+      setMessage('Dirección guardada.')
+      setAdding(false)
+    } catch (error) {
+      setAddressError(true)
+      setMessage(authErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
   }
-  function remove() {
-    removeAddress()
-    setAddressError(false)
-    setMessage('Dirección eliminada.')
+  async function remove() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await removeAddress()
+      setAddressError(false)
+      setMessage('Dirección eliminada.')
+      setAdding(false)
+    } catch (error) {
+      setAddressError(true)
+      setMessage(authErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
   }
   function restore() {
-    const restored = createDemoAddress()
+    const restored = emptyAccountAddress()
     setForm(restored)
-    saveAddress(restored)
+    setAdding(true)
     setAddressError(false)
-    setMessage('Dirección restaurada.')
+    setLocationNeedsReview(false)
+    setMessage('')
   }
 
   return (
@@ -321,7 +497,7 @@ export function AccountAddressesPage() {
             : 'Revisa y actualiza tus datos de entrega en Lima o Callao.'}
         </p>
       </header>
-      {!address ? (
+      {!address && !adding ? (
         <EmptyState
           className="account-empty"
           title="No hay una dirección guardada"
@@ -339,14 +515,15 @@ export function AccountAddressesPage() {
       ) : (
         <form
           className="account-form"
-          onSubmit={submit}
+          onSubmit={(event) => void submit(event)}
           onInput={(event) => {
             if (event.target instanceof HTMLInputElement)
               event.target.setCustomValidity('')
           }}
           data-scroll-reveal="copy"
         >
-          {!isShippingDestinationEnabled(
+          {address &&
+          !isShippingDestinationEnabled(
             shipping,
             address.department,
             address.province,
@@ -361,25 +538,38 @@ export function AccountAddressesPage() {
           <div className="account-fields">
             <div className="account-field">
               <label htmlFor="account-address-label">
-                Nombre de la dirección
+                Etiqueta de la dirección
               </label>
               <input
                 id="account-address-label"
+                placeholder="Casa, Oficina…"
+                maxLength={80}
+                aria-describedby="account-address-label-help"
                 value={form.label}
                 onChange={(event) => update('label', event.target.value)}
                 required
                 data-trim-required
               />
+              <p className="account-field-help" id="account-address-label-help">
+                Por ejemplo: Casa u Oficina.
+              </p>
             </div>
             <div className="account-field">
-              <label htmlFor="account-recipient">Destinatario</label>
+              <label htmlFor="account-recipient">Nombre de quien recibe</label>
               <input
                 id="account-recipient"
+                placeholder="Nombres y apellidos"
+                autoComplete="shipping name"
+                maxLength={160}
+                aria-describedby="account-recipient-help"
                 value={form.recipient}
                 onChange={(event) => update('recipient', event.target.value)}
                 required
                 data-trim-required
               />
+              <p className="account-field-help" id="account-recipient-help">
+                Puede ser tú u otra persona.
+              </p>
             </div>
             <div className="account-field">
               <label htmlFor="account-zone">
@@ -449,6 +639,7 @@ export function AccountAddressesPage() {
               <label htmlFor="account-street">Dirección</label>
               <input
                 id="account-street"
+                autoComplete="shipping street-address"
                 value={form.street}
                 onChange={(event) => update('street', event.target.value)}
                 required
@@ -466,13 +657,49 @@ export function AccountAddressesPage() {
               />
             </div>
           </div>
+          <AddressLocationPicker
+            value={form.location}
+            disabled={saving}
+            onChange={(location) => {
+              setForm((current) => ({ ...current, location }))
+              setMessage('')
+              setAddressError(false)
+              setLocationNeedsReview(false)
+            }}
+          />
+          {locationNeedsReview ? (
+            <p className="account-field-help" role="status">
+              Cambiaste la dirección. Vuelve a marcar su ubicación si deseas
+              incluirla.
+            </p>
+          ) : null}
           <div className="account-form-actions account-form-actions--split">
-            <button className="button button--primary" type="submit">
-              Guardar dirección
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={saving}
+            >
+              {saving ? 'Guardando…' : 'Guardar dirección'}
             </button>
-            <button className="account-remove" type="button" onClick={remove}>
-              Eliminar dirección
-            </button>
+            {address ? (
+              <button
+                className="account-remove"
+                type="button"
+                onClick={() => void remove()}
+                disabled={saving}
+              >
+                Eliminar dirección
+              </button>
+            ) : (
+              <button
+                className="account-remove"
+                type="button"
+                onClick={() => setAdding(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         </form>
       )}
@@ -488,9 +715,8 @@ export function AccountAddressesPage() {
 }
 
 export function AccountOrdersPage() {
-  const { orders } = useAccount()
-  const [searchParams] = useSearchParams()
-  const visibleOrders = searchParams.get('demo') === 'empty' ? [] : orders
+  const { orders, ordersAvailable } = useAccount()
+  const visibleOrders = orders
   return (
     <section className="account-section" aria-labelledby="account-orders-title">
       <header className="account-heading" data-scroll-reveal="copy">
@@ -498,13 +724,23 @@ export function AccountOrdersPage() {
         <h1 id="account-orders-title">Mis pedidos</h1>
         <p>Consulta el detalle y el estado de cada pedido.</p>
       </header>
-      {visibleOrders.length ? (
+      {!ordersAvailable ? (
+        <EmptyState
+          className="account-empty"
+          title="Historial no disponible"
+          description="No puedes consultar tus pedidos aquí por el momento. Vuelve a intentarlo más adelante."
+          icon="orders"
+        />
+      ) : visibleOrders.length ? (
         <ul className="account-order-list" data-scroll-reveal="stagger">
           {visibleOrders.map((order) => (
             <li key={order.reference}>
               <div>
                 <span>{dateFormatter.format(new Date(order.placedAt))}</span>
                 <strong>{order.reference}</strong>
+                {order.simulation ? (
+                  <small>Modo prueba · sin cobro real</small>
+                ) : null}
               </div>
               <div>
                 <span>
@@ -543,7 +779,17 @@ export function AccountOrdersPage() {
 
 export function AccountOrderDetailPage() {
   const { reference = '' } = useParams()
-  const { orders } = useAccount()
+  const { orders, ordersAvailable } = useAccount()
+  if (!ordersAvailable)
+    return (
+      <section className="account-section">
+        <EmptyState
+          title="Historial no disponible"
+          description="No puedes consultar este pedido por el momento."
+          icon="orders"
+        />
+      </section>
+    )
   const order = orders.find((item) => item.reference === reference)
   if (!order)
     return (
@@ -579,6 +825,11 @@ export function AccountOrderDetailPage() {
         <p>{dateFormatter.format(new Date(order.placedAt))}</p>
       </header>
       <AccountOrderTimeline status={order.status} />
+      {order.simulation ? (
+        <p className="account-field-hint">
+          Pedido de prueba: no se realizó un cobro ni se reservó inventario.
+        </p>
+      ) : null}
       <div className="account-order-detail-grid" data-scroll-reveal="stagger">
         <section aria-labelledby="order-products-title">
           <h2 id="order-products-title">Productos</h2>
@@ -668,7 +919,7 @@ export function AccountOrderDetailPage() {
 }
 
 export function AccountPaymentsPage() {
-  const { orders } = useAccount()
+  const { orders, ordersAvailable } = useAccount()
   return (
     <section
       className="account-section"
@@ -691,8 +942,15 @@ export function AccountPaymentsPage() {
         aria-labelledby="transactions-title"
         data-scroll-reveal="copy"
       >
-        <h2 id="transactions-title">Resumen de pagos</h2>
-        {orders.length ? (
+        <h2 id="transactions-title">Estado de pago de tus pedidos</h2>
+        {!ordersAvailable ? (
+          <EmptyState
+            className="account-empty"
+            title="Historial no disponible"
+            description="No puedes consultar los pagos de tus pedidos aquí por el momento."
+            headingLevel="h3"
+          />
+        ) : orders.length ? (
           <ul>
             {orders.map((order) => (
               <li key={order.reference}>
@@ -700,13 +958,26 @@ export function AccountPaymentsPage() {
                   <strong>{order.reference}</strong>
                   <span>{dateFormatter.format(new Date(order.placedAt))}</span>
                 </div>
-                <span>Registrado</span>
+                <span>
+                  {order.simulation
+                    ? 'Prueba · sin cobro'
+                    : {
+                        pending: 'Pendiente de pago',
+                        approved: 'Pago confirmado',
+                        rejected: 'Pago rechazado',
+                        refunded: 'Reembolsado',
+                      }[order.payment.status]}
+                </span>
                 <strong>{formatPEN(order.totalCents)}</strong>
               </li>
             ))}
           </ul>
         ) : (
-          <EmptyState title="No hay pagos registrados" headingLevel="h3">
+          <EmptyState
+            className="account-empty"
+            title="No hay pagos registrados"
+            headingLevel="h3"
+          >
             <Link className="text-link" to="/cuenta/pedidos">
               Ver mis pedidos <Icon name="arrow" />
             </Link>

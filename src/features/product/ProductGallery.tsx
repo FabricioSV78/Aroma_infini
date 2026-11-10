@@ -48,7 +48,7 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
               onClick={() => setActiveIndex(index)}
             >
               <img
-                src={imageSource(view.image)}
+                src={imageSource(view.image, 480)}
                 width={480}
                 height={600}
                 alt=""
@@ -77,7 +77,9 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
               <img
                 src={imageSource(view.image)}
                 srcSet={imageSourceSet(view.image, [480, 960])}
-                sizes="(min-width: 1024px) 52vw, 100vw"
+                // Match the gallery's viewport-height cap and tablet columns;
+                // 52vw overestimated the actual frame and fetched larger files.
+                sizes="(min-width: 1600px) min(560px, 62svh), (min-width: 1024px) min(520px, 56svh), (min-width: 768px) calc(50vw - 36px), calc(100vw - 32px)"
                 width={960}
                 height={1200}
                 loading={index === 0 ? 'eager' : 'lazy'}

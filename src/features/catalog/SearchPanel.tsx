@@ -61,7 +61,7 @@ export function SearchPanel({ onClose }: { onClose: () => void }) {
             autoFocus
             type="search"
             name="q"
-            placeholder="Por ejemplo, Bois Clair"
+            placeholder="Nombre del producto o marca"
             required
             maxLength={100}
             value={query}

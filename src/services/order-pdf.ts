@@ -1,12 +1,13 @@
 import { PDFDocument, PDFPage, PDFFont, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
-import type { AdminOrder } from './admin-service'
+import type { AdminOrder } from '../types/admin'
 import type { CustomerRecord } from '../types/commerce'
 import { variantLabel } from '../domain/product-type'
 import {
   documentText,
   getOrderDocumentRecipient,
   inspectOrderDocuments,
+  orderDocumentPaymentLabel,
   type OrderDocumentType,
 } from '../domain/order-documents'
 import { formatPEN } from './currency'
@@ -42,13 +43,6 @@ const statusLabels: Record<AdminOrder['status'], string> = {
   shipped: 'Enviado',
   delivered: 'Entregado',
 }
-const paymentLabels: Record<AdminOrder['paymentStatus'], string> = {
-  pending: 'Pago pendiente',
-  approved: 'Pagado',
-  rejected: 'Pago rechazado',
-  refunded: 'Reembolsado',
-}
-
 interface DocumentFonts {
   regular: PDFFont
   bold: PDFFont
@@ -430,7 +424,7 @@ function drawSummary(
     year: 'numeric',
   }).format(new Date(order.placedAt))
   writer.paragraph(
-    `${date} · ${statusLabels[order.status]} · ${paymentLabels[order.paymentStatus]}`,
+    `${date} · ${statusLabels[order.status]} · ${orderDocumentPaymentLabel(order)}`,
     10.5,
     false,
     muted,
@@ -730,7 +724,7 @@ function drawCompactSummary(
   }).format(new Date(order.placedAt))
   drawText(
     page,
-    `${date} · ${statusLabels[order.status]} · ${paymentLabels[order.paymentStatus]}`,
+    `${date} · ${statusLabels[order.status]} · ${orderDocumentPaymentLabel(order)}`,
     margin,
     top + 1,
     9,
@@ -934,6 +928,7 @@ export async function generateOrderPdf(
   pdf.setAuthor('Aroma Infini')
   pdf.setCreator('Aroma Infini')
   const referencesByPage: string[] = []
+  const simulationsByPage: boolean[] = []
   for (let index = 0; index < inspection.valid.length; index += 1) {
     const order = inspection.valid[index]
     validateCharacters(order, customers, type, fonts)
@@ -941,8 +936,10 @@ export async function generateOrderPdf(
     if (type === 'shipping') drawShippingLabel(pdf, order, customers, fonts)
     else if (!drawCompactSummary(pdf, order, customers, fonts))
       drawSummary(pdf, order, customers, fonts)
-    for (let page = before; page < pdf.getPageCount(); page += 1)
+    for (let page = before; page < pdf.getPageCount(); page += 1) {
       referencesByPage[page] = order.reference
+      simulationsByPage[page] = order.simulation === true
+    }
     options.onProgress?.(index + 1, inspection.valid.length)
     if (index % 5 === 0)
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -950,6 +947,28 @@ export async function generateOrderPdf(
   const pages = pdf.getPages()
   pages.forEach((page, index) => {
     const size = type === 'shipping' ? 7.5 : 8
+    if (type === 'summary')
+      drawText(
+        page,
+        simulationsByPage[index]
+          ? 'PEDIDO DE PRUEBA · NO ES UN COMPROBANTE DE PAGO'
+          : 'Resumen informativo · No es un comprobante de pago',
+        40,
+        page.getHeight() - 31,
+        7,
+        fonts.regular,
+        muted,
+      )
+    else if (simulationsByPage[index])
+      drawText(
+        page,
+        'PRUEBA · NO DESPACHAR',
+        18,
+        page.getHeight() - 19,
+        7.5,
+        fonts.bold,
+        brand,
+      )
     drawRight(
       page,
       `${index + 1} / ${pages.length}`,

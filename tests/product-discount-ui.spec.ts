@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const sizes = [
   { name: 'desktop-1920', width: 1920, height: 1080 },

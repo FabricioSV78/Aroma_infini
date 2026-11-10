@@ -2,20 +2,185 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "aroma-infini-frontend",
   "main": "./worker/seo-router.ts",
-  "compatibility_date": "2026-10-05",
+  "compatibility_date": "2026-10-08",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "workers_dev": true,
   "preview_urls": true,
+  "secrets": {
+    "required": [
+      "SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_MEDIA_SECRET_KEY",
+      "SUPABASE_COMMERCE_SECRET_KEY",
+      "SUPABASE_PUSH_SECRET_KEY",
+      "VAPID_PUBLIC_KEY",
+      "VAPID_PRIVATE_KEY",
+      "VAPID_SUBJECT",
+    ],
+  },
+  "build": {
+    "command": "node --experimental-strip-types scripts/worker-build.mjs check",
+  },
+  "r2_buckets": [
+    { "binding": "MEDIA_BUCKET", "bucket_name": "aroma-infini-media-dev" },
+  ],
+  "ratelimits": [
+    {
+      "name": "CHECKOUT_RATE_LIMITER",
+      "namespace_id": "10002",
+      "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "10001",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      "name": "ADMIN_PUSH_RATE_LIMITER",
+      "namespace_id": "10003",
+      "simple": { "limit": 30, "period": 60 },
+    },
+  ],
+  "vars": {
+    "APP_ENVIRONMENT": "production",
+    "PUSH_ENVIRONMENT": "production",
+    "ADMIN_PUSH_ENABLED": "false",
+    "SEO_ALLOW_INDEXING": "false",
+    "SEO_CATALOG_IS_REAL": "false",
+    "SEO_SITE_URL": "",
+    "SUPABASE_URL": "https://tkxvexfapszilzhogvgu.supabase.co",
+    "MEDIA_ALLOWED_ORIGINS": "http://127.0.0.1:5173,http://localhost:5173",
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true,
+    "traces": { "enabled": true, "head_sampling_rate": 0.1 },
+  },
+  "rules": [
+    { "type": "CompiledWasm", "globs": ["**/*.wasm"], "fallthrough": true },
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "drop-trailing-slash",
-    "run_worker_first": ["/tienda", "/marcas/*", "/producto/*"],
+    "run_worker_first": [
+      "/api/*",
+      "/media/*",
+      "/",
+      "/marcas",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/sitemap-*.xml",
+      "/tienda",
+      "/marcas/*",
+      "/producto/*",
+    ],
   },
   "env": {
     "staging": {
       "name": "aroma-infini-frontend-staging",
+      "build": {
+        "command": "node --experimental-strip-types scripts/worker-build.mjs check staging",
+      },
       "workers_dev": true,
       "preview_urls": true,
+      "secrets": {
+        "required": [
+          "SUPABASE_PUBLISHABLE_KEY",
+          "SUPABASE_MEDIA_SECRET_KEY",
+          "SUPABASE_COMMERCE_SECRET_KEY",
+          "SUPABASE_PUSH_SECRET_KEY",
+          "VAPID_PUBLIC_KEY",
+          "VAPID_PRIVATE_KEY",
+          "VAPID_SUBJECT",
+        ],
+      },
+      "r2_buckets": [
+        { "binding": "MEDIA_BUCKET", "bucket_name": "aroma-infini-media-dev" },
+      ],
+      "ratelimits": [
+        {
+          "name": "CHECKOUT_RATE_LIMITER",
+          "namespace_id": "10002",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "MEDIA_RATE_LIMITER",
+          "namespace_id": "10001",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "ADMIN_PUSH_RATE_LIMITER",
+          "namespace_id": "10003",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
+      "vars": {
+        "APP_ENVIRONMENT": "staging",
+        "PUSH_ENVIRONMENT": "staging",
+        "ADMIN_PUSH_ENABLED": "true",
+        "SEO_ALLOW_INDEXING": "false",
+        "SEO_CATALOG_IS_REAL": "false",
+        "SEO_SITE_URL": "",
+        "CHECKOUT_SIMULATION_ORIGIN": "https://aroma-infini-frontend-staging.fabricioseminarioo2004.workers.dev",
+        "CHECKOUT_SIMULATION_ENABLED": "true",
+        "SUPABASE_URL": "https://tkxvexfapszilzhogvgu.supabase.co",
+        "MEDIA_ALLOWED_ORIGINS": "http://127.0.0.1:5173,http://localhost:5173",
+      },
+      "triggers": { "crons": ["* * * * *"] },
+    },
+    // Prepared independently. No public route or simulated purchases in production.
+    "production": {
+      "name": "aroma-infini-frontend-production",
+      "build": {
+        "command": "node --experimental-strip-types scripts/worker-build.mjs check production",
+      },
+      "placement": { "region": "aws:sa-east-1" },
+      "workers_dev": false,
+      "preview_urls": false,
+      "secrets": {
+        "required": [
+          "SUPABASE_PUBLISHABLE_KEY",
+          "SUPABASE_MEDIA_SECRET_KEY",
+          "SUPABASE_COMMERCE_SECRET_KEY",
+          "SUPABASE_PUSH_SECRET_KEY",
+          "VAPID_PUBLIC_KEY",
+          "VAPID_PRIVATE_KEY",
+          "VAPID_SUBJECT",
+        ],
+      },
+      "r2_buckets": [
+        { "binding": "MEDIA_BUCKET", "bucket_name": "aroma-infini-media-prod" },
+      ],
+      "ratelimits": [
+        {
+          "name": "CHECKOUT_RATE_LIMITER",
+          "namespace_id": "20002",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "MEDIA_RATE_LIMITER",
+          "namespace_id": "20001",
+          "simple": { "limit": 60, "period": 60 },
+        },
+        {
+          "name": "ADMIN_PUSH_RATE_LIMITER",
+          "namespace_id": "20003",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
+      "vars": {
+        "APP_ENVIRONMENT": "production",
+        "PUSH_ENVIRONMENT": "production",
+        "ADMIN_PUSH_ENABLED": "false",
+        "SEO_ALLOW_INDEXING": "false",
+        "SEO_CATALOG_IS_REAL": "false",
+        "SEO_SITE_URL": "",
+        "CHECKOUT_SIMULATION_ENABLED": "false",
+        "SUPABASE_URL": "https://ogpfhhucnaldgxyqajkc.supabase.co",
+        "MEDIA_ALLOWED_ORIGINS": "",
+      },
+      "triggers": { "crons": ["* * * * *"] },
     },
   },
 }

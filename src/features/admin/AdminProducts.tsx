@@ -1,5 +1,9 @@
 import { OlfactoryProfile } from '../product/OlfactoryProfile'
-import { productSlug, normalizeSku } from '../../domain/product-identity'
+import {
+  productSlug,
+  normalizeSku,
+  variantSkuSummary,
+} from '../../domain/product-identity'
 import { getProductPhotoStatus } from '../../domain/product-photos'
 import {
   hasProductMainImage,
@@ -31,23 +35,19 @@ import { Icon } from '../../components/ui/Icon'
 import { Dialog } from '../../components/ui/Dialog'
 import { NoteBottleIcon } from '../../components/ui/NoteBottleIcon'
 import {
-  adminService,
   createAdminProductDetail,
   getStoreProducts,
   type AdminGender,
   type AdminProduct,
 } from '../../services/admin-service'
+import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { formatPEN } from '../../services/currency'
 import { getVariantPrice } from '../../services/product-discounts'
 import { imageSource } from '../../services/image-source'
 import type { ProductVariant } from '../../types/catalog'
 import { AdminPagination } from './AdminPagination'
 import { AdminBadge, AdminPageHeader, AdminStatus } from './AdminShared'
-import {
-  getInventoryAlerts,
-  getProductInventory,
-  getVariantInventory,
-} from './admin-utils'
+import { getProductInventory, getVariantInventory } from './admin-utils'
 import { useAdminPagination } from './useAdminPagination'
 import { useAdminStore } from './useAdminStore'
 import { AdminProductPhotos } from './AdminProductPhotos'
@@ -90,7 +90,7 @@ export function AdminProductsPage() {
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const confirmingVisibility = useRef(false)
-  const visibilityPersistence = useAdminSave()
+  const visibilityPersistence = useAdminSave({ catalog: true })
   const search = params.get('q') ?? ''
   const stockFilter = ['alert', 'out', 'healthy'].includes(
     params.get('stock') ?? '',
@@ -104,23 +104,30 @@ export function AdminProductsPage() {
     : 'all'
   const saved = params.get('guardado') === '1'
   const normalizedSearch = search.trim().toLocaleLowerCase('es')
-  const activeProducts = state.products.filter((record) => record.active)
-  const activeInventory = activeProducts.map(getProductInventory)
+  const brandsById = new Map<string, (typeof state.brands)[number]>()
+  for (const brand of state.brands) {
+    if (!brandsById.has(brand.id)) brandsById.set(brand.id, brand)
+  }
+  const productRows = state.products.map((record) => ({
+    record,
+    brand: brandsById.get(record.product.brandId),
+    inventory: getProductInventory(record),
+  }))
+  const activeInventory = productRows
+    .filter(({ record }) => record.active)
+    .map(({ inventory }) => inventory)
   const totalStock = activeInventory.reduce(
     (total, inventory) => total + inventory.totalStock,
     0,
   )
   const productsWithAlerts = new Set(
-    getInventoryAlerts(state.products).map((item) => item.productId),
+    productRows
+      .filter(({ inventory }) => inventory.alerts.length > 0)
+      .map(({ record }) => record.product.id),
   ).size
-  const soldOutProducts = state.products.filter(
-    (record) => getProductInventory(record).fullyOutOfStock,
+  const soldOutProducts = productRows.filter(
+    ({ inventory }) => inventory.fullyOutOfStock,
   ).length
-  const productRows = state.products.map((record) => ({
-    record,
-    brand: state.brands.find((item) => item.id === record.product.brandId),
-    inventory: getProductInventory(record),
-  }))
   const products = productRows
     .filter(({ record, brand, inventory }) => {
       const matchesSearch =
@@ -370,8 +377,8 @@ export function AdminProductsPage() {
                           <strong>{record.product.name}</strong>
                           <small>{brand?.name}</small>
                           <small>
-                            SKU {record.product.sku} · {photos.count}/
-                            {photos.expected} fotos
+                            {variantSkuSummary(record.product.variants)} ·{' '}
+                            {photos.count}/{photos.expected} fotos
                           </small>
                         </span>
                       </div>
@@ -627,7 +634,7 @@ export function AdminProductFormPage() {
   const [mediaBusy, setMediaBusy] = useState(false)
   const mediaUploadRef = useRef(false)
   const [showPreview, setShowPreview] = useState(false)
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const saving = persistence.saving
   const perfume = isPerfume(form.product)
   const editorialPrimaryFamily = getEditorialPrimaryFamily(form.product.family)
@@ -890,8 +897,8 @@ export function AdminProductFormPage() {
         title={editing ? form.product.name : 'Crear producto'}
         description={
           editing
-            ? `SKU ${form.product.sku ?? 'pendiente'} · Completa la ficha y guarda los cambios.`
-            : 'El SKU del producto se asigna automáticamente al guardar.'
+            ? 'Completa la ficha y guarda los cambios.'
+            : 'Los SKU de las presentaciones se asignan al guardar si los dejas vacíos.'
         }
       />
       <nav
@@ -1108,7 +1115,7 @@ export function AdminProductFormPage() {
                 <fieldset aria-describedby="admin-olfactory-family-help">
                   <legend>Familias olfativas</legend>
                   <div className="admin-olfactory-family-options">
-                    {OLFACTORY_FAMILIES.map((family) => (
+                    {OLFACTORY_FAMILIES.filter((family) => family.active || selectedFamilies.includes(family.value)).map((family) => (
                       <label
                         key={family.value}
                         className={
@@ -1145,7 +1152,7 @@ export function AdminProductFormPage() {
                             })
                           }}
                         />
-                        <span>{family.label}</span>
+                        <span>{family.label}{family.active ? '' : ' (desactivada)'}</span>
                       </label>
                     ))}
                   </div>
@@ -1153,6 +1160,7 @@ export function AdminProductFormPage() {
                 <p id="admin-olfactory-family-help">
                   Puedes elegir varias. Solo marca familias verificadas para
                   este perfume.
+                  {' '}<Link to="/admin/familias-olfativas">Gestionar familias</Link>
                 </p>
                 {familyConflict ? (
                   <p
@@ -1488,7 +1496,7 @@ export function AdminProductFormPage() {
                           normalizeSku(event.target.value),
                         )
                       }
-                      placeholder="Código único"
+                      placeholder="Automático si lo dejas vacío"
                     />
                   </label>
                   <label>

@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator } from './test'
 
 const group = (root: Locator, name: string) =>
   root.locator(`[data-filter-group="${name}"]`)

@@ -12,6 +12,7 @@ export const ORDER_STATUSES: readonly OrderStatus[] = [
 ]
 
 interface OrderWorkflowData {
+  simulation?: boolean
   customerName: string
   customerEmail: string
   contactPhone?: string
@@ -52,7 +53,7 @@ export function getOrderTransitionError(
   if (currentIndex < 0 || nextIndex < 0)
     return 'El estado del pedido no es válido.'
   if (order.status === target) return null
-  if (order.paymentStatus !== 'approved')
+  if (order.paymentStatus !== 'approved' && order.simulation !== true)
     return 'El pago debe estar aprobado antes de preparar el pedido.'
   if (Math.abs(currentIndex - nextIndex) !== 1)
     return 'Actualiza el pedido un paso a la vez.'

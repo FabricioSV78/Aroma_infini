@@ -1,9 +1,11 @@
 import { variantLabel } from '../../domain/product-type'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/ui/Dialog'
-import { adminService, type AdminProduct } from '../../services/admin-service'
+import type { AdminProduct } from '../../services/admin-service'
+import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { formatPEN } from '../../services/currency'
 import {
+  getNextProductDiscountChange,
   getProductDiscountStatus,
   getVariantPrice,
   validateProductDiscount,
@@ -20,6 +22,7 @@ import './admin-product-offers.css'
 
 interface OfferDraft {
   productId: string
+  expectedVersion?: number
   type: ProductDiscount['type']
   amount: string
   active: boolean
@@ -55,6 +58,7 @@ function draftFrom(record: AdminProduct): OfferDraft {
   const discount = record.product.discount!
   return {
     productId: record.product.id,
+    expectedVersion: record.version,
     type: discount.type,
     amount: String(
       discount.type === 'fixed' ? discount.value / 100 : discount.value,
@@ -125,9 +129,24 @@ export function AdminProductOffers() {
   const [now, setNow] = useState(() => Date.now())
   const headingRef = useRef<HTMLHeadingElement>(null)
   const productRef = useRef<HTMLSelectElement>(null)
+  const focusProductAfterSave = useRef(false)
   const sectionRef = useRef<HTMLElement>(null)
   const removingRef = useRef(false)
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
+  useEffect(() => {
+    if (
+      !focusProductAfterSave.current ||
+      persistence.saving ||
+      persistence.persistenceFailed
+    )
+      return
+    // Wait for React to remove inert before focusing the next product.
+    const frame = window.requestAnimationFrame(() => {
+      productRef.current?.focus()
+      focusProductAfterSave.current = false
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [draft, persistence.saving, persistence.persistenceFailed])
   const isEditing = Boolean(draft && originalDraft?.productId)
   const dirty = Boolean(
     draft &&
@@ -138,15 +157,10 @@ export function AdminProductOffers() {
     dirty || persistence.saving || persistence.persistenceFailed,
   )
   useEffect(() => {
-    const next = state.products
-      .flatMap(({ product }) => {
-        const discount = product.discount
-        return discount?.active ? [discount.startsAt, discount.endsAt] : []
-      })
-      .filter(Boolean)
-      .map((value) => Date.parse(value))
-      .filter((value) => Number.isFinite(value) && value > now)
-      .sort((first, second) => first - second)[0]
+    const next = getNextProductDiscountChange(
+      state.products.map(({ product }) => product),
+      now,
+    )
     const timer =
       next === undefined
         ? undefined
@@ -246,13 +260,18 @@ export function AdminProductOffers() {
     setSaveAction(createAnother ? 'create-another' : 'finish')
     setError('')
     const result = await persistence.save(
-      () => adminService.saveProductDiscount(draft.productId, parsedDiscount),
+      () =>
+        adminService.saveProductDiscount(
+          draft.productId,
+          parsedDiscount,
+          draft.expectedVersion,
+        ),
       () => {
         if (createAnother) {
+          focusProductAfterSave.current = true
           setDraft({ ...emptyDraft })
           setOriginalDraft({ ...emptyDraft })
           setError('')
-          window.requestAnimationFrame(() => productRef.current?.focus())
         } else {
           setDraft(null)
           setOriginalDraft(null)
@@ -274,10 +293,14 @@ export function AdminProductOffers() {
     setError('')
     const result = await persistence.save(
       () =>
-        adminService.saveProductDiscount(record.product.id, {
-          ...discount,
-          active: !discount.active,
-        }),
+        adminService.saveProductDiscount(
+          record.product.id,
+          {
+            ...discount,
+            active: !discount.active,
+          },
+          record.version,
+        ),
       () =>
         notice.toast(
           `Oferta de ${record.product.name} ${discount.active ? 'desactivada' : 'activada'}.`,
@@ -313,7 +336,12 @@ export function AdminProductOffers() {
         return
       setError('')
       const result = await persistence.save(
-        () => adminService.saveProductDiscount(record.product.id, null),
+        () =>
+          adminService.saveProductDiscount(
+            record.product.id,
+            null,
+            fromEditor ? draft?.expectedVersion : record.version,
+          ),
         () => {
           if (fromEditor) {
             setDraft(null)
@@ -390,7 +418,14 @@ export function AdminProductOffers() {
                 onChange={(event) =>
                   setDraft((current) =>
                     current
-                      ? { ...current, productId: event.target.value }
+                      ? {
+                          ...current,
+                          productId: event.target.value,
+                          expectedVersion: state.products.find(
+                            (record) =>
+                              record.product.id === event.target.value,
+                          )?.version,
+                        }
                       : current,
                   )
                 }

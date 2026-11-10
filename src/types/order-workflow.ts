@@ -1,10 +1,10 @@
 import type { OrderStatus } from './commerce'
 
-/** Internal audit actor. Historical entries are kept; authentication is not connected yet. */
+/** Local historical entries remain unverified; remote actors come from Auth. */
 export interface OrderOperator {
   name: string
-  verified: false
-  id: null
+  verified: boolean
+  id: string | null
 }
 
 export interface OrderHistoryEntry {

@@ -1,6 +1,6 @@
 import { expectImportSuccess } from './admin-notice-fixtures'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import {
   importFile,
   importRecord,

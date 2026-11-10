@@ -11,6 +11,8 @@ export interface ShippingZone {
 }
 
 export interface ShippingSettings {
+  /** False only when the remote store has not published delivery settings. */
+  configured?: boolean
   freeThresholdCents: number
   /** Public checkout coverage; preparing a provincial rate never enables it. */
   provinceShippingEnabled: boolean

@@ -19,12 +19,24 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
     wideViewport,
     () => false,
   )
+  const selectedVideo = wide
+    ? content.video
+    : (content.mobileVideo ?? content.video)
   const source = assetSource(
-    content.video ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc),
+    selectedVideo ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc),
   )
-  const poster = assetSource(
-    content.poster ?? (wide ? editorialFilm.poster : editorialFilm.mobilePoster),
-  )
+  // A custom clip must retain its own frame, never a poster from the default
+  // film or from a different mobile rendition.
+  const selectedPoster = wide
+    ? content.poster
+    : content.mobileVideo
+      ? content.mobilePoster
+      : content.poster
+  const poster = selectedVideo
+    ? selectedPoster
+      ? assetSource(selectedPoster)
+      : undefined
+    : assetSource(wide ? editorialFilm.poster : editorialFilm.mobilePoster)
   const frame = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [failedSource, setFailedSource] = useState<string | null>(null)
@@ -104,12 +116,14 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
         <div className="editorial-film-copy">
           <p className="eyebrow">{content.eyebrow}</p>
           <h2 id="editorial-film-title">
-            {headingText(content.title).split('\n').map((line, index) => (
-              <span key={index}>
-                {index > 0 && <br />}
-                {line}
-              </span>
-            ))}
+            {headingText(content.title)
+              .split('\n')
+              .map((line, index) => (
+                <span key={index}>
+                  {index > 0 && <br />}
+                  {line}
+                </span>
+              ))}
           </h2>
           <p>{content.description}</p>
           <Link className="text-link" to="/tienda">
@@ -121,7 +135,7 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
             src={poster}
             alt={failed ? editorialFilm.description : ''}
             width={wide ? 1920 : 720}
-            height={wide ? 926 : 1280}
+            height={wide ? 926 : 900}
             loading="lazy"
           />
           <video

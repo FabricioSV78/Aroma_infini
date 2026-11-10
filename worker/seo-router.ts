@@ -1,4 +1,29 @@
 import { classifyRoute } from './route-policy'
+import { createMediaHandler, cleanupMedia } from './media-handler'
+import { createCheckoutHandler } from './checkout-handler'
+import { createCatalogSeoHandler } from './catalog-seo'
+import { createSitemapHandler } from './sitemap'
+import { createComplaintsHandler } from './complaints-handler'
+import { createAdminPushHandler, dispatchAdminPush } from './admin-push-handler'
+import {
+  seoPageRobots,
+  seoPublicationOrigin,
+} from '../src/domain/seo-publication'
+
+const checkoutRequest = createCheckoutHandler()
+const catalogSeoRequest = createCatalogSeoHandler()
+const sitemapRequest = createSitemapHandler()
+const complaintsRequest = createComplaintsHandler()
+const adminPushRequest = createAdminPushHandler()
+
+// SEO, ordinary page requests and cleanup do not need the image decoder.
+// Load it only after the upload handler has authorized and bounded the file.
+const mediaRequest = createMediaHandler({
+  async decodeWebp(bytes) {
+    const { decodeWebp } = await import('./media-codec')
+    return decodeWebp(bytes)
+  },
+})
 
 function assetUrl(request: Request, pathname: string) {
   const url = new URL(request.url)
@@ -7,18 +32,73 @@ function assetUrl(request: Request, pathname: string) {
   return url
 }
 
-function withStatusAndRobots(
+async function withPagePolicy(
   response: Response,
   status: number,
-  robots: string,
+  request: Request,
+  env: Env,
+  indexable = false,
+  follow = false,
 ) {
+  const url = new URL(request.url)
+  const publicationOrigin = seoPublicationOrigin(
+    {
+      environment: env.APP_ENVIRONMENT,
+      allowIndexing: env.SEO_ALLOW_INDEXING,
+      catalogIsReal: env.SEO_CATALOG_IS_REAL,
+      siteUrl: env.SEO_SITE_URL,
+      supabaseUrl: env.SUPABASE_URL,
+    },
+    url.origin,
+  )
+  const robots = seoPageRobots(Boolean(publicationOrigin), {
+    status,
+    indexable,
+    follow,
+  })
   const headers = new Headers(response.headers)
-  headers.set('X-Robots-Tag', robots)
+  headers.set('X-Robots-Tag', robots.split(',').join(', '))
+  const transformHtml =
+    publicationOrigin &&
+    /^text\/html\b/i.test(headers.get('Content-Type') ?? '')
+  if (transformHtml) {
+    for (const key of [
+      'Content-Length',
+      'ETag',
+      'Last-Modified',
+      'Content-Encoding',
+    ])
+      headers.delete(key)
+    headers.set('Cache-Control', 'no-store')
+  }
+  if (request.method === 'HEAD') {
+    await response.body?.cancel()
+    return new Response(null, { status, headers })
+  }
+  if (transformHtml) {
+    return new HTMLRewriter()
+      .on('head meta[name="robots"]', {
+        element(element) {
+          element.setAttribute('content', robots)
+        },
+      })
+      .transform(new Response(response.body, { status, headers }))
+  }
   return new Response(response.body, { status, headers })
 }
 
 export default {
   async fetch(request, env): Promise<Response> {
+    const adminPush = await adminPushRequest(request, env)
+    if (adminPush) return adminPush
+    const complaint = await complaintsRequest(request, env)
+    if (complaint) return complaint
+    const checkout = await checkoutRequest(request, env)
+    if (checkout) return checkout
+    const media = await mediaRequest(request, env)
+    if (media) return media
+    const sitemap = await sitemapRequest(request, env)
+    if (sitemap) return sitemap
     if (request.method !== 'GET' && request.method !== 'HEAD')
       return new Response('Método no permitido', {
         status: 405,
@@ -33,36 +113,57 @@ export default {
       return Response.redirect(destination.toString(), 308)
     }
 
+    const catalogPage = await catalogSeoRequest(request, env)
+    if (catalogPage) return catalogPage
+
     if (url.pathname === '/tienda') {
       const asset = await env.ASSETS.fetch(request)
       const response = asset.ok
         ? asset
         : await env.ASSETS.fetch(assetUrl(request, '/__app_shell'))
-      return url.search
-        ? withStatusAndRobots(response, 200, 'noindex, follow')
-        : response
+      return withPagePolicy(response, 200, request, env, !url.search, true)
     }
 
     const kind = classifyRoute(url.pathname)
     if (kind === 'public' || kind === 'app') {
       const asset = await env.ASSETS.fetch(request)
       if (asset.ok)
-        return kind === 'public' && url.search
-          ? withStatusAndRobots(asset, 200, 'noindex, follow')
-          : asset
+        return withPagePolicy(
+          asset,
+          asset.status,
+          request,
+          env,
+          kind === 'public' && !url.search,
+          kind === 'public',
+        )
       const shell = await env.ASSETS.fetch(assetUrl(request, '/__app_shell'))
-      return withStatusAndRobots(shell, 200, 'noindex, nofollow')
+      return withPagePolicy(
+        shell,
+        200,
+        request,
+        env,
+        kind === 'public' && !url.search,
+        kind === 'public',
+      )
     }
 
     if (kind === 'candidate') {
-      // Un producto o marca creado solo en IndexedDB puede renderizar en el
-      // navegador, pero el servidor no debe declarar existente una URL que no
-      // aparece en la publicación estática.
+      // Invalid multi-segment/empty slugs remain outside the public catalog.
       const shell = await env.ASSETS.fetch(assetUrl(request, '/__app_shell'))
-      return withStatusAndRobots(shell, 404, 'noindex, nofollow')
+      return withPagePolicy(shell, 404, request, env)
     }
 
     const notFound = await env.ASSETS.fetch(assetUrl(request, '/404'))
-    return withStatusAndRobots(notFound, 404, 'noindex, nofollow')
+    return withPagePolicy(notFound, 404, request, env)
+  },
+  async scheduled(event, env) {
+    // One-minute outbox ticks; preserve hourly media cleanup at :23.
+    const results = await Promise.allSettled([
+      dispatchAdminPush(env),
+      ...(new Date(event.scheduledTime).getUTCMinutes() === 23 && env.SUPABASE_MEDIA_SECRET_KEY
+        ? [cleanupMedia(env)] : []),
+    ])
+    if (results.some((result) => result.status === 'rejected'))
+      console.warn(JSON.stringify({ event: 'scheduled_job_failed', count: results.filter((result) => result.status === 'rejected').length }))
   },
 } satisfies ExportedHandler<Env>

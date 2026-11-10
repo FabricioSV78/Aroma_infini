@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './test'
 
 for (const width of [390, 768, 1440]) {
   test(`Catalog photos and product galleries load at ${width}px`, async ({

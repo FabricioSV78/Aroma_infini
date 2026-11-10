@@ -1,17 +1,1 @@
-[
-  "/",
-  "/tienda",
-  "/marcas",
-  "/marcas/atelier-01",
-  "/marcas/forme",
-  "/marcas/studio-sillage",
-  "/marcas/matiere-04",
-  "/producto/bois-clair",
-  "/producto/petale-nu",
-  "/producto/vert-silence",
-  "/producto/ambre-lent",
-  "/producto/neroli-matin",
-  "/producto/iris-velours",
-  "/producto/figue-douce",
-  "/producto/santal-nuit"
-]
+["/", "/tienda", "/marcas"]

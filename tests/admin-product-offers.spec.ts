@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { answerAdminNotice } from './admin-notice-fixtures'
 
 test('Las pestañas de promociones se recorren con el teclado', async ({

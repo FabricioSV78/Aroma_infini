@@ -7,6 +7,17 @@ import {
 } from '../content/peru'
 import type { ShippingSettings } from '../types/shipping'
 
+export function emptyShippingSettings(): ShippingSettings {
+  return {
+    configured: false,
+    freeThresholdCents: 0,
+    provinceShippingEnabled: false,
+    nationalCourierFeeCents: 0,
+    nationalEstimate: '',
+    zones: [],
+  }
+}
+
 /** The same coverage rule is used by forms, quotes and approved orders. */
 export function isShippingDestinationEnabled(
   shipping: ShippingSettings,
@@ -14,6 +25,7 @@ export function isShippingDestinationEnabled(
   province: string,
   district: string,
 ) {
+  if (shipping.configured === false) return false
   if (isCoveredDeliveryLocation(department, province, district)) return true
   return (
     shipping.provinceShippingEnabled &&

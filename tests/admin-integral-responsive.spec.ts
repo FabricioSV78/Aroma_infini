@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const routes = [
   { name: 'dashboard', path: '/admin', capture: true },

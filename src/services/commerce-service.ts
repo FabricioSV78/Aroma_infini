@@ -1,9 +1,5 @@
 import type { Brand, CartItem, Product, ProductVariant } from '../types/catalog'
-import {
-  getShippingSettings,
-  getStoreBrands,
-  getStoreProducts,
-} from './admin-service'
+import { storefrontRepository } from './storefront-repository'
 import { getVariantPrice } from './product-discounts'
 
 export interface FavoriteProduct {
@@ -45,13 +41,14 @@ function firstById<T extends { id: string }>(items: readonly T[]) {
 }
 
 export function getFreeShippingThresholdCents() {
-  return getShippingSettings().freeThresholdCents
+  return storefrontRepository.peekSnapshot().shipping.freeThresholdCents
 }
 
 export function resolveFavoriteProducts(ids: readonly string[]) {
   if (!ids.length) return { found: [], missingIds: [] }
-  const products = firstById(getStoreProducts())
-  const brands = firstById(getStoreBrands())
+  const snapshot = storefrontRepository.peekSnapshot()
+  const products = firstById(snapshot.products.map(({ product }) => product))
+  const brands = firstById(snapshot.brands)
   const found: FavoriteProduct[] = []
   const missingIds: string[] = []
   for (const id of ids) {
@@ -77,8 +74,9 @@ export function resolveCart(items: readonly CartItem[]): ResolvedCart {
       quantity: 0,
       needsAttention: false,
     }
-  const products = getStoreProducts()
-  const brands = firstById(getStoreBrands())
+  const snapshot = storefrontRepository.peekSnapshot()
+  const products = snapshot.products.map(({ product }) => product)
+  const brands = firstById(snapshot.brands)
   const variants = new Map<
     string,
     { product: Product; variant: ProductVariant | undefined }

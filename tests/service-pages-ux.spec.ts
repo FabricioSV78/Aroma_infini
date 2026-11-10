@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const routes = [
   { path: '/contacto', title: 'Contacto', slug: 'contact' },
@@ -88,7 +88,7 @@ for (const viewport of viewports) {
       if (route.slug === 'contact') {
         const description = await page
           .locator('.contact-copy > p:not(.eyebrow)')
-          .first()
+          .last()
           .boundingBox()
         const action = await page
           .locator('.contact-actions .button')

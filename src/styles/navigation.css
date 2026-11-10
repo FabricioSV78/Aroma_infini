@@ -22,6 +22,18 @@
   margin: 0;
   padding: 0;
 }
+.navigation-columns .navigation-brand-links {
+  max-height: min(352px, 40dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 4px;
+  margin: -4px;
+}
+.navigation-brand-links a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .navigation-columns a {
   display: flex;
   gap: 12px;

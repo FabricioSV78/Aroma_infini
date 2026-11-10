@@ -10,6 +10,8 @@ import { imageSource, imageSourceSet } from '../../services/image-source'
 import { PriceDisplay } from '../../components/ui/PriceDisplay'
 import { OfferBadge } from '../../components/ui/OfferBadge'
 import { useOfferPriceRevision } from '../../services/offer-price-clock'
+import { storefrontRepository } from '../../services/storefront-repository'
+import { isRemoteCatalog } from '../../services/catalog-source'
 
 interface ProductCardProps {
   product: Product
@@ -21,8 +23,8 @@ interface ProductCardProps {
   preview?: boolean
 }
 export function ProductCard({
-  product,
-  brand,
+  product: suppliedProduct,
+  brand: suppliedBrand,
   variant = 'standard',
   imageSizes: imageSizesOverride,
   headingLevel = 3,
@@ -30,7 +32,25 @@ export function ProductCard({
   preview = false,
 }: ProductCardProps) {
   useOfferPriceRevision()
-  const { favoriteIds, toggleFavorite } = useFavorites()
+  const snapshot = storefrontRepository.peekSnapshot()
+  const product =
+    !preview && isRemoteCatalog
+      ? (snapshot.products.find(
+          (record) => record.product.id === suppliedProduct.id,
+        )?.product ?? suppliedProduct)
+      : suppliedProduct
+  const brand =
+    !preview && isRemoteCatalog
+      ? (snapshot.brands.find((record) => record.id === product.brandId) ??
+        suppliedBrand)
+      : suppliedBrand
+  const {
+    favoriteIds,
+    toggleFavorite,
+    loading: favoritesLoading,
+    pendingIds,
+    error: favoritesError,
+  } = useFavorites()
   const isFavorite = favoriteIds.has(product.id)
   const { inStock, variants } = getProductPresentation(product.variants)
   const variantPrices = variants.map((variant) =>
@@ -62,14 +82,25 @@ export function ProductCard({
       className="icon-button product-favorite"
       aria-label={`${isFavorite ? 'Quitar' : 'Guardar'} ${product.name} ${isFavorite ? 'de' : 'en'} favoritos`}
       aria-pressed={isFavorite}
-      aria-disabled={preview}
+      disabled={
+        !preview &&
+        (favoritesLoading ||
+          pendingIds.has(product.id) ||
+          Boolean(favoritesError))
+      }
+      aria-busy={!preview && (favoritesLoading || pendingIds.has(product.id))}
+      aria-disabled={
+        preview ||
+        favoritesLoading ||
+        pendingIds.has(product.id) ||
+        Boolean(favoritesError)
+      }
       tabIndex={preview ? -1 : undefined}
       title={
         preview
           ? 'Disponible en la tienda'
-          : isFavorite
-            ? 'Quitar de favoritos'
-            : 'Guardar en favoritos'
+          : favoritesError ||
+            (isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos')
       }
       onClick={() => {
         if (!preview) toggleFavorite(product.id)

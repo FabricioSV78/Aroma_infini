@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('El resumen evita acciones repetidas y abre el trabajo editorial', async ({
   page,

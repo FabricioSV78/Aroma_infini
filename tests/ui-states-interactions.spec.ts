@@ -1,4 +1,5 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { installAuthFixture } from './auth-fixtures'
+import { expect, test, type Locator } from './test'
 
 async function paint(control: Locator) {
   return control.evaluate((element) => {
@@ -214,6 +215,7 @@ test('móvil táctil: la selección permanece visible sin depender del hover', a
     hasTouch: true,
     isMobile: true,
   })
+  await installAuthFixture(context)
   const page = await context.newPage()
   await page.goto('/admin/home')
   expect(

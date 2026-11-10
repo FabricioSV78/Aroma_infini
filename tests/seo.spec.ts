@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { resolveSeoPage } from '../src/seo/seo-config'
 import { catalogService } from '../src/services/catalog-service'
 
@@ -73,10 +73,10 @@ test('Home publica metadatos únicos y datos estructurados seguros', async ({
   page,
 }) => {
   await page.goto('/')
-  await expect(page).toHaveTitle('Aroma Infini | Perfumería de autor en Perú')
+  await expect(page).toHaveTitle('Aroma Infini | Perfumería multimarca en Perú')
   await expect(page.locator('meta[name="description"]')).toHaveAttribute(
     'content',
-    /propuesta peruana de perfumería de autor/,
+    /perfumes de distintas marcas/,
   )
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
     'content',
@@ -84,7 +84,7 @@ test('Home publica metadatos únicos y datos estructurados seguros', async ({
   )
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:5173/',
+    new URL('/', page.url()).href,
   )
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
@@ -102,10 +102,10 @@ test('Tienda, ficha y utilidades actualizan SEO sin duplicar etiquetas', async (
   page,
 }) => {
   await page.goto('/tienda?genero=unisex&orden=precio-asc')
-  await expect(page).toHaveTitle('Perfumes de autor | Aroma Infini')
+  await expect(page).toHaveTitle('Perfumes | Aroma Infini')
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:5173/tienda',
+    new URL('/tienda', page.url()).href,
   )
   await page.goto('/producto/petale-nu')
   await expect(page).toHaveTitle('Pétale Nu de Forme | Aroma Infini')
@@ -137,9 +137,51 @@ test('La página de marca tiene canonical limpio y una marca inválida queda fue
   await expect(page).toHaveTitle('Forme: perfumes | Aroma Infini')
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:5173/marcas/forme',
+    new URL('/marcas/forme', page.url()).href,
   )
   await page.goto('/marcas/inexistente')
   await expect(page).toHaveTitle('Página no encontrada | Aroma Infini')
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
+})
+
+test('La navegación SPA retira las etiquetas sociales iniciales del producto al abrir la cuenta', async ({
+  page,
+}) => {
+  await page.route('**/producto/petale-nu', async (route) => {
+    const response = await route.fetch()
+    const html = await response.text()
+    await route.fulfill({
+      response,
+      body: html.replace(
+        '</head>',
+        `
+        <link rel="canonical" href="http://initial.example.invalid/producto/petale-nu" data-seo-managed="true">
+        <meta property="og:url" content="http://initial.example.invalid/producto/petale-nu" data-seo-managed="true">
+        <meta property="og:image" content="https://initial.example.invalid/product.webp" data-seo-managed="true">
+        <meta name="twitter:image" content="https://initial.example.invalid/product.webp" data-seo-managed="true">
+      </head>`,
+      ),
+    })
+  })
+  await page.goto('/producto/petale-nu')
+  await expect(page).toHaveTitle('Pétale Nu de Forme | Aroma Infini')
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
+  await expect(page.locator('meta[property="og:image"]')).toHaveCount(1)
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    'content',
+    /petale-960\.webp$/,
+  )
+  await page
+    .getByRole('link', { name: 'Mi cuenta', exact: true })
+    .first()
+    .click()
+  await expect(page).toHaveURL(/\/iniciar-sesion/)
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
+  await expect(page.locator('meta[property="og:url"]')).toHaveCount(0)
+  await expect(page.locator('meta[property="og:image"]')).toHaveCount(0)
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveCount(0)
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    'content',
+    'noindex,nofollow',
+  )
 })

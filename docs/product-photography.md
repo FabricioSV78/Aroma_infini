@@ -1,6 +1,6 @@
 # Fotografías de productos
 
-En **Productos**, utiliza **Visibilidad → Pendientes de fotos** para encontrar productos sin fotografía principal. Se retiró el filtro independiente de Fotografías para evitar controles redundantes. La búsqueda acepta nombre, SKU automático del producto y códigos de sus presentaciones. El enlace de fotografías abre una edición dedicada; **Guardar y continuar** avanza al siguiente pendiente de la cola sin publicar el producto. Los contadores de fotos y la gestión de galería e imagen olfativa se conservan.
+En **Productos**, utiliza **Visibilidad → Pendientes de fotos** para encontrar productos sin fotografía principal. Se retiró el filtro independiente de Fotografías para evitar controles redundantes. La búsqueda acepta nombre, código interno de producto y SKU de sus presentaciones. El enlace de fotografías abre una edición dedicada; **Guardar y continuar** avanza al siguiente pendiente de la cola sin publicar el producto. Los contadores de fotos y la gestión de galería e imagen olfativa se conservan.
 
 ## Organización
 
@@ -15,7 +15,7 @@ Se pueden seleccionar varias imágenes, arrastrarlas, reemplazarlas, quitarlas y
 
 `ProductPhotoUploadAdapter` (`src/services/product-photo-upload.ts`) separa la preparación de archivos del guardado del producto. Acepta JPG, PNG, WebP y AVIF de hasta 20 MB; verifica que el navegador pueda decodificarlos y que tengan dimensiones suficientes. Produce WebP con calidad 0,9, proporción 4:5, recorte central y ancho máximo de 1600 px, sin ampliar el original. Los mínimos son 800 × 1000 px para galería y 960 × 1200 px para la imagen olfativa.
 
-Actualmente las fotos preparadas se representan mediante **data URLs dentro del snapshot de IndexedDB del mismo navegador y origen**. No son archivos escritos en `public`, URLs temporales `blob:` ni objetos de R2. Recargar conserva un guardado exitoso; otro navegador, equipo u origen no comparte esas imágenes. Borrar los datos del navegador las elimina. La capacidad depende de su cuota: no se garantiza almacenar las fotografías de cien productos en todos los dispositivos.
+En el adaptador local de pruebas, las fotos preparadas se representan mediante **data URLs dentro del snapshot de IndexedDB del mismo navegador y origen**. Ese modo no comparte fotografías entre dispositivos. El catálogo remoto guarda los archivos en R2 y sus referencias en Supabase; consulta [R2_IMPLEMENTATION.md](R2_IMPLEMENTATION.md).
 
 No existe un repositorio separado de archivos subidos: descartar un borrador no genera archivos huérfanos. Reemplazar o eliminar una fotografía retira su referencia del siguiente snapshot; referencias aún utilizadas por otros productos permanecen. No hay deduplicación global de archivos ni un recolector remoto simulado.
 
@@ -25,11 +25,11 @@ El producto se asocia mediante su `product.id` estable; las referencias de fotos
 
 Si IndexedDB falla, la interfaz informa que el cambio permanece aplicado solo en la sesión, conserva el borrador y ofrece reintentar. La navegación al siguiente producto ocurre después de confirmar la escritura. Los envíos repetidos se bloquean durante el guardado.
 
-## SKU y futuras integraciones
+## SKU de presentaciones y código interno
 
-Cada producto recibe un SKU numérico automático desde `10000`, persistente e inmutable al editar el nombre. La asignación individual y por Excel comparte el contador del snapshot. Los SKU opcionales de presentaciones se conservan en un espacio independiente para no alterar el inventario.
+Cada presentación tiene su propio SKU. Se respeta el valor manual y, si falta en una presentación nueva, se genera desde `1000` o el siguiente disponible. Al editar o guardar fotografías se conserva el SKU existente. El listado y el encabezado de fotografías muestran esos SKU comerciales. `products.product_code` sigue siendo un código interno independiente; no se etiqueta como SKU ni se renumeran los productos existentes.
 
-**R2 y Supabase no están conectados.** El futuro adaptador autenticado podrá devolver una referencia pública de almacenamiento y conservar esta interfaz y los campos separados. La persistencia y unicidad concurrente deberán garantizarse en el backend cuando exista; el mecanismo actual es local al navegador. No se incluyen credenciales ni acceso directo a R2 para el administrador.
+**El catálogo remoto utiliza Supabase y R2.** El servidor garantiza los SKU únicos con una secuencia propia y coordinación transaccional; Excel y el formulario comparten las mismas reglas. El adaptador local se conserva para pruebas aisladas. No se incluyen credenciales ni acceso directo a R2 para el administrador.
 
 ## Pruebas focalizadas
 

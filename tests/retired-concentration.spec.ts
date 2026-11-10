@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('migra la concentración retirada de registros anteriores sin alterar el resto del producto', async ({
   page,

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('SKU únicos se normalizan al guardar y editar no colisiona con el mismo producto', async ({
   page,

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { isShippingDestinationEnabled } from '../src/services/shipping-rates'
 import type { ShippingSettings } from '../src/types/shipping'
 

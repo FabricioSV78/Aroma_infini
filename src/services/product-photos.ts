@@ -1,11 +1,15 @@
-import { adminService, type AdminSaveResult } from './admin-service'
+import { adminService } from './admin-service'
+import { catalogAdminService } from './catalog-admin-service'
+import { isRemoteCatalog } from './catalog-source'
+import type { AdminSaveResult } from '../types/admin'
 import type { ProductDetail } from '../types/catalog'
 
 /** Read the latest record so a photo-only save never overwrites price or stock. */
 export function saveProductPhotos(
   productId: string,
   photos: Pick<ProductDetail, 'gallery' | 'olfactoryImage'>,
-): AdminSaveResult {
+  expectedVersion?: number,
+): AdminSaveResult | Promise<AdminSaveResult> {
   const current = adminService
     .getSnapshot()
     .products.find((record) => record.product.id === productId)
@@ -20,8 +24,9 @@ export function saveProductPhotos(
       kind: 'validation',
       message: 'La galería admite hasta cuatro fotografías.',
     }
-  return adminService.saveProduct({
+  return (isRemoteCatalog ? catalogAdminService : adminService).saveProduct({
     ...current,
+    version: expectedVersion ?? current.version,
     product: { ...current.product, image: gallery[0]?.image ?? '' },
     detail: {
       ...current.detail,

@@ -49,7 +49,11 @@ export function PerfumeFinder({
           {content.mobileImage && (
             <source
               media="(max-width: 767px)"
-              srcSet={assetSource(content.mobileImage)}
+              srcSet={
+                imageSourceSet(content.mobileImage, [480, 780, 1024]) ??
+                assetSource(content.mobileImage)
+              }
+              sizes="100vw"
             />
           )}
           <img
@@ -57,6 +61,12 @@ export function PerfumeFinder({
             src={assetSource(
               content.desktopImage ?? '/images/olfactory-cedre.webp',
             )}
+            srcSet={
+              content.desktopImage
+                ? imageSourceSet(content.desktopImage, [960, 1536, 2048])
+                : undefined
+            }
+            sizes="100vw"
             alt=""
             loading="lazy"
             decoding="async"

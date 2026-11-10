@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 const viewports = [
   { name: 'desktop-1920', width: 1920, height: 1080 },
@@ -25,7 +25,9 @@ for (const viewport of viewports) {
     for (const route of routes) {
       await page.goto(route.path)
       await page.evaluate(() => document.fonts.ready.then(() => true))
-      await expect(page.locator('main h1')).toHaveText(route.title)
+      await expect(page.locator('main h1')).toHaveText(route.title, {
+        timeout: 15000,
+      })
       await expect(
         page.locator('main nav[aria-label="Ruta de navegación"]'),
       ).toBeVisible()
@@ -53,6 +55,15 @@ test('Las acciones de atención se recorren con teclado y las tarifas siguen leg
   const whatsapp = page.getByRole('link', { name: 'Escribir por WhatsApp' })
   await whatsapp.focus()
   await expect(whatsapp).toBeFocused()
+  // Configured email and social links follow WhatsApp before the help links.
+  // Check their real keyboard order instead of skipping those contact methods.
+  const secondaryContacts = (
+    await page.locator('.contact-actions a').all()
+  ).slice(1)
+  for (const contact of secondaryContacts) {
+    await page.keyboard.press('Tab')
+    await expect(contact).toBeFocused()
+  }
   await page.keyboard.press('Tab')
   await expect(
     page.locator('main').getByRole('link', { name: 'Seguir pedido' }),

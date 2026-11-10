@@ -89,10 +89,13 @@ export async function prepareVideoFile(file: File) {
         'video-duration',
         'El video debe durar entre 2 y 60 segundos.',
       )
-    if (Math.min(element.videoWidth, element.videoHeight) < 480)
+    if (
+      Math.min(element.videoWidth, element.videoHeight) < 480 ||
+      Math.max(element.videoWidth, element.videoHeight) > 4096
+    )
       throw new UserFacingError(
         'video-dimensions',
-        'El lado más corto del video debe medir 480 px o más.',
+        'El video debe medir entre 480 y 4096 px por lado.',
       )
     await waitForVideo(
       element,
@@ -107,8 +110,13 @@ export async function prepareVideoFile(file: File) {
 
     const scale = Math.min(
       1,
-      960 / Math.max(element.videoWidth, element.videoHeight),
+      1600 / Math.max(element.videoWidth, element.videoHeight),
     )
+    if (Math.min(element.videoWidth, element.videoHeight) * scale < 320)
+      throw new UserFacingError(
+        'video-dimensions',
+        'Elige un video con una proporción menos panorámica para generar su portada.',
+      )
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(element.videoWidth * scale)
     canvas.height = Math.round(element.videoHeight * scale)

@@ -1,0 +1,79 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Do not interrupt Wrangler while it is publishing. A queued obsolete commit
+# is rejected against develop immediately before deployment.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+      - run: node scripts/github-deployment.mjs request staging
+
+  quality:
+    needs: request
+    uses: ./.github/workflows/quality.yml
+    # Tests deliberately receive no deployment secrets.
+
+  deploy:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://aroma-infini-frontend-staging.fabricioseminarioo2004.workers.dev
+    env:
+      DO_NOT_TRACK: '1'
+      WRANGLER_SEND_METRICS: 'false'
+      WRANGLER_WRITE_LOGS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Configure the staging frontend
+        run: node scripts/github-deployment.mjs configure staging
+        env:
+          DEPLOY_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          DEPLOY_ADDRESS_MAP_TILE_URL: ${{ vars.ADDRESS_MAP_TILE_URL }}
+          DEPLOY_ADDRESS_MAP_ATTRIBUTION: ${{ vars.ADDRESS_MAP_ATTRIBUTION }}
+      - run: npm run build:staging
+      - run: node --experimental-strip-types scripts/worker-build.mjs check staging
+      - name: Reject a superseded commit
+        run: node scripts/github-deployment.mjs check-head staging
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Deploy the verified staging package
+        run: |
+          node scripts/github-deployment.mjs credentials staging
+          npx --no-install wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Read-only hosted verification
+        run: npm run staging:check
+      - name: Record the deployed revision
+        run: node scripts/github-deployment.mjs summary staging

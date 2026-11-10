@@ -1,6 +1,6 @@
 // Textos y datos editables de Nosotros y Contacto.
-// El relato de origen de Nosotros es provisional, autorizado por el cliente
-// mientras se confirma la historia real de la marca. Sustituirlo antes de publicar.
+// El contenido describe la propuesta actual; no atribuye una historia de origen
+// o un proceso de fabricación que el negocio no haya confirmado.
 export const aboutPageContent = {
   hero: {
     eyebrow: 'Aroma Infini · Perfumería multimarca',
@@ -17,11 +17,11 @@ export const aboutPageContent = {
     },
   },
   story: {
-    eyebrow: 'Nuestra historia',
-    title: 'La curiosidad como punto de partida',
+    eyebrow: 'Nuestra esencia',
+    title: 'Distintos aromas, una elección personal',
     paragraphs: [
-      'Aroma Infini nace de una idea sencilla: elegir un perfume puede ser tan personal como llevarlo. Queríamos que la búsqueda comenzara por la curiosidad, no por una respuesta predeterminada.',
-      'Por eso reunimos distintas firmas en un mismo lugar y dejamos espacio para explorar sus matices con calma. Cada persona reconoce algo diferente en un aroma; esa diferencia es parte del encanto.',
+      'Somos una perfumería multimarca: un espacio para descubrir perfumes de distintas casas y reconocer los aromas que conectan contigo.',
+      'Explora perfiles, presentaciones y precios a tu ritmo. La información de cada producto y el recomendador te ayudan a comparar opciones según tus preferencias.',
     ],
     image: {
       src: '/images/olfactory-santal.webp',
@@ -56,18 +56,3 @@ export const contactPageContent = {
     { title: 'Envíos y entregas', to: '/envios' },
   ],
 } as const
-
-export interface ContactDetails {
-  // Número internacional confirmado, sin símbolos. Cambia solo este dato cuando corresponda.
-  whatsappNumber: string | null
-  email: string | null
-  hours: string | null
-  socialLinks: { label: string; url: string }[]
-}
-
-export const contactDetails: ContactDetails = {
-  whatsappNumber: '51955565209', // Número provisional proporcionado por el propietario.
-  email: null,
-  hours: null,
-  socialLinks: [],
-}

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { seedWorkflowOrders, workflowSnapshot } from './order-workflow-fixtures'
 
 const regularFont = '**/ibm-plex-sans-latin-400-normal.woff'

@@ -2,6 +2,9 @@ import { useEffect, useMemo } from 'react'
 import { useLocation, useMatches } from 'react-router'
 import { resolveSeoPage, type SeoRouteData } from './seo-config'
 import { useOfferPriceRevision } from '../services/offer-price-clock'
+import { runtimeEnvironment } from '../services/runtime-environment'
+import { isRemoteCatalog } from '../services/catalog-source'
+import { seoPageRobots, seoPublicationOrigin } from '../domain/seo-publication'
 import {
   absoluteUrl,
   buildSeoStructuredData,
@@ -10,9 +13,6 @@ import {
 
 const DEFAULT_DESCRIPTION =
   'Aroma Infini. Explora perfumes, familias olfativas y propuestas para encontrar tu próxima fragancia.'
-const PRODUCTION_ROBOTS =
-  'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
-
 function siteOrigin() {
   const configured = import.meta.env.VITE_SITE_URL?.trim()
   if (configured) {
@@ -87,14 +87,26 @@ export function SeoManager() {
 
     const origin = siteOrigin()
     const indexingEnabled =
-      import.meta.env.PROD && import.meta.env.VITE_ALLOW_INDEXING === 'true'
+      import.meta.env.PROD &&
+      isRemoteCatalog &&
+      Boolean(
+        seoPublicationOrigin(
+          {
+            environment: runtimeEnvironment,
+            allowIndexing: import.meta.env.VITE_ALLOW_INDEXING,
+            catalogIsReal: import.meta.env.VITE_CATALOG_IS_REAL,
+            siteUrl: import.meta.env.VITE_SITE_URL,
+            supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+          },
+          window.location.origin,
+        ),
+      )
     const publishCommercialData =
       indexingEnabled && import.meta.env.VITE_CATALOG_IS_REAL === 'true'
-    const robots = indexingEnabled
-      ? config.indexable
-        ? PRODUCTION_ROBOTS
-        : `noindex,${config.follow ? 'follow' : 'nofollow'}`
-      : 'noindex,nofollow'
+    const robots = seoPageRobots(indexingEnabled, {
+      indexable: config.indexable,
+      follow: config.follow,
+    })
     const canonical = config.canonicalPath
       ? absoluteUrl(origin, config.canonicalPath)
       : null

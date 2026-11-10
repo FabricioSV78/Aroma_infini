@@ -4,7 +4,29 @@ import type { FinderResult, FinderStep } from './fragrance-finder'
 export type HomeMediaKey = ProductAudience | 'complementos'
 export type HomeMedia = Record<HomeMediaKey, string | null>
 
+export type HomeHeroDestination =
+  | { type: 'shop' }
+  | { type: 'product'; productId: string }
+  | { type: 'category'; category: HomeMediaKey }
+  | {
+      type: 'page'
+      page: '/nosotros' | '/contacto' | '/envios' | '/seguir-pedido' | '/marcas'
+    }
+
 export interface HomeHeroContent {
+  id: string
+  /** Original built-in campaign; null means an uploaded campaign only. */
+  fallbackIndex: number | null
+  order: number
+  mediaType: 'image' | 'video'
+  video: string | null
+  mobileVideo: string | null
+  poster: string | null
+  mobilePoster: string | null
+  showText: boolean
+  showButton: boolean
+  published: boolean
+  destination: HomeHeroDestination
   eyebrow: string
   title: string
   description: string
@@ -21,6 +43,9 @@ export interface HomeFilmContent {
   cta: string
   video: string | null
   poster: string | null
+  /** Optional rendition of the same clip, prepared for smaller screens. */
+  mobileVideo?: string | null
+  mobilePoster?: string | null
 }
 
 export interface HomeAnnouncementContent {

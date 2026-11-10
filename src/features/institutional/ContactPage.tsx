@@ -1,14 +1,29 @@
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
-import {
-  contactDetails,
-  contactPageContent as content,
-} from '../../content/institutional'
+import { contactPageContent as content } from '../../content/institutional'
 import { buildWhatsAppUrl } from '../../utils/whatsapp'
 import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
+import { useSiteSettings } from '../../services/site-settings-service'
+import { socialProfileUrl } from '../../domain/site-settings'
+import { ContactSocialIcon } from './ContactSocialIcon'
 
 export function ContactPage() {
-  const whatsappUrl = buildWhatsAppUrl(contactDetails.whatsappNumber)
+  const settings = useSiteSettings()
+  const whatsappUrl = buildWhatsAppUrl(settings.contact.whatsapp)
+  const contactDetails = {
+    email: settings.contact.email,
+    hours: settings.contact.hours,
+    socialLinks: (
+      [
+        { key: 'instagram', label: 'Instagram' },
+        { key: 'facebook', label: 'Facebook' },
+        { key: 'tiktok', label: 'TikTok' },
+      ] as const
+    ).flatMap((social) => {
+      const url = socialProfileUrl(social.key, settings.social[social.key])
+      return url ? [{ ...social, url }] : []
+    }),
+  }
 
   return (
     <article className="store-page institutional-page institutional-contact service-page">
@@ -68,17 +83,33 @@ export function ContactPage() {
                     {contactDetails.email} <Icon name="arrow" />
                   </a>
                 )}
-                {contactDetails.socialLinks.map((social) => (
-                  <a
-                    className="text-link"
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    key={social.url}
+                {contactDetails.socialLinks.length > 0 && (
+                  <nav
+                    className="contact-social"
+                    aria-labelledby="contact-social-title"
                   >
-                    {social.label} <Icon name="arrow" />
-                  </a>
-                ))}
+                    <h3 id="contact-social-title">Síguenos</h3>
+                    <span id="contact-social-external" className="sr-only">
+                      Abre en una nueva pestaña
+                    </span>
+                    <ul>
+                      {contactDetails.socialLinks.map((social) => (
+                        <li key={social.key}>
+                          <a
+                            className="contact-social-link"
+                            href={social.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-describedby="contact-social-external"
+                          >
+                            <ContactSocialIcon name={social.key} />
+                            <span>{social.label}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                )}
               </div>
             </section>
             <section

@@ -1,11 +1,22 @@
 import { Link } from 'react-router'
 import { assetSource } from '../../services/asset-source'
 import { footerGroups } from '../../content/navigation'
-import { footerSocialProfiles } from '../../content/social'
+import { useSiteSettings } from '../../services/site-settings-service'
 import { Icon } from '../ui/Icon'
 
 export function Footer() {
-  const socialProfiles = footerSocialProfiles
+  const settings = useSiteSettings()
+  const socialProfiles = (
+    [
+      { key: 'instagram', label: 'Instagram', icon: 'instagram' },
+      { key: 'facebook', label: 'Facebook', icon: 'facebook' },
+      { key: 'tiktok', label: 'TikTok', icon: 'tiktok' },
+    ] as const
+  ).flatMap((profile) =>
+    settings.social[profile.key]
+      ? [{ ...profile, url: settings.social[profile.key] }]
+      : [],
+  )
   return (
     <footer className="site-footer">
       <div className="container">
@@ -32,32 +43,17 @@ export function Footer() {
                 <ul>
                   {socialProfiles.map((profile) => (
                     <li key={profile.label}>
-                      {profile.url ? (
-                        <a
-                          href={profile.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`${profile.label} de Aroma Infini, abre en una nueva pestaña`}
-                        >
-                          <Icon name={profile.icon} />
-                        </a>
-                      ) : (
-                        <span
-                          className="footer-social-placeholder"
-                          title={`${profile.label}: perfil pendiente`}
-                        >
-                          <Icon name={profile.icon} />
-                          <span className="sr-only">
-                            {profile.label}: perfil pendiente
-                          </span>
-                        </span>
-                      )}
+                      <a
+                        href={profile.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${profile.label} de Aroma Infini, abre en una nueva pestaña`}
+                      >
+                        <Icon name={profile.icon} />
+                      </a>
                     </li>
                   ))}
                 </ul>
-                {socialProfiles.some((profile) => !profile.url) && (
-                  <p>Perfiles en preparación.</p>
-                )}
               </div>
             )}
           </div>

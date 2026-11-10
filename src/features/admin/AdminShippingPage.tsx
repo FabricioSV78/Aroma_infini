@@ -23,6 +23,8 @@ import { useUnsavedChanges } from './useUnsavedChanges'
 import { useAdminSave } from './useAdminSave'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { commerceSettingsService } from '../../services/commerce-settings-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
 
 const pageSize = 5
 
@@ -162,10 +164,11 @@ export function AdminShippingPage() {
   const [message, setMessage] = useState('')
   const [messageIsError, setMessageIsError] = useState(false)
   const [removedZones, setRemovedZones] = useState<AdminShippingZone[]>([])
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const saving = persistence.saving
   const editorRef = useRef<HTMLFieldSetElement>(null)
   const provinceEditorRef = useRef<HTMLFieldSetElement>(null)
+  const remoteVersionRef = useRef(state.shippingVersion ?? 0)
   const [savedVersion, setSavedVersion] = useState(() => JSON.stringify(form))
   const [savedProvinceEnabled, setSavedProvinceEnabled] = useState(
     Boolean(form.provinceShippingEnabled),
@@ -409,10 +412,14 @@ export function AdminShippingPage() {
       if (!confirmed) return
     }
     const result = await persistence.save(
-      () => adminService.saveShipping(form),
+      () =>
+        commerceSettingsService.saveShipping(form, remoteVersionRef.current),
       () => {
-        setSavedVersion(JSON.stringify(form))
-        setSavedProvinceEnabled(form.provinceShippingEnabled)
+        const canonical = adminService.getSnapshot()
+        setForm(structuredClone(canonical.shipping))
+        setSavedVersion(JSON.stringify(canonical.shipping))
+        setSavedProvinceEnabled(canonical.shipping.provinceShippingEnabled)
+        remoteVersionRef.current = canonical.shippingVersion ?? 0
         setRemovedZones([])
         notice.toast('Configuración aplicada a la tienda.')
       },
@@ -459,6 +466,12 @@ export function AdminShippingPage() {
         }
       />
       <form className="admin-shipping-form" onSubmit={save}>
+        {isRemoteCatalog && state.shipping.configured === false ? (
+          <AdminNotice>
+            Configura las tarifas y los plazos de Lima y Callao. Se publicarán
+            al guardar; no se importaron tarifas del navegador.
+          </AdminNotice>
+        ) : null}
         <div
           className="admin-editor-content"
           inert={saving || persistence.persistenceFailed}
@@ -1253,8 +1266,19 @@ export function AdminShippingPage() {
         </div>
         <div className={`admin-shipping-footer${dirty ? ' is-dirty' : ''}`}>
           <div className="admin-shipping-feedback">
-            <span className={dirty ? 'is-unsaved' : 'is-saved'}>
-              {dirty ? 'Cambios sin guardar' : 'Todo guardado'}
+            <span
+              className={
+                dirty ||
+                (isRemoteCatalog && state.shipping.configured === false)
+                  ? 'is-unsaved'
+                  : 'is-saved'
+              }
+            >
+              {dirty
+                ? 'Cambios sin guardar'
+                : isRemoteCatalog && state.shipping.configured === false
+                  ? 'Configuración pendiente'
+                  : 'Todo guardado'}
             </span>
             {messageIsError ? (
               <p className="admin-form-notice" role="alert">

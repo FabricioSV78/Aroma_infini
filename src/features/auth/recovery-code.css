@@ -1,0 +1,116 @@
+.account-recovery-settings {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--color-line);
+}
+.account-recovery-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  margin-bottom: 14px;
+}
+.account-recovery-heading h2 {
+  font-size: 22px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.account-recovery-heading p,
+.account-recovery-settings > p,
+.recovery-code-receipt p {
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.recovery-inline-status,
+.recovery-code-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.recovery-code-receipt {
+  display: grid;
+  gap: 20px;
+}
+.recovery-code {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--color-brand);
+  font-family: monospace;
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.recovery-code-confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.recovery-code-confirm input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-brand);
+}
+.recovery-code-tools .text-link {
+  min-height: 44px;
+}
+.offline-recovery-layout {
+  max-width: 640px;
+  margin-inline: auto;
+  padding-block: 32px 56px;
+}
+.offline-recovery-layout .auth-form-panel {
+  background: #fff;
+  padding: 0;
+}
+.offline-recovery-layout .auth-form-heading h1 {
+  font-weight: 500;
+}
+.offline-recovery-layout .auth-form-heading > p:last-child {
+  max-width: 520px;
+}
+.offline-recovery-layout .auth-form {
+  gap: 20px;
+}
+.offline-recovery-help {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-line);
+  font-size: 14px;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+.offline-recovery-help a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.offline-recovery-layout .recovery-code-receipt {
+  margin-top: 24px;
+}
+@media (max-width: 639px) {
+  .offline-recovery-layout {
+    padding-block: 28px 44px;
+  }
+  .account-recovery-heading {
+    align-items: start;
+  }
+  .account-recovery-heading .button {
+    width: 100%;
+  }
+  .recovery-code {
+    font-size: 15px;
+  }
+}

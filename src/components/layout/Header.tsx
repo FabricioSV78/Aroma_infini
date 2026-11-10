@@ -15,7 +15,10 @@ import { Icon } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { getFreeShippingThresholdCents } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
-import { localStorefrontRepository } from '../../services/storefront-repository'
+import {
+  storefrontRepository,
+  readStorefrontMetadata,
+} from '../../services/storefront-repository'
 
 interface NavigationColumnsProps {
   group: NavigationGroup
@@ -27,10 +30,16 @@ function NavigationColumns({ group, onNavigate }: NavigationColumnsProps) {
   const current = `${location.pathname}${location.search}${location.hash}`
   return (
     <div className="navigation-columns">
-      {group.columns.map((column) => (
+      {group.columns.map((column, index) => (
         <div key={column.title}>
           <h3 className="eyebrow">{column.title}</h3>
-          <ul>
+          <ul
+            className={
+              group.id === 'marcas' && index === 0
+                ? 'navigation-brand-links'
+                : undefined
+            }
+          >
             {column.links.map((link) => (
               <li key={link.to}>
                 <Link
@@ -65,7 +74,7 @@ export function Header() {
   const [expanded, setExpanded] = useState<{ id: string; key: string } | null>(
     null,
   )
-  const [mobileGroup, setMobileGroup] = useState<string | null>('perfumes')
+  const [mobileGroup, setMobileGroup] = useState<string | null>(null)
   const headerRef = useRef<HTMLElement>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const location = useLocation()
@@ -76,32 +85,44 @@ export function Header() {
   const isTransparent = pathname === '/' && !scrolled && !openGroup
   const freeShippingThresholdCents = getFreeShippingThresholdCents()
   const storefrontSnapshot = useSyncExternalStore(
-    localStorefrontRepository.subscribe,
-    localStorefrontRepository.peekSnapshot,
-    localStorefrontRepository.peekSnapshot,
+    storefrontRepository.subscribe,
+    storefrontRepository.peekSnapshot,
+    storefrontRepository.peekSnapshot,
   )
   const announcement = storefrontSnapshot.content.announcement
   const featuredBrand = storefrontSnapshot.brands.find(
     (brand) => brand.id === storefrontSnapshot.content.featuredBrandId,
   )
-  const visibleNavigationGroups = getNavigationGroups(featuredBrand).map(
-    (group) => ({
-      ...group,
-      columns: group.columns.map((column) => ({
-        ...column,
-        links: column.links.filter(
-          (link) =>
-            storefrontSnapshot.features.complementsEnabled ||
-            link.to !== '/tienda?tipo=complemento',
-        ),
-      })),
-    }),
-  )
+  const visibleNavigationGroups = getNavigationGroups(
+    storefrontSnapshot.brands,
+    featuredBrand,
+  ).map((group) => ({
+    ...group,
+    columns: group.columns.map((column) => ({
+      ...column,
+      links: column.links.filter(
+        (link) =>
+          storefrontSnapshot.features.complementsEnabled ||
+          link.to !== '/tienda?tipo=complemento',
+      ),
+    })),
+  }))
   const deliveryAnnouncement =
     storefrontSnapshot.shipping.provinceShippingEnabled &&
     announcement.deliveryText === 'Envíos en Lima y Callao'
       ? 'Envíos a todo el Perú'
       : announcement.deliveryText
+
+  useEffect(() => {
+    if (
+      openGroup !== 'marcas' &&
+      !(overlay === 'menu' && mobileGroup === 'marcas')
+    )
+      return
+    // Reuse the public metadata cache and its pending request; no full-catalog
+    // fetch or administrative projection is needed to refresh the menu.
+    void readStorefrontMetadata().catch(() => {})
+  }, [openGroup, overlay, mobileGroup])
 
   function cancelHover() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current)
@@ -197,7 +218,7 @@ export function Header() {
               label="Abrir menú"
               className="mobile-menu-button"
               onClick={() => {
-                setMobileGroup('perfumes')
+                setMobileGroup(null)
                 setOverlay('menu')
               }}
               aria-haspopup="dialog"

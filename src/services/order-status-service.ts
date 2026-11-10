@@ -1,4 +1,6 @@
-import { adminService, type AdminOrder } from './admin-service'
+import { adminService } from './admin-service'
+import type { AdminOrder } from '../types/admin'
+import { isRemoteCatalog } from './catalog-source'
 
 /** Read boundary shared by account and guest order tracking in the demo. */
 export interface OrderStatusReadService {
@@ -6,12 +8,16 @@ export interface OrderStatusReadService {
   getSnapshot(): readonly AdminOrder[]
   getByReference(reference: string): AdminOrder | undefined
 }
+const noPublicOrders: readonly AdminOrder[] = []
 
 export const orderStatusService: OrderStatusReadService = {
   subscribe: adminService.subscribe,
-  getSnapshot: () => adminService.getSnapshot().orders,
+  getSnapshot: () =>
+    isRemoteCatalog ? noPublicOrders : adminService.getSnapshot().orders,
   getByReference: (reference) =>
-    adminService
-      .getSnapshot()
-      .orders.find((order) => order.reference === reference),
+    isRemoteCatalog
+      ? undefined
+      : adminService
+          .getSnapshot()
+          .orders.find((order) => order.reference === reference),
 }

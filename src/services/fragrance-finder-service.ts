@@ -5,7 +5,7 @@ import type {
 } from '../types/fragrance-finder'
 import { getFinderOptions, recommendFragrances } from './fragrance-matching'
 import {
-  localStorefrontRepository,
+  storefrontRepository,
   type StorefrontRepository,
 } from './storefront-repository'
 
@@ -29,6 +29,5 @@ export function createFragranceFinderService(
   }
 }
 
-export const fragranceFinderService = createFragranceFinderService(
-  localStorefrontRepository,
-)
+export const fragranceFinderService =
+  createFragranceFinderService(storefrontRepository)

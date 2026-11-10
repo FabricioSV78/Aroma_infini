@@ -1,6 +1,6 @@
 import { expectImportSuccess } from './admin-notice-fixtures'
 import { mkdir } from 'node:fs/promises'
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './test'
 import type { AdminState } from '../src/services/admin-service'
 import {
   importFile,

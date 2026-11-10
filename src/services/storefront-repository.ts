@@ -12,8 +12,16 @@ import {
   getStoreBrands,
   getStoreProductRecords,
   hydrateAdminStore,
-  type AdminState,
 } from './admin-service'
+import type { AdminState } from '../types/admin'
+import { isRemoteCatalog } from './catalog-source'
+import { invalidatePublicQueryCache } from './public-query-cache'
+import {
+  createRemoteStorefrontTransport,
+  createSupabaseStorefrontRepository,
+} from './supabase-storefront'
+import { publicHomeContent } from './home-content-service'
+import { publicShippingSettings } from './commerce-settings-service'
 
 /** Published product information shared by the shop and admin inventory. */
 export interface StorefrontProductRecord {
@@ -38,7 +46,7 @@ export interface StorefrontRepository {
   readSnapshot(): Promise<StorefrontSnapshot>
 }
 
-/** Compatibility read for the browser-local session; remote adapters need no sync API. */
+/** Observable confirmed cache for consumers that render synchronously. */
 export interface LocalStorefrontRepository extends StorefrontRepository {
   peekSnapshot(): StorefrontSnapshot
   subscribe(listener: () => void): () => void
@@ -69,4 +77,52 @@ export const localStorefrontRepository: LocalStorefrontRepository = {
     return peekLocalSnapshot()
   },
   peekSnapshot: peekLocalSnapshot,
+}
+
+const remoteStorefrontRepository = createSupabaseStorefrontRepository({
+  ...createRemoteStorefrontTransport(),
+  editorial() {
+    // Both editorial and delivery data are confirmed public projections;
+    // browser-local settings never become a remote network fallback.
+    return {
+      shipping: publicShippingSettings.peek(),
+      media: publicHomeContent.peek().media,
+      content: publicHomeContent.peek().content,
+    }
+  },
+  subscribeEditorial(listener) {
+    const unsubscribeLocal = adminService.subscribe(listener)
+    const unsubscribeHome = publicHomeContent.subscribe(listener)
+    const unsubscribeShipping = publicShippingSettings.subscribe(listener)
+    return () => {
+      unsubscribeLocal()
+      unsubscribeHome()
+      unsubscribeShipping()
+    }
+  },
+})
+
+export const storefrontRepository: LocalStorefrontRepository = isRemoteCatalog
+  ? remoteStorefrontRepository
+  : localStorefrontRepository
+
+/** A confirmed administrative command invalidates public reads, never hydrates them. */
+export function invalidateSupabaseStorefront() {
+  invalidatePublicQueryCache()
+  if (isRemoteCatalog) remoteStorefrontRepository.invalidate()
+}
+
+export function readStorefrontMetadata(): Promise<StorefrontSnapshot> {
+  return isRemoteCatalog
+    ? remoteStorefrontRepository.readMetadata()
+    : localStorefrontRepository.readSnapshot()
+}
+
+export function confirmPublicCatalogRecords(
+  records: StorefrontProductRecord[],
+  metadata?: Parameters<typeof remoteStorefrontRepository.confirmRecords>[1],
+  selection?: Parameters<typeof remoteStorefrontRepository.confirmRecords>[2],
+) {
+  if (isRemoteCatalog)
+    remoteStorefrontRepository.confirmRecords(records, metadata, selection)
 }

@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import sharp from 'sharp'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { expectImportSuccess } from './admin-notice-fixtures'
 import {
   importFile,

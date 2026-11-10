@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
-test('La portada presenta la selección sin avisos de popularidad no verificada', async ({
+test('La portada presenta Más vendidos sin avisos de popularidad no verificada', async ({
   page,
 }) => {
   await page.goto('/')
@@ -100,6 +100,9 @@ test('Menú móvil: teclado, foco contenido y retorno con Escape', async ({
   await expect(dialog).not.toBeVisible()
   await expect(trigger).toBeFocused()
   await trigger.click()
+  const storeGroup = dialog.getByRole('button', { name: 'Tienda', exact: true })
+  await expect(storeGroup).toHaveAttribute('aria-expanded', 'false')
+  await storeGroup.click()
   await dialog.getByRole('link', { name: 'Para ella' }).click()
   await expect(page).toHaveURL(/tienda\?genero=mujer/)
   await expect(page.locator('main')).toBeFocused()

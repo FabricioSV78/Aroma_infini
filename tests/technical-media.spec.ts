@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { existsSync } from 'node:fs'
 import { assetSource, assetSourceSet } from '../src/services/asset-source'
 import { imageSource, imageSourceSet } from '../src/services/image-source'

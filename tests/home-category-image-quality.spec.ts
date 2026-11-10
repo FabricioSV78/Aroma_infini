@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -37,12 +37,13 @@ const originalDimensions = [
 for (const viewport of scenarios) {
   test(`Las categorías eligen resolución suficiente sin ampliar los originales · ${viewport.name} @${viewport.dpr}x`, async ({
     browser,
+    baseURL,
   }) => {
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: viewport.dpr,
       reducedMotion: 'reduce',
-      baseURL: 'http://127.0.0.1:5173',
+      baseURL,
     })
     try {
       const page = await context.newPage()
@@ -120,7 +121,7 @@ for (const viewport of scenarios) {
         const candidates = measurement.sourceSet.split(',').map((candidate) => {
           const [path, descriptor] = candidate.trim().split(/\s+/)
           return {
-            path: new URL(path, 'http://127.0.0.1:5173').href,
+            path: new URL(path, baseURL).href,
             width: Number(descriptor.replace(/w$/, '')),
           }
         })

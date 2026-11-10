@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
@@ -14,6 +14,11 @@ import {
   type AdminOrderStatus,
 } from '../../services/admin-service'
 import { formatPEN } from '../../services/currency'
+import {
+  loadAdminOrders,
+  orderAdminService,
+} from '../../services/order-admin-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import type { OrderActionIssue } from '../../types/order-workflow'
 import { AdminPagination } from './AdminPagination'
 import { AdminOrderPdfExport } from './AdminOrderPdfExport'
@@ -49,6 +54,8 @@ function orderDay(value: string) {
 interface OrderStatusAction {
   references: string[]
   expected: Record<string, AdminOrderStatus>
+  expectedVersions?: Record<string, number>
+  operationId?: string
   individual: boolean
 }
 
@@ -65,7 +72,7 @@ interface OrderSelectionState {
 
 export function AdminOrdersPage() {
   const notice = useAdminNotice()
-  const persistence = useAdminSave()
+  const persistence = useAdminSave({ catalog: true })
   const state = useAdminStore()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
@@ -100,6 +107,26 @@ export function AdminOrdersPage() {
     }))
   }
   const [error, setError] = useState('')
+  useEffect(() => {
+    if (!isRemoteCatalog) return
+    let active = true
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      void loadAdminOrders(true).catch(() => {
+        if (active)
+          setError(
+            'No pudimos actualizar la lista. Conservamos los pedidos confirmados; vuelve a abrir este apartado para intentar de nuevo.',
+          )
+      })
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
   const [feedback, setFeedback] = useState<OrderActionFeedback | null>(null)
   const [reviewReferences, setReviewReferences] = useState<string[] | null>(
     null,
@@ -243,6 +270,12 @@ export function AdminOrdersPage() {
     return {
       references: [...selection.keys()],
       expected: Object.fromEntries(selection),
+      expectedVersions: Object.fromEntries(
+        state.orders
+          .filter((order) => selection.has(order.reference))
+          .map((order) => [order.reference, order.version ?? 0]),
+      ),
+      operationId: crypto.randomUUID(),
       individual: false,
     }
   }
@@ -253,6 +286,8 @@ export function AdminOrdersPage() {
       ? {
           references: [order.reference],
           expected: { [order.reference]: order.status },
+          expectedVersions: { [order.reference]: order.version ?? 0 },
+          operationId: crypto.randomUUID(),
           individual: true,
         }
       : selectedAction()
@@ -288,7 +323,15 @@ export function AdminOrdersPage() {
           )
           return
         }
-        const result = adminService.setOrderStatus(reference, targetStatus)
+        const result = await orderAdminService.setOrderStatus(
+          reference,
+          targetStatus,
+          {
+            deliveryConfirmed,
+            expectedVersions: statusAction.expectedVersions,
+            operationId: statusAction.operationId,
+          },
+        )
         if (result.kind === 'validation') {
           setActionError(result.message)
           return
@@ -298,11 +341,16 @@ export function AdminOrdersPage() {
           `Pedido ${reference}: ${adminOrderStatusMeta[targetStatus].label.toLowerCase()}.`,
         )
       } else {
-        const result = adminService.bulkSetOrderStatus(
+        const result = await orderAdminService.bulkSetOrderStatus(
           statusAction.references,
           targetStatus,
           undefined,
           statusAction.expected,
+          {
+            deliveryConfirmed,
+            expectedVersions: statusAction.expectedVersions,
+            operationId: statusAction.operationId,
+          },
         )
         if (result.kind === 'validation') {
           setActionError(result.message)
@@ -676,6 +724,11 @@ export function AdminOrdersPage() {
                       <strong className="admin-order-reference">
                         {order.reference}
                       </strong>
+                      {order.simulation ? (
+                        <small className="admin-order-simulation">
+                          Modo prueba · sin cobro real
+                        </small>
+                      ) : null}
                       <small className="admin-order-date">
                         {shortDateFormatter.format(new Date(order.placedAt))}
                       </small>

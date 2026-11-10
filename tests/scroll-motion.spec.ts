@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 const mobileRoutes = [
   '/',
@@ -16,21 +16,34 @@ const desktopRoutes = ['/', '/tienda', '/producto/petale-nu', '/nosotros']
 
 async function revealEverySection(page: Page) {
   const elements = page.locator('[data-scroll-reveal], [data-reveal]')
-  const count = await elements.count()
-  expect(count).toBeGreaterThan(0)
+  const nodes = await elements.elementHandles()
+  expect(nodes.length).toBeGreaterThan(0)
 
-  for (let index = 0; index < count; index += 1) {
-    const element = elements.nth(index)
+  for (const element of nodes) {
     const participatesInLayout = await element.evaluate(
-      (node) => node.getClientRects().length > 0,
+      (node) =>
+        node instanceof Element &&
+        node.isConnected &&
+        node.getClientRects().length > 0,
     )
     if (!participatesInLayout) continue
-    await element.evaluate((node) =>
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' }),
-    )
-    await expect(element).toHaveAttribute('data-revealed', '', {
-      timeout: 2_000,
+    await element.evaluate((node) => {
+      if (node instanceof Element)
+        node.scrollIntoView({ block: 'center', behavior: 'smooth' })
     })
+    await expect
+      .poll(
+        () =>
+          element.evaluate((node) =>
+            !node.isConnected
+              ? ''
+              : node instanceof Element
+                ? node.getAttribute('data-revealed')
+                : null,
+          ),
+        { timeout: 2000 },
+      )
+      .toBe('')
   }
 
   await page.waitForTimeout(900)

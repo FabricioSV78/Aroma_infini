@@ -3,6 +3,28 @@ import type { Product, ProductDiscount, ProductVariant } from '../types/catalog'
 export type ProductDiscountStatus =
   'none' | 'inactive' | 'scheduled' | 'active' | 'expired' | 'invalid'
 
+/** The next enabled-offer boundary; callers retain their own timer lifecycle. */
+export function getNextProductDiscountChange(
+  products: readonly Pick<Product, 'discount'>[],
+  now = Date.now(),
+): number | undefined {
+  let next: number | undefined
+  for (const { discount } of products) {
+    if (!discount?.active) continue
+    for (const value of [discount.startsAt, discount.endsAt]) {
+      if (!value) continue
+      const timestamp = Date.parse(value)
+      if (
+        Number.isFinite(timestamp) &&
+        timestamp > now &&
+        (next === undefined || timestamp < next)
+      )
+        next = timestamp
+    }
+  }
+  return next
+}
+
 function time(value: string): number | null {
   if (!value) return null
   const timestamp = Date.parse(value)
@@ -97,10 +119,24 @@ export interface VariantPrice {
 /** One source of truth for storefront, cart, checkout and order validation. */
 export function getVariantPrice(
   product: Product,
-  variant: Pick<ProductVariant, 'priceCents' | 'active'>,
+  variant: Pick<ProductVariant, 'priceCents' | 'active' | 'finalPriceCents'>,
   now: number | Date = Date.now(),
 ): VariantPrice {
   const originalCents = variant.priceCents
+  const quoted = variant.finalPriceCents
+  if (
+    variant.active !== false &&
+    typeof quoted === 'number' &&
+    Number.isSafeInteger(quoted) &&
+    quoted > 0 &&
+    quoted <= originalCents
+  )
+    return {
+      originalCents,
+      finalCents: quoted,
+      discountCents: originalCents - quoted,
+      discountActive: quoted < originalCents,
+    }
   if (
     variant.active === false ||
     getProductDiscountStatus(product.discount, now, product.variants) !==

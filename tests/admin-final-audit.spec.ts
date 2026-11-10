@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 const viewports = [
   { name: 'monitor grande', width: 1920, height: 1080 },

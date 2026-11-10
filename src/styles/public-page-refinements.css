@@ -5,7 +5,6 @@
 .store-layout .checkout-heading h1,
 .store-layout .checkout-confirmation-heading h1,
 .store-layout .tracking-heading h1,
-.store-layout .account-heading h1,
 .store-layout .institutional-about-opening h1,
 .store-layout .institutional-contact-opening h1 {
   color: var(--color-ink);
@@ -181,25 +180,6 @@
 
 .store-layout .tracking-steps {
   margin-top: 32px;
-}
-
-.store-layout .account-overview-grid > section {
-  min-height: 178px;
-  padding: 20px;
-}
-
-.store-layout .account-overview-grid h2 {
-  margin-top: 18px;
-  font-weight: 600;
-}
-
-.store-layout .account-overview-grid p {
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.store-layout .account-overview-grid .text-link {
-  margin-top: 14px;
 }
 
 .store-layout .institutional-about-hero {

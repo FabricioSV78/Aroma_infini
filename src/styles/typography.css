@@ -5,7 +5,6 @@
   .brand-intro h2,
   .category h3,
   .editorial-copy h2,
-  .featured-intro h2,
   .product-meta :is(h2, h3),
   .catalog-heading h1,
   .catalog-empty h1,
@@ -56,13 +55,6 @@
   font-size: var(--type-title-campaign);
   line-height: 1.08;
   letter-spacing: -0.038em;
-}
-
-.featured-intro h2 {
-  max-width: 13ch;
-  font-size: var(--type-title-sm);
-  line-height: 1;
-  letter-spacing: -0.03em;
 }
 
 .product-meta :is(h2, h3) {
@@ -119,7 +111,6 @@
   .section-heading .eyebrow,
   .brand-intro .eyebrow,
   .editorial-copy > .eyebrow,
-  .featured-intro .eyebrow,
   .product-meta > .eyebrow,
   .product-profile-heading .eyebrow,
   .product-recommendations .eyebrow

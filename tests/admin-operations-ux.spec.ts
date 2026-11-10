@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 import { answerAdminNotice } from './admin-notice-fixtures'
 
 test('El resumen permite abrir un estado de pedidos desde todo el indicador', async ({

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 import { seedAccessory } from './complements-fixtures'
 import { importViewports, persistedAdminState } from './product-import-fixtures'
 

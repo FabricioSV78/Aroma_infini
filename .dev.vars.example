@@ -1,0 +1,16 @@
+# Server-only local Worker configuration. Copy to ignored .dev.vars.
+# Never use VITE_ prefixes for this file or copy a server key into React.
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_MEDIA_SECRET_KEY=
+SUPABASE_COMMERCE_SECRET_KEY=
+SUPABASE_PUSH_SECRET_KEY=
+# Server-only VAPID: generate separately for staging and production.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:aromainfiniweb@gmail.com
+ADMIN_PUSH_ENABLED=false
+PUSH_ENVIRONMENT=staging
+MEDIA_ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+# Sólo para wrangler dev local y el proyecto Supabase de desarrollo validado.
+# APP_ENVIRONMENT=development
+# CHECKOUT_SIMULATION_ENABLED=true

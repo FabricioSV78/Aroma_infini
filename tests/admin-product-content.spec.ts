@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test('el editor ordena y quita fotografías sin pedir encuadre ni desincronizar la principal', async ({
   page,

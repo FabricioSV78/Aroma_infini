@@ -1,4 +1,4 @@
-import type { AdminProduct } from '../services/admin-service'
+import type { AdminProduct } from '../types/admin'
 import { productImageAlt } from '../services/product-image-alt'
 
 /** Additional catalog records; edited through Products after registration. */

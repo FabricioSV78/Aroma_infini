@@ -19,11 +19,12 @@ import { getVariantPrice } from '../../services/product-discounts'
 import { getProductRecommendations } from '../../services/product-recommendations'
 import { shippingService } from '../../services/shipping-service'
 import { useOfferPriceRevision } from '../../services/offer-price-clock'
+import { storefrontRepository } from '../../services/storefront-repository'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import { PriceDisplay } from '../../components/ui/PriceDisplay'
 import { OfferBadge } from '../../components/ui/OfferBadge'
 import { ProductReviewsPreview } from './ProductReviewsPreview'
 import { ProductPopularityPreview } from './ProductPopularityPreview'
-import { getBestsellingProducts } from '../../services/home-service'
 import { brandStorePath } from '../../utils/brand-store-path'
 import {
   getOlfactoryAromaLabel,
@@ -42,14 +43,26 @@ interface ProductReadyProps {
 type ProductInfoPanel = 'family' | 'description' | 'reviews'
 
 function ProductReady({
-  product,
-  detail,
-  brand,
+  product: suppliedProduct,
+  detail: suppliedDetail,
+  brand: suppliedBrand,
   recommendations,
   brands,
   preview = false,
 }: ProductReadyProps) {
   useOfferPriceRevision()
+  const snapshot = storefrontRepository.peekSnapshot()
+  const canonical =
+    !preview && isRemoteCatalog
+      ? snapshot.products.find(
+          (record) => record.product.id === suppliedProduct.id,
+        )
+      : undefined
+  const product = canonical?.product ?? suppliedProduct
+  const detail = canonical?.detail ?? suppliedDetail
+  const brand = canonical
+    ? snapshot.brands.find((record) => record.id === product.brandId)
+    : suppliedBrand
   const initialVariant =
     product.variants.find(
       (variant) => variant.active !== false && variant.stock > 0,
@@ -57,7 +70,13 @@ function ProductReady({
   const [selectedVariantId, setSelectedVariantId] = useState(
     initialVariant?.id ?? '',
   )
-  const { favoriteIds, toggleFavorite } = useFavorites()
+  const {
+    favoriteIds,
+    toggleFavorite,
+    loading: favoritesLoading,
+    pendingIds,
+    error: favoritesError,
+  } = useFavorites()
   const { addItem } = useCart()
   const shipping = useSyncExternalStore(
     shippingService.subscribe,
@@ -71,7 +90,11 @@ function ProductReady({
     product.variants.find(
       (variant) => variant.id === selectedVariantId && variant.active !== false,
     ) ?? initialVariant
-  const isAvailable = Boolean(selectedVariant && selectedVariant.stock > 0)
+  const isAvailable = Boolean(
+    selectedVariant &&
+    selectedVariant.stock > 0 &&
+    (preview || !isRemoteCatalog || canonical),
+  )
   const selectedPrice = selectedVariant
     ? getVariantPrice(product, selectedVariant)
     : null
@@ -162,6 +185,16 @@ function ProductReady({
               type="button"
               className="product-save"
               aria-pressed={favoriteIds.has(product.id)}
+              disabled={
+                !preview &&
+                (favoritesLoading ||
+                  pendingIds.has(product.id) ||
+                  Boolean(favoritesError))
+              }
+              aria-busy={
+                !preview && (favoritesLoading || pendingIds.has(product.id))
+              }
+              title={favoritesError || undefined}
               onClick={() =>
                 preview
                   ? setPreviewMessage(
@@ -450,9 +483,6 @@ function ProductReady({
           productImage={product.image}
           productName={product.name}
           description={detail.shortDescription}
-          bestseller={getBestsellingProducts().some(
-            (item) => item.id === product.id,
-          )}
         />
       ) : null}
 
@@ -519,7 +549,9 @@ export function ProductPage() {
             aria-busy={revalidator.state !== 'idle'}
             onClick={() => revalidator.revalidate()}
           >
-            {revalidator.state !== 'idle' ? 'Cargando el producto…' : 'Reintentar'}
+            {revalidator.state !== 'idle'
+              ? 'Cargando el producto…'
+              : 'Reintentar'}
           </button>
         ) : null}
         <Link className="text-link" to="/tienda">
@@ -537,6 +569,10 @@ const previewFavorites: FavoritesContextValue = {
   favoriteIds: new Set<string>(),
   favoriteCount: 0,
   persistence: 'session',
+  loading: false,
+  pendingIds: new Set<string>(),
+  error: '',
+  refreshFavorites: ignorePreviewAction,
   toggleFavorite: ignorePreviewAction,
   removeFavorite: ignorePreviewAction,
 }
@@ -550,6 +586,7 @@ const previewCart: CartContextValue = {
   setQuantity: ignorePreviewAction,
   removeItem: ignorePreviewAction,
   clearCart: ignorePreviewAction,
+  consumeItems: ignorePreviewAction,
   openCart: ignorePreviewAction,
   closeCart: ignorePreviewAction,
   dismissNotice: ignorePreviewAction,
