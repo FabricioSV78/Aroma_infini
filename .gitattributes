@@ -1,0 +1,3 @@
+# SQL migrations patch stored function definitions using exact LF fragments.
+# Keep their contents identical across Windows checkouts, CI and deployments.
+*.sql text eol=lf

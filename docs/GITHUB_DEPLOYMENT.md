@@ -4,6 +4,10 @@
 describe la configuración que debe completarse en GitHub y Cloudflare; no
 certifica una ejecución alojada de GitHub Actions ni autoriza un despliegue.
 
+La primera ejecución real de `main` y sus correcciones se documentan en
+[Primera ejecución de GitHub Actions](GITHUB_ACTIONS_FIRST_RUN.md). Las
+correcciones necesitan una nueva ejecución alojada antes de crear `develop`.
+
 ## Flujo y destinos
 
 Se utiliza el mismo repositorio público
@@ -268,8 +272,10 @@ de Actions si hay un error; nunca sus credenciales.
   `.env.local`, `.env.production.local` ni `.dev.vars`, para reproducir la ausencia
   de esos archivos en GitHub. Comparte las dependencias instaladas: no equivale
   a un runner Linux ni a una instalación nueva de `npm ci`.
-- La primera ejecución real de GitHub Actions, los tokens y las reglas de los
-  entornos siguen pendientes de la configuración personal descrita arriba.
+- La primera ejecución real detectó los problemas descritos en el informe
+  enlazado. Las correcciones requieren otro commit y una nueva ejecución. El
+  despliegue desde GitHub sigue dependiendo de configurar los secretos y reglas
+  de los entornos descritos arriba.
 
 Evidencia local: `artifacts/github-deployment-2026-11-10/result.json`. Se conservan
 también dos intentos locales fallidos: el sandbox impidió inicialmente leer una

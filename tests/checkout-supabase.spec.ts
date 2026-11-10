@@ -112,6 +112,7 @@ interface Network {
   history: OrderHistoryEntry[]
   statusWrites: Record<string, unknown>[]
   beforeResponse?: () => Promise<void>
+  beforeQuoteResponse?: () => Promise<void>
 }
 const test = authTest.extend<{ checkoutNetwork: Network }>({
   checkoutNetwork: async ({ context, supabaseNetwork }, runFixture) => {
@@ -324,6 +325,7 @@ const test = authTest.extend<{ checkoutNetwork: Network }>({
         await reply({ items: [record], total: 1 })
       else if (name === 'checkout_quote') {
         state.quotes.push(body)
+        await state.beforeQuoteResponse?.()
         if (state.failQuote) {
           await reply({ code: 'PGRST000' }, 503)
           return
@@ -1175,6 +1177,98 @@ test('el mismo pedido pasa de checkout de cuenta a administración, PDF y seguim
   expect(checkoutNetwork.writes).toHaveLength(1)
   expect(record.product.variants[0].stock).toBe(5)
 })
+for (const [width, height] of [
+  [1440, 900],
+  [768, 1024],
+  [390, 844],
+])
+  test(`la cotización no desplaza los controles de contacto ${width}`, async ({
+    page,
+    checkoutNetwork,
+  }, testInfo) => {
+    let releaseQuote!: () => void
+    const pendingQuote = new Promise<void>((resolve) => {
+      releaseQuote = resolve
+    })
+    checkoutNetwork.beforeQuoteResponse = () => pendingQuote
+    try {
+      await page.setViewportSize({ width, height })
+      await page.goto('/checkout')
+      await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+      await page.getByLabel('Apellido', { exact: true }).fill('Torres')
+      await page
+        .getByLabel('Correo electrónico', { exact: true })
+        .fill('ana@example.invalid')
+      await page.getByLabel('Celular', { exact: true }).fill('912345678')
+      await page.evaluate(() => document.fonts.ready.then(() => undefined))
+      const busy = page
+        .getByRole('status')
+        .filter({ hasText: 'Actualizando importes' })
+      await expect(busy).toBeVisible()
+      await expect.poll(() => checkoutNetwork.quotes.length).toBeGreaterThan(0)
+      const placement = await busy.evaluate((element) => {
+        const description = element
+          .closest('.checkout-heading')
+          ?.querySelector('p:not(.checkout-quote-status)')
+        const progress = document.querySelector('.checkout-progress')
+        if (!description || !progress)
+          throw new Error('Missing checkout heading')
+        return {
+          descriptionBottom: description.getBoundingClientRect().bottom,
+          statusTop: element.getBoundingClientRect().top,
+          statusBottom: element.getBoundingClientRect().bottom,
+          progressTop: progress.getBoundingClientRect().top,
+          overflow:
+            document.documentElement.scrollWidth > window.innerWidth + 1,
+        }
+      })
+      expect(placement.statusTop).toBeGreaterThanOrEqual(
+        placement.descriptionBottom,
+      )
+      expect(placement.statusBottom).toBeLessThanOrEqual(placement.progressTop)
+      expect(placement.overflow).toBe(false)
+      const continueButton = page.getByRole('button', {
+        name: 'Continuar a entrega',
+        exact: true,
+      })
+      const before = await continueButton.evaluate(
+        (element) => element.getBoundingClientRect().top + window.scrollY,
+      )
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({
+        path: `artifacts/checkout-quote-stability/${width}-busy.png`,
+        fullPage: true,
+        animations: 'disabled',
+      })
+      releaseQuote()
+      await expect(busy).toBeHidden()
+      const after = await continueButton.evaluate(
+        (element) => element.getBoundingClientRect().top + window.scrollY,
+      )
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({
+        path: `artifacts/checkout-quote-stability/${width}-idle.png`,
+        fullPage: true,
+        animations: 'disabled',
+      })
+      expect(after).toBe(before)
+      await testInfo.attach('quote-layout.json', {
+        body: JSON.stringify({ width, height, before, after, placement }),
+        contentType: 'application/json',
+      })
+      await expect(page.getByLabel('Celular', { exact: true })).toHaveValue(
+        '912345678',
+      )
+      await continueButton.click()
+      await expect(
+        page.getByRole('heading', { name: 'A dónde lo enviamos', exact: true }),
+      ).toBeVisible()
+      expect(checkoutNetwork.writes).toHaveLength(0)
+    } finally {
+      releaseQuote()
+    }
+  })
+
 for (const [width, height] of [
   [1920, 1080],
   [1440, 900],

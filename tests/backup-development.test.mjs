@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { test } from 'node:test'
+import { promisify } from 'node:util'
 import {
   parseSupabaseDumpPlan,
   validateBackupInventory,
@@ -196,4 +198,40 @@ test('export requires explicit confirmation before reading credentials or creati
     backupEnvironment({ confirmed: true, environmentName: 'arbitrary' }),
     /explicit-backup-profile-required/,
   )
+})
+
+test('export authorization and profile guards run before platform-specific work on every supported test host', async () => {
+  const execute = promisify(execFile)
+  const moduleUrl = new URL(
+    '../scripts/backup-development.mjs',
+    import.meta.url,
+  ).href
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    await execute(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `
+          import assert from 'node:assert/strict';
+          const { backupEnvironment } = await import(${JSON.stringify(moduleUrl)});
+          Object.defineProperty(process, 'platform', { value: ${JSON.stringify(platform)} });
+          await assert.rejects(backupEnvironment(), /explicit-windows-development-export-required/);
+          await assert.rejects(
+            backupEnvironment({ confirmed: true, environmentName: 'arbitrary' }),
+            /explicit-backup-profile-required/,
+          );
+          if (process.platform !== 'win32') {
+            for (const environmentName of ['development', 'production']) {
+              await assert.rejects(
+                backupEnvironment({ confirmed: true, environmentName }),
+                /explicit-windows-development-export-required/,
+              );
+            }
+          }
+        `,
+      ],
+      { windowsHide: true },
+    )
+  }
 })

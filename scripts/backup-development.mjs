@@ -417,17 +417,21 @@ export async function backupEnvironment({
   keepVerifiedPackage = false,
   environmentName = 'development',
 } = {}) {
+  assert(confirmed === true, 'explicit-windows-development-export-required')
+  // Validate the explicit target independently of the host before any I/O.
+  // Linux CI must reject an unknown profile as well as Windows; this never
+  // permits the Windows/DPAPI exporter to run on an unsupported platform.
   assert(
-    confirmed === true && process.platform === 'win32',
+    Object.hasOwn(backupProfiles, environmentName),
+    'explicit-backup-profile-required',
+  )
+  assert(
+    process.platform === 'win32',
     'explicit-windows-development-export-required',
   )
   assert(
     process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
     'backup-tls-verification-required',
-  )
-  assert(
-    Object.hasOwn(backupProfiles, environmentName),
-    'explicit-backup-profile-required',
   )
   const { projectRef, bucket, workdir } = backupProfiles[environmentName]
   const output = path.join(root, 'artifacts/protected-backups')

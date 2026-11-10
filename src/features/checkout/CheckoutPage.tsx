@@ -304,10 +304,12 @@ export function CheckoutPage() {
       <header className="checkout-heading" data-scroll-reveal="copy">
         <h1>Finaliza tu selección</h1>
         <p>Revisa tus datos y la entrega antes de continuar.</p>
+        {isRemoteCatalog && quoteLoading ? (
+          <InlineStatus className="checkout-quote-status" busy>
+            Actualizando importes…
+          </InlineStatus>
+        ) : null}
       </header>
-      {isRemoteCatalog && quoteLoading ? (
-        <InlineStatus busy>Actualizando importes…</InlineStatus>
-      ) : null}
       {quoteError ? (
         <div role="alert">
           <p>{quoteError}</p>

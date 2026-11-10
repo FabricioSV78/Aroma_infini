@@ -5,6 +5,7 @@
 }
 
 .checkout-heading {
+  position: relative;
   padding-block: 34px 40px;
 }
 .checkout-confirmation-heading .eyebrow {
@@ -22,7 +23,7 @@
   letter-spacing: -0.038em;
   text-wrap: balance;
 }
-.checkout-heading > p:last-child,
+.checkout-heading > p:not(.checkout-quote-status),
 .checkout-confirmation-heading > p:not(.eyebrow),
 .checkout-unavailable > p:not(.eyebrow) {
   max-width: 600px;
@@ -30,6 +31,13 @@
   color: var(--color-muted);
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* Keep quote updates in the existing heading spacing, away from the controls. */
+.checkout-heading .checkout-quote-status {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
 }
 
 .checkout-progress {
