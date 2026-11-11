@@ -4,6 +4,9 @@ import { mkdir, readFile } from 'node:fs/promises'
 test('El video editorial usa la versión móvil y conserva el póster del mismo archivo', async ({
   page,
 }) => {
+  // This flow transcodes two real MP4s; the default UI assertion budget is
+  // shorter than video preparation on a shared CI runner.
+  test.setTimeout(120_000)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/admin/home')
@@ -17,19 +20,33 @@ test('El video editorial usa la versión móvil y conserva el póster del mismo 
       mimeType: 'video/mp4',
       buffer: await readFile('public/videos/perfume-editorial-wide.mp4'),
     })
-  await expect(page.getByText('Preparando archivo…')).not.toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Usar video original', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60_000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('alertdialog')).not.toBeVisible()
+  // The main upload may also create a mobile rendition. Remove it so the
+  // following assertion can only succeed after the explicit mobile upload.
+  const mobileReset = page.getByRole('button', {
+    name: 'Usar el video principal',
+    exact: true,
+  })
+  if (await mobileReset.isVisible()) await mobileReset.click()
+  await expect(mobileReset).not.toBeVisible()
   await page.getByLabel('Subir video editorial para celular').setInputFiles({
     name: 'celular.mp4',
     mimeType: 'video/mp4',
     buffer: await readFile('public/videos/perfume-editorial-mobile.mp4'),
   })
-  await expect(page.getByText('Preparando archivo…')).not.toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Usar el video principal', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60_000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('alertdialog')).not.toBeVisible()
   await page.getByRole('button', { name: 'Guardar cambios del Home' }).click()
   await expect(page.getByText('Todo guardado', { exact: true })).toBeVisible()
   const state = await page.evaluate(async () => {

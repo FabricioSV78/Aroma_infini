@@ -4,6 +4,7 @@ import { answerAdminNotice } from './admin-notice-fixtures'
 test('El panel publica cinco campañas editables y el video editorial tras guardar y recargar', async ({
   page,
 }) => {
+  test.setTimeout(120_000)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/admin/home')
   await page.getByRole('button', { name: 'Carrusel principal' }).click()
@@ -76,6 +77,13 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
   await page
     .getByLabel('Subir video editorial', { exact: true })
     .setInputFiles('public/videos/perfume-editorial-wide.mp4')
+  await expect(
+    page.getByRole('button', { name: 'Usar video original', exact: true }),
+  ).toBeVisible({ timeout: 60_000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('alertdialog')).not.toBeVisible()
   await page.getByRole('button', { name: 'Abrir vista previa' }).click()
   await expect(page.locator('.admin-home-film-preview video')).toHaveAttribute(
     'src',

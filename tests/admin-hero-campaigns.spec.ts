@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { mkdir } from 'node:fs/promises'
 import { expect, test, type Page } from './test'
 import { answerAdminNotice } from './admin-notice-fixtures'
+import { VIDEO_ORIGINAL_MAX_BYTES } from '../src/services/native-video-preparation'
 
 const captures = 'artifacts/hero-campaigns-2026-11-04/admin-screenshots'
 const campaigns = (page: Page) =>
@@ -190,6 +191,7 @@ test('categorías y páginas internas no requieren URLs y pueden ocultarse los t
 test('prepara un MP4 con portada, reproduce una sola vista previa y conserva las fuentes tras guardar', async ({
   page,
 }) => {
+  test.setTimeout(120_000)
   await openEditor(page)
   await page
     .getByLabel('Tipo de contenido', { exact: true })
@@ -199,7 +201,11 @@ test('prepara un MP4 con portada, reproduce una sola vista previa y conserva las
     .setInputFiles('public/videos/perfume-editorial-wide.mp4')
   await expect(
     page.getByRole('button', { name: 'Quitar video', exact: true }),
-  ).toBeVisible({ timeout: 20000 })
+  ).toBeVisible({ timeout: 60_000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('alertdialog')).not.toBeVisible()
   await page
     .getByRole('button', { name: 'Abrir vista previa', exact: true })
     .click()
@@ -230,12 +236,22 @@ test('prepara un MP4 con portada, reproduce una sola vista previa y conserva las
   await expect(
     page.getByRole('button', { name: 'Quitar video', exact: true }),
   ).toBeVisible()
+  const mobileReset = page.getByRole('button', {
+    name: 'Usar video principal',
+    exact: true,
+  })
+  if (await mobileReset.isVisible()) await mobileReset.click()
+  await expect(mobileReset).not.toBeVisible()
   await page
     .getByLabel('Subir video móvil de campaña 1', { exact: true })
     .setInputFiles('public/videos/perfume-editorial-mobile.mp4')
   await expect(
     page.getByRole('button', { name: 'Usar video principal', exact: true }),
-  ).toBeVisible({ timeout: 20000 })
+  ).toBeVisible({ timeout: 60_000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('alertdialog')).not.toBeVisible()
 })
 
 test('rechaza videos incompatibles y demasiado grandes sin perder textos ni la configuración anterior', async ({
@@ -266,9 +282,9 @@ test('rechaza videos incompatibles y demasiado grandes sin perder textos ni la c
     .setInputFiles({
       name: 'demasiado-grande.mp4',
       mimeType: 'video/mp4',
-      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+      buffer: Buffer.alloc(VIDEO_ORIGINAL_MAX_BYTES + 1),
     })
-  await expect(page.locator('.admin-notice-dialog')).toContainText('10 MB')
+  await expect(page.locator('.admin-notice-dialog')).toContainText('20 MB')
   await page.keyboard.press('Escape')
   await expect(page.locator('.admin-notice-dialog')).not.toBeVisible()
   await expect(page.getByRole('textbox', { name: /^Título/ })).toHaveValue(
