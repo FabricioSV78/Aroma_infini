@@ -17,6 +17,8 @@ interface DialogProps {
   closeDisabled?: boolean
   descriptionId?: string
   returnFocusRef?: RefObject<HTMLElement | null>
+  /** Isolate nested modal interactions from a parent form or dialog. */
+  isolateEvents?: boolean
 }
 export function Dialog({
   open,
@@ -28,9 +30,11 @@ export function Dialog({
   closeDisabled = false,
   descriptionId,
   returnFocusRef,
+  isolateEvents = false,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   function keepFocusInside(event: KeyboardEvent<HTMLDialogElement>) {
+    if (isolateEvents) event.stopPropagation()
     if (event.key !== 'Tab') return
     const controls = [
       ...event.currentTarget.querySelectorAll<HTMLElement>(
@@ -76,11 +80,16 @@ export function Dialog({
       className={`dialog ${className}`}
       onKeyDown={keepFocusInside}
       onCancel={(event) => {
+        if (isolateEvents) event.stopPropagation()
         event.preventDefault()
         if (!closeDisabled) onClose()
       }}
       onClick={(event) => {
+        if (isolateEvents) event.stopPropagation()
         if (!closeDisabled && event.target === event.currentTarget) onClose()
+      }}
+      onSubmit={(event) => {
+        if (isolateEvents) event.stopPropagation()
       }}
     >
       <div className="dialog-inner">

@@ -400,7 +400,7 @@ async function transferPhoto(
 }
 
 /** One Home draft upload is scoped to the caller's verified save generation. */
-async function guardedUpload<T>(
+export async function guardedUpload<T>(
   expected: ExpectedMediaActor,
   run: (signal: AbortSignal, cancelled: () => boolean) => Promise<T>,
 ): Promise<T> {
@@ -450,6 +450,46 @@ export function uploadManagedImage(
 ): Promise<ManagedMediaAsset> {
   return guardedUpload(expected, async (signal, cancelled) => {
     const variants = await prepareManagedImageVariants(source, purpose, signal)
+    return transferPhoto(variants, purpose, expected, signal, cancelled)
+  })
+}
+
+/** Import existing verified WebP variants without recropping or re-encoding.
+ * The Worker still fully decodes every file and verifies immutable receipts. */
+export function uploadManagedImageFiles(
+  files: readonly Blob[],
+  purpose: ImageMediaPurpose,
+  expected: ExpectedMediaActor,
+): Promise<ManagedMediaAsset> {
+  return guardedUpload(expected, async (signal, cancelled) => {
+    if (!files.length || files.length > 3) invalidImage()
+    const variants: PreparedVariant[] = []
+    for (const blob of files) {
+      const header = inspectRasterHeader(
+        new Uint8Array(await blob.slice(0, 65536).arrayBuffer()),
+      )
+      if (
+        !header ||
+        header.mime !== 'image/webp' ||
+        header.animated ||
+        blob.size < 1 ||
+        blob.size > MEDIA_VARIANT_MAX_BYTES ||
+        !validPreparedImageDimensions(header.width, header.height, purpose)
+      )
+        invalidImage()
+      variants.push({ blob, width: header.width, height: header.height })
+    }
+    variants.sort((a, b) => a.width - b.width)
+    const master = variants.at(-1)!
+    if (
+      new Set(variants.map((x) => x.width)).size !== variants.length ||
+      variants.some(
+        (x) =>
+          Math.abs(x.height - (x.width * master.height) / master.width) > 1,
+      ) ||
+      variants.reduce((sum, x) => sum + x.blob.size, 0) > MEDIA_UPLOAD_MAX_BYTES
+    )
+      invalidImage()
     return transferPhoto(variants, purpose, expected, signal, cancelled)
   })
 }

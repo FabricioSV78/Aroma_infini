@@ -1,11 +1,12 @@
 import { UserFacingError } from '../../services/admin-messages'
 
-const maxVideoBytes = 10 * 1024 * 1024
+const maxVideoBytes = 20 * 1024 * 1024
 
 function waitForVideo(
   element: HTMLVideoElement,
   eventName: 'loadedmetadata' | 'loadeddata' | 'seeked',
   ready: () => boolean,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (ready()) return Promise.resolve()
   return new Promise((resolve, reject) => {
@@ -22,6 +23,7 @@ function waitForVideo(
       window.clearTimeout(timer)
       element.removeEventListener(eventName, done)
       element.removeEventListener('error', failed)
+      signal?.removeEventListener('abort', failed)
     }
     function done() {
       cleanup()
@@ -38,10 +40,12 @@ function waitForVideo(
     }
     element.addEventListener(eventName, done, { once: true })
     element.addEventListener('error', failed, { once: true })
+    signal?.addEventListener('abort', failed, { once: true })
+    if (signal?.aborted) failed()
   })
 }
 
-function readDataUrl(file: File): Promise<string> {
+function readDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
@@ -56,7 +60,7 @@ function readDataUrl(file: File): Promise<string> {
   })
 }
 
-export async function prepareVideoFile(file: File) {
+export async function prepareVideoFile(file: File, signal?: AbortSignal) {
   if (file.type !== 'video/mp4')
     throw new UserFacingError(
       'video-format',
@@ -65,10 +69,13 @@ export async function prepareVideoFile(file: File) {
   if (file.size === 0 || file.size > maxVideoBytes)
     throw new UserFacingError(
       'video-size',
-      'El video debe pesar entre 1 byte y 10 MB.',
+      'El video original debe pesar entre 1 byte y 20 MB.',
     )
 
-  const objectUrl = URL.createObjectURL(file)
+  const { prepareNativeVideo } =
+    await import('../../services/native-video-preparation')
+  const prepared = await prepareNativeVideo(file, signal)
+  const objectUrl = URL.createObjectURL(prepared.main.blob)
   const element = document.createElement('video')
   element.preload = 'auto'
   element.muted = true
@@ -79,6 +86,7 @@ export async function prepareVideoFile(file: File) {
       element,
       'loadedmetadata',
       () => element.readyState >= HTMLMediaElement.HAVE_METADATA,
+      signal,
     )
     if (
       !Number.isFinite(element.duration) ||
@@ -101,11 +109,12 @@ export async function prepareVideoFile(file: File) {
       element,
       'loadeddata',
       () => element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
+      signal,
     )
     const targetTime = Math.min(0.3, element.duration / 2)
     if (Math.abs(element.currentTime - targetTime) > 0.02) {
       element.currentTime = targetTime
-      await waitForVideo(element, 'seeked', () => !element.seeking)
+      await waitForVideo(element, 'seeked', () => !element.seeking, signal)
     }
 
     const scale = Math.min(
@@ -133,13 +142,37 @@ export async function prepareVideoFile(file: File) {
         'video-preview',
         'No se pudo crear la vista previa del video. Prueba con otro MP4.',
       )
-    const video = await readDataUrl(file)
+    const video = await readDataUrl(prepared.main.blob)
     if (!video.startsWith('data:video/mp4;base64,'))
       throw new UserFacingError(
         'video-read',
         'No se pudo preparar el video. Prueba con otro MP4.',
       )
-    return { video, poster }
+    let mobilePoster: string | undefined
+    let mobileVideo: string | undefined
+    if (prepared.mobile) {
+      mobileVideo = await readDataUrl(prepared.mobile.blob)
+      canvas.width = prepared.mobile.width
+      canvas.height = prepared.mobile.height
+      context.drawImage(element, 0, 0, canvas.width, canvas.height)
+      mobilePoster = canvas.toDataURL('image/webp', 0.8)
+      if (!mobilePoster.startsWith('data:image/webp;base64,'))
+        throw new UserFacingError(
+          'video-preview',
+          'No se pudo crear la portada de la versión móvil.',
+        )
+    }
+    if (signal?.aborted)
+      throw new UserFacingError(
+        'video-cancelled',
+        'La preparación del video se detuvo.',
+      )
+    return {
+      video,
+      poster,
+      ...(mobileVideo && mobilePoster ? { mobileVideo, mobilePoster } : {}),
+      optimization: prepared.optimization,
+    }
   } finally {
     element.pause()
     element.removeAttribute('src')

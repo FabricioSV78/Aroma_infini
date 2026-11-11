@@ -3,7 +3,11 @@ type PublicCatalogEnvironment = Pick<
   'SUPABASE_URL' | 'SUPABASE_PUBLISHABLE_KEY'
 >
 type PublicCatalogOperation =
-  'catalog_products' | 'catalog_product_context' | 'catalog_brands'
+  | 'catalog_products'
+  | 'catalog_product_context'
+  | 'catalog_brands'
+  | 'site_media_document'
+  | 'public_media_aliases'
 
 function publicConfiguration(env: PublicCatalogEnvironment) {
   const origin = new URL(env.SUPABASE_URL)
@@ -37,9 +41,13 @@ export async function readPublicCatalog(
   maximumBytes = 2 * 1024 * 1024,
 ): Promise<unknown> {
   if (
-    !['catalog_products', 'catalog_product_context', 'catalog_brands'].includes(
-      operation,
-    ) ||
+    ![
+      'catalog_products',
+      'catalog_product_context',
+      'catalog_brands',
+      'site_media_document',
+      'public_media_aliases',
+    ].includes(operation) ||
     !Number.isSafeInteger(maximumBytes) ||
     maximumBytes < 1 ||
     maximumBytes > 8 * 1024 * 1024

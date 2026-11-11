@@ -280,6 +280,9 @@ export function mediaWorkerHarness() {
     privateResponse: false,
     gcClaims: [] as unknown[],
     gcFinalizations: [] as Record<string, unknown>[],
+    gcRecheckAllowed: true,
+    gcRecheckResults: [] as boolean[],
+    gcFailures: [] as Record<string, unknown>[],
   }
   const environment: MediaEnvironment = {
     MEDIA_BUCKET: bucket,
@@ -459,6 +462,12 @@ export function mediaWorkerHarness() {
       return reply(reservation?.status === 'ready' ? reservation.asset : null)
     }
     if (name === 'media_gc_claim') return reply(state.gcClaims)
+    if (name === 'media_gc_recheck')
+      return reply(state.gcRecheckResults.shift() ?? state.gcRecheckAllowed)
+    if (name === 'media_gc_failure') {
+      state.gcFailures.push(body)
+      return new Response(null, { status: 204 })
+    }
     if (name === 'media_gc_finalize') {
       state.gcFinalizations.push(body)
       return new Response(null, { status: 204 })

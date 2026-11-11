@@ -4,7 +4,11 @@ import { defineConfig } from '@playwright/test'
 // bucket is used by this suite.
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'r2-media-browser.spec.ts',
+  testMatch: [
+    'r2-media-browser.spec.ts',
+    'admin-media-library.spec.ts',
+    'media-alias.spec.ts',
+  ],
   reporter: 'list',
   fullyParallel: false,
   workers: 1,

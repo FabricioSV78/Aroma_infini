@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
+import { deleteMediaLibraryFixtureChildren } from './sql-media-library-security-audit.mjs'
 
 // Called only by the disposable PostgreSQL runner. This module does not open
 // connections and has no path to a hosted service or payment provider.
@@ -514,6 +515,7 @@ export async function auditCommerceConcurrency({
       await client.query('delete from app.products where id=$1', [
         second.product,
       ])
+      await deleteMediaLibraryFixtureChildren(client, [second.media])
       await client.query('delete from app.media_renditions where asset_id=$1', [
         second.media,
       ])

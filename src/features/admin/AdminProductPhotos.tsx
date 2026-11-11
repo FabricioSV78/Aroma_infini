@@ -13,6 +13,8 @@ import { prepareProductPhoto } from '../../services/product-photo-upload'
 import { UserFacingError } from '../../services/admin-messages'
 import { Dialog } from '../../components/ui/Dialog'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { AdminMediaPicker } from './AdminMediaPicker'
+import type { MediaLibraryItem } from '../../services/media-library-service'
 import './admin-product-photos.css'
 
 interface AdminProductPhotosProps {
@@ -90,6 +92,38 @@ export function AdminProductPhotos({
   const count = slots.filter((view) => view.image.trim()).length
   const remaining = slots.length - count
   const locked = busy || preparing !== null
+
+  function selectLibraryPhoto(item: MediaLibraryItem, target: number) {
+    if (locked || !item.asset || !('variants' in item.asset)) return
+    const asset = item.asset
+    if (
+      target < 4 &&
+      slots
+        .slice(0, 4)
+        .some((view, index) => index !== target && view.image === asset.src)
+    ) {
+      notice.error(
+        new UserFacingError(
+          'image-duplicate',
+          'Esta foto ya está en la galería. Elige una diferente.',
+        ),
+        'image',
+      )
+      return
+    }
+    onChange((current) => {
+      const next = photoSlots(current)
+      next[target] = {
+        image: asset.src,
+        alt: item.alt.slice(0, 160),
+        framing: 'full',
+      }
+      return applySlots(current, next)
+    })
+    notice.toast(
+      'Foto seleccionada. Guarda el producto para aplicar el cambio.',
+    )
+  }
 
   async function upload(files: File[], target?: number) {
     if (!files.length || preparingRef.current || busy) return
@@ -284,6 +318,12 @@ export function AdminProductPhotos({
             <small>Portada de la tienda y primera foto.</small>
           ) : null}
           <div className="admin-product-photo-controls">
+            <AdminMediaPicker
+              purpose={olfactory ? 'product-olfactory' : 'product-gallery'}
+              label={photoNames[index]}
+              disabled={locked}
+              onSelect={(item) => selectLibraryPhoto(item, index)}
+            />
             <label className="admin-home-file-button">
               {preparing === index
                 ? 'Preparando…'

@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
@@ -17,6 +17,7 @@ import { heroImageSource } from '../../services/hero-image-source'
 import { homeImagePresets, prepareImageFile } from './prepareImageFile'
 import { prepareVideoFile } from './prepareVideoFile'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { AdminMediaPicker } from './AdminMediaPicker'
 import './admin-hero-editor.css'
 
 interface AdminHeroEditorProps {
@@ -51,6 +52,10 @@ export function AdminHeroEditor({
   endMediaPreparation,
 }: AdminHeroEditorProps) {
   const notice = useAdminNotice()
+  const videoPreparationAbort = useRef<AbortController | null>(null)
+  useEffect(function cancelVideoOnUnmount() {
+    return () => videoPreparationAbort.current?.abort()
+  }, [])
   const ordered = orderedHeroContent(slides)
   const [selectedId, setSelectedId] = useState(ordered[0]?.id ?? '')
   const [previewFormat, setPreviewFormat] = useState<'desktop' | 'mobile'>(
@@ -148,6 +153,7 @@ export function AdminHeroEditor({
                 )
               : getHeroFallback(next.fallbackIndex).alt
         }
+        if (patch.alt !== undefined) next.alt = patch.alt
         return next
       }),
     )
@@ -252,20 +258,33 @@ export function AdminHeroEditor({
 
   async function uploadVideo(id: string, mobile: boolean, file: File) {
     if (!beginMediaPreparation()) return
+    const cancellation = new AbortController()
+    videoPreparationAbort.current = cancellation
     try {
-      const prepared = await prepareVideoFile(file)
+      const prepared = await prepareVideoFile(file, cancellation.signal)
+      if (cancellation.signal.aborted) return
       update(
         id,
         mobile
-          ? { mobileVideo: prepared.video, mobilePoster: prepared.poster }
-          : { video: prepared.video, poster: prepared.poster },
+          ? {
+              mobileVideo: prepared.mobileVideo ?? prepared.video,
+              mobilePoster: prepared.mobilePoster ?? prepared.poster,
+            }
+          : {
+              video: prepared.video,
+              poster: prepared.poster,
+              mobileVideo: prepared.mobileVideo ?? null,
+              mobilePoster: prepared.mobilePoster ?? null,
+            },
       )
       notice.toast(
-        'Video y portada preparados. Guarda los cambios para publicarlos.',
+        `${prepared.optimization.message} Guarda los cambios para publicarlo.`,
       )
     } catch (error) {
-      notice.error(error, 'video')
+      if (!cancellation.signal.aborted) notice.error(error, 'video')
     } finally {
+      if (videoPreparationAbort.current === cancellation)
+        videoPreparationAbort.current = null
       endMediaPreparation()
     }
   }
@@ -321,6 +340,27 @@ export function AdminHeroEditor({
             onChange={(event) => imageChanged(field, event)}
           />
         </label>
+        <AdminMediaPicker
+          purpose={
+            field === 'desktopImage'
+              ? 'hero-desktop'
+              : field === 'mobileImage'
+                ? 'hero-mobile'
+                : 'film-poster'
+          }
+          label={`${title} de campaña ${visibleNumber}`}
+          onSelect={(item) => {
+            if (item.asset && 'variants' in item.asset) {
+              update(current.id, {
+                [field]: item.asset.src,
+                ...(item.alt ? { alt: item.alt.slice(0, 160) } : {}),
+              })
+              notice.toast(
+                'Imagen seleccionada. Guarda los cambios para publicarla.',
+              )
+            }
+          }}
+        />
         {resource ? (
           <button
             type="button"
@@ -598,8 +638,8 @@ export function AdminHeroEditor({
                 <div>
                   <strong>Video principal</strong>
                   <small>
-                    MP4 H.264 · 2–60 s · máximo 10 MB · recomendado 1920 × 1080
-                    px.
+                    MP4 · 2–60 s · original hasta 20 MB · recomendado 1920 ×
+                    1080 px.
                   </small>
                 </div>
                 <label className="admin-home-file-button">
@@ -611,6 +651,23 @@ export function AdminHeroEditor({
                     onChange={(event) => videoChanged(false, event)}
                   />
                 </label>
+                <AdminMediaPicker
+                  purpose="film-video"
+                  label={`Video de campaña ${visibleNumber}`}
+                  onSelect={(item) => {
+                    if (item.asset) {
+                      update(current.id, {
+                        video: item.asset.src,
+                        poster: null,
+                        mobileVideo: null,
+                        mobilePoster: null,
+                      })
+                      notice.toast(
+                        'Video seleccionado. Elige su portada y guarda los cambios.',
+                      )
+                    }
+                  }}
+                />
                 {current.video ? (
                   <button
                     type="button"
@@ -645,6 +702,21 @@ export function AdminHeroEditor({
                     onChange={(event) => videoChanged(true, event)}
                   />
                 </label>
+                <AdminMediaPicker
+                  purpose="film-video"
+                  label={`Video móvil de campaña ${visibleNumber}`}
+                  onSelect={(item) => {
+                    if (item.asset) {
+                      update(current.id, {
+                        mobileVideo: item.asset.src,
+                        mobilePoster: null,
+                      })
+                      notice.toast(
+                        'Video móvil seleccionado. Elige su portada y guarda los cambios.',
+                      )
+                    }
+                  }}
+                />
                 {current.mobileVideo ? (
                   <button
                     type="button"
@@ -668,8 +740,9 @@ export function AdminHeroEditor({
                   )
                 : null}
               <p className="admin-hero-help">
-                La portada aparece primero. R2 almacena el MP4; no comprime ni
-                crea otra resolución.
+                Se prepara el video y su portada. Cuando se obtiene un archivo
+                más ligero, también se ofrece una versión móvil del mismo clip.
+                Revisa ambas vistas antes de guardar.
               </p>
             </>
           )}

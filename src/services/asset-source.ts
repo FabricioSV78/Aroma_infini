@@ -1,4 +1,9 @@
-import { isManagedMediaSource, parseManagedVideoPath } from '../domain/media'
+import {
+  isManagedMediaSource,
+  parseManagedVideoPath,
+  parseManagedSvgPath,
+} from '../domain/media'
+import { resolveMediaAlias } from './media-alias-registry'
 
 const managedAssetPath = /^\/(?:images|videos|brand)\//
 
@@ -33,7 +38,12 @@ export function assetSource(
   publicMediaBase: string | undefined = import.meta.env?.VITE_MEDIA_BASE_URL,
   mediaApiBase: string | undefined = import.meta.env?.VITE_MEDIA_API_BASE_URL,
 ): string {
-  if (isManagedMediaSource(source) || parseManagedVideoPath(source)) {
+  source = resolveMediaAlias(source) ?? source
+  if (
+    isManagedMediaSource(source) ||
+    parseManagedVideoPath(source) ||
+    parseManagedSvgPath(source)
+  ) {
     const origin = mediaApiBaseUrl(mediaApiBase)
     return origin ? `${origin}${source}` : source
   }

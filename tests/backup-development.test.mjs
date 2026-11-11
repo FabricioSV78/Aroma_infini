@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { test } from 'node:test'
 import { promisify } from 'node:util'
+import { STATIC_SVG_MAX_BYTES } from '../src/domain/static-svg.js'
 import {
   parseSupabaseDumpPlan,
   validateBackupInventory,
@@ -188,6 +189,30 @@ test('video inventory has exactly one object with its own complete-file checksum
       ]),
     { message: 'invalid-media-inventory' },
   )
+})
+
+test('static vector inventory retains one exact hash-addressed object within the shared SVG limit', () => {
+  const vector = {
+    key: `public/dynamic/${id}/${hash}/vector.svg`,
+    byteSize: STATIC_SVG_MAX_BYTES,
+    sha256: hash,
+  }
+  const result = validateBackupInventory([
+    { id, status: 'ready', objects: [vector] },
+  ])
+  assert.equal(result.objectCount, 1)
+  assert.equal(result.byteSize, STATIC_SVG_MAX_BYTES)
+  assert.equal(result.assets[0].objects[0].path, `objects/${vector.key}`)
+  for (const objects of [
+    [{ ...vector, byteSize: STATIC_SVG_MAX_BYTES + 1 }],
+    [{ ...vector, sha256: 'b'.repeat(64) }],
+    [{ ...vector, key: vector.key.replace('vector.svg', '774.svg') }],
+    [vector, master],
+  ])
+    assert.throws(
+      () => validateBackupInventory([{ id, status: 'disabled', objects }]),
+      { message: 'invalid-media-inventory' },
+    )
 })
 test('export requires explicit confirmation before reading credentials or creating private folders', async () => {
   await assert.rejects(

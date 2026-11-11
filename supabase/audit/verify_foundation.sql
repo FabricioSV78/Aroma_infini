@@ -7,7 +7,7 @@ with executors as (
   values ('catalog_products(integer, integer)'),('catalog_product(text)'),('catalog_brands()'),('catalog_settings()'),
     ('catalog_olfactory_families()'),('catalog_browse(jsonb, integer)'),('catalog_products_by_ids(uuid[], uuid[])'),
     ('catalog_product_context(text)'),('catalog_home_context()'),('catalog_brand_previews()'),
-    ('media_public_asset(uuid)'),('home_document()'),('commerce_settings()'),
+    ('media_public_asset(uuid)'),('home_document()'),('site_media_document()'),('public_media_aliases()'),('commerce_settings()'),
     ('checkout_quote(jsonb, text, text, text, text, text)'),('order_tracking(text, text)'),
     ('product_reviews(uuid, integer, integer, text)'),('site_settings()')
 )

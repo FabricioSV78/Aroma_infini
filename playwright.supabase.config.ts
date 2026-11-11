@@ -24,6 +24,7 @@ export default defineConfig({
         'supabase-auth.spec.ts',
         'supabase-account.spec.ts',
         'supabase-auth-races.spec.ts',
+        'admin-trusted-devices.spec.ts',
         'account-email-change.spec.ts',
         'offline-account-recovery-ui.spec.ts',
       ],

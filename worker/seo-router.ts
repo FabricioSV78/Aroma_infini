@@ -3,8 +3,10 @@ import { createMediaHandler, cleanupMedia } from './media-handler'
 import { createCheckoutHandler } from './checkout-handler'
 import { createCatalogSeoHandler } from './catalog-seo'
 import { createSitemapHandler } from './sitemap'
+import { createSiteMediaSeoHandler } from './site-media-seo'
 import { createComplaintsHandler } from './complaints-handler'
 import { createAdminPushHandler, dispatchAdminPush } from './admin-push-handler'
+import { createAdminDeviceHandler } from './admin-device-handler'
 import {
   seoPageRobots,
   seoPublicationOrigin,
@@ -13,8 +15,10 @@ import {
 const checkoutRequest = createCheckoutHandler()
 const catalogSeoRequest = createCatalogSeoHandler()
 const sitemapRequest = createSitemapHandler()
+const siteMediaSeo = createSiteMediaSeoHandler()
 const complaintsRequest = createComplaintsHandler()
 const adminPushRequest = createAdminPushHandler()
+const adminDeviceRequest = createAdminDeviceHandler()
 
 // SEO, ordinary page requests and cleanup do not need the image decoder.
 // Load it only after the upload handler has authorized and bounded the file.
@@ -76,19 +80,24 @@ async function withPagePolicy(
     return new Response(null, { status, headers })
   }
   if (transformHtml) {
-    return new HTMLRewriter()
+    const page = new HTMLRewriter()
       .on('head meta[name="robots"]', {
         element(element) {
           element.setAttribute('content', robots)
         },
       })
       .transform(new Response(response.body, { status, headers }))
+    return classifyRoute(url.pathname) === 'public'
+      ? siteMediaSeo(page, request, env)
+      : page
   }
   return new Response(response.body, { status, headers })
 }
 
 export default {
   async fetch(request, env): Promise<Response> {
+    const adminDevice = await adminDeviceRequest(request, env)
+    if (adminDevice) return adminDevice
     const adminPush = await adminPushRequest(request, env)
     if (adminPush) return adminPush
     const complaint = await complaintsRequest(request, env)
@@ -114,7 +123,7 @@ export default {
     }
 
     const catalogPage = await catalogSeoRequest(request, env)
-    if (catalogPage) return catalogPage
+    if (catalogPage) return siteMediaSeo(catalogPage, request, env)
 
     if (url.pathname === '/tienda') {
       const asset = await env.ASSETS.fetch(request)
@@ -157,13 +166,21 @@ export default {
     return withPagePolicy(notFound, 404, request, env)
   },
   async scheduled(event, env) {
-    // One-minute outbox ticks; preserve hourly media cleanup at :23.
+    // One-minute outbox ticks; bounded media cleanup every five minutes.
     const results = await Promise.allSettled([
       dispatchAdminPush(env),
-      ...(new Date(event.scheduledTime).getUTCMinutes() === 23 && env.SUPABASE_MEDIA_SECRET_KEY
-        ? [cleanupMedia(env)] : []),
+      ...(new Date(event.scheduledTime).getUTCMinutes() % 5 === 3 &&
+      env.SUPABASE_MEDIA_SECRET_KEY
+        ? [cleanupMedia(env)]
+        : []),
     ])
     if (results.some((result) => result.status === 'rejected'))
-      console.warn(JSON.stringify({ event: 'scheduled_job_failed', count: results.filter((result) => result.status === 'rejected').length }))
+      console.warn(
+        JSON.stringify({
+          event: 'scheduled_job_failed',
+          count: results.filter((result) => result.status === 'rejected')
+            .length,
+        }),
+      )
   },
 } satisfies ExportedHandler<Env>

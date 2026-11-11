@@ -12,6 +12,7 @@ export default defineConfig({
     'r2-media-worker-runtime.spec.ts',
     'worker-disconnect.spec.ts',
     'r2-media-home.spec.ts',
+    'r2-media-svg.spec.ts',
     'r2-media-mp4.spec.ts',
     'public-query-cache.spec.ts',
   ],

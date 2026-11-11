@@ -1,3 +1,5 @@
+import { STATIC_SVG_MAX_BYTES } from './static-svg.js'
+
 /** Contracts shared by image preparation, the Worker and public catalog DTOs. */
 export const MEDIA_ORIGINAL_MAX_BYTES = 20 * 1024 * 1024
 export const MEDIA_ORIGINAL_MAX_PIXELS = 40_000_000
@@ -19,6 +21,7 @@ export type ImageMediaPurpose =
   | 'finder-mobile'
   | 'finder-option'
   | 'film-poster'
+  | 'site-image'
 export const MEDIA_VIDEO_MAX_BYTES = 10 * 1024 * 1024
 export const MEDIA_VIDEO_MAX_DURATION_MS = 60000
 export interface ManagedVideoAsset {
@@ -29,6 +32,52 @@ export interface ManagedVideoAsset {
   durationMs: number
   byteSize: number
   mimeType: 'video/mp4'
+}
+
+export const MEDIA_SVG_MAX_BYTES = STATIC_SVG_MAX_BYTES
+export interface ManagedSvgAsset {
+  id: string
+  src: string
+  width: number
+  height: number
+  byteSize: number
+  mimeType: 'image/svg+xml'
+}
+
+const managedSvgPath =
+  /^\/media\/public\/dynamic\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([0-9a-f]{64})\/vector\.svg$/
+export function parseManagedSvgPath(value: unknown) {
+  if (typeof value !== 'string' || value.length > 240) return null
+  const match = value.match(managedSvgPath)
+  return match ? { id: match[1], hash: match[2], src: value } : null
+}
+export function parseManagedSvgAsset(value: unknown): ManagedSvgAsset {
+  const source = object(value)
+  const path = parseManagedSvgPath(source.src)
+  const width = dimension(source.width),
+    height = dimension(source.height)
+  if (
+    !path ||
+    path.id !== source.id ||
+    source.mimeType !== 'image/svg+xml' ||
+    width < 1 ||
+    height < 1 ||
+    width > 4096 ||
+    height > 4096 ||
+    typeof source.byteSize !== 'number' ||
+    !Number.isSafeInteger(source.byteSize) ||
+    source.byteSize < 1 ||
+    source.byteSize > MEDIA_SVG_MAX_BYTES
+  )
+    throw new InvalidMediaManifestError()
+  return {
+    id: path.id,
+    src: path.src,
+    width,
+    height,
+    byteSize: source.byteSize,
+    mimeType: 'image/svg+xml',
+  }
 }
 
 export interface ManagedMediaVariant {
@@ -59,6 +108,7 @@ export const IMAGE_MEDIA_PROFILES = {
   'finder-mobile': { width: 780, height: 1170, maxWidth: 1560 },
   'finder-option': { width: 480, height: 480, maxWidth: 960 },
   'film-poster': { width: 320, height: 320, maxWidth: 1600 },
+  'site-image': { width: 64, height: 32, maxWidth: 2304 },
 } as const satisfies Record<
   ImageMediaPurpose,
   { width: number; height: number; maxWidth: number }
@@ -88,6 +138,7 @@ export function validPreparedImageDimensions(
     width * height <= MEDIA_PREPARED_MAX_PIXELS &&
     (!master || (width >= profile.width && height >= profile.height)) &&
     (purpose === 'film-poster' ||
+      purpose === 'site-image' ||
       Math.abs(height - (width * profile.height) / profile.width) <= 1)
   )
 }

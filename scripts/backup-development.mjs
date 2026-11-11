@@ -25,6 +25,7 @@ import { pipeline } from 'node:stream/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyBackupPackage } from './backup-verify.mjs'
 import { captureDatabaseState } from './backup-database-verification.mjs'
+import { STATIC_SVG_MAX_BYTES } from '../src/domain/static-svg.js'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 export const backupProfiles = Object.freeze({
@@ -147,7 +148,7 @@ export function validateBackupInventory(rows) {
         const match =
           typeof object.key === 'string' &&
           object.key.match(
-            /^public\/dynamic\/([a-f0-9-]{36})\/([a-f0-9]{64})\/([1-9][0-9]{1,4}\.webp|video\.mp4)$/,
+            /^public\/dynamic\/([a-f0-9-]{36})\/([a-f0-9]{64})\/([1-9][0-9]{1,4}\.webp|video\.mp4|vector\.svg)$/,
           )
         assert(match && match[1] === row.id && !keys.has(object.key))
         keys.add(object.key)
@@ -160,9 +161,11 @@ export function validateBackupInventory(rows) {
         )
         prefixHash ??= match[2]
         assert.equal(prefixHash, match[2])
-        if (match[3] === 'video.mp4') {
+        if (match[3] === 'video.mp4' || match[3] === 'vector.svg') {
           assert.equal(row.objects.length, 1)
           assert.equal(object.sha256, prefixHash)
+          if (match[3] === 'vector.svg')
+            assert(byteSize <= STATIC_SVG_MAX_BYTES)
         } else {
           const width = Number(match[3].split('.')[0])
           assert(width <= 2304 && byteSize <= 4 * 1024 * 1024)
@@ -572,7 +575,7 @@ export async function backupEnvironment({
     assert(/^[0-9A-Fa-f]+-[0-9A-Fa-f]+-[0-9]+$/.test(snapshot))
     const rows = (
       await client.query(`select a.id::text,a.status,
-      case when a.mime_type='video/mp4' then jsonb_build_array(jsonb_build_object('key',a.object_key,'byteSize',a.byte_size,'sha256',a.sha256))
+      case when a.mime_type in ('video/mp4','image/svg+xml') then jsonb_build_array(jsonb_build_object('key',a.object_key,'byteSize',a.byte_size,'sha256',a.sha256))
       else coalesce((select jsonb_agg(jsonb_build_object('key',r.object_key,'byteSize',r.byte_size,'sha256',r.sha256) order by r.width) from app.media_renditions r where r.asset_id=a.id),'[]'::jsonb) end as objects
       from app.media_assets a where a.storage_kind='r2' and a.status in ('ready','disabled') order by a.id`)
     ).rows

@@ -75,7 +75,8 @@ function currentAdminOwner() {
   const state = authService.getSnapshot()
   return state.status === 'authenticated' &&
     state.session?.user.role === 'admin' &&
-    state.session.assurance === 'aal2' &&
+    (state.session.assurance === 'aal2' ||
+      state.session.trustedDevice === true) &&
     state.session.intent === 'account' &&
     !state.session.mfaRequired
     ? state.session.user.id

@@ -28,6 +28,7 @@ export const isolatedSuites = Object.freeze({
     'playwright.orders.config.ts',
     'playwright.commerce-settings.config.ts',
     'playwright.media.config.ts',
+    'playwright.video-preparation.config.ts',
     'playwright.home.config.ts',
     'playwright.reviews.config.ts',
     'playwright.complaints.config.ts',

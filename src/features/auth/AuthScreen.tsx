@@ -1,7 +1,10 @@
 import { useRef, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
-import { imageSource, imageSourceSet } from '../../services/image-source'
+import {
+  ManagedSiteImage,
+  ManagedSiteSource,
+} from '../../components/ManagedSiteImage'
 import type { AuthSignUpInput } from '../../types/auth'
 import { PasswordField } from './PasswordField'
 import { AdminAuthShell } from './AdminAuthShell'
@@ -267,20 +270,13 @@ export function AuthScreen(props: AuthScreenProps) {
           {(view === 'login' || view === 'register') && (
             <figure className="auth-editorial" aria-hidden="true">
               <picture>
-                <source
+                <ManagedSiteSource
+                  slot="auth.customer.mobile"
                   media="(max-width: 760px)"
-                  srcSet={imageSourceSet(
-                    'account-selection-v1-wide',
-                    [960, 1536],
-                  )}
                   sizes="(max-width: 392px) 360px, (max-width: 472px) calc(100vw - 32px), 440px"
                 />
-                <img
-                  src={imageSource('account-selection-v1-portrait', 1024)}
-                  srcSet={imageSourceSet(
-                    'account-selection-v1-portrait',
-                    [480, 780, 1024],
-                  )}
+                <ManagedSiteImage
+                  slot="auth.customer.desktop"
                   // Cover uses the portrait's full scaled width before cropping.
                   sizes="(max-width: 1023px) 459px, 427px"
                   alt=""

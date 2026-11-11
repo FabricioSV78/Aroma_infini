@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { assetSource } from '../../services/asset-source'
+import { ManagedSiteImage } from '../ManagedSiteImage'
 import { footerGroups } from '../../content/navigation'
 import { useSiteSettings } from '../../services/site-settings-service'
 import { Icon } from '../ui/Icon'
@@ -23,9 +23,9 @@ export function Footer() {
         <div className="footer-top" data-scroll-reveal="stagger">
           <div className="footer-brand">
             <Link to="/" className="wordmark" aria-label="Aroma Infini, inicio">
-              <img
+              <ManagedSiteImage
+                slot="identity.logo"
                 className="brand-logo"
-                src={assetSource('/brand/logo-on-light.svg')}
                 alt=""
                 width="774"
                 height="374"

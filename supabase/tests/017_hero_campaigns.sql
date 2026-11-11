@@ -112,6 +112,6 @@ select aroma_hero_test.ok(api.home_document()->'content'->'hero'='[]'::jsonb,'Al
 reset role;
 select aroma_hero_test.ok((select count(*)=0 from app.home_media),'Removing campaign media removes only the Home associations');
 select aroma_hero_test.ok((select count(*)=2 from app.media_assets where id in('d7100000-0000-4000-8000-000000000001','d7100000-0000-4000-8000-000000000002')
- and status='ready' and retire_after>now()+interval '6 days'),'Detached campaign bytes retain the existing recovery window');
+ and status='ready' and retire_after>now()+interval '23 hours' and retire_after<=clock_timestamp()+interval '24 hours'),'Detached campaign bytes retain the 24-hour recovery window');
 select aroma_hero_test.ok((select count(*)=0 from app.products),'Campaign configuration never invents promoted products');
 rollback;

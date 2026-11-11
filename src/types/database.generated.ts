@@ -2,7 +2,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  
+
   "api": {
           Tables: {
             [_ in never]: never
@@ -38,11 +38,38 @@ export type Database = {
 "admin_delete_product":
 { Args: { "p_expected_version": number,"p_id": string }; Returns: undefined
                            },
+"admin_device_list":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_device_register":
+{ Args: { "p_label": string,"p_token_hash": string }; Returns: Json
+                           },
+"admin_device_resume":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"admin_device_revoke":
+{ Args: { "p_device_id": string }; Returns: Json
+                           },
 "admin_home_document":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "admin_import_products":
 { Args: { "p_records": Json }; Returns: Json
+                           },
+"admin_media_aliases":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_media_detail":
+{ Args: { "p_asset_id": string }; Returns: Json
+                           },
+"admin_media_library":
+{ Args: { "p_page"?: number,"p_page_size"?: number,"p_query"?: string,"p_section"?: string,"p_state"?: string }; Returns: Json
+                           },
+"admin_media_metadata":
+{ Args: { "p_alt": string,"p_asset_id": string,"p_expected_version": number,"p_name": string,"p_section": string }; Returns: Json
+                           },
+"admin_media_retire":
+{ Args: { "p_asset_id": string,"p_expected_version": number }; Returns: Json
                            },
 "admin_notifications":
 { Args: { "p_limit"?: number }; Returns: Json
@@ -86,6 +113,9 @@ export type Database = {
 "admin_save_home":
 { Args: { "p_complements_enabled": boolean,"p_content": Json,"p_expected_settings_version": number,"p_expected_version": number,"p_featured_brand_id"?: string,"p_media": Json }; Returns: Json
                            },
+"admin_save_media_alias":
+{ Args: { "p_asset_id": string,"p_expected_version": number,"p_path": string }; Returns: Json
+                           },
 "admin_save_offer":
 { Args: { "p_expected_version": number,"p_offer": Json,"p_product_id": string }; Returns: Json
                            },
@@ -101,6 +131,9 @@ export type Database = {
 "admin_save_shipping":
 { Args: { "p_expected_version": number,"p_shipping": Json }; Returns: Json
                            },
+"admin_save_site_media":
+{ Args: { "p_alt": string,"p_asset_id": string,"p_expected_version": number,"p_slot": string }; Returns: Json
+                           },
 "admin_save_site_settings":
 { Args: { "p_data": Json,"p_expected_version": number }; Returns: Json
                            },
@@ -109,6 +142,9 @@ export type Database = {
                            },
 "admin_set_stock":
 { Args: { "p_expected_version": number,"p_stock": number,"p_variant_id": string }; Returns: Json
+                           },
+"admin_site_media_document":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "admin_update_complaint":
 { Args: { "p_delivered_at"?: string,"p_delivery_evidence"?: string,"p_expected_version": number,"p_id": string,"p_response"?: string,"p_response_channel"?: string,"p_status": string }; Returns: Json
@@ -194,8 +230,14 @@ export type Database = {
 "media_gc_claim":
 { Args: { "p_limit"?: number }; Returns: Json
                            },
+"media_gc_failure":
+{ Args: { "p_asset_id": string,"p_claim_id": string,"p_code": string }; Returns: undefined
+                           },
 "media_gc_finalize":
 { Args: { "p_asset_id": string,"p_claim_id": string }; Returns: undefined
+                           },
+"media_gc_recheck":
+{ Args: { "p_asset_id": string,"p_claim_id": string }; Returns: boolean
                            },
 "media_public_asset":
 { Args: { "p_asset_id": string }; Returns: Json
@@ -203,11 +245,17 @@ export type Database = {
 "media_upload_complete":
 { Args: { "p_actor_id": string,"p_asset_id": string,"p_metadata": Json }; Returns: Json
                            },
+"media_upload_complete_svg":
+{ Args: { "p_actor_id": string,"p_asset_id": string,"p_manifest": Json }; Returns: Json
+                           },
 "media_upload_complete_video":
 { Args: { "p_actor_id": string,"p_asset_id": string,"p_manifest": Json }; Returns: Json
                            },
 "media_upload_prepare":
 { Args: { "p_actor_id": string,"p_asset_id": string,"p_metadata": Json }; Returns: Json
+                           },
+"media_upload_prepare_svg":
+{ Args: { "p_actor_id": string,"p_asset_id": string,"p_manifest": Json }; Returns: Json
                            },
 "media_upload_prepare_video":
 { Args: { "p_actor_id": string,"p_asset_id": string,"p_manifest": Json }; Returns: Json
@@ -224,6 +272,9 @@ export type Database = {
 "product_reviews":
 { Args: { "p_order"?: string,"p_page"?: number,"p_product_id": string,"p_rating"?: number }; Returns: Json
                            },
+"public_media_aliases":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "release_account_recovery_claim":
 { Args: { "p_claim_id": string,"p_user_id": string }; Returns: boolean
                            },
@@ -238,6 +289,9 @@ export type Database = {
                            },
 "set_customer_favorite":
 { Args: { "p_expected_version": number,"p_product_id": string,"p_selected": boolean }; Returns: Json
+                           },
+"site_media_document":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "site_settings":
 { Args: Record<PropertyKey, never>; Returns: Json
@@ -269,7 +323,7 @@ export type Database = {
                     "created_at"?: string,"department"?: string,"district"?: string,"id"?: string,"label"?: string,"latitude"?: number | null,"longitude"?: number | null,"province"?: string,"recipient"?: string,"reference"?: string,"street"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"admin_notifications": {
                   Row: {
@@ -303,7 +357,7 @@ isOneToOne: false
                     "active"?: boolean,"created_at"?: string,"id"?: string,"name"?: string,"name_key"?: never,"slug"?: string,"updated_at"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"commerce_locations": {
                   Row: {
@@ -317,7 +371,7 @@ isOneToOne: false
                     "department"?: string,"department_label"?: string,"district"?: string,"district_label"?: string,"province"?: string,"province_label"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"complaints": {
                   Row: {
@@ -331,7 +385,7 @@ isOneToOne: false
                     "delivery_evidence"?: string,"demonstration"?: boolean,"id"?: string,"input"?: NonNullable<Json>,"input_hash"?: string,"operation_id"?: string,"provider"?: NonNullable<Json>,"receipt_hash"?: string,"reference"?: string,"response"?: string,"response_channel"?: string,"response_delivered_at"?: string | null,"status"?: string,"submitted_at"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"coupons": {
                   Row: {
@@ -345,7 +399,7 @@ isOneToOne: false
                     "code"?: string,"created_at"?: string,"discount_type"?: string,"enabled"?: boolean,"ends_at"?: string | null,"id"?: string,"minimum_cents"?: number,"starts_at"?: string | null,"updated_at"?: string,"usage_limit"?: number | null,"used"?: number,"value"?: number,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"customer_favorites": {
                   Row: {
@@ -385,7 +439,7 @@ isOneToOne: false
                     "updated_at"?: string,"user_id"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"home_document": {
                   Row: {
@@ -399,7 +453,7 @@ isOneToOne: false
                     "content"?: NonNullable<Json>,"created_at"?: string,"media"?: NonNullable<Json>,"singleton"?: boolean,"updated_at"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"home_media": {
                   Row: {
@@ -439,7 +493,47 @@ isOneToOne: false
                     "byte_size"?: number | null,"created_at"?: string,"deleted_at"?: string | null,"deletion_claim_id"?: string | null,"deletion_lease_until"?: string | null,"duration_ms"?: number | null,"height"?: number | null,"id"?: string,"mime_type"?: string | null,"object_key"?: string | null,"operation_id"?: string | null,"prepared_metadata"?: Json | null,"purpose"?: string | null,"retire_after"?: string | null,"sha256"?: string | null,"status"?: string,"storage_kind"?: string,"updated_at"?: string,"uploader_id"?: string | null,"verified_at"?: string | null,"width"?: number | null
                   }
                   Relationships: [
-                    
+
+                  ]
+                },"media_builtin_aliases": {
+                  Row: {
+                    "asset_id": string | null,"height": number,"kind": string,"name": string,"path": string,"section": string,"updated_at": string,"updated_by": string | null,"version": number,"width": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "asset_id"?: string | null,"height": number,"kind": string,"name": string,"path": string,"section": string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"width": number
+                  }
+                  Update: {
+                    "asset_id"?: string | null,"height"?: number,"kind"?: string,"name"?: string,"path"?: string,"section"?: string,"updated_at"?: string,"updated_by"?: string | null,"version"?: number,"width"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "media_builtin_aliases_asset_id_fkey"
+      columns: ["asset_id"]
+isOneToOne: false
+      referencedRelation: "media_assets"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"media_library": {
+                  Row: {
+                    "alt": string,"asset_id": string,"label": string,"search_document": unknown,"section": string,"updated_at": string,"version": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "alt"?: string,"asset_id": string,"label": string,"search_document"?: never,"section": string,"updated_at"?: string,"version"?: number
+                  }
+                  Update: {
+                    "alt"?: string,"asset_id"?: string,"label"?: string,"search_document"?: never,"section"?: string,"updated_at"?: string,"version"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "media_library_asset_id_fkey"
+      columns: ["asset_id"]
+isOneToOne: true
+      referencedRelation: "media_assets"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"media_renditions": {
                   Row: {
@@ -473,7 +567,7 @@ isOneToOne: false
                     "active"?: boolean,"aliases"?: (string)[],"aroma_label"?: string,"code"?: string,"label"?: string,"name_key"?: never,"sort_order"?: number,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"order_delivery_history": {
                   Row: {
@@ -565,7 +659,7 @@ isOneToOne: false
                     "address_reference"?: string,"alternate_recipient_dni"?: string | null,"alternate_recipient_name"?: string | null,"delivery_method"?: string,"department"?: string,"discount_cents"?: number,"district"?: string,"email"?: string,"first_name"?: string,"id"?: string,"last_name"?: string,"mode"?: string,"operation_id"?: string,"payment_provider"?: string,"payment_status"?: string,"payment_verified_at"?: string | null,"phone"?: string,"placed_at"?: string,"product_discount_cents"?: number,"promotion_code"?: string | null,"province"?: string,"reference"?: string,"request_hash"?: string,"shipping_cents"?: number,"shipping_estimate"?: string,"simulation"?: boolean,"status"?: string,"street"?: string,"subtotal_cents"?: number,"total_cents"?: number,"tracking_hash"?: string,"updated_at"?: string,"user_id"?: string | null,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"product_images": {
                   Row: {
@@ -763,7 +857,7 @@ isOneToOne: false
                     "created_at"?: string,"first_name"?: string,"last_name"?: string,"phone"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"shipping_settings": {
                   Row: {
@@ -777,7 +871,7 @@ isOneToOne: false
                     "free_threshold_cents"?: number,"national_courier_fee_cents"?: number,"national_estimate"?: string,"province_shipping_enabled"?: boolean,"singleton"?: boolean,"updated_at"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"shipping_zones": {
                   Row: {
@@ -799,6 +893,26 @@ isOneToOne: false
       referencedColumns: ["singleton"]
     }
                   ]
+                },"site_media_slots": {
+                  Row: {
+                    "alt": string,"asset_id": string | null,"slot": string,"updated_at": string,"version": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "alt"?: string,"asset_id"?: string | null,"slot": string,"updated_at"?: string,"version"?: number
+                  }
+                  Update: {
+                    "alt"?: string,"asset_id"?: string | null,"slot"?: string,"updated_at"?: string,"version"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "site_media_slots_asset_id_fkey"
+      columns: ["asset_id"]
+isOneToOne: false
+      referencedRelation: "media_assets"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"site_settings": {
                   Row: {
                     "data": NonNullable<Json>,"singleton": boolean,"updated_at": string,"updated_by": string | null,"version": number
@@ -811,7 +925,7 @@ isOneToOne: false
                     "data"?: NonNullable<Json>,"singleton"?: boolean,"updated_at"?: string,"updated_by"?: string | null,"version"?: number
                   }
                   Relationships: [
-                    
+
                   ]
                 },"store_settings": {
                   Row: {
@@ -861,7 +975,7 @@ isOneToOne: false
                     "claim_id"?: string | null,"code_hash"?: string,"consumed_at"?: string | null,"created_at"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"account_recovery_limits": {
                   Row: {
@@ -875,7 +989,7 @@ isOneToOne: false
                     "attempt_count"?: number,"bucket_hash"?: string,"window_started_at"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"admin_memberships": {
                   Row: {
@@ -889,7 +1003,7 @@ isOneToOne: false
                     "active"?: boolean,"granted_at"?: string,"granted_by"?: string | null,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"admin_notification_reads": {
                   Row: {
@@ -903,7 +1017,7 @@ isOneToOne: false
                     "notification_id"?: string,"read_at"?: string,"user_id"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"admin_push_deliveries": {
                   Row: {
@@ -937,7 +1051,55 @@ isOneToOne: false
                     "auth"?: string,"created_at"?: string,"device_id"?: string,"device_label"?: string,"enabled"?: boolean,"enabled_at"?: string,"endpoint"?: string,"endpoint_hash"?: string,"environment"?: string,"id"?: string,"last_error_code"?: string | null,"last_test_at"?: string | null,"p256dh"?: string,"updated_at"?: string,"user_id"?: string,"version"?: number
                   }
                   Relationships: [
-                    
+
+                  ]
+                },"admin_trusted_device_limits": {
+                  Row: {
+                    "action": string,"attempt_count": number,"user_id": string,"window_started_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"attempt_count": number,"user_id": string,"window_started_at": string
+                  }
+                  Update: {
+                    "action"?: string,"attempt_count"?: number,"user_id"?: string,"window_started_at"?: string
+                  }
+                  Relationships: [
+
+                  ]
+                },"admin_trusted_devices": {
+                  Row: {
+                    "created_at": string,"created_by": string,"credential_hash": string,"expires_at": string,"factor_id": string,"id": string,"label": string,"last_used_at": string | null,"revoke_reason": string | null,"revoked_at": string | null,"revoked_by": string | null,"token_hash": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at": string,"created_by": string,"credential_hash": string,"expires_at": string,"factor_id": string,"id"?: string,"label": string,"last_used_at"?: string | null,"revoke_reason"?: string | null,"revoked_at"?: string | null,"revoked_by"?: string | null,"token_hash": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string,"credential_hash"?: string,"expires_at"?: string,"factor_id"?: string,"id"?: string,"label"?: string,"last_used_at"?: string | null,"revoke_reason"?: string | null,"revoked_at"?: string | null,"revoked_by"?: string | null,"token_hash"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+
+                  ]
+                },"admin_trusted_sessions": {
+                  Row: {
+                    "authorized_by_resume": boolean,"created_at": string,"device_id": string,"expires_at": string,"session_id": string,"user_id": string,"verified_claims_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "authorized_by_resume"?: boolean,"created_at": string,"device_id": string,"expires_at": string,"session_id": string,"user_id": string,"verified_claims_hash": string
+                  }
+                  Update: {
+                    "authorized_by_resume"?: boolean,"created_at"?: string,"device_id"?: string,"expires_at"?: string,"session_id"?: string,"user_id"?: string,"verified_claims_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "admin_trusted_sessions_device_id_fkey"
+      columns: ["device_id"]
+isOneToOne: false
+      referencedRelation: "admin_trusted_devices"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"auth_email_change_attempts": {
                   Row: {
@@ -951,7 +1113,7 @@ isOneToOne: false
                     "attempt_count"?: number,"user_id"?: string,"window_started_at"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"complaint_history": {
                   Row: {
@@ -965,7 +1127,7 @@ isOneToOne: false
                     "actor_id"?: string | null,"changed_at"?: string,"complaint_id"?: string,"id"?: never,"next_status"?: string,"previous_status"?: string | null
                   }
                   Relationships: [
-                    
+
                   ]
                 },"complaint_limits": {
                   Row: {
@@ -979,7 +1141,21 @@ isOneToOne: false
                     "attempts"?: number,"identifier"?: string,"window_start"?: string
                   }
                   Relationships: [
-                    
+
+                  ]
+                },"media_lifecycle_events": {
+                  Row: {
+                    "actor_id": string | null,"asset_id": string,"claim_id": string | null,"code": string | null,"event_type": string,"id": number,"occurred_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id"?: string | null,"asset_id": string,"claim_id"?: string | null,"code"?: string | null,"event_type": string,"id"?: never,"occurred_at"?: string
+                  }
+                  Update: {
+                    "actor_id"?: string | null,"asset_id"?: string,"claim_id"?: string | null,"code"?: string | null,"event_type"?: string,"id"?: never,"occurred_at"?: string
+                  }
+                  Relationships: [
+
                   ]
                 },"media_upload_limits": {
                   Row: {
@@ -993,7 +1169,7 @@ isOneToOne: false
                     "attempts"?: number,"user_id"?: string,"window_start"?: string
                   }
                   Relationships: [
-                    
+
                   ]
                 },"order_status_operations": {
                   Row: {
@@ -1007,7 +1183,7 @@ isOneToOne: false
                     "actor_id"?: string,"created_at"?: string,"operation_id"?: string,"request_hash"?: string,"result"?: NonNullable<Json>
                   }
                   Relationships: [
-                    
+
                   ]
                 }
           }
@@ -1015,7 +1191,18 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "admin_product_document":
+            "admin_device_rate":
+{ Args: { "p_action": string,"p_user_id": string }; Returns: boolean
+                           },
+"admin_device_session":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "assurance": string,"credential_hash": string,"factor_id": string,"password_verified": boolean,"session_id": string,"totp_recent": boolean,"user_id": string,"verified_claims_hash": string
+            }[]
+                           },
+"admin_device_trusted_until":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"admin_product_document":
 { Args: { "p_product_id": string }; Returns: Json
                            },
 "catalog_flush_constraints":
@@ -1044,6 +1231,9 @@ isOneToOne: false
                            },
 "catalog_ready_image":
 { Args: { "p_reference": string }; Returns: string
+                           },
+"catalog_ready_image_for":
+{ Args: { "p_purpose": string,"p_reference": string }; Returns: string
                            },
 "catalog_sales_units":
 { Args: Record<PropertyKey, never>; Returns: {
@@ -1127,6 +1317,12 @@ isOneToOne: false
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"media_default_label":
+{ Args: { "p_id": string,"p_purpose": string }; Returns: string
+                           },
+"media_default_section":
+{ Args: { "p_purpose": string }; Returns: string
+                           },
 "media_document":
 { Args: { "p_id": string }; Returns: Json
                            },
@@ -1136,8 +1332,22 @@ isOneToOne: false
 "media_image_dimensions_valid":
 { Args: { "p_height": number,"p_purpose": string,"p_width": number }; Returns: boolean
                            },
+"media_library_json":
+{ Args: { "p_library": Omit<Database["app"]['Tables']["media_library"]['Row'], Database["app"]['Tables']["media_library"]['ComputedFields']>,"p_media": Omit<Database["app"]['Tables']["media_assets"]['Row'], Database["app"]['Tables']["media_assets"]['ComputedFields']>,"p_uses": number,"p_variants": Json }; Returns: Json
+                           },
+"media_library_record":
+{ Args: { "p_id": string }; Returns: Json
+                           },
+"media_placement_compatible":
+{ Args: { "p_height": number,"p_mime": string,"p_purpose": string,"p_width": number }; Returns: boolean
+                           },
 "media_source":
 { Args: { "p_key": string,"p_storage": string }; Returns: string
+                           },
+"media_usages":
+{ Args: { "p_ids"?: (string)[] }; Returns: {
+              "asset_id": string,"key": string,"label": string,"section": string
+            }[]
                            },
 "olfactory_aliases_valid":
 { Args: { "p_values": (string)[] }; Returns: boolean
@@ -1183,6 +1393,12 @@ isOneToOne: false
                            },
 "shipping_quote":
 { Args: { "p_department": string,"p_district": string,"p_method": string,"p_province": string,"p_subtotal": number }; Returns: Json
+                           },
+"site_image_compatible":
+{ Args: { "p_height": number,"p_mime": string,"p_slot": string,"p_width": number }; Returns: boolean
+                           },
+"site_media_projection":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "validate_complaint":
 { Args: { "p_input": Json }; Returns: undefined
@@ -1324,19 +1540,19 @@ export type CompositeTypes<
 export const Constants = {
   "api": {
           Enums: {
-            
+
           }
         },"app": {
           Enums: {
-            
+
           }
         },"private": {
           Enums: {
-            
+
           }
         },"public": {
           Enums: {
-            
+
           }
         }
 } as const

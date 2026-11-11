@@ -33,6 +33,6 @@ end;
 $bootstrap$;
 commit;
 
--- The grant does not skip MFA. private.is_admin() still requires AAL2, and the
--- administrative login must complete TOTP enrollment before allowing access.
+-- This grant does not skip initial MFA. The administrative login must complete
+-- TOTP enrollment before access or a remembered-device authorization can exist.
 -- granted_by is NULL for this operator bootstrap; do not invent an app actor.

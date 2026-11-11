@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
-import { assetSource } from '../../services/asset-source'
+import { ManagedSiteImage } from '../../components/ManagedSiteImage'
 
 export function AdminAuthShell({
   children,
@@ -17,8 +17,8 @@ export function AdminAuthShell({
       </a>
       <header className="admin-auth-header">
         <Link to="/" aria-label="Aroma Infini, inicio">
-          <img
-            src={assetSource('/brand/logo-on-light.svg')}
+          <ManagedSiteImage
+            slot="identity.logo"
             width="142"
             height="64"
             alt="Aroma Infini"

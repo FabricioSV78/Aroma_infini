@@ -1,0 +1,1298 @@
+[
+  {
+    "path": "/brand/logo-on-light.svg",
+    "kind": "svg",
+    "section": "Identidad",
+    "label": "Logotipo Aroma Infini",
+    "width": 774,
+    "height": 374
+  },
+  {
+    "path": "/images/account-selection-v1-portrait-1024.webp",
+    "kind": "image",
+    "section": "Mi cuenta",
+    "label": "account-selection-v1-portrait-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/account-selection-v1-portrait-480.webp",
+    "kind": "image",
+    "section": "Mi cuenta",
+    "label": "account-selection-v1-portrait-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/account-selection-v1-portrait-780.webp",
+    "kind": "image",
+    "section": "Mi cuenta",
+    "label": "account-selection-v1-portrait-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/account-selection-v1-wide-1536.webp",
+    "kind": "image",
+    "section": "Mi cuenta",
+    "label": "account-selection-v1-wide-1536",
+    "width": 1536,
+    "height": 512
+  },
+  {
+    "path": "/images/account-selection-v1-wide-960.webp",
+    "kind": "image",
+    "section": "Mi cuenta",
+    "label": "account-selection-v1-wide-960",
+    "width": 960,
+    "height": 320
+  },
+  {
+    "path": "/images/ambre-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/ambre-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/ambre-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/ambre-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/ambre-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/ambre-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/ambre-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/ambre-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "ambre-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/cedre-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/cedre-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/cedre-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/cedre-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/cedre-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/cedre-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/cedre-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/cedre-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "cedre-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/discovery-bois-1536.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-1536",
+    "width": 1536,
+    "height": 2304
+  },
+  {
+    "path": "/images/discovery-bois-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/discovery-bois-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-960",
+    "width": 960,
+    "height": 1440
+  },
+  {
+    "path": "/images/discovery-bois-category-1024.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-1024",
+    "width": 1024,
+    "height": 1280
+  },
+  {
+    "path": "/images/discovery-bois-category-320.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/discovery-bois-category-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/discovery-bois-category-640.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-640",
+    "width": 640,
+    "height": 800
+  },
+  {
+    "path": "/images/discovery-bois-category-800.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-800",
+    "width": 800,
+    "height": 1000
+  },
+  {
+    "path": "/images/discovery-bois-category-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-bois-category-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/discovery-complements-v1-1122.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-1122",
+    "width": 1122,
+    "height": 1402
+  },
+  {
+    "path": "/images/discovery-complements-v1-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/discovery-complements-v1-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-1120.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-1120",
+    "width": 1120,
+    "height": 1400
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-320.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-640.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-640",
+    "width": 640,
+    "height": 800
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-800.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-800",
+    "width": 800,
+    "height": 1000
+  },
+  {
+    "path": "/images/discovery-complements-v1-category-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-complements-v1-category-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/discovery-libre-1536.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-1536",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "path": "/images/discovery-libre-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-480",
+    "width": 480,
+    "height": 320
+  },
+  {
+    "path": "/images/discovery-libre-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-960",
+    "width": 960,
+    "height": 640
+  },
+  {
+    "path": "/images/discovery-libre-category-320.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-category-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/discovery-libre-category-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-category-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/discovery-libre-category-640.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-category-640",
+    "width": 640,
+    "height": 800
+  },
+  {
+    "path": "/images/discovery-libre-category-800.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-category-800",
+    "width": 800,
+    "height": 1000
+  },
+  {
+    "path": "/images/discovery-libre-category-816.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-libre-category-816",
+    "width": 816,
+    "height": 1020
+  },
+  {
+    "path": "/images/discovery-petale-1536.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-1536",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "path": "/images/discovery-petale-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-480",
+    "width": 480,
+    "height": 320
+  },
+  {
+    "path": "/images/discovery-petale-960.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-960",
+    "width": 960,
+    "height": 640
+  },
+  {
+    "path": "/images/discovery-petale-category-320.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-category-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/discovery-petale-category-480.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-category-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/discovery-petale-category-640.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-category-640",
+    "width": 640,
+    "height": 800
+  },
+  {
+    "path": "/images/discovery-petale-category-800.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-category-800",
+    "width": 800,
+    "height": 1000
+  },
+  {
+    "path": "/images/discovery-petale-category-816.webp",
+    "kind": "image",
+    "section": "Categorías",
+    "label": "discovery-petale-category-816",
+    "width": 816,
+    "height": 1020
+  },
+  {
+    "path": "/images/editorial-essential-v3-1536.webp",
+    "kind": "image",
+    "section": "Nosotros",
+    "label": "editorial-essential-v3-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/editorial-essential-v3-480.webp",
+    "kind": "image",
+    "section": "Nosotros",
+    "label": "editorial-essential-v3-480",
+    "width": 480,
+    "height": 270
+  },
+  {
+    "path": "/images/editorial-essential-v3-960.webp",
+    "kind": "image",
+    "section": "Nosotros",
+    "label": "editorial-essential-v3-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/editorial-essential-v3-mobile-480.webp",
+    "kind": "image",
+    "section": "Nosotros",
+    "label": "editorial-essential-v3-mobile-480",
+    "width": 480,
+    "height": 528
+  },
+  {
+    "path": "/images/editorial-essential-v3-mobile-780.webp",
+    "kind": "image",
+    "section": "Nosotros",
+    "label": "editorial-essential-v3-mobile-780",
+    "width": 780,
+    "height": 858
+  },
+  {
+    "path": "/images/featured-duo-v3-1536.webp",
+    "kind": "image",
+    "section": "Compartir",
+    "label": "featured-duo-v3-1536",
+    "width": 1448,
+    "height": 1086
+  },
+  {
+    "path": "/images/figue-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/figue-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/figue-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/figue-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/figue-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/figue-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/figue-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/figue-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "figue-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/hero-v2-lumiere-desktop-1536.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-desktop-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/hero-v2-lumiere-desktop-2048.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-desktop-2048",
+    "width": 2048,
+    "height": 1153
+  },
+  {
+    "path": "/images/hero-v2-lumiere-desktop-960.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-desktop-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/hero-v2-lumiere-mobile-1024.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-mobile-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/hero-v2-lumiere-mobile-480.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-mobile-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/hero-v2-lumiere-mobile-780.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v2-lumiere-mobile-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/hero-v3-petale-desktop-1536.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-desktop-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/hero-v3-petale-desktop-2048.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-desktop-2048",
+    "width": 2048,
+    "height": 1152
+  },
+  {
+    "path": "/images/hero-v3-petale-desktop-960.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-desktop-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/hero-v3-petale-mobile-1024.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-mobile-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/hero-v3-petale-mobile-480.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-mobile-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/hero-v3-petale-mobile-780.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v3-petale-mobile-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/hero-v4-amber-desktop-1536.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-desktop-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/hero-v4-amber-desktop-2048.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-desktop-2048",
+    "width": 2048,
+    "height": 1153
+  },
+  {
+    "path": "/images/hero-v4-amber-desktop-960.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-desktop-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/hero-v4-amber-mobile-1024.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-mobile-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/hero-v4-amber-mobile-480.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-mobile-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/hero-v4-amber-mobile-780.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-amber-mobile-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/hero-v4-citrus-desktop-1536.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-desktop-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/hero-v4-citrus-desktop-2048.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-desktop-2048",
+    "width": 2048,
+    "height": 1153
+  },
+  {
+    "path": "/images/hero-v4-citrus-desktop-960.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-desktop-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/hero-v4-citrus-mobile-1024.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-mobile-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/hero-v4-citrus-mobile-480.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-mobile-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/hero-v4-citrus-mobile-780.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v4-citrus-mobile-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/hero-v5-silence-desktop-1536.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-desktop-1536",
+    "width": 1536,
+    "height": 864
+  },
+  {
+    "path": "/images/hero-v5-silence-desktop-2048.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-desktop-2048",
+    "width": 2048,
+    "height": 1152
+  },
+  {
+    "path": "/images/hero-v5-silence-desktop-960.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-desktop-960",
+    "width": 960,
+    "height": 540
+  },
+  {
+    "path": "/images/hero-v5-silence-mobile-1024.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-mobile-1024",
+    "width": 1024,
+    "height": 1536
+  },
+  {
+    "path": "/images/hero-v5-silence-mobile-480.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-mobile-480",
+    "width": 480,
+    "height": 720
+  },
+  {
+    "path": "/images/hero-v5-silence-mobile-780.webp",
+    "kind": "image",
+    "section": "Campañas",
+    "label": "hero-v5-silence-mobile-780",
+    "width": 780,
+    "height": 1170
+  },
+  {
+    "path": "/images/iris-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/iris-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/iris-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/iris-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/iris-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/iris-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/iris-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/iris-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "iris-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/neroli-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/neroli-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/neroli-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/neroli-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/neroli-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/neroli-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/neroli-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/neroli-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "neroli-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-ambre-thumb-160.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-ambre-thumb-160",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "path": "/images/olfactory-ambre-thumb-320.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-ambre-thumb-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/olfactory-ambre.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-ambre",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-cedre-thumb-160.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-cedre-thumb-160",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "path": "/images/olfactory-cedre-thumb-320.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-cedre-thumb-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/olfactory-cedre.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-cedre",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-figue.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-figue",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-iris.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-iris",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-neroli-thumb-160.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-neroli-thumb-160",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "path": "/images/olfactory-neroli-thumb-320.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-neroli-thumb-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/olfactory-neroli.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-neroli",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-petale-thumb-160.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-petale-thumb-160",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "path": "/images/olfactory-petale-thumb-320.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-petale-thumb-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/olfactory-petale.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-petale",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-santal.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-santal",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/olfactory-sillage-thumb-160.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-sillage-thumb-160",
+    "width": 160,
+    "height": 200
+  },
+  {
+    "path": "/images/olfactory-sillage-thumb-320.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-sillage-thumb-320",
+    "width": 320,
+    "height": 400
+  },
+  {
+    "path": "/images/olfactory-sillage.webp",
+    "kind": "image",
+    "section": "Perfil olfativo y recomendador",
+    "label": "olfactory-sillage",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/petale-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/petale-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/petale-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/petale-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/petale-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/petale-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/petale-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/petale-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "petale-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/santal-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/santal-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/santal-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/santal-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/santal-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/santal-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/santal-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/santal-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "santal-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/sillage-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/sillage-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/sillage-alternate-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-alternate-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/sillage-alternate-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-alternate-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/sillage-back-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-back-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/sillage-back-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-back-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/images/sillage-detail-480.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-detail-480",
+    "width": 480,
+    "height": 600
+  },
+  {
+    "path": "/images/sillage-detail-960.webp",
+    "kind": "image",
+    "section": "Productos",
+    "label": "sillage-detail-960",
+    "width": 960,
+    "height": 1200
+  },
+  {
+    "path": "/videos/perfume-editorial-mobile.mp4",
+    "kind": "video",
+    "section": "Video editorial",
+    "label": "perfume-editorial-mobile",
+    "width": 720,
+    "height": 900
+  },
+  {
+    "path": "/videos/perfume-editorial-mobile.webp",
+    "kind": "image",
+    "section": "Video editorial",
+    "label": "perfume-editorial-mobile · portada",
+    "width": 720,
+    "height": 900
+  },
+  {
+    "path": "/videos/perfume-editorial-wide.mp4",
+    "kind": "video",
+    "section": "Video editorial",
+    "label": "perfume-editorial-wide",
+    "width": 1920,
+    "height": 926
+  },
+  {
+    "path": "/videos/perfume-editorial-wide.webp",
+    "kind": "image",
+    "section": "Video editorial",
+    "label": "perfume-editorial-wide · portada",
+    "width": 1920,
+    "height": 926
+  }
+]

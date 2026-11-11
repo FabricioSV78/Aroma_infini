@@ -24,6 +24,8 @@ export interface AuthSession {
   intent: 'account' | 'recovery'
   assurance?: 'aal1' | 'aal2'
   mfaRequired?: boolean
+  trustedDevice?: boolean
+  trustedUntil?: string
 }
 
 export interface AuthMfaFactor {

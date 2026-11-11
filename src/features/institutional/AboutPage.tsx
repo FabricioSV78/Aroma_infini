@@ -2,7 +2,10 @@ import { Link } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { aboutPageContent as content } from '../../content/institutional'
 import { InstitutionalBreadcrumb } from './InstitutionalBreadcrumb'
-import { assetSource, assetSourceSet } from '../../services/asset-source'
+import {
+  ManagedSiteImage,
+  ManagedSiteSource,
+} from '../../components/ManagedSiteImage'
 
 export function AboutPage() {
   return (
@@ -17,18 +20,16 @@ export function AboutPage() {
             <p className="about-hero-intro">{content.hero.introduction}</p>
           </header>
           <picture className="about-hero-media">
-            <source
+            <ManagedSiteSource
+              slot="about.hero.mobile"
               media="(max-width: 767px)"
-              srcSet={assetSourceSet(content.hero.image.mobileSet)}
               sizes="(max-width: 767px) calc(100vw - 32px), 100vw"
             />
-            <img
-              src={assetSource(content.hero.image.desktop)}
-              srcSet={assetSourceSet(content.hero.image.desktopSet)}
+            <ManagedSiteImage
+              slot="about.hero.desktop"
               sizes="(max-width: 767px) calc(100vw - 32px), (max-width: 1680px) calc(100vw - 80px), 1680px"
               width={1536}
               height={864}
-              alt={content.hero.image.alt}
               decoding="async"
               fetchPriority="high"
             />
@@ -36,13 +37,15 @@ export function AboutPage() {
         </section>
       </div>
 
-      <section className="container about-story" aria-labelledby="about-story-title">
+      <section
+        className="container about-story"
+        aria-labelledby="about-story-title"
+      >
         <figure className="about-story-media" data-scroll-reveal="image">
-          <img
-            src={assetSource(content.story.image.src)}
+          <ManagedSiteImage
+            slot="about.story"
             width={960}
             height={1200}
-            alt={content.story.image.alt}
             loading="lazy"
             decoding="async"
           />
@@ -56,7 +59,10 @@ export function AboutPage() {
         </div>
       </section>
 
-      <section className="container about-proposal" aria-labelledby="about-proposal-title">
+      <section
+        className="container about-proposal"
+        aria-labelledby="about-proposal-title"
+      >
         <div className="about-proposal-heading" data-scroll-reveal="copy">
           <p className="eyebrow">{content.proposal.eyebrow}</p>
           <h2 id="about-proposal-title">{content.proposal.title}</h2>

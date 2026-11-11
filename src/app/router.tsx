@@ -421,6 +421,13 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: 'biblioteca',
+        lazy: async () => {
+          const module = await adminRouteModules.media()
+          return { Component: module.AdminMediaLibrary }
+        },
+      },
+      {
         path: 'reclamaciones',
         lazy: async () => {
           const module = await adminRouteModules.complaints()

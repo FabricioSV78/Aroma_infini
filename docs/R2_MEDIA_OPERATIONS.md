@@ -1,5 +1,10 @@
 # Fotografías administradas: uso y límites
 
+La ampliación de biblioteca, reutilización entre apartados, gestión de logotipo
+y limpieza a las 24 horas se describe en [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md).
+Requiere activar sus migraciones y el Worker del mismo entorno; no basta con
+actualizar únicamente el frontend.
+
 ## Flujo desde Productos
 
 El formulario y la cola de fotografías conservan sus controles actuales. Un

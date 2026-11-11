@@ -481,29 +481,46 @@ test('gestión rápida de fotografías conserva cinco espacios y acciones alcanz
   for (const viewport of importViewports) {
     await page.setViewportSize(viewport)
     await expect(page.locator('.admin-product-upload-item')).toHaveCount(4)
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth + 1,
-      ),
-    ).toBe(true)
+    await expect(page.locator('.admin-product-olfactory-slot')).toHaveCount(1)
+    // A viewport change can resolve before the responsive layout is painted.
+    // Retry the actual geometry, so a persistent overflow still fails in CI.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => ({
+            viewportWidth: innerWidth,
+            horizontalOverflow: Math.max(
+              0,
+              document.documentElement.scrollWidth - innerWidth - 1,
+            ),
+          })),
+        { message: `Fotografías sin desbordamiento en ${viewport.name}` },
+      )
+      .toEqual({ viewportWidth: viewport.width, horizontalOverflow: 0 })
     await page
       .getByRole('button', { name: 'Guardar fotos', exact: true })
       .scrollIntoViewIfNeeded()
     const actions = page.getByRole('button', {
       name: /^Guardar fotos$|^Guardar y continuar$/,
     })
-    expect(
-      await actions.evaluateAll((buttons) =>
-        buttons.every((button) => {
-          const bounds = button.getBoundingClientRect()
-          return (
-            bounds.left >= 0 &&
-            bounds.right <= innerWidth + 1 &&
-            bounds.height >= 40
-          )
-        }),
-      ),
-    ).toBe(true)
+    await expect
+      .poll(
+        () =>
+          actions.evaluateAll(
+            (buttons) =>
+              buttons.length === 2 &&
+              buttons.every((button) => {
+                const bounds = button.getBoundingClientRect()
+                return (
+                  bounds.left >= 0 &&
+                  bounds.right <= innerWidth + 1 &&
+                  bounds.height >= 40
+                )
+              }),
+          ),
+        { message: `Acciones de fotografías alcanzables en ${viewport.name}` },
+      )
+      .toBe(true)
     await page.screenshot({
       path: `artifacts/product-photo-queue/editor-${viewport.name}.png`,
       fullPage: true,

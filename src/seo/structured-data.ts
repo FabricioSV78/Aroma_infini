@@ -1,5 +1,7 @@
 import { getVariantPrice } from '../services/product-discounts'
 import type { SeoPageConfig } from './seo-config'
+import { siteMediaDefaults } from '../content/site-media-defaults'
+import { assetSource } from '../services/asset-source'
 
 export const SITE_NAME = 'Aroma Infini'
 
@@ -12,6 +14,7 @@ export function buildSeoStructuredData(
   origin: string,
   publishCommercialData: boolean,
   now: number = Date.now(),
+  logoPath: string = siteMediaDefaults['identity.logo'].src,
 ) {
   const graph: Record<string, unknown>[] = []
   const productImagePath = config.product?.imagePath
@@ -22,7 +25,7 @@ export function buildSeoStructuredData(
         '@id': `${origin}/#organization`,
         name: SITE_NAME,
         url: `${origin}/`,
-        logo: absoluteUrl(origin, '/brand/logo-on-light.svg'),
+        logo: absoluteUrl(origin, assetSource(logoPath)),
       },
       {
         '@type': 'WebSite',
@@ -73,7 +76,7 @@ export function buildSeoStructuredData(
       '@id': `${url}#product`,
       name: product.name,
       description: product.description,
-      image: absoluteUrl(origin, productImagePath),
+      image: absoluteUrl(origin, assetSource(productImagePath)),
       ...(product.brand
         ? { brand: { '@type': 'Brand', name: product.brand } }
         : {}),

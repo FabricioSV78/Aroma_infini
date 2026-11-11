@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto'
 import { lstat, open, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import {
+  inspectStaticSvg,
+  STATIC_SVG_MAX_BYTES,
+} from '../src/domain/static-svg.js'
 
 const maximumManifestBytes = 4 * 1024 * 1024
 const maximumSqlBytes = 16 * 1024 * 1024 * 1024
@@ -10,7 +14,7 @@ const maximumMediaBytes = 10 * 1024 * 1024
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const hash = /^[a-f0-9]{64}$/
 const objectKey =
-  /^public\/dynamic\/([a-f0-9-]{36})\/([a-f0-9]{64})\/([1-9][0-9]{1,4}\.webp|video\.mp4)$/
+  /^public\/dynamic\/([a-f0-9-]{36})\/([a-f0-9]{64})\/([1-9][0-9]{1,4}\.webp|video\.mp4|vector\.svg)$/
 
 function fields(value, expected) {
   assert(value && typeof value === 'object' && !Array.isArray(value))
@@ -95,7 +99,7 @@ function manifestDocument(value) {
     let prefixHash,
       masterWidth = 0,
       masterSha,
-      video = false
+      standalone = false
     for (const object of asset.objects) {
       fields(object, ['key', 'path', 'byteSize', 'sha256'])
       fileMetadata(object, maximumMediaBytes)
@@ -107,10 +111,12 @@ function manifestDocument(value) {
       assert(!keys.has(object.key) && !paths.has(object.path.toLowerCase()))
       keys.add(object.key)
       paths.add(object.path.toLowerCase())
-      if (match[3] === 'video.mp4') {
+      if (match[3] === 'video.mp4' || match[3] === 'vector.svg') {
         assert.equal(asset.objects.length, 1)
         assert.equal(object.sha256, prefixHash)
-        video = true
+        if (match[3] === 'vector.svg')
+          assert(object.byteSize <= STATIC_SVG_MAX_BYTES)
+        standalone = true
       } else {
         assert(object.byteSize <= 4 * 1024 * 1024)
         const width = Number(match[3].split('.')[0])
@@ -124,7 +130,7 @@ function manifestDocument(value) {
       mediaObjects++
     }
     // All renditions share the master's path hash, but have their own byte hashes.
-    if (!video) assert.equal(masterSha, prefixHash)
+    if (!standalone) assert.equal(masterSha, prefixHash)
   }
   return {
     files,
@@ -153,7 +159,13 @@ async function safeFile(root, relative) {
   return target
 }
 
-async function readVerifiedFile(root, relative, maximum, expected) {
+async function readVerifiedFile(
+  root,
+  relative,
+  maximum,
+  expected,
+  validateContents,
+) {
   const target = await safeFile(root, relative)
   const entry = await lstat(target)
   assert(entry.size > 0 && entry.size <= maximum)
@@ -172,7 +184,7 @@ async function readVerifiedFile(root, relative, maximum, expected) {
       byteSize += chunk.byteLength
       assert(byteSize <= maximum)
       digest.update(chunk)
-      if (!expected) chunks.push(chunk)
+      if (!expected || validateContents) chunks.push(chunk)
     }
     const after = await handle.stat()
     assert.equal(after.size, before.size)
@@ -180,6 +192,7 @@ async function readVerifiedFile(root, relative, maximum, expected) {
     assert.equal(byteSize, before.size)
     const sha256 = digest.digest('hex')
     if (expected) assert.equal(sha256, expected.sha256)
+    if (validateContents) validateContents(Buffer.concat(chunks))
     await safeFile(root, relative)
     return expected ? { byteSize } : Buffer.concat(chunks)
   } finally {
@@ -220,11 +233,26 @@ export async function verifyBackupPackage(directory) {
     totals.mediaObjects = document.mediaObjects
     for (const [index, file] of document.files.entries()) {
       stage = `${file.category}-file-${index + 1}`
+      const vector =
+        file.category === 'media' && file.key.endsWith('/vector.svg')
       const verified = await readVerifiedFile(
         root,
         file.path,
-        file.category === 'sql' ? maximumSqlBytes : maximumMediaBytes,
+        file.category === 'sql'
+          ? maximumSqlBytes
+          : vector
+            ? STATIC_SVG_MAX_BYTES
+            : maximumMediaBytes,
         file,
+        vector
+          ? (bytes) =>
+              inspectStaticSvg(
+                bytes.buffer.slice(
+                  bytes.byteOffset,
+                  bytes.byteOffset + bytes.byteLength,
+                ),
+              )
+          : undefined,
       )
       totals.verifiedFiles++
       totals.bytes += verified.byteSize

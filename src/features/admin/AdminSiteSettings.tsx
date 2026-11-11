@@ -9,6 +9,7 @@ import { AdminPageHeader } from './AdminShared'
 import { useAdminNotice } from './AdminNoticeProvider'
 import { useUnsavedChanges } from './useUnsavedChanges'
 import { AdminContactQr } from './AdminContactQr'
+import { AdminTrustedDevices } from './AdminTrustedDevices'
 
 type SettingsGroup = 'business' | 'contact' | 'social' | 'policies'
 
@@ -256,6 +257,7 @@ export function AdminSiteSettings() {
           </button>
         </div>
       </form>
+      <AdminTrustedDevices />
     </section>
   )
 }

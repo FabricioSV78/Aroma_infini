@@ -234,6 +234,11 @@ obtener artificialmente una comprobación verde.
 
 ## Migraciones, datos, medios y recuperación
 
+La persistencia de 2FA requiere aplicar primero la migración y la revisión de
+[dispositivos de confianza](ADMIN_TRUSTED_DEVICES.md) en desarrollo. Un push del
+frontend no instala ese cambio SQL. El entorno de producción mantiene su
+aprobación independiente.
+
 - GitHub contiene código y migraciones; PostgreSQL y R2 conservan los datos.
 - El flujo de despliegue no ejecuta migraciones remotas ni carga datos de muestra.
 - Antes de publicar código que necesite un cambio SQL, revisar y aplicar por

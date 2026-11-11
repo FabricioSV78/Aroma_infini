@@ -782,6 +782,95 @@ test('unclaimed image objects are never garbage-collected from a deployment mani
   expect(fixture.state.gcFinalizations).toHaveLength(0)
 })
 
+test('cleanup rechecks a stale claim before listing or deleting its prefix', async () => {
+  const fixture = setup()
+  const asset = await readAsset(await fixture.handle(await uploadRequest()))
+  fixture.state.gcClaims = [
+    {
+      id: asset.id,
+      claimId: randomUUID(),
+      prefix: `public/dynamic/${asset.id}/`,
+    },
+  ]
+  fixture.state.gcRecheckAllowed = false
+  let listed = false
+  const list = fixture.bucket.list.bind(fixture.bucket)
+  fixture.bucket.list = async (options) => {
+    listed = true
+    return list(options)
+  }
+  await cleanupMedia(fixture.environment, fixture.upstream)
+  expect(listed).toBe(false)
+  expect(fixture.bucket.objects.size).toBe(3)
+  expect(fixture.bucket.removed).toHaveLength(0)
+  expect(fixture.state.gcFinalizations).toHaveLength(0)
+})
+
+test('cleanup does not delete when its authority changes after the storage listing', async () => {
+  const fixture = setup()
+  const asset = await readAsset(await fixture.handle(await uploadRequest()))
+  const claimId = randomUUID()
+  fixture.state.gcClaims = [
+    { id: asset.id, claimId, prefix: `public/dynamic/${asset.id}/` },
+  ]
+  fixture.state.gcRecheckResults = [true, false]
+  await expect(
+    cleanupMedia(fixture.environment, fixture.upstream),
+  ).rejects.toThrow('Some media cleanup claims remain pending')
+  expect(fixture.bucket.objects.size).toBe(3)
+  expect(fixture.bucket.removed).toHaveLength(0)
+  expect(fixture.state.gcFinalizations).toHaveLength(0)
+  expect(fixture.state.gcFailures).toEqual([
+    { p_asset_id: asset.id, p_claim_id: claimId, p_code: 'storage-list' },
+  ])
+})
+
+test('a partial storage deletion records a fixed error, processes other claims and resumes safely', async () => {
+  const fixture = setup()
+  const assets = [
+    await readAsset(await fixture.handle(await uploadRequest())),
+    await readAsset(await fixture.handle(await uploadRequest())),
+  ]
+  const claims = assets.map((asset) => ({
+    id: asset.id,
+    claimId: randomUUID(),
+    prefix: `public/dynamic/${asset.id}/`,
+  }))
+  fixture.state.gcClaims = claims
+  const remove = fixture.bucket.delete.bind(fixture.bucket)
+  let failOnce = true
+  fixture.bucket.delete = async (keys) => {
+    const selected = Array.isArray(keys) ? keys : [keys]
+    if (failOnce && selected.some((key) => key.includes(assets[0].id))) {
+      failOnce = false
+      await remove(selected[0])
+      throw new Error('PRIVATE_STORAGE_PROVIDER_DETAILS')
+    }
+    await remove(keys)
+  }
+  await expect(
+    cleanupMedia(fixture.environment, fixture.upstream),
+  ).rejects.toThrow('Some media cleanup claims remain pending')
+  expect(fixture.bucket.objects.size).toBe(2)
+  expect(fixture.state.gcFinalizations).toEqual([
+    { p_asset_id: assets[1].id, p_claim_id: claims[1].claimId },
+  ])
+  expect(fixture.state.gcFailures).toEqual([
+    {
+      p_asset_id: assets[0].id,
+      p_claim_id: claims[0].claimId,
+      p_code: 'storage-delete',
+    },
+  ])
+  expect(JSON.stringify(fixture.state.gcFailures)).not.toContain(
+    'PRIVATE_STORAGE_PROVIDER_DETAILS',
+  )
+  fixture.state.gcClaims = [claims[0]]
+  await cleanupMedia(fixture.environment, fixture.upstream)
+  expect(fixture.bucket.objects.size).toBe(0)
+  expect(fixture.state.gcFinalizations).toHaveLength(2)
+})
+
 for (const count of [10, 50]) {
   test(`${count} products keep their four commercial photos and independent olfactory image distinct`, async () => {
     const fixture = setup()

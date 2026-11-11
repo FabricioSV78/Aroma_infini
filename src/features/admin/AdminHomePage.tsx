@@ -37,6 +37,7 @@ import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { useAdminNotice } from './AdminNoticeProvider'
 import { AdminHeroEditor } from './AdminHeroEditor'
+import { AdminMediaPicker } from './AdminMediaPicker'
 
 type HomeTab =
   'hero' | 'announcement' | 'categories' | 'brands' | 'film' | 'finder'
@@ -165,6 +166,10 @@ export function AdminHomePage() {
     storefrontRepository.peekSnapshot,
   )
   const notice = useAdminNotice()
+  const videoPreparationAbort = useRef<AbortController | null>(null)
+  useEffect(function cancelVideoOnUnmount() {
+    return () => videoPreparationAbort.current?.abort()
+  }, [])
   const [tab, setTab] = useState<HomeTab>('hero')
   useEffect(() => {
     // Only the fragrance editor needs the public eligibility/options snapshot.
@@ -429,17 +434,32 @@ export function AdminHomePage() {
 
   async function uploadFilm(file: File, mobile = false) {
     if (!beginMediaPreparation()) return
+    const cancellation = new AbortController()
+    videoPreparationAbort.current = cancellation
     try {
-      const prepared = await prepareVideoFile(file)
+      const prepared = await prepareVideoFile(file, cancellation.signal)
+      if (cancellation.signal.aborted) return
       updateFilm(
         mobile
-          ? { mobileVideo: prepared.video, mobilePoster: prepared.poster }
-          : prepared,
+          ? {
+              mobileVideo: prepared.mobileVideo ?? prepared.video,
+              mobilePoster: prepared.mobilePoster ?? prepared.poster,
+            }
+          : {
+              video: prepared.video,
+              poster: prepared.poster,
+              mobileVideo: prepared.mobileVideo ?? null,
+              mobilePoster: prepared.mobilePoster ?? null,
+            },
       )
-      notice.toast('Video preparado. Guarda los cambios para publicarlo.')
+      notice.toast(
+        `${prepared.optimization.message} Guarda los cambios para publicarlo.`,
+      )
     } catch (error) {
-      notice.error(error, 'video')
+      if (!cancellation.signal.aborted) notice.error(error, 'video')
     } finally {
+      if (videoPreparationAbort.current === cancellation)
+        videoPreparationAbort.current = null
       endMediaPreparation()
     }
   }
@@ -539,6 +559,15 @@ export function AdminHomePage() {
             onChange={(event) => fileChanged(key, event)}
           />
         </label>
+        <AdminMediaPicker
+          purpose="category"
+          label={category.title}
+          disabled={preparingMedia || saving}
+          onSelect={(item) => {
+            if (item.asset && 'variants' in item.asset)
+              setMedia((current) => ({ ...current, [key]: item.asset!.src }))
+          }}
+        />
         {media[key] ? (
           <button
             className="admin-home-reset"
@@ -1090,7 +1119,8 @@ export function AdminHomePage() {
                 <div>
                   <strong>Archivo de video</strong>
                   <small>
-                    MP4 · 2 a 60 segundos · lado menor de 480 px · hasta 10 MB
+                    MP4 · 2 a 60 segundos · lado menor de 480 px · original
+                    hasta 20 MB
                   </small>
                 </div>
                 <label className="admin-home-file-button">
@@ -1106,6 +1136,29 @@ export function AdminHomePage() {
                     }}
                   />
                 </label>
+                <AdminMediaPicker
+                  purpose="film-video"
+                  label="Video editorial"
+                  disabled={preparingMedia || saving}
+                  onSelect={(item) => {
+                    if (item.asset)
+                      updateFilm({
+                        video: item.asset.src,
+                        poster: null,
+                        mobileVideo: null,
+                        mobilePoster: null,
+                      })
+                  }}
+                />
+                <AdminMediaPicker
+                  purpose="film-poster"
+                  label="Portada del video editorial"
+                  disabled={preparingMedia || saving}
+                  onSelect={(item) => {
+                    if (item.asset && 'variants' in item.asset)
+                      updateFilm({ poster: item.asset.src })
+                  }}
+                />
                 {content.film.video && (
                   <button
                     className="admin-home-reset"
@@ -1120,7 +1173,8 @@ export function AdminHomePage() {
                 <div>
                   <strong>Versión para celular (opcional)</strong>
                   <small>
-                    El mismo clip adaptado a móvil. MP4 · 2 a 60 s · hasta 10 MB
+                    El mismo clip adaptado a móvil. MP4 · 2 a 60 s · original
+                    hasta 20 MB
                   </small>
                 </div>
                 <label className="admin-home-file-button">
@@ -1138,6 +1192,27 @@ export function AdminHomePage() {
                     }}
                   />
                 </label>
+                <AdminMediaPicker
+                  purpose="film-video"
+                  label="Video editorial para celular"
+                  disabled={preparingMedia || saving}
+                  onSelect={(item) => {
+                    if (item.asset)
+                      updateFilm({
+                        mobileVideo: item.asset.src,
+                        mobilePoster: null,
+                      })
+                  }}
+                />
+                <AdminMediaPicker
+                  purpose="film-poster"
+                  label="Portada del video editorial para celular"
+                  disabled={preparingMedia || saving}
+                  onSelect={(item) => {
+                    if (item.asset && 'variants' in item.asset)
+                      updateFilm({ mobilePoster: item.asset.src })
+                  }}
+                />
                 {content.film.mobileVideo && (
                   <button
                     className="admin-home-reset"
@@ -1483,6 +1558,15 @@ export function AdminHomePage() {
                           }
                         />
                       </label>
+                      <AdminMediaPicker
+                        purpose="finder-desktop"
+                        label="Imagen de escritorio del recomendador"
+                        disabled={preparingMedia || saving}
+                        onSelect={(item) => {
+                          if (item.asset && 'variants' in item.asset)
+                            updateFinder({ desktopImage: item.asset.src })
+                        }}
+                      />
                       {content.finder.desktopImage && (
                         <button
                           className="admin-home-reset"
@@ -1512,6 +1596,15 @@ export function AdminHomePage() {
                           }
                         />
                       </label>
+                      <AdminMediaPicker
+                        purpose="finder-mobile"
+                        label="Imagen móvil del recomendador"
+                        disabled={preparingMedia || saving}
+                        onSelect={(item) => {
+                          if (item.asset && 'variants' in item.asset)
+                            updateFinder({ mobileImage: item.asset.src })
+                        }}
+                      />
                       {content.finder.mobileImage && (
                         <button
                           className="admin-home-reset"
@@ -1813,6 +1906,21 @@ export function AdminHomePage() {
                                               }
                                             />
                                           </label>
+                                          <AdminMediaPicker
+                                            purpose="finder-option"
+                                            label={`Opción ${option.label}`}
+                                            disabled={preparingMedia || saving}
+                                            onSelect={(item) => {
+                                              if (
+                                                item.asset &&
+                                                'variants' in item.asset
+                                              )
+                                                updateFinderFamilyVisual(
+                                                  option.value,
+                                                  { image: item.asset.src },
+                                                )
+                                            }}
+                                          />
                                           {configuredVisual?.image && (
                                             <button
                                               className="admin-home-reset"

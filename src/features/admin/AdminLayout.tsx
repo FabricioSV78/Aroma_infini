@@ -15,6 +15,7 @@ import { mountAdminPwa } from '../../services/admin-pwa'
 import { AdminNotificationBell } from './AdminNotificationBell'
 import { disableAdminPushOnSignOut } from '../../services/admin-notifications'
 import { preloadAdminRoute } from './admin-route-modules'
+import { consumeAdminDeviceNotice } from '../../services/admin-device-service'
 
 const adminGroups = [
   {
@@ -48,6 +49,7 @@ const adminGroups = [
     sections: [
       { to: '/admin/promociones', label: 'Promociones', icon: 'percent' },
       { to: '/admin/home', label: 'Contenido del Home', icon: 'home' },
+      { to: '/admin/biblioteca', label: 'Biblioteca multimedia', icon: 'package' },
     ],
   },
   {
@@ -83,6 +85,15 @@ export function AdminLayout() {
 function AdminLayoutContent() {
   useEffect(mountAdminPwa, [])
   const notice = useAdminNotice()
+  useEffect(
+    function reportDeviceRegistrationFailure() {
+      const userId = authService.getSnapshot().session?.user.id
+      if (!userId) return
+      const message = consumeAdminDeviceNotice(userId)
+      if (message) notice.toast(message)
+    },
+    [notice],
+  )
   const location = useLocation()
   const navigate = useNavigate()
   const previousKey = useRef(location.key)
@@ -121,15 +132,17 @@ function AdminLayoutContent() {
     // The drawer can still inherit its hidden style on the first frame after
     // opening (especially with reduced motion). Focus only once it is rendered;
     // focusing an invisible button otherwise silently leaves focus on body.
-    let focusFrame = window.requestAnimationFrame(function focusVisibleDrawer() {
-      const button = menuCloseButtonRef.current
-      if (!button) return
-      if (window.getComputedStyle(button).visibility !== 'visible') {
-        focusFrame = window.requestAnimationFrame(focusVisibleDrawer)
-        return
-      }
-      button.focus({ preventScroll: true })
-    })
+    let focusFrame = window.requestAnimationFrame(
+      function focusVisibleDrawer() {
+        const button = menuCloseButtonRef.current
+        if (!button) return
+        if (window.getComputedStyle(button).visibility !== 'visible') {
+          focusFrame = window.requestAnimationFrame(focusVisibleDrawer)
+          return
+        }
+        button.focus({ preventScroll: true })
+      },
+    )
     const handleDrawerKeys = (event: KeyboardEvent) => {
       if (document.querySelector('.admin-notice-dialog[open]')) return
       if (event.key === 'Escape') {

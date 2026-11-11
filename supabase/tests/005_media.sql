@@ -154,7 +154,7 @@ select aroma_media_test.ok((select status='deleted' and deleted_at is not null f
 set local role authenticated;
 select api.admin_delete_product('55000000-0000-4000-8000-000000000001',1);
 reset role;
-select aroma_media_test.ok((select retire_after>now()+interval '6 days' from app.media_assets where id=(select id from aroma_media_test.ids where name='gallery')),'Removing the final product link starts the seven-day recovery period');
+select aroma_media_test.ok((select retire_after>now()+interval '23 hours' and retire_after<=clock_timestamp()+interval '24 hours' from app.media_assets where id=(select id from aroma_media_test.ids where name='gallery')),'Removing the final product link starts the 24-hour recovery period');
 set local role authenticated;
 insert into aroma_media_test.ids select 'rounded',(api.media_upload_reserve('53000000-0000-4000-8000-000000000005','product-gallery')->>'id')::uuid;
 reset role;

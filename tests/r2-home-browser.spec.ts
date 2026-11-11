@@ -424,6 +424,7 @@ test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el o
   supabaseNetwork,
   homeNetwork,
 }) => {
+  test.setTimeout(120000)
   await openHome(page, supabaseNetwork)
   await page
     .getByRole('button', { name: 'Video editorial', exact: true })
@@ -437,7 +438,10 @@ test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el o
     })
   await expect(
     page.getByRole('button', { name: 'Usar video original', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60000 })
   await page.getByLabel('Subir video editorial para celular').setInputFiles({
     name: 'movil.mp4',
     mimeType: 'video/mp4',
@@ -445,7 +449,10 @@ test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el o
   })
   await expect(
     page.getByRole('button', { name: 'Usar el video principal', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60000 })
   await page.getByRole('button', { name: 'Abrir vista previa' }).click()
   expect(homeNetwork.uploads).toBe(0)
   expect(homeNetwork.videoUploads).toBe(0)
@@ -504,6 +511,7 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
   supabaseNetwork,
   homeNetwork,
 }) => {
+  test.setTimeout(120000)
   await openHome(page, supabaseNetwork)
   await page
     .getByLabel('Tipo de contenido', { exact: true })
@@ -517,7 +525,10 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
     })
   await expect(
     page.getByRole('button', { name: 'Quitar video', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60000 })
   await page
     .getByLabel('Subir video móvil de campaña 1', { exact: true })
     .setInputFiles({
@@ -527,7 +538,10 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
     })
   await expect(
     page.getByRole('button', { name: 'Usar video principal', exact: true }),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 60000 })
+  await expect(
+    page.getByText('Preparando archivo…', { exact: true }),
+  ).not.toBeVisible({ timeout: 60000 })
   await page
     .getByRole('button', { name: 'Abrir vista previa', exact: true })
     .click()

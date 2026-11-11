@@ -1,6 +1,7 @@
 import type { MediaEnvironment, VerifiedImage } from './media-types'
 import { webpDimensions } from './media-webp-header'
 import { inspectMp4 } from './media-mp4'
+import { inspectStaticSvg } from './media-svg'
 import {
   MEDIA_UPLOAD_MAX_BYTES,
   MEDIA_VARIANT_MAX_BYTES,
@@ -9,6 +10,8 @@ import {
   isImageMediaPurpose,
   validPreparedImageDimensions,
   parseManagedVideoAsset,
+  parseManagedSvgAsset,
+  MEDIA_SVG_MAX_BYTES,
 } from '../src/domain/media'
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -16,6 +19,8 @@ const imagePath =
   /^\/media\/(public\/dynamic\/([0-9a-f-]{36})\/[a-f0-9]{64}\/[0-9]{2,4}\.webp)$/
 const videoPath =
   /^\/media\/(public\/dynamic\/([0-9a-f-]{36})\/[a-f0-9]{64}\/video\.mp4)$/
+const vectorPath =
+  /^\/media\/(public\/dynamic\/([0-9a-f-]{36})\/[a-f0-9]{64}\/vector\.svg)$/
 const maximumBody = MEDIA_UPLOAD_MAX_BYTES + 65536
 const maximumFile = MEDIA_VARIANT_MAX_BYTES
 class MediaError extends Error {
@@ -315,7 +320,12 @@ export function createMediaHandler(dependencies: Dependencies) {
       !userId ||
       current.user_id !== userId ||
       current.role !== 'admin' ||
-      current.aal !== 'aal2'
+      !(
+        current.aal === 'aal2' ||
+        (current.aal === 'aal1' &&
+          current.trusted_device === true &&
+          current.requires_mfa === false)
+      )
     )
       throw new MediaError(
         403,
@@ -666,6 +676,176 @@ export function createMediaHandler(dependencies: Dependencies) {
     return answer({ asset })
   }
 
+  async function uploadSvg(request: Request, env: MediaEnvironment) {
+    if (request.method !== 'POST')
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: 'POST, OPTIONS' },
+      })
+    const current = await actor(request, env)
+    if (
+      env.MEDIA_RATE_LIMITER &&
+      !(await env.MEDIA_RATE_LIMITER.limit({ key: `actor:${current.userId}` }))
+        .success
+    )
+      throw new MediaError(
+        429,
+        'rate-limit',
+        'Espera un momento antes de subir otro archivo.',
+      )
+    const contentType = request.headers.get('Content-Type') ?? ''
+    if (!contentType.startsWith('multipart/form-data;'))
+      throw new MediaError(415, 'format', 'Selecciona un SVG estático.')
+    const body = await readBounded(
+      request,
+      MEDIA_SVG_MAX_BYTES + 65536,
+      dependencies.requestSignal?.(),
+    )
+    const form = await new Request('https://local.invalid/', {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body,
+    }).formData()
+    const operation = form.get('operationId'),
+      file = form.get('file')
+    if (
+      typeof operation !== 'string' ||
+      !uuid.test(operation) ||
+      !file ||
+      typeof file === 'string' ||
+      file.type !== 'image/svg+xml' ||
+      !file.size ||
+      file.size > MEDIA_SVG_MAX_BYTES ||
+      form.getAll('operationId').length !== 1 ||
+      form.getAll('file').length !== 1 ||
+      [...form.keys()].some((key) => !['operationId', 'file'].includes(key))
+    )
+      throw new MediaError(
+        400,
+        'file',
+        'Elige un logotipo SVG estático de hasta 512 KB.',
+      )
+    const bytes = await file.arrayBuffer()
+    let dimensions: VerifiedImage
+    try {
+      dimensions = inspectStaticSvg(bytes)
+    } catch {
+      throw new MediaError(
+        422,
+        'vector',
+        'El SVG contiene elementos no permitidos. Exporta un logotipo estático sin enlaces ni scripts.',
+      )
+    }
+    const reservation = object(
+      await rpc(
+        env,
+        'media_upload_reserve',
+        { p_operation_id: operation, p_purpose: 'site-vector' },
+        current.token,
+      ),
+    )
+    const assetId = reservation.id
+    if (typeof assetId !== 'string' || !uuid.test(assetId))
+      throw new MediaError(502, 'service', 'No pudimos reservar el archivo.')
+    const sha256 = await digest(bytes),
+      manifest = { ...dimensions, byteSize: bytes.byteLength, sha256 }
+    await rpc(env, 'media_upload_prepare_svg', {
+      p_asset_id: assetId,
+      p_actor_id: current.userId,
+      p_manifest: manifest,
+    })
+    const key = `public/dynamic/${assetId}/${sha256}/vector.svg`
+    const existing = await env.MEDIA_BUCKET.head(key)
+    if (
+      existing &&
+      (existing.size !== bytes.byteLength ||
+        existing.customMetadata?.sha256 !== sha256 ||
+        existing.httpMetadata?.contentType !== 'image/svg+xml')
+    )
+      throw new MediaError(
+        409,
+        'conflict',
+        'El archivo guardado no coincide con esta carga.',
+      )
+    if (!existing)
+      await env.MEDIA_BUCKET.put(key, bytes, {
+        onlyIf: { etagDoesNotMatch: '*' },
+        httpMetadata: {
+          contentType: 'image/svg+xml',
+          cacheControl: 'public, max-age=31536000, immutable',
+        },
+        customMetadata: { sha256, assetId },
+      })
+    const stored = await env.MEDIA_BUCKET.head(key)
+    if (
+      !stored ||
+      stored.size !== bytes.byteLength ||
+      stored.customMetadata?.sha256 !== sha256 ||
+      stored.httpMetadata?.contentType !== 'image/svg+xml'
+    )
+      throw new MediaError(
+        503,
+        'storage',
+        'No pudimos verificar el archivo guardado. Conserva el original.',
+      )
+    await actor(request, env)
+    return answer({
+      asset: await rpc(env, 'media_upload_complete_svg', {
+        p_asset_id: assetId,
+        p_actor_id: current.userId,
+        p_manifest: manifest,
+      }),
+    })
+  }
+
+  async function serveSvg(
+    request: Request,
+    env: MediaEnvironment,
+    key: string,
+    supplied: unknown,
+  ) {
+    const asset = parseManagedSvgAsset(supplied)
+    if (asset.src !== `/media/${key}`) return answer({ code: 'missing' }, 404)
+    const condition = request.headers.get('If-None-Match')
+    const stored =
+      request.method === 'HEAD'
+        ? await env.MEDIA_BUCKET.head(key)
+        : await env.MEDIA_BUCKET.get(
+            key,
+            condition
+              ? { onlyIf: new Headers({ 'If-None-Match': condition }) }
+              : undefined,
+          )
+    if (
+      !stored ||
+      stored.size !== asset.byteSize ||
+      stored.httpMetadata?.contentType !== 'image/svg+xml'
+    ) {
+      if (stored?.body) await stored.body.cancel()
+      return answer({ code: 'missing' }, 404)
+    }
+    const headers = new Headers({
+      'Content-Type': 'image/svg+xml',
+      'Content-Length': String(stored.size),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ETag: stored.httpEtag,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy':
+        "sandbox; default-src 'none'; style-src 'none'",
+      'Access-Control-Allow-Origin': '*',
+    })
+    if (request.method === 'HEAD')
+      return new Response(null, {
+        status: condition === stored.httpEtag ? 304 : 200,
+        headers,
+      })
+    if (!stored.body)
+      return condition
+        ? new Response(null, { status: 304, headers })
+        : answer({ code: 'missing' }, 404)
+    return new Response(stored.body, { headers })
+  }
+
   async function serveVideo(
     request: Request,
     env: MediaEnvironment,
@@ -802,7 +982,10 @@ export function createMediaHandler(dependencies: Dependencies) {
         headers: { Allow: 'GET, HEAD' },
       })
     const pathname = new URL(request.url).pathname
-    const match = pathname.match(imagePath) ?? pathname.match(videoPath)
+    const match =
+      pathname.match(imagePath) ??
+      pathname.match(videoPath) ??
+      pathname.match(vectorPath)
     if (!match || !uuid.test(match[2])) return answer({ code: 'missing' }, 404)
     const key = match[1],
       assetId = match[2]
@@ -815,6 +998,8 @@ export function createMediaHandler(dependencies: Dependencies) {
     if (!publicAsset) return answer({ code: 'missing' }, 404)
     if (videoPath.test(pathname))
       return serveVideo(request, env, key, publicAsset)
+    if (vectorPath.test(pathname))
+      return serveSvg(request, env, key, publicAsset)
     const asset = object(publicAsset)
     const variants = Array.isArray(asset.variants) ? asset.variants : []
     if (
@@ -903,14 +1088,18 @@ export function createMediaHandler(dependencies: Dependencies) {
             : {},
         })
       if (
-        !['/api/admin/media/upload', '/api/admin/media/video-upload'].includes(
-          url.pathname,
-        )
+        ![
+          '/api/admin/media/upload',
+          '/api/admin/media/video-upload',
+          '/api/admin/media/svg-upload',
+        ].includes(url.pathname)
       )
         return answer({ code: 'missing' }, 404)
-      const response = url.pathname.endsWith('/video-upload')
-        ? await uploadVideo(request, env)
-        : await upload(request, env)
+      const response = url.pathname.endsWith('/svg-upload')
+        ? await uploadSvg(request, env)
+        : url.pathname.endsWith('/video-upload')
+          ? await uploadVideo(request, env)
+          : await upload(request, env)
       if (origin) {
         response.headers.set('Access-Control-Allow-Origin', origin)
         response.headers.set('Vary', 'Origin')
@@ -978,7 +1167,9 @@ export async function cleanupMedia(
     return readProviderJson(response, deadline)
   }
   const entries = await command('media_gc_claim', { p_limit: 10 })
-  if (!Array.isArray(entries)) throw new Error('Invalid media cleanup claims')
+  if (!Array.isArray(entries) || entries.length > 10)
+    throw new Error('Invalid media cleanup claims')
+  let failures = 0
   for (const value of entries) {
     const claim = object(value)
     if (
@@ -989,24 +1180,63 @@ export async function cleanupMedia(
       claim.prefix !== `public/dynamic/${claim.id}/`
     )
       throw new Error('Unsafe media cleanup scope')
-    let cursor: string | undefined
-    do {
-      const page = await env.MEDIA_BUCKET.list({
-        prefix: claim.prefix,
-        limit: 100,
-        ...(cursor ? { cursor } : {}),
+    let stage = 'unavailable'
+    try {
+      // SQL holds a terminal claim. Never revive one while an older Worker
+      // could still be removing this immutable prefix.
+      if (
+        (await command('media_gc_recheck', {
+          p_asset_id: claim.id,
+          p_claim_id: claim.claimId,
+        })) !== true
+      )
+        continue
+      let cursor: string | undefined
+      const seen = new Set<string>()
+      do {
+        stage = 'storage-list'
+        const page = await env.MEDIA_BUCKET.list({
+          prefix: claim.prefix,
+          limit: 100,
+          ...(cursor ? { cursor } : {}),
+        })
+        const keys = page.objects.map((entry) => entry.key)
+        if (keys.some((key) => !key.startsWith(String(claim.prefix))))
+          throw new Error('Unsafe media cleanup key')
+        // Recheck immediately before physical deletion, not only afterwards.
+        if (
+          (await command('media_gc_recheck', {
+            p_asset_id: claim.id,
+            p_claim_id: claim.claimId,
+          })) !== true
+        )
+          throw new Error('Cleanup authority changed')
+        stage = 'storage-delete'
+        if (keys.length) await env.MEDIA_BUCKET.delete(keys)
+        cursor = page.truncated ? page.cursor : undefined
+        if (page.truncated && !cursor)
+          throw new Error('Invalid media cleanup pagination')
+        if (cursor) {
+          if (seen.has(cursor) || seen.size >= 10)
+            throw new Error('Media cleanup pagination limit')
+          seen.add(cursor)
+        }
+      } while (cursor)
+      stage = 'confirmation'
+      await command('media_gc_finalize', {
+        p_asset_id: claim.id,
+        p_claim_id: claim.claimId,
       })
-      const keys = page.objects.map((entry) => entry.key)
-      if (keys.some((key) => !key.startsWith(String(claim.prefix))))
-        throw new Error('Unsafe media cleanup key')
-      if (keys.length) await env.MEDIA_BUCKET.delete(keys)
-      cursor = page.truncated ? page.cursor : undefined
-      if (page.truncated && !cursor)
-        throw new Error('Invalid media cleanup pagination')
-    } while (cursor)
-    await command('media_gc_finalize', {
-      p_asset_id: claim.id,
-      p_claim_id: claim.claimId,
-    })
+    } catch {
+      failures++
+      // Only a fixed code is recorded. Provider bodies, keys and credentials
+      // are never included in the event history or returned to the browser.
+      await command('media_gc_failure', {
+        p_asset_id: claim.id,
+        p_claim_id: claim.claimId,
+        p_code: stage,
+      }).catch(() => {})
+    }
   }
+  if (failures) throw new Error('Some media cleanup claims remain pending')
 }

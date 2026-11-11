@@ -1,6 +1,10 @@
 import type { Brand, Product, ProductDetail } from '../types/catalog'
 import { isPerfume } from '../domain/product-type'
 import {
+  resolveSiteMedia,
+  type SiteMediaDocument,
+} from '../domain/site-media-slots'
+import {
   brandPageMetadata,
   productPageMetadata,
   shareableProductImage,
@@ -62,6 +66,7 @@ export function resolveSeoPage(
   pathname: string,
   search: string,
   routeData?: SeoRouteData,
+  siteMedia: SiteMediaDocument = { items: [] },
 ): SeoPageConfig {
   const path = normalizePath(pathname)
   const hasQuery = Boolean(search)
@@ -78,8 +83,8 @@ export function resolveSeoPage(
       canonicalPath: '/',
       indexable: true,
       follow: true,
-      imagePath: '/images/hero-v2-lumiere-desktop-1536.webp',
-      imageAlt: 'Universo editorial de Aroma Infini',
+      imagePath: resolveSiteMedia(siteMedia, 'seo.home').src,
+      imageAlt: resolveSiteMedia(siteMedia, 'seo.home').alt,
     }
 
   if (path === '/tienda') {
@@ -108,8 +113,8 @@ export function resolveSeoPage(
       canonicalPath: '/tienda',
       indexable: !hasQuery,
       follow: true,
-      imagePath: '/images/featured-duo-v3-1536.webp',
-      imageAlt: 'Selección de perfumes de Aroma Infini',
+      imagePath: resolveSiteMedia(siteMedia, 'seo.catalog').src,
+      imageAlt: resolveSiteMedia(siteMedia, 'seo.catalog').alt,
       breadcrumbs: [
         { name: 'Inicio', path: '/' },
         { name: 'Perfumes', path: '/tienda' },
@@ -125,8 +130,8 @@ export function resolveSeoPage(
       canonicalPath: '/marcas',
       indexable: true,
       follow: true,
-      imagePath: '/images/discovery-bois-1536.webp',
-      imageAlt: 'Selección de marcas de Aroma Infini',
+      imagePath: resolveSiteMedia(siteMedia, 'seo.brands').src,
+      imageAlt: resolveSiteMedia(siteMedia, 'seo.brands').alt,
       breadcrumbs: [
         { name: 'Inicio', path: '/' },
         { name: 'Marcas', path: '/marcas' },

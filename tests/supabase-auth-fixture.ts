@@ -17,6 +17,7 @@ interface NetworkRequest {
   method: string
   path: string
   grant: string | null
+  scope: string | null
   redirectTo: string | null
   body: Record<string, unknown>
 }
@@ -33,6 +34,7 @@ export interface SupabaseAuthNetwork {
   profileOwnerMismatch: boolean
   signOutUnavailable: boolean
   passwordUpdated: boolean
+  trustedSessions: Map<string, string>
   currentUserId: string
   currentEmail: string
   seedSession(
@@ -41,7 +43,12 @@ export interface SupabaseAuthNetwork {
   ): Promise<void>
 }
 
-function jwt(userId: string, assurance: 'aal1' | 'aal2', expired = false) {
+function jwt(
+  userId: string,
+  assurance: 'aal1' | 'aal2',
+  expired = false,
+  sessionId = '00000000-0000-4000-8000-000000000001',
+) {
   const encode = (value: object) =>
     Buffer.from(JSON.stringify(value)).toString('base64url')
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({
@@ -53,15 +60,16 @@ function jwt(userId: string, assurance: 'aal1' | 'aal2', expired = false) {
     aal: assurance,
     iat: Math.floor(Date.now() / 1000) - 10,
     exp: Math.floor(Date.now() / 1000) + (expired ? -60 : 3600),
-    session_id: '00000000-0000-4000-8000-000000000001',
+    session_id: sessionId,
   })}.c2RrLW5ldHdvcmstZml4dHVyZS1zaWduYXR1cmU`
 }
 
-async function installNetwork(
+export async function installNetwork(
   context: BrowserContext,
 ): Promise<SupabaseAuthNetwork> {
   let assurance: 'aal1' | 'aal2' = 'aal1'
   let enrollmentStarted = false
+  let sessionNumber = 0
   const profiles = new Map([
     [customerA, { first_name: 'Ana', last_name: 'Torres', phone: '912345678' }],
     [
@@ -81,6 +89,7 @@ async function installNetwork(
     profileOwnerMismatch: false,
     signOutUnavailable: false,
     passwordUpdated: false,
+    trustedSessions: new Map(),
     currentUserId: customerA,
     currentEmail: fixtureEmail,
     async seedSession(page, options = {}) {
@@ -140,7 +149,12 @@ async function installNetwork(
   }
   function makeSession(expired = false) {
     return {
-      access_token: jwt(network.currentUserId, assurance, expired),
+      access_token: jwt(
+        network.currentUserId,
+        assurance,
+        expired,
+        `fixture-session-${sessionNumber}`,
+      ),
       refresh_token: 'fixture-refresh-token',
       token_type: 'bearer',
       expires_in: expired ? -60 : 3600,
@@ -178,6 +192,7 @@ async function installNetwork(
       method: request.method(),
       path: url.pathname,
       grant: url.searchParams.get('grant_type'),
+      scope: url.searchParams.get('scope'),
       redirectTo: url.searchParams.get('redirect_to'),
       body,
     })
@@ -216,6 +231,10 @@ async function installNetwork(
           400,
         )
       } else {
+        if (grant === 'password') {
+          assurance = 'aal1'
+          sessionNumber++
+        }
         await fulfill(makeSession())
       }
       return
@@ -276,11 +295,23 @@ async function installNetwork(
       return
     }
     if (url.pathname === '/rest/v1/rpc/current_actor') {
+      const token =
+        request.headers().authorization?.replace(/^Bearer /i, '') ?? ''
+      const claims = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString(),
+      )
+      const trustedUntil = network.trustedSessions.get(token)
+      const trusted = Boolean(
+        trustedUntil && Date.parse(trustedUntil) > Date.now(),
+      )
       await fulfill({
         user_id: network.actorOwnerMismatch ? customerB : network.currentUserId,
         role: network.adminMembership ? 'admin' : 'customer',
-        aal: assurance,
-        requires_mfa: network.adminMembership && assurance !== 'aal2',
+        aal: claims.aal,
+        requires_mfa:
+          network.adminMembership && claims.aal !== 'aal2' && !trusted,
+        trusted_device: trusted,
+        trusted_until: trusted ? trustedUntil : null,
       })
       return
     }
@@ -320,6 +351,15 @@ async function installNetwork(
     }
     if (url.pathname === '/rest/v1/rpc/site_settings') {
       await fulfill({ version: 1, data: defaultSiteSettings() })
+      return
+    }
+    if (
+      [
+        '/rest/v1/rpc/site_media_document',
+        '/rest/v1/rpc/public_media_aliases',
+      ].includes(url.pathname)
+    ) {
+      await fulfill({ items: [] })
       return
     }
     // Product detail reads these public/account documents even when the suite

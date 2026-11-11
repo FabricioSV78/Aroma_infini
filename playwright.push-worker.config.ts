@@ -4,6 +4,7 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './tests',
   testMatch: [
+    'admin-device-worker.spec.ts',
     'admin-push-worker.spec.ts',
     'admin-push-crypto.spec.ts',
     'admin-pwa-contract.spec.ts',

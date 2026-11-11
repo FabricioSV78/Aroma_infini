@@ -227,6 +227,16 @@ test('móvil táctil: la selección permanece visible sin depender del hover', a
   await expect(alternative).toHaveAttribute('aria-pressed', 'false')
   await alternative.tap()
   await expect(alternative).toHaveAttribute('aria-pressed', 'true')
+  const selectedBackground = await alternative.evaluate((element) => {
+    const expected = document.createElement('span')
+    expected.style.backgroundColor =
+      getComputedStyle(element).getPropertyValue('--admin-accent')
+    return expected.style.backgroundColor
+  })
+  // ARIA commits before the shared 160 ms background transition finishes.
+  await expect
+    .poll(async () => (await paint(alternative)).background)
+    .toBe(selectedBackground)
   const selected = await paint(alternative)
   expect(selected.background).not.toBe('rgba(0, 0, 0, 0)')
   const inactive = page.getByRole('button', {

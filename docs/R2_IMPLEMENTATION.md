@@ -1,5 +1,10 @@
 # R2 de productos — entrega de desarrollo
 
+> Actualización local del 11 de noviembre de 2026: la biblioteca centralizada
+> amplía esta entrega y sustituye la retención de siete días por 24 horas al
+> activar sus migraciones. Véase [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md) para el
+> alcance, los recursos del sitio y el estado de activación por entorno.
+
 Este informe conserva la entrega del 29 de octubre. El Home remoto posterior
 se documenta en [R2 del Home](R2_HOME_IMPLEMENTATION.md); el bucket independiente
 de producción y los respaldos reales ya preparados están en

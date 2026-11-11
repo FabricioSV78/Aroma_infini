@@ -10,9 +10,8 @@ import {
   parseManagedVideoAsset,
   parseManagedVideoPath,
   type ImageMediaPurpose,
-  type ManagedVideoAsset,
 } from '../domain/media'
-import { getManagedMedia, registerManagedMedia } from './media-registry'
+import { getManagedMedia, registerManagedMedia, getManagedVideo, registerManagedVideo } from './media-registry'
 import { requireSupabaseClient } from './supabase-client'
 import { cachedPublicQuery } from './public-query-cache'
 import type { ExpectedMediaActor } from './media-upload'
@@ -40,7 +39,6 @@ function defaultDocument(featuredBrandId: string | null = null): HomeDocument {
   return { media: emptyMedia(), content, version: 0 }
 }
 
-const videos = new Map<string, ManagedVideoAsset>()
 const listeners = new Set<() => void>()
 let confirmed = defaultDocument()
 let expectedPublicVersion = 0
@@ -233,11 +231,7 @@ export function parseHomeDocument(
   // Register only after the entire document and every manifest passed checks.
   for (const asset of parsed) {
     if ('mimeType' in asset) {
-      const previous = videos.get(asset.src)
-      if (previous && canonical(previous) !== canonical(asset)) invalid()
-      if (videos.size >= 1000 && !previous)
-        videos.delete(videos.keys().next().value!)
-      videos.set(asset.src, asset)
+      registerManagedVideo(asset)
     } else registerManagedMedia(asset)
   }
   return result
@@ -265,12 +259,12 @@ export async function prepareHomeDocument(
     let saved = references.get(identity)
     if (!saved) {
       if (slot.purpose === 'film-video') {
-        const existing = videos.get(resource)
+        const existing = getManagedVideo(resource)
         if (existing) saved = existing.id
         else if (parseManagedVideoPath(resource)) invalid()
         else {
           const uploaded = await uploadManagedVideo(resource, actor)
-          videos.set(uploaded.src, uploaded)
+          registerManagedVideo(uploaded)
           saved = uploaded.id
         }
       } else {

@@ -370,7 +370,12 @@ async function actor(
     !uuid.test(user.id) ||
     current.user_id !== user.id ||
     current.role !== 'admin' ||
-    current.aal !== 'aal2'
+    !(
+      current.aal === 'aal2' ||
+      (current.aal === 'aal1' &&
+        current.trusted_device === true &&
+        current.requires_mfa === false)
+    )
   )
     throw new PushError(
       403,

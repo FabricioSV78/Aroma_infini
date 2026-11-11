@@ -251,7 +251,7 @@ insert into aroma_home_test.saved values('removed',api.admin_save_home(aroma_hom
 reset role;
 select aroma_home_test.ok((select count(*)=0 from app.home_media),'Removing images clears associations without deleting R2 objects immediately');
 select aroma_home_test.ok((select count(*)=9 from app.media_assets where id in(select id from aroma_home_test.ids)
-  and status='ready' and retire_after>now()+interval '6 days'),'Detached images and videos retain seven days for recovery');
+  and status='ready' and retire_after>now()+interval '23 hours' and retire_after<=clock_timestamp()+interval '24 hours'),'Detached images and videos retain 24 hours for recovery');
 select aroma_home_test.ok((select coalesce(jsonb_agg(to_jsonb(p) order by id),'[]'::jsonb) from app.products p)
   =(select value from aroma_home_test.saved where name='productsBefore'),'Home edits leave all existing product data untouched');
 select aroma_home_test.ok((select count(*)=0 from app.product_olfactory_families),'Quiz configuration never assigns classifications to products');

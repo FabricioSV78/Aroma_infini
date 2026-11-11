@@ -66,6 +66,9 @@ export default defineConfig(({ mode }) => {
               : 'production'),
       ),
     },
+    // Keep the lazy admin codec available without a development-server reload
+    // during the first video upload. Production still loads it on demand.
+    optimizeDeps: { include: ['mediabunny'] },
     server: {
       port: 5173,
       strictPort: true,

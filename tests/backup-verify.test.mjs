@@ -11,9 +11,28 @@ import {
 import path from 'node:path'
 import { test } from 'node:test'
 import { verifyBackupPackage } from '../scripts/backup-verify.mjs'
+import { STATIC_SVG_MAX_BYTES } from '../src/domain/static-svg.js'
 
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const mediaId = '50000000-0000-4000-8000-000000000001'
+const staticVector =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 774 374"><path fill="#000" d="M0 0h10v10z"/></svg>'
+
+function addVector({ manifest, files }, bytes = Buffer.from(staticVector)) {
+  const id = '50000000-0000-4000-8000-000000000003'
+  const key = `public/dynamic/${id}/${digest(bytes)}/vector.svg`
+  const source = `objects/${key}`
+  files.set(source, bytes)
+  const asset = {
+    id,
+    status: 'ready',
+    objects: [
+      { key, path: source, byteSize: bytes.length, sha256: digest(bytes) },
+    ],
+  }
+  manifest.media.assets.push(asset)
+  return asset
+}
 
 async function fixture(run) {
   const base = path.resolve('artifacts/backup-verifier-tests')
@@ -234,6 +253,93 @@ test('video byte hash and single object are checked independently from images', 
     assert.equal(result.result, 'passed')
     assert.equal(result.totals.mediaObjects, 3)
   })
+})
+
+test('an original static brand vector verifies without rendering or changing its bytes', async () => {
+  await fixture(async (context) => {
+    const original = await readFile(
+      new URL('../public/brand/logo-on-light.svg', import.meta.url),
+    )
+    const asset = addVector(context, original)
+    await context.save()
+    const result = await verifyBackupPackage(context.directory)
+    assert.equal(result.result, 'passed')
+    assert.equal(result.totals.mediaAssets, 2)
+    assert.equal(result.totals.mediaObjects, 3)
+    assert.equal(result.remoteRequests, 0)
+    assert.deepEqual(
+      await readFile(path.join(context.directory, asset.objects[0].path)),
+      original,
+    )
+  })
+})
+
+for (const [label, source] of [
+  [
+    'executable elements',
+    staticVector.replace(
+      '<path',
+      '<script>secret-vector-payload</script><path',
+    ),
+  ],
+  [
+    'event handlers',
+    staticVector.replace('<svg ', '<svg onload="secret-vector-payload()" '),
+  ],
+  [
+    'external references',
+    staticVector.replace(
+      'fill="#000"',
+      'fill="url(https://secret-vector-payload.invalid/image)"',
+    ),
+  ],
+  [
+    'XML entities',
+    '<!DOCTYPE svg [<!ENTITY x "secret-vector-payload">]>' + staticVector,
+  ],
+  [
+    'foreign markup',
+    staticVector.replace(
+      '<path',
+      '<foreignObject>secret-vector-payload</foreignObject><path',
+    ),
+  ],
+  ['unbounded dimensions', staticVector.replace('774 374', '4097 374')],
+  ['invalid UTF8', Buffer.from([0xc0, 0x80])],
+]) {
+  test(`static vector backup rejects ${label} even when every declared hash matches`, async () => {
+    await fixture(async (context) => {
+      addVector(context, Buffer.isBuffer(source) ? source : Buffer.from(source))
+      await context.save()
+      const result = await verifyBackupPackage(context.directory)
+      assert.equal(result.result, 'failed')
+      assert(!JSON.stringify(result).includes('secret-vector-payload'))
+      assert.equal(result.remoteRequests, 0)
+    })
+  })
+}
+
+test('vector manifests reject oversized files, mismatched hash prefixes and invented renditions', async () => {
+  for (const mutate of [
+    (asset) => {
+      asset.objects[0].byteSize = STATIC_SVG_MAX_BYTES + 1
+    },
+    (asset) => {
+      asset.objects[0].sha256 = 'b'.repeat(64)
+    },
+    (asset, context) => {
+      asset.objects.push(context.manifest.media.assets[0].objects[0])
+    },
+  ]) {
+    await fixture(async (context) => {
+      const asset = addVector(context)
+      mutate(asset, context)
+      await context.save()
+      const result = await verifyBackupPackage(context.directory)
+      assert.equal(result.result, 'failed')
+      assert.equal(result.totals.verifiedFiles, 0)
+    })
+  }
 })
 
 test('unknown secret fields and parser failures never leak into output', async () => {

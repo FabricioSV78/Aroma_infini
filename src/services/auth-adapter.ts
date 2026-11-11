@@ -4,6 +4,11 @@ import { AuthError, type AuthErrorCode } from './auth-errors'
 import { mapSupabaseAuthError } from './supabase-auth-errors'
 import { verifySupabaseUser } from './verified-auth-user'
 import {
+  rememberAdminDevice,
+  resetAdminDeviceRequests,
+  resumeAdminDevice,
+} from './admin-device-service'
+import {
   commitSupabaseMfaSession,
   getSupabaseClient,
   getSupabasePublicConfig,
@@ -76,22 +81,47 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
       session.expires_at * 1000 <= Date.now()
     )
       return null
-    const actorResult = await client
-      .rpc('current_actor')
-      .setHeader('Authorization', `Bearer ${session.access_token}`)
-    if (actorResult.error)
-      throw mapSupabaseAuthError(actorResult.error, 'service')
-    const actor = actorResult.data
+    const actorToken = session.access_token
+    async function currentActor() {
+      const result = await client
+        .rpc('current_actor')
+        .setHeader('Authorization', `Bearer ${actorToken}`)
+      if (result.error) throw mapSupabaseAuthError(result.error, 'service')
+      const actor = result.data
+      if (
+        !actor ||
+        typeof actor !== 'object' ||
+        Array.isArray(actor) ||
+        actor.user_id !== user.id ||
+        !['customer', 'admin'].includes(String(actor.role)) ||
+        !['aal1', 'aal2'].includes(String(actor.aal)) ||
+        typeof actor.requires_mfa !== 'boolean' ||
+        (actor.trusted_device === true &&
+          (typeof actor.trusted_until !== 'string' ||
+            !Number.isFinite(Date.parse(actor.trusted_until)) ||
+            Date.parse(actor.trusted_until) <= Date.now()))
+      )
+        throw new AuthError('service')
+      return actor
+    }
+    let actor = await currentActor()
     if (
-      !actor ||
-      typeof actor !== 'object' ||
-      Array.isArray(actor) ||
-      actor.user_id !== user.id ||
-      !['customer', 'admin'].includes(String(actor.role)) ||
-      !['aal1', 'aal2'].includes(String(actor.aal)) ||
-      typeof actor.requires_mfa !== 'boolean'
-    )
-      throw new AuthError('service')
+      actor.role === 'admin' &&
+      actor.aal !== 'aal2' &&
+      actor.trusted_device !== true
+    ) {
+      let resumed = false
+      try {
+        resumed = await resumeAdminDevice({
+          userId: user.id,
+          token: session.access_token,
+        })
+      } catch {
+        // Older deployments or a missing cookie preserve ordinary TOTP login.
+        // The identity/token checks below still discard delayed replies.
+      }
+      if (resumed) actor = await currentActor()
+    }
     // Do not publish a reply to an operation begun under another SDK identity.
     const after = await client.auth.getSession()
     if (after.error) throw after.error
@@ -110,11 +140,24 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
           : {}),
         role: actor.role === 'admin' ? 'admin' : 'customer',
       },
-      expiresAt: session.expires_at * 1000,
+      expiresAt:
+        actor.role === 'admin' &&
+        actor.aal !== 'aal2' &&
+        actor.trusted_device === true &&
+        typeof actor.trusted_until === 'string'
+          ? Math.min(session.expires_at * 1000, Date.parse(actor.trusted_until))
+          : session.expires_at * 1000,
       intent: 'account',
       assurance: actor.aal === 'aal2' ? 'aal2' : 'aal1',
       mfaRequired:
-        actor.role === 'admin' && (actor.requires_mfa || actor.aal !== 'aal2'),
+        actor.role === 'admin' &&
+        (actor.requires_mfa === true ||
+          (actor.aal !== 'aal2' && actor.trusted_device !== true)),
+      trustedDevice: actor.trusted_device === true,
+      ...(actor.trusted_device === true &&
+      typeof actor.trusted_until === 'string'
+        ? { trustedUntil: actor.trusted_until }
+        : {}),
     }
   })
 }
@@ -201,6 +244,7 @@ export const authAdapter: AuthAdapter = {
   getVerifiedSession,
   signInWithPassword(input) {
     return safe(async () => {
+      resetAdminDeviceRequests()
       const result =
         await requireSupabaseClient().auth.signInWithPassword(input)
       if (result.error) throw result.error
@@ -229,6 +273,7 @@ export const authAdapter: AuthAdapter = {
   },
   signOut() {
     return safe(async () => {
+      resetAdminDeviceRequests()
       rejectedRecoveryToken = null
       pendingEnrollment = null
       const client = getSupabaseClient()
@@ -258,6 +303,7 @@ export const authAdapter: AuthAdapter = {
         return
       }
       if (event === 'SIGNED_OUT') {
+        resetAdminDeviceRequests()
         rejectedRecoveryToken = null
         pendingEnrollment = null
       }
@@ -382,6 +428,10 @@ export const authAdapter: AuthAdapter = {
       )
         throw new AuthError('permission')
       pendingEnrollment = null
+      await rememberAdminDevice({
+        userId: verified.user.id,
+        token: result.access_token,
+      })
     }, 'mfa')
   },
 }

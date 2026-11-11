@@ -2,6 +2,8 @@ import { useEffect, useMemo } from 'react'
 import { useLocation, useMatches } from 'react-router'
 import { resolveSeoPage, type SeoRouteData } from './seo-config'
 import { useOfferPriceRevision } from '../services/offer-price-clock'
+import { siteMediaImage, useSiteMedia } from '../services/site-media-service'
+import { assetSource } from '../services/asset-source'
 import { runtimeEnvironment } from '../services/runtime-environment'
 import { isRemoteCatalog } from '../services/catalog-source'
 import { seoPageRobots, seoPublicationOrigin } from '../domain/seo-publication'
@@ -64,6 +66,7 @@ function addManagedLink(rel: string, href: string, hreflang?: string) {
 }
 
 export function SeoManager() {
+  const siteMedia = useSiteMedia()
   const offerPriceRevision = useOfferPriceRevision()
   const { pathname, search } = useLocation()
   const matches = useMatches()
@@ -76,8 +79,9 @@ export function SeoManager() {
         typeof loaderData === 'object' && loaderData !== null
           ? (loaderData as SeoRouteData)
           : undefined,
+        siteMedia,
       ),
-    [pathname, search, loaderData],
+    [pathname, search, loaderData, siteMedia],
   )
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export function SeoManager() {
       ? absoluteUrl(origin, config.canonicalPath)
       : null
     const image = config.imagePath
-      ? absoluteUrl(origin, config.imagePath)
+      ? absoluteUrl(origin, assetSource(config.imagePath))
       : null
 
     document.title = config.title
@@ -146,6 +150,7 @@ export function SeoManager() {
       origin,
       publishCommercialData,
       offerPriceRevision,
+      siteMediaImage(siteMedia, 'identity.logo').src,
     )
     if (schema) {
       const script = document.createElement('script')
@@ -162,7 +167,7 @@ export function SeoManager() {
       setNamedMeta('description', DEFAULT_DESCRIPTION)
       setNamedMeta('robots', 'noindex,nofollow')
     }
-  }, [config, offerPriceRevision])
+  }, [config, offerPriceRevision, siteMedia])
 
   return null
 }

@@ -39,6 +39,11 @@
       "namespace_id": "10003",
       "simple": { "limit": 30, "period": 60 },
     },
+    {
+      "name": "ADMIN_AUTH_RATE_LIMITER",
+      "namespace_id": "10004",
+      "simple": { "limit": 10, "period": 60 },
+    },
   ],
   "vars": {
     "APP_ENVIRONMENT": "production",
@@ -114,6 +119,11 @@
           "namespace_id": "10003",
           "simple": { "limit": 30, "period": 60 },
         },
+        {
+          "name": "ADMIN_AUTH_RATE_LIMITER",
+          "namespace_id": "10004",
+          "simple": { "limit": 10, "period": 60 },
+        },
       ],
       "vars": {
         "APP_ENVIRONMENT": "staging",
@@ -167,6 +177,11 @@
           "name": "ADMIN_PUSH_RATE_LIMITER",
           "namespace_id": "20003",
           "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "ADMIN_AUTH_RATE_LIMITER",
+          "namespace_id": "20004",
+          "simple": { "limit": 10, "period": 60 },
         },
       ],
       "vars": {

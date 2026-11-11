@@ -130,6 +130,11 @@ export function AdminMfa({ target }: { target: string }) {
             Verificación en dos pasos
           </h1>
           <p>Confirma tu acceso con una aplicación autenticadora.</p>
+          <p>
+            Tu aplicación se configura una sola vez. Al verificar, este
+            navegador podrá recordarse durante 60 días; cada nuevo inicio
+            seguirá pidiendo tu contraseña.
+          </p>
         </header>
         {factors === null ? (
           <div role="status">

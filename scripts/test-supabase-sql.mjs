@@ -14,6 +14,10 @@ import {
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auditCommerceConcurrency } from './sql-commerce-security-audit.mjs'
+import {
+  auditMediaLibraryConcurrency,
+  deleteMediaLibraryFixtureChildren,
+} from './sql-media-library-security-audit.mjs'
 
 // This runner ALWAYS creates its own loopback-only, disposable PostgreSQL.
 // It deliberately accepts no DATABASE_URL, PGHOST or remote project argument.
@@ -942,6 +946,15 @@ try {
         await client.query('delete from app.products where id=$1', [
           mediaProduct,
         ])
+        await deleteMediaLibraryFixtureChildren(
+          client,
+          (
+            await client.query(
+              'select id from app.media_assets where uploader_id in ($1,$2)',
+              [mediaAdmin, otherMediaAdmin],
+            )
+          ).rows.map((row) => row.id),
+        )
         await client.query(
           'delete from app.media_renditions where asset_id in (select id from app.media_assets where uploader_id in ($1,$2))',
           [mediaAdmin, otherMediaAdmin],
@@ -1262,6 +1275,15 @@ try {
       await client.query('begin')
       try {
         await client.query('delete from app.home_document')
+        await deleteMediaLibraryFixtureChildren(
+          client,
+          (
+            await client.query(
+              'select id from app.media_assets where uploader_id=$1',
+              [homeAdmin],
+            )
+          ).rows.map((row) => row.id),
+        )
         await client.query(
           'delete from app.media_renditions where asset_id in(select id from app.media_assets where uploader_id=$1)',
           [homeAdmin],
@@ -1617,6 +1639,7 @@ try {
       await client.query('delete from app.brands where id=$1', [
         commerceIds.brand,
       ])
+      await deleteMediaLibraryFixtureChildren(client, [commerceIds.media])
       await client.query('delete from app.media_renditions where asset_id=$1', [
         commerceIds.media,
       ])
@@ -1843,6 +1866,7 @@ try {
       await client.query('delete from app.brands where id=$1', [
         favoriteIds.brand,
       ])
+      await deleteMediaLibraryFixtureChildren(client, [favoriteIds.media])
       await client.query('delete from app.media_renditions where asset_id=$1', [
         favoriteIds.media,
       ])
@@ -1863,6 +1887,12 @@ try {
     throw new Error(
       'Favorites concurrency cleanup failed; inspect isolated report.',
     )
+
+  report.mediaLibrarySecurity = await auditMediaLibraryConcurrency({
+    client,
+    config,
+    pg,
+  })
 
   const counts = (
     await client.query(

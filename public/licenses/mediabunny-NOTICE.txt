@@ -1,0 +1,9 @@
+Mediabunny 1.65.2
+Copyright (c) Vanilagy and contributors.
+License: Mozilla Public License 2.0 (MPL-2.0).
+
+This application uses the unmodified library to prepare administrator uploads.
+The complete corresponding source, including original license notices, is at:
+https://registry.npmjs.org/mediabunny/-/mediabunny-1.65.2.tgz
+
+License text: /licenses/mediabunny-MPL-2.0.txt

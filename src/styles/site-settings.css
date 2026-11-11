@@ -3,7 +3,8 @@
   gap: 20px;
   max-width: 1120px;
 }
-.site-settings-form .admin-card {
+.site-settings-form .admin-card,
+.admin-trusted-devices-card {
   padding: 24px;
   min-width: 0;
   border: 1px solid var(--admin-border);
@@ -13,6 +14,36 @@
 .site-settings-form h2 {
   font-size: 20px;
   margin: 0 0 18px;
+}
+.admin-trusted-devices-card {
+  max-width: 1120px;
+  margin-top: 20px;
+}
+.admin-trusted-devices-card h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+.admin-trusted-devices {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.admin-trusted-devices li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--admin-border);
+}
+.admin-trusted-devices li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-trusted-devices .button {
+  min-height: 44px;
 }
 .site-settings-grid {
   display: grid;
@@ -96,7 +127,8 @@
   .site-settings-grid {
     grid-template-columns: 1fr;
   }
-  .site-settings-form .admin-card {
+  .site-settings-form .admin-card,
+  .admin-trusted-devices-card {
     padding: 20px;
   }
 }

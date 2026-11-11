@@ -7,14 +7,6 @@ export const aboutPageContent = {
     title: 'Distintas casas. Un perfume que sientas tuyo',
     introduction:
       'Un lugar donde mirar más allá del frasco y reconocer lo que te gusta.',
-    image: {
-      desktop: '/images/editorial-essential-v3-1536.webp',
-      desktopSet:
-        '/images/editorial-essential-v3-480.webp 480w, /images/editorial-essential-v3-960.webp 960w, /images/editorial-essential-v3-1536.webp 1536w',
-      mobileSet:
-        '/images/editorial-essential-v3-mobile-480.webp 480w, /images/editorial-essential-v3-mobile-780.webp 780w',
-      alt: 'Frasco de perfume sobre piedra clara, junto a una pieza de madera.',
-    },
   },
   story: {
     eyebrow: 'Nuestra esencia',
@@ -23,10 +15,6 @@ export const aboutPageContent = {
       'Somos una perfumería multimarca: un espacio para descubrir perfumes de distintas casas y reconocer los aromas que conectan contigo.',
       'Explora perfiles, presentaciones y precios a tu ritmo. La información de cada producto y el recomendador te ayudan a comparar opciones según tus preferencias.',
     ],
-    image: {
-      src: '/images/olfactory-santal.webp',
-      alt: 'Virutas de madera y vainas de cardamomo sobre una superficie de piedra.',
-    },
   },
   proposal: {
     eyebrow: 'Nuestra propuesta',

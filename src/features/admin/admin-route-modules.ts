@@ -10,6 +10,7 @@ export const adminRouteModules = {
   orders: () => import('./AdminOrdersPage'),
   shipping: () => import('./AdminShippingPage'),
   home: () => import('./AdminHomePage'),
+  media: () => import('./AdminMediaLibrary'),
   settings: () => import('./AdminSiteSettings'),
   complaints: () => import('./AdminComplaints'),
 } as const
@@ -23,6 +24,7 @@ const sidebarModules = {
   '/admin/clientes': adminRouteModules.operations,
   '/admin/promociones': adminRouteModules.operations,
   '/admin/home': adminRouteModules.home,
+  '/admin/biblioteca': adminRouteModules.media,
   '/admin/envios': adminRouteModules.shipping,
   '/admin/configuracion': adminRouteModules.settings,
   '/admin/notificaciones': adminRouteModules.notifications,

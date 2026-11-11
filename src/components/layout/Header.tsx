@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router'
-import { assetSource } from '../../services/asset-source'
+import { ManagedSiteImage } from '../ManagedSiteImage'
 import {
   getNavigationGroups,
   type NavigationGroup,
@@ -232,9 +232,9 @@ export function Header() {
             aria-label="Aroma Infini, inicio"
             onClick={closeNavigation}
           >
-            <img
+            <ManagedSiteImage
+              slot="identity.logo"
               className="brand-logo"
-              src={assetSource('/brand/logo-on-light.svg')}
               alt=""
               width="774"
               height="374"
