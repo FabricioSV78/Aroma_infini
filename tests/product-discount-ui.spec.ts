@@ -161,13 +161,21 @@ test('La oferta de importe fijo muestra el ahorro exacto en cada presentación',
 test('El precio visible cambia cuando empieza y termina la vigencia sin recargar', async ({
   page,
 }) => {
-  await page.clock.install()
+  const pausedAt = new Date('2030-01-02T12:00:00.000Z')
+  await page.clock.install({ time: new Date('2030-01-02T11:59:00.000Z') })
   await page.goto('/tienda')
-  await page.evaluate(async () => {
+  const card = page
+    .locator('.catalog-page .product-card')
+    .filter({ hasText: 'Bois Clair' })
+  await expect(card.locator('.price-display__current')).toContainText('390')
+  // Loading/IndexedDB duration is real time, not part of the offer's lifetime.
+  // Freeze only after the app loads, before registering its short boundaries.
+  await page.clock.pauseAt(pausedAt)
+  const saved = await page.evaluate(async () => {
     const path = '/src/services/admin-service.ts'
     const { adminService, hydrateAdminStore } = await import(path)
     await hydrateAdminStore()
-    adminService.saveProductDiscount('cedre', {
+    const result = adminService.saveProductDiscount('cedre', {
       active: true,
       type: 'percent',
       value: 20,
@@ -175,11 +183,11 @@ test('El precio visible cambia cuando empieza y termina la vigencia sin recargar
       endsAt: new Date(Date.now() + 3_000).toISOString(),
     })
     await adminService.flush()
+    return result
   })
+  expect(saved.kind).toBe('saved')
   await page.reload()
-  const card = page
-    .locator('.catalog-page .product-card')
-    .filter({ hasText: 'Bois Clair' })
+  expect(await page.evaluate(() => Date.now())).toBe(pausedAt.getTime())
   await expect(card.locator('.offer-label')).toHaveCount(0)
   await expect(card.locator('.price-display__current')).toContainText('390')
   await page.clock.runFor(1_200)

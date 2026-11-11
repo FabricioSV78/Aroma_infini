@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { InstitutionalBreadcrumb } from '../institutional/InstitutionalBreadcrumb'
@@ -55,6 +55,51 @@ function OrderStatus({ record }: { record: TrackingRecord }) {
   )
 }
 
+function TrackingSearch({
+  code,
+  onSubmit,
+}: {
+  code: string
+  onSubmit: (value: string) => void
+}) {
+  const [draft, setDraft] = useState({ code, value: code })
+  // Adjust only the draft when the queried reference changes. Keep the form
+  // mounted so a history navigation does not restart its reveal animation.
+  if (draft.code !== code) setDraft({ code, value: code })
+  return (
+    <form
+      className="tracking-search"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit(draft.value)
+      }}
+      data-scroll-reveal="copy"
+    >
+      <label htmlFor="tracking-code">Código de pedido</label>
+      <div>
+        <input
+          key={code}
+          id="tracking-code"
+          name="codigo"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={64}
+          value={draft.value}
+          onChange={(event) =>
+            setDraft({ code, value: event.currentTarget.value })
+          }
+          placeholder="AI-…"
+          required
+        />
+        <button className="button button--primary" type="submit">
+          Consultar <Icon name="arrow" />
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export function OrderTrackingPage() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
@@ -93,13 +138,8 @@ export function OrderTrackingPage() {
     }
   }, [code, location.hash, requestKey])
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = event.currentTarget
-    const data = new FormData(form)
-    const value = String(data.get('codigo') ?? '')
-      .trim()
-      .toUpperCase()
+  function submit(input: string) {
+    const value = input.trim().toUpperCase()
     if (value)
       void navigate({
         pathname: location.pathname,
@@ -124,30 +164,7 @@ export function OrderTrackingPage() {
             Consulta el estado con el código que aparece en la confirmación.
           </p>
         </header>
-        <form
-          className="tracking-search"
-          onSubmit={submit}
-          data-scroll-reveal="copy"
-        >
-          <label htmlFor="tracking-code">Código de pedido</label>
-          <div>
-            <input
-              key={code}
-              id="tracking-code"
-              name="codigo"
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={64}
-              defaultValue={code}
-              placeholder="AI-…"
-              required
-            />
-            <button className="button button--primary" type="submit">
-              Consultar <Icon name="arrow" />
-            </button>
-          </div>
-        </form>
+        <TrackingSearch code={code} onSubmit={submit} />
       </div>
       <p className="sr-only" role="status">
         {record

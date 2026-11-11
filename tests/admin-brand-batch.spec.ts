@@ -60,12 +60,33 @@ for (const count of [5, 20, 50, 100]) {
           /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(brand.slug) && brand.active,
       ),
     ).toBe(true)
-    const nextPage = page.getByRole('button', {
-      name: 'Siguiente',
+    const pagination = page.getByRole('navigation', {
+      name: 'Paginación de marcas',
       exact: true,
     })
-    while ((await nextPage.count()) && (await nextPage.isEnabled()))
-      await nextPage.click()
+    if (await pagination.count()) {
+      await expect(pagination.locator('p')).toContainText(
+        `de ${after.brands.length} marcas`,
+      )
+      const currentPage = pagination.locator('[aria-current="page"]')
+      const match = (await currentPage.innerText()).match(
+        /^Página (\d+) de (\d+)$/,
+      )
+      expect(match).not.toBeNull()
+      const nextPage = pagination.getByRole('button', {
+        name: 'Siguiente',
+        exact: true,
+      })
+      const totalPages = Number(match![2])
+      for (let number = Number(match![1]) + 1; number <= totalPages; number++) {
+        await expect(nextPage).toBeEnabled()
+        await nextPage.click()
+        await expect(currentPage).toHaveText(
+          `Página ${number} de ${totalPages}`,
+        )
+      }
+      await expect(nextPage).toBeDisabled()
+    }
     await expect(page.locator('.admin-brands-page tbody')).toContainText(
       names.at(-1)!,
     )

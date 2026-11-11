@@ -30,8 +30,9 @@ test('El mismo video utiliza una versión panorámica en escritorio y un encuadr
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
-  const video = page.locator('.editorial-film video')
-  await video.scrollIntoViewIfNeeded()
+  const section = page.locator('.editorial-film')
+  const video = section.locator('video')
+  await section.scrollIntoViewIfNeeded()
   await expect(video).toHaveAttribute(
     'src',
     '/videos/perfume-editorial-wide.mp4',
@@ -44,7 +45,13 @@ test('El mismo video utiliza una versión panorámica en escritorio y un encuadr
   )
   expect(desktopDuration).toBeLessThan(16)
   await page.setViewportSize({ width: 390, height: 844 })
-  await video.scrollIntoViewIfNeeded()
+  // The responsive rendition replaces the video node. Wait for that profile
+  // and scroll its persistent section instead of the node being replaced.
+  await expect(video).toHaveAttribute(
+    'poster',
+    '/videos/perfume-editorial-mobile.webp',
+  )
+  await section.scrollIntoViewIfNeeded()
   await expect(video).toHaveAttribute(
     'src',
     '/videos/perfume-editorial-mobile.mp4',

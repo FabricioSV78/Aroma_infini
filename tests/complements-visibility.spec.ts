@@ -331,6 +331,12 @@ for (const viewport of importViewports) {
       await page
         .getByRole('button', { name: 'Abrir menú', exact: true })
         .click()
+      const shopGroup = page
+        .getByRole('dialog', { name: 'Explorar', exact: true })
+        .getByRole('button', { name: 'Tienda', exact: true })
+      await expect(shopGroup).toHaveAttribute('aria-expanded', 'false')
+      await shopGroup.click()
+      await expect(shopGroup).toHaveAttribute('aria-expanded', 'true')
     } else {
       await page.locator('#nav-trigger-perfumes').click()
     }

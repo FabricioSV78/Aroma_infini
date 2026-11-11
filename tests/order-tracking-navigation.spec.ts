@@ -73,18 +73,74 @@ test('El código visible sigue la consulta al retroceder y avanzar', async ({
   await controlTracking(page, ({ reference }) => record(reference))
   await page.goto(`/seguir-pedido?codigo=${firstReference}`)
   const input = page.getByLabel('Código de pedido')
+  const form = await page.locator('.tracking-search').elementHandle()
+  expect(form).not.toBeNull()
   await expect(
     page.getByRole('heading', { name: 'Estado: recibido' }),
   ).toBeVisible()
   await input.fill(secondReference)
   await page.getByRole('button', { name: 'Consultar', exact: true }).click()
   await expect(page).toHaveURL(`/seguir-pedido?codigo=${secondReference}`)
+  expect(await form!.evaluate((element) => element.isConnected)).toBe(true)
   await page.goBack()
   await expect(page).toHaveURL(`/seguir-pedido?codigo=${firstReference}`)
   await expect(input).toHaveValue(firstReference)
+  expect(await form!.evaluate((element) => element.isConnected)).toBe(true)
   await page.goForward()
   await expect(page).toHaveURL(`/seguir-pedido?codigo=${secondReference}`)
   await expect(input).toHaveValue(secondReference)
+})
+
+test('La restauración de campos del navegador no sustituye la referencia consultada al retroceder', async ({
+  page,
+}) => {
+  const pending = deferred()
+  let delayFirstReference = false
+  let restoredReadStarted = false
+  await controlTracking(page, async ({ reference }) => {
+    if (delayFirstReference && reference === firstReference) {
+      restoredReadStarted = true
+      await pending.promise
+    }
+    return record(reference)
+  })
+  try {
+    await page.goto(`/seguir-pedido?codigo=${firstReference}`)
+    const input = page.getByLabel('Código de pedido')
+    const heading = page.getByRole('heading', { name: 'Estado: recibido' })
+    await expect(heading).toBeVisible()
+    await input.fill(secondReference)
+    await page.getByRole('button', { name: 'Consultar', exact: true }).click()
+    await expect(page).toHaveURL(`/seguir-pedido?codigo=${secondReference}`)
+    await expect(page.locator('.tracking-result .eyebrow')).toHaveText(
+      secondReference,
+    )
+    delayFirstReference = true
+    await page.goBack()
+    await expect(page).toHaveURL(`/seguir-pedido?codigo=${firstReference}`)
+    await expect.poll(() => restoredReadStarted).toBe(true)
+    await expect(heading).toHaveCount(0)
+    await expect(input).toHaveAttribute('value', firstReference)
+    // Chromium may restore the edited value of the first history entry after
+    // popstate, independently of React's defaultValue. Reproduce the exact
+    // property/default-value mismatch observed in the Linux CI trace.
+    await input.evaluate((element, reference) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!
+      setter.call(element, reference)
+    }, secondReference)
+    await expect(input).toHaveValue(secondReference)
+    pending.release()
+    await expect(heading).toBeVisible()
+    await expect(page.locator('.tracking-result .eyebrow')).toHaveText(
+      firstReference,
+    )
+    await expect(input).toHaveValue(firstReference)
+  } finally {
+    pending.release()
+  }
 })
 
 test('Reconsultar conserva el enlace privado y una respuesta no borra lo escrito', async ({

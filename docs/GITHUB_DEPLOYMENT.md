@@ -5,8 +5,10 @@ describe la configuración que debe completarse en GitHub y Cloudflare; no
 certifica una ejecución alojada de GitHub Actions ni autoriza un despliegue.
 
 La primera ejecución real de `main` y sus correcciones se documentan en
-[Primera ejecución de GitHub Actions](GITHUB_ACTIONS_FIRST_RUN.md). Las
-correcciones necesitan una nueva ejecución alojada antes de crear `develop`.
+[Primera ejecución de GitHub Actions](GITHUB_ACTIONS_FIRST_RUN.md). Los fallos
+posteriores de la suite general se revisan en
+[Correcciones de browser-core](GITHUB_ACTIONS_BROWSER_CORE_2026_11_10.md).
+Las correcciones necesitan una nueva ejecución alojada antes de crear `develop`.
 
 ## Flujo y destinos
 
