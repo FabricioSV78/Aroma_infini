@@ -11,7 +11,12 @@ import {
   parseManagedVideoPath,
   type ImageMediaPurpose,
 } from '../domain/media'
-import { getManagedMedia, registerManagedMedia, getManagedVideo, registerManagedVideo } from './media-registry'
+import {
+  getManagedMedia,
+  registerManagedMedia,
+  getManagedVideo,
+  registerManagedVideo,
+} from './media-registry'
 import { requireSupabaseClient } from './supabase-client'
 import { cachedPublicQuery } from './public-query-cache'
 import type { ExpectedMediaActor } from './media-upload'
@@ -331,7 +336,7 @@ export const publicHomeContent = {
 }
 
 export async function readPublicHome(
-  featuredBrandId: string | null = null,
+  featuredBrandId: string | null | Promise<string | null> = null,
 ): Promise<HomeDocument> {
   const read = async () => {
     const { data, error } = await requireSupabaseClient().rpc('home_document')
@@ -345,11 +350,15 @@ export async function readPublicHome(
   // Metadata or a successful save can advance while a previous read is still
   // in flight. Re-read once without cache instead of publishing older copy.
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw =
+    // Fetch independent public projections together, but keep catalog context
+    // as a validation/publication barrier (including the version-zero default).
+    const [raw, brandId] = await Promise.all([
       attempt === 0
-        ? await cachedPublicQuery(`home:${expectedPublicVersion}`, read, 30000)
-        : await read()
-    const result = parseHomeDocument(raw, featuredBrandId, {
+        ? cachedPublicQuery(`home:${expectedPublicVersion}`, read, 30000)
+        : read(),
+      featuredBrandId,
+    ])
+    const result = parseHomeDocument(raw, brandId, {
       publicDocument: true,
     })
     if (publicHomeContent.confirm(result)) return result

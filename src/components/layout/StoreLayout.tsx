@@ -48,20 +48,31 @@ function StoreFrame() {
   useEffect(() => {
     let timer: number | undefined
     let active = true
-    async function refreshOfferSource() {
-      if (isRemoteCatalog) {
-        invalidateSupabaseStorefront()
-        try {
-          await readStorefrontMetadata()
-          void revalidateRef.current()
-        } catch {
-          // Public cache reports its empty failed state to subscribers. A
-          // route loader keeps ownership of its existing error/retry screen.
+    let refreshing: Promise<void> | undefined
+    function refreshOfferSource() {
+      if (refreshing) return refreshing
+      const operation = (async () => {
+        if (isRemoteCatalog) {
+          invalidateSupabaseStorefront()
+          try {
+            // Catalog, Home, detail and selection loaders already confirm the
+            // metadata they read. Reuse it; informational routes still get the
+            // standalone projection when revalidation did not supply one.
+            await revalidateRef.current()
+            await readStorefrontMetadata()
+          } catch {
+            // Route loaders retain ownership of their error/retry screen.
+          }
         }
-      }
-      if (!active) return
-      refreshOfferPrices(Date.now())
-      scheduleNextOfferChange()
+        if (!active) return
+        refreshOfferPrices(Date.now())
+        scheduleNextOfferChange()
+      })()
+      refreshing = operation
+      void operation.finally(() => {
+        if (refreshing === operation) refreshing = undefined
+      })
+      return operation
     }
     function scheduleNextOfferChange() {
       window.clearTimeout(timer)

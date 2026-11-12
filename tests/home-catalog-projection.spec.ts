@@ -143,6 +143,30 @@ test('Home projections reject malformed or oversized profiles and invalid finder
   ).toThrow(CatalogReadError)
 })
 
+test('Brand profiles visit each product once and retain exact first-three ordering', () => {
+  const brands = Array.from({ length: 1000 }, (_, index) => ({
+    id: id(index + 1),
+    name: `Brand ${index}`,
+    slug: `brand-${index}`,
+  }))
+  let visits = 0
+  const profiles = Array.from({ length: 10000 }, (_, index) => ({
+    get brandId() {
+      visits++
+      return brands[index % 999].id
+    },
+    family:
+      index < 999
+        ? 'Por definir · Floral · fresco'
+        : 'Floral · Ámbar · pendiente · Verde',
+  }))
+  const result = getHomeBrandProfiles(brands, profiles)
+  expect(visits).toBe(profiles.length)
+  expect(result[brands[0].id]).toEqual(['Floral', 'fresco', 'Ámbar'])
+  expect(result[brands[998].id]).toEqual(['Floral', 'fresco', 'Ámbar'])
+  expect(result[brands[999].id]).toEqual([])
+})
+
 test('Brand previews keep empty brands and validate image references', () => {
   const { snapshot } = fixture()
   const source = {

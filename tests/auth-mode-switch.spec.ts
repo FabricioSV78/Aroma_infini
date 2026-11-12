@@ -162,6 +162,11 @@ test('la alternancia por teclado conserva foco, destino de compra y posición de
   ).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL('/crear-cuenta?returnTo=%2Fcheckout')
+  // History can update while React still shows the previous form. Its link
+  // already has focus, so wait for the destination UI before testing focus.
+  await expect(
+    choices.getByRole('link', { name: 'Crear cuenta', exact: true }),
+  ).toHaveAttribute('aria-current', 'page')
   await expect(
     choices.getByRole('link', { name: 'Crear cuenta', exact: true }),
   ).toBeFocused()
@@ -172,6 +177,9 @@ test('la alternancia por teclado conserva foco, destino de compra y posición de
   ).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL('/iniciar-sesion?returnTo=%2Fcheckout')
+  await expect(
+    choices.getByRole('link', { name: 'Iniciar sesión', exact: true }),
+  ).toHaveAttribute('aria-current', 'page')
   await expect(
     choices.getByRole('link', { name: 'Iniciar sesión', exact: true }),
   ).toBeFocused()

@@ -89,23 +89,21 @@ export function getHomeBrandProfiles(
   brands: readonly Brand[],
   profiles: readonly Pick<HomeCatalogProfile, 'brandId' | 'family'>[],
 ): Record<string, string[]> {
+  const familiesByBrand = new Map<string, Set<string>>(
+    brands.map(({ id }) => [id, new Set<string>()]),
+  )
+  for (const profile of profiles) {
+    const families = familiesByBrand.get(profile.brandId)
+    if (!families || families.size === 3) continue
+    for (const part of profile.family.split('·')) {
+      const family = part.trim()
+      if (family && !/^(por definir|pendiente|—)$/i.test(family))
+        families.add(family)
+      if (families.size === 3) break
+    }
+  }
   return Object.fromEntries(
-    brands.map((brand) => [
-      brand.id,
-      [
-        ...new Set(
-          profiles
-            .filter((profile) => profile.brandId === brand.id)
-            .flatMap((profile) =>
-              profile.family.split('·').map((part) => part.trim()),
-            )
-            .filter(
-              (family) =>
-                family && !/^(por definir|pendiente|—)$/i.test(family),
-            ),
-        ),
-      ].slice(0, 3),
-    ]),
+    brands.map((brand) => [brand.id, [...familiesByBrand.get(brand.id)!]]),
   )
 }
 

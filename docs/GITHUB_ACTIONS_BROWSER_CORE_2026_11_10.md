@@ -56,3 +56,48 @@ el commit anterior no incorpora los cambios locales.
 Esta corrección no hizo commits, pushes, migraciones remotas ni despliegues.
 Las pruebas usaron servidores y datos aislados; no modificaron los servicios
 alojados de Supabase, Cloudflare o R2.
+
+## Seguimiento del 12 de noviembre: acceso y diálogos
+
+La ejecución comunicada de staging terminó con 1327 pruebas aprobadas, dos
+fallidas y tres omitidas. Las dos correcciones siguientes afectan únicamente
+a las pruebas; no cambian el diseño, los componentes de la aplicación, la
+autenticación ni la configuración de despliegue.
+
+- **Alternancia por teclado:** el enlace a Crear cuenta ya tenía el foco antes
+  de pulsar Enter. La URL podía cambiar mientras React conservaba el formulario
+  anterior, de modo que comprobar URL y foco no garantizaba que la navegación
+  hubiera terminado. La prueba ahora espera también `aria-current="page"`
+  en el enlace de destino antes de continuar con Tab o Shift+Tab. Conserva
+  las comprobaciones de foco, destino de compra y posición de página.
+- **Diálogo ocupado:** la prueba importaba React desde la ruta interna fija
+  `/node_modules/.vite/deps/`, incompatible con la caché aislada por puerto.
+  Un fixture de navegador importa React, ReactDOM y el componente real mediante
+  sus imports normales, que Vite resuelve. Se comprueba el mismo bloqueo de
+  Escape y fondo, y la devolución del foco. La referencia de retorno permanece
+  estable durante la operación.
+
+Validación local completada:
+
+| Comprobación                                                 | Resultado                                                                              |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Autenticación, registro, mensajes, alternancia y diálogo     | 59 casos aprobados                                                                     |
+| Dos fallos originales, 25 repeticiones cada uno, dos workers | 50 ejecuciones aprobadas                                                               |
+| Suite de alternancia y diálogo, tres repeticiones            | 30 ejecuciones aprobadas                                                               |
+| Diagnóstico con CPU limitada a 4×, escritorio y móvil        | 20 cambios de modo aprobados; se observó el cambio de URL anterior al commit en los 20 |
+| Pruebas Node                                                 | 179 aprobadas                                                                          |
+| TypeScript, ESLint y build de producción aislado             | Aprobados                                                                              |
+
+Las capturas de alternancia cubren 1920 × 1080, 1440 × 900, 1366 × 768,
+768 × 1024 y 390 × 844. No se añadieron sleeps, reintentos, omisiones ni
+ampliaciones de timeout. El fallo intermitente de teclado no apareció en sus
+20 repeticiones iniciales sin cambios; el diagnóstico separado verificó la
+ventana entre History y el commit, sin presentarla como una reproducción del
+fallo exacto de CI.
+
+Evidencias locales: `artifacts/ci-auth-dialog-2026-11-12/`, incluidos los
+resultados de Playwright y `navigation-probe.json`. No se repitió toda la suite
+de más de 1300 casos en esta corrección. La validación alojada completa queda
+pendiente de subir estos cambios a `develop` y completar **Deploy staging**.
+Reejecutar el commit anterior no incluye la corrección. No se realizaron
+commits, pushes, migraciones ni despliegues.

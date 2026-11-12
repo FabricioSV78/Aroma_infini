@@ -113,6 +113,95 @@ test('Las páginas remotas se combinan antes de publicar una caché completa', a
   expect(result.products[100].product.id).toBe(id(101))
 })
 
+test('Mil productos públicos se leen con cuatro páginas concurrentes, orden estable y una sola publicación completa', async () => {
+  const offsets: number[] = []
+  const gates = new Map<number, () => void>()
+  let active = 0,
+    maximum = 0,
+    publications = 0
+  const store = repository({
+    readPage: async (_limit, offset) => {
+      offsets.push(offset)
+      maximum = Math.max(maximum, ++active)
+      if (offset)
+        await new Promise<void>((resolve) => {
+          gates.set(offset, resolve)
+        })
+      active--
+      return {
+        items: Array.from({ length: 100 }, (_, index) =>
+          product(offset + index + 1),
+        ),
+        total: 1000,
+      }
+    },
+  })
+  store.subscribe(() => {
+    publications++
+  })
+  const result = store.readSnapshot()
+  await expect.poll(() => offsets).toEqual([0, 100, 200, 300, 400])
+  expect(store.peekSnapshot().products).toEqual([])
+  for (const offset of [400, 300, 200, 100]) gates.get(offset)!()
+  await expect.poll(() => offsets.length).toBe(9)
+  expect(store.peekSnapshot().products).toEqual([])
+  for (const offset of [800, 700, 600, 500]) gates.get(offset)!()
+  await expect.poll(() => offsets.length).toBe(10)
+  gates.get(900)!()
+  const snapshot = await result
+  expect(maximum).toBe(4)
+  expect(publications).toBe(1)
+  expect(snapshot.products.map(({ product }) => product.id)).toEqual(
+    Array.from({ length: 1000 }, (_, index) => id(index + 1)),
+  )
+})
+
+test('Invalidar una oleada pública pendiente descarta todas sus páginas y no inicia otra oleada antigua', async () => {
+  const offsets: number[] = []
+  const gates = new Map<number, () => void>()
+  let fresh = false
+  const store = repository({
+    readPage: async (_limit, offset) => {
+      offsets.push(offset)
+      if (fresh) return { items: [product(999)], total: 1 }
+      if (offset)
+        await new Promise<void>((resolve) => {
+          gates.set(offset, resolve)
+        })
+      return {
+        items: Array.from({ length: 100 }, (_, index) =>
+          product(offset + index + 1),
+        ),
+        total: 1000,
+      }
+    },
+  })
+  const old = store.readSnapshot()
+  await expect.poll(() => offsets.length).toBe(5)
+  fresh = true
+  store.invalidate()
+  const current = await store.readSnapshot()
+  for (const offset of [400, 300, 200, 100]) gates.get(offset)!()
+  expect(await old).toBe(current)
+  expect(offsets).toEqual([0, 100, 200, 300, 400, 0])
+  expect(
+    store.peekSnapshot().products.map(({ product }) => product.id),
+  ).toEqual([id(999)])
+})
+
+test('Una primera página truncada falla antes de iniciar lecturas adicionales', async () => {
+  const offsets: number[] = []
+  const store = repository({
+    readPage: async (_limit, offset) => {
+      offsets.push(offset)
+      return { items: [product()], total: 10000 }
+    },
+  })
+  await expect(store.readSnapshot()).rejects.toThrow(CatalogReadError)
+  expect(offsets).toEqual([0])
+  expect(store.peekSnapshot().products).toEqual([])
+})
+
 test('Solicitudes simultáneas comparten la lectura y una invalidación exige datos nuevos', async () => {
   let requests = 0
   const store = repository({

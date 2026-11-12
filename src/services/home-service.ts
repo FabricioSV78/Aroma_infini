@@ -49,8 +49,13 @@ export function getBestsellingProducts(): Product[] {
 export const homeService: HomeService = {
   async getHome() {
     if (isRemoteCatalog) {
-      const catalog = await readRemoteHomeCatalog()
-      const home = await readPublicHome(catalog.settings.featuredBrandId)
+      const catalogReady = readRemoteHomeCatalog()
+      const [catalog, home] = await Promise.all([
+        catalogReady,
+        readPublicHome(
+          catalogReady.then(({ settings }) => settings.featuredBrandId),
+        ),
+      ])
       const heroProductIds = home.content.hero.flatMap((slide) =>
         slide.destination?.type === 'product'
           ? [slide.destination.productId]

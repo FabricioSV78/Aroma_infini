@@ -13,6 +13,7 @@ import { hydrateAdminStore } from './services/admin-service'
 import { authService } from './services/auth-service'
 import { builtinMediaService } from './services/builtin-media-service'
 import { PageLoadingState } from './components/ui/PageLoadingState'
+import { getRouter } from './app/router'
 import './styles/ui-states.css'
 import './styles/interaction-states.css'
 
@@ -24,12 +25,12 @@ appRoot.render(<PageLoadingState pathname={window.location.pathname} />)
 // Public pages need not wait for a private Auth network check. Protected route
 // loaders await the same initialization before granting access.
 void authService.initialize()
-await Promise.all([
-  hydrateAdminStore(),
+const [, router] = await Promise.all([
+  // Resolve aliases before rendering images, while route modules and their
+  // public queries load concurrently. Local loaders still await hydration.
   builtinMediaService.load().catch(() => {}),
+  hydrateAdminStore().then(getRouter),
 ])
-// Create loaders after the shared catalog has finished loading.
-const { router } = await import('./app/router')
 appRoot.render(
   <StrictMode>
     <RouterProvider router={router} />

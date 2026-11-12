@@ -296,8 +296,8 @@ async function account(page: Page) {
 async function navigate(page: Page, target: string) {
   await page.evaluate(async (target) => {
     const source = '/src/app/router.tsx'
-    const { router } = await import(source)
-    await router.navigate(target)
+    const { getRouter } = await import(source)
+    await getRouter().navigate(target)
   }, target)
 }
 async function changeSession(page: Page, owner: string) {

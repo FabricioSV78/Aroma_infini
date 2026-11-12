@@ -8,6 +8,7 @@ import {
 import { readRemoteProductsByIds } from './remote-catalog-queries'
 import { customerFavoritesService } from './customer-favorites-service'
 import { authService } from './auth-service'
+import { readPublicBatches } from './public-read-batches'
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 
@@ -48,13 +49,16 @@ export async function loadSelectionProducts(
     const unique = [...new Set(ids)]
       .filter((value) => uuid.test(value))
       .slice(0, 500)
-    for (let offset = 0; offset < unique.length; offset += 100) {
-      const selected = unique.slice(offset, offset + 100)
-      await readRemoteProductsByIds(
+    const groups = Array.from(
+      { length: Math.ceil(unique.length / 100) },
+      (_, index) => unique.slice(index * 100, (index + 1) * 100),
+    )
+    await readPublicBatches(groups, (selected) =>
+      readRemoteProductsByIds(
         kind === 'favorites' ? selected : [],
         kind === 'cart' ? selected : [],
-      )
-    }
+      ),
+    )
   })()
   await Promise.all([metadataReady, selectionReady])
 }

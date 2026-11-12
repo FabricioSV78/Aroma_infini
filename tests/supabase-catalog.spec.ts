@@ -929,6 +929,144 @@ test('Home hidrata exactamente los productos públicos referenciados por el Hero
   ).toBe(false)
 })
 
+test('Home inicia sus lecturas independientes juntas y espera el contexto antes de publicar', async ({
+  page,
+  context,
+  catalogNetwork,
+}) => {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let homeStarted = false
+  catalogNetwork.featuredBrandId = remoteBrandId
+  await context.route(
+    `${origin}/rest/v1/rpc/catalog_home_context`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fallback()
+      await held
+      await route.fallback()
+    },
+  )
+  await context.route(`${origin}/rest/v1/rpc/home_document`, async (route) => {
+    if (route.request().method() !== 'OPTIONS') homeStarted = true
+    await route.fallback()
+  })
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect.poll(() => homeStarted).toBe(true)
+    await expect(page.locator('.home')).toHaveCount(0)
+  } finally {
+    release()
+  }
+  await expect(page.locator('.home')).toBeVisible()
+  const featured = await page.evaluate(async () => {
+    const path = '/src/services/home-content-service.ts'
+    const { publicHomeContent } = (await import(
+      path
+    )) as typeof import('../src/services/home-content-service')
+    return publicHomeContent.peek().content.featuredBrandId
+  })
+  expect(featured).toBe(remoteBrandId)
+})
+
+test('El arranque carga rutas y consultas mientras resuelve alias sin renderizar recursos anteriores', async ({
+  page,
+  context,
+  catalogNetwork,
+}) => {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await context.route(
+    `${origin}/rest/v1/rpc/public_media_aliases`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({ status: 204, headers })
+      await held
+      await route.fulfill({ headers, json: { items: [] } })
+    },
+  )
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect
+      .poll(() =>
+        catalogNetwork.calls.some(
+          ({ name }) => name === 'catalog_home_context',
+        ),
+      )
+      .toBe(true)
+    await expect(page.locator('.home')).toHaveCount(0)
+  } finally {
+    release()
+  }
+  await expect(page.locator('.home')).toBeVisible()
+})
+
+test('Actualizar una ficha reutiliza su metadata y agrupa avisos de visibilidad simultáneos', async ({
+  page,
+  catalogNetwork,
+}) => {
+  await page.goto('/producto/fleur-de-test')
+  await expect(page.locator('#product-title')).toHaveText('Fleur de Test')
+  catalogNetwork.calls.length = 0
+  catalogNetwork.products[0].product.name = 'Perfume actualizado'
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(page.locator('#product-title')).toHaveText('Perfume actualizado')
+  expect(
+    catalogNetwork.calls.filter(
+      ({ name }) => name === 'catalog_product_context',
+    ),
+  ).toHaveLength(1)
+  expect(
+    catalogNetwork.calls.some(
+      ({ name }) => name === 'catalog_brands' || name === 'catalog_settings',
+    ),
+  ).toBe(false)
+})
+
+test('Actualizar Contacto conserva su lectura de metadata sin consultar productos ni duplicar avisos', async ({
+  page,
+  catalogNetwork,
+}) => {
+  await page.goto('/contacto')
+  // The metadata module can resolve before React has mounted StoreFrame and
+  // subscribed to visibility events. Refresh the rendered page, not bootstrap.
+  await expect(page.locator('main h1')).toHaveText('Contacto')
+  await page.evaluate(async () => {
+    const path = '/src/services/storefront-repository.ts'
+    const { readStorefrontMetadata } = (await import(
+      path
+    )) as typeof import('../src/services/storefront-repository')
+    await readStorefrontMetadata()
+  })
+  catalogNetwork.calls.length = 0
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect
+    .poll(
+      () =>
+        catalogNetwork.calls.filter(({ name }) => name === 'catalog_settings')
+          .length,
+    )
+    .toBe(1)
+  expect(
+    catalogNetwork.calls.filter(({ name }) => name === 'catalog_brands'),
+  ).toHaveLength(1)
+  expect(
+    catalogNetwork.calls.some(
+      ({ name }) =>
+        name === 'catalog_products' || name === 'catalog_product_context',
+    ),
+  ).toBe(false)
+})
+
 test('Una RPC de Home ausente no dispara una descarga completa ni un catálogo local alternativo', async ({
   page,
   context,
@@ -2327,6 +2465,68 @@ test('La selección acotada no confirma tras error de metadata y permite reinten
   expect(
     catalogNetwork.calls.some(({ name }) => name === 'catalog_products'),
   ).toBe(false)
+})
+
+test('Quinientos favoritos cargan cinco lotes con un máximo de cuatro peticiones simultáneas', async ({
+  page,
+  context,
+  catalogNetwork,
+}) => {
+  const template = catalogNetwork.products[0]
+  catalogNetwork.products = Array.from({ length: 500 }, (_, index) => {
+    const item = structuredClone(template)
+    item.product.id = `30000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+    item.product.slug = `public-selection-${index + 1}`
+    item.product.variants[0].id = `40000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+    return item
+  })
+  const gates: Array<() => void> = []
+  let active = 0,
+    maximum = 0
+  await context.route(
+    `${origin}/rest/v1/rpc/catalog_products_by_ids`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fallback()
+      maximum = Math.max(maximum, ++active)
+      await new Promise<void>((resolve) => {
+        gates.push(resolve)
+      })
+      await route.fallback()
+      active--
+    },
+  )
+  await page.goto('/contacto')
+  const ids = catalogNetwork.products.map(({ product }) => product.id)
+  const loading = page.evaluate(async (ids) => {
+    const path = '/src/services/selection-catalog-service.ts'
+    const { loadSelectionProducts } = (await import(
+      path
+    )) as typeof import('../src/services/selection-catalog-service')
+    await loadSelectionProducts('favorites', ids)
+    const storePath = '/src/services/storefront-repository.ts'
+    const { storefrontRepository } = (await import(
+      storePath
+    )) as typeof import('../src/services/storefront-repository')
+    return storefrontRepository
+      .peekSnapshot()
+      .products.map(({ product }) => product.id)
+      .sort()
+  }, ids)
+  try {
+    await expect.poll(() => gates.length).toBe(4)
+    for (const index of [3, 2, 1, 0]) gates[index]()
+    await expect.poll(() => gates.length).toBe(5)
+    gates[4]()
+    expect(await loading).toEqual([...ids].sort())
+    expect(maximum).toBe(4)
+    expect(
+      catalogNetwork.calls.filter(
+        ({ name }) => name === 'catalog_products_by_ids',
+      ),
+    ).toHaveLength(5)
+  } finally {
+    gates.forEach((release) => release())
+  }
 })
 
 test('La selección acotada no cachea errores de IDs y permite reintentar', async ({

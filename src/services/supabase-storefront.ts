@@ -24,6 +24,7 @@ import type { ShippingSettings } from '../types/shipping'
 import { requireSupabaseClient } from './supabase-client'
 import { parseManagedMediaPath } from '../domain/media'
 import { rememberManagedAssets } from './media-registry'
+import { readPublicBatches } from './public-read-batches'
 import type {
   LocalStorefrontRepository,
   StorefrontProductRecord,
@@ -443,13 +444,23 @@ export function createSupabaseStorefrontRepository({
       const first = parseCatalogPage(firstValue)
       if (first.total > 10000) throw new CatalogReadError()
       const products = [...first.items]
-      if (products.length > first.total) throw new CatalogReadError()
-      for (let offset = 100; offset < first.total; offset += 100) {
+      if (products.length !== Math.min(100, first.total))
+        throw new CatalogReadError()
+      const offsets = Array.from(
+        { length: Math.max(0, Math.ceil(first.total / 100) - 1) },
+        (_, index) => (index + 1) * 100,
+      )
+      const pages = await readPublicBatches(offsets, async (offset) => {
         const page = parseCatalogPage(await readPage(100, offset))
-        if (page.total !== first.total || !page.items.length)
+        if (
+          expectedGeneration !== generation ||
+          page.total !== first.total ||
+          page.items.length !== Math.min(100, first.total - offset)
+        )
           throw new CatalogReadError()
-        products.push(...page.items)
-      }
+        return page
+      })
+      for (const page of pages) products.push(...page.items)
       if (products.length !== first.total) throw new CatalogReadError()
       unique(products.map(({ product }) => product.id))
       const brands = list(brandsValue, parseCatalogBrand, 10000)
