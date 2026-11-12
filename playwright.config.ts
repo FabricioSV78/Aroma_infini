@@ -18,6 +18,7 @@ export default defineConfig({
     '**/account-email-change.spec.ts',
     '**/offline-account-recovery-ui.spec.ts',
     '**/supabase-catalog.spec.ts',
+    '**/admin-workspace-loading.spec.ts',
     '**/r2-media-browser.spec.ts',
     '**/media-alias.spec.ts',
     '**/admin-media-library.spec.ts',
@@ -49,6 +50,7 @@ export default defineConfig({
     reuseExistingServer: false,
     // Do not inherit a developer's live/staging Auth or media configuration.
     env: {
+      AROMA_TEST_PORT: String(port),
       VITE_APP_ENV: 'development',
       VITE_CATALOG_SOURCE: 'local',
       VITE_SUPABASE_URL: '',

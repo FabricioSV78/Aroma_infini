@@ -101,16 +101,17 @@ const test = authTest.extend<{ settingsNetwork: SettingsFixture }>({
       else if (name === 'admin_orders')
         await reply({ orders: [], orderHistory: [], total: 0 })
       else if (name === 'admin_commerce_settings') {
-        const hold = state.holdNextRead
-        state.holdNextRead = null
-        if (hold) await hold
-        await reply({
+        const payload = structuredClone({
           ...shipping,
           coupons: state.coupons,
           couponVersions: Object.fromEntries(
             state.coupons.map((item) => [item.id, item.version]),
           ),
         })
+        const hold = state.holdNextRead
+        state.holdNextRead = null
+        if (hold) await hold
+        await reply(payload)
       } else if (name === 'admin_save_shipping') {
         if (state.fail) {
           await reply({ code: 'PGRST000' }, 503)
@@ -200,6 +201,127 @@ async function products(page: Page, network: SupabaseAuthNetwork) {
   await administrator(page, network)
   await page.getByRole('link', { name: 'Productos', exact: true }).click()
   await expect(page.locator('main h1')).toHaveText('Productos')
+}
+
+for (const change of ['shipping', 'save-coupon', 'delete-coupon'] as const) {
+  test(`Una lectura anterior a ${change} no restaura la configuración comercial reemplazada`, async ({
+    page,
+    supabaseNetwork,
+    settingsNetwork,
+  }) => {
+    settingsNetwork.shipping = {
+      freeThresholdCents: 30000,
+      provinceShippingEnabled: false,
+      nationalCourierFeeCents: 0,
+      nationalEstimate: '',
+      zones: [],
+    }
+    settingsNetwork.shippingVersion = 1
+    settingsNetwork.coupons = [
+      {
+        id: 'b3110000-0000-4000-8000-000000000001',
+        code: 'FIXTURE',
+        active: true,
+        type: 'percent',
+        value: 10,
+        minimumCents: 0,
+        startsAt: '',
+        endsAt: '',
+        usageLimit: null,
+        used: 0,
+        version: 1,
+      },
+    ]
+    await administrator(page, supabaseNetwork)
+    await page.evaluate(async () => {
+      const path = '/src/services/commerce-settings-service.ts'
+      const { loadAdminCommerceSettings } = (await import(
+        path
+      )) as typeof import('../src/services/commerce-settings-service')
+      await loadAdminCommerceSettings()
+    })
+    const gate = deferred()
+    settingsNetwork.holdNextRead = gate.promise
+    const before = settingsNetwork.calls.filter(
+      ({ name }) => name === 'admin_commerce_settings',
+    ).length
+    const reading = page.evaluate(async () => {
+      const path = '/src/services/commerce-settings-service.ts'
+      const { loadAdminCommerceSettings } = (await import(
+        path
+      )) as typeof import('../src/services/commerce-settings-service')
+      await loadAdminCommerceSettings()
+    })
+    try {
+      await expect
+        .poll(
+          () =>
+            settingsNetwork.calls.filter(
+              ({ name }) => name === 'admin_commerce_settings',
+            ).length,
+        )
+        .toBe(before + 1)
+      await page.evaluate(async (change) => {
+        const servicePath = '/src/services/commerce-settings-service.ts'
+        const statePath = '/src/services/admin-service.ts'
+        const { commerceSettingsService } = (await import(
+          servicePath
+        )) as typeof import('../src/services/commerce-settings-service')
+        const { adminService } = (await import(
+          statePath
+        )) as typeof import('../src/services/admin-service')
+        const state = adminService.getSnapshot()
+        if (change === 'shipping')
+          await commerceSettingsService.saveShipping(
+            { ...state.shipping, freeThresholdCents: 45000 },
+            state.shippingVersion!,
+          )
+        else if (change === 'save-coupon')
+          await commerceSettingsService.savePromotion({
+            ...state.promotions[0],
+            value: 20,
+          })
+        else
+          await commerceSettingsService.deletePromotion(
+            state.promotions[0].id,
+            state.promotions[0].version!,
+          )
+      }, change)
+      gate.release()
+      await reading
+      const confirmed = await page.evaluate(async () => {
+        const path = '/src/services/admin-service.ts'
+        const { adminService } = (await import(
+          path
+        )) as typeof import('../src/services/admin-service')
+        const state = adminService.getSnapshot()
+        return {
+          shippingVersion: state.shippingVersion,
+          threshold: state.shipping.freeThresholdCents,
+          coupons: state.promotions.map(({ version, value }) => ({
+            version,
+            value,
+          })),
+        }
+      })
+      expect(confirmed).toEqual({
+        shippingVersion: change === 'shipping' ? 2 : 1,
+        threshold: change === 'shipping' ? 45000 : 30000,
+        coupons:
+          change === 'delete-coupon'
+            ? []
+            : [
+                {
+                  version: change === 'save-coupon' ? 2 : 1,
+                  value: change === 'save-coupon' ? 20 : 10,
+                },
+              ],
+      })
+    } finally {
+      gate.release()
+      await reading
+    }
+  })
 }
 
 test('Preparar el código de una opción del menú no adelanta consultas privadas de Supabase', async ({

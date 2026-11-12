@@ -7,6 +7,7 @@ function isolatedAuthServer(port: number) {
     reuseExistingServer: false,
     timeout: 60000,
     env: {
+      AROMA_TEST_PORT: String(port),
       VITE_CATALOG_SOURCE: 'local',
       VITE_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
       VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test-only',

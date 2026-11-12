@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { installAdminPageBatchGate } from './admin-page-batch-fixture'
 import { mkdir } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { DEFAULT_OLFACTORY_FAMILIES } from '../src/domain/olfactory-family'
@@ -181,16 +182,19 @@ const test = authTest.extend<{ ordersNetwork: OrdersFixture }>({
         return
       }
       if (name === 'admin_orders') {
-        const held = state.holdNextRead
-        state.holdNextRead = null
-        if (held) await held
         const start = Number(body.p_offset ?? 0),
           size = Number(body.p_limit ?? 100)
-        await reply({
+        // Capture the server result before transport latency; a later write
+        // cannot rewrite the body of an already completed SQL read.
+        const payload = structuredClone({
           orders: state.orders.slice(start, start + size),
           orderHistory: state.history,
           total: state.orders.length,
         })
+        const held = state.holdNextRead
+        state.holdNextRead = null
+        if (held) await held
+        await reply(payload)
         return
       }
       if (name === 'admin_set_order_statuses') {
@@ -338,6 +342,133 @@ async function admin(page: Page, network: SupabaseAuthNetwork) {
     .click()
   await expect(page).toHaveURL('/admin', { timeout: 15000 })
 }
+
+for (const revoked of [false, true]) {
+  test(`Los pedidos cargan mil registros con cuatro lecturas acotadas y ${revoked ? 'una denegación no restaura datos privados' : 'publican el snapshot completo'}`, async ({
+    page,
+    context,
+    supabaseNetwork,
+    ordersNetwork,
+  }) => {
+    await admin(page, supabaseNetwork)
+    ordersNetwork.orders = Array.from({ length: 1000 }, (_, index) =>
+      makeOrder(index + 1),
+    )
+    const gate = await installAdminPageBatchGate(
+      context,
+      origin,
+      'admin_orders',
+    )
+    const reading = page.evaluate(async () => {
+      const path = '/src/services/order-admin-service.ts'
+      const { loadAdminOrders } = (await import(
+        path
+      )) as typeof import('../src/services/order-admin-service')
+      try {
+        await loadAdminOrders(true)
+        return 'resolved'
+      } catch {
+        return 'rejected'
+      }
+    })
+    try {
+      await expect.poll(() => gate.started.length).toBe(5)
+      expect(gate.peak()).toBe(4)
+      expect(
+        await page.evaluate(async () => {
+          const path = '/src/services/admin-service.ts'
+          const { adminService } = (await import(
+            path
+          )) as typeof import('../src/services/admin-service')
+          return adminService.getSnapshot().orders.length
+        }),
+      ).toBe(100)
+      if (revoked) gate.deny(200)
+      gate.releaseAll()
+      expect(await reading).toBe(revoked ? 'rejected' : 'resolved')
+      const count = await page.evaluate(async () => {
+        const path = '/src/services/admin-service.ts'
+        const { adminService } = (await import(
+          path
+        )) as typeof import('../src/services/admin-service')
+        return adminService.getSnapshot().orders.length
+      })
+      expect(count).toBe(revoked ? 0 : 1000)
+      expect([...gate.started].sort((a, b) => a - b)).toEqual(
+        Array.from({ length: revoked ? 5 : 10 }, (_, index) => index * 100),
+      )
+    } finally {
+      gate.releaseAll()
+      await reading
+    }
+  })
+}
+
+test('Una lectura anterior al guardado no reemplaza el estado ni el historial confirmados del pedido', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  await admin(page, supabaseNetwork)
+  const reference = ordersNetwork.orders[0].reference
+  let release!: () => void
+  ordersNetwork.holdNextRead = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const before = ordersNetwork.calls.filter(
+    ({ name }) => name === 'admin_orders',
+  ).length
+  const reading = page.evaluate(async () => {
+    const path = '/src/services/order-admin-service.ts'
+    const { loadAdminOrders } = (await import(
+      path
+    )) as typeof import('../src/services/order-admin-service')
+    await loadAdminOrders(true)
+  })
+  try {
+    await expect
+      .poll(
+        () =>
+          ordersNetwork.calls.filter(({ name }) => name === 'admin_orders')
+            .length,
+      )
+      .toBe(before + 1)
+    await page.evaluate(async (reference) => {
+      const path = '/src/services/order-admin-service.ts'
+      const { orderAdminService } = (await import(
+        path
+      )) as typeof import('../src/services/order-admin-service')
+      const result = await orderAdminService.bulkSetOrderStatus(
+        [reference],
+        'preparing',
+      )
+      if (result.kind !== 'updated' || result.updated.length !== 1)
+        throw new Error('The canonical fixture mutation did not succeed')
+    }, reference)
+    expect(ordersNetwork.orders[0].version).toBe(2)
+    release()
+    await reading
+    const confirmed = await page.evaluate(async (reference) => {
+      const path = '/src/services/admin-service.ts'
+      const { adminService } = (await import(
+        path
+      )) as typeof import('../src/services/admin-service')
+      const state = adminService.getSnapshot()
+      const order = state.orders.find((item) => item.reference === reference)
+      return {
+        version: order?.version,
+        status: order?.status,
+        history: state.orderHistory.filter(
+          (item) => item.reference === reference,
+        ).length,
+      }
+    }, reference)
+    expect(confirmed).toEqual({ version: 2, status: 'preparing', history: 1 })
+  } finally {
+    release()
+    await reading
+  }
+})
 
 test('Cien pedidos remotos mantienen paginación y se actualizan con una sola operación masiva', async ({
   page,
@@ -654,3 +785,160 @@ for (const [width, height] of [
       animations: 'disabled',
     })
   })
+
+interface OrderRefreshFrames {
+  pending(): number
+  flush(): void
+  restore(): void
+}
+
+type OrderRefreshWindow = typeof window & {
+  orderRefreshFrames: OrderRefreshFrames
+}
+
+/** Hold only browser frames; application services and SDK HTTP stay real. */
+async function holdOrderRefreshFrames(page: Page) {
+  await page.evaluate(() => {
+    let nextId = 0
+    const frames = new Map<number, FrameRequestCallback>()
+    const requestFrame = window.requestAnimationFrame
+    const cancelFrame = window.cancelAnimationFrame
+    window.requestAnimationFrame = (callback) => {
+      const id = ++nextId
+      frames.set(id, callback)
+      return id
+    }
+    window.cancelAnimationFrame = (id) => {
+      frames.delete(id)
+    }
+    ;(window as OrderRefreshWindow).orderRefreshFrames = {
+      pending: () => frames.size,
+      flush() {
+        const callbacks = [...frames.values()]
+        frames.clear()
+        callbacks.forEach((callback) => callback(performance.now()))
+      },
+      restore() {
+        window.requestAnimationFrame = requestFrame
+        window.cancelAnimationFrame = cancelFrame
+        frames.clear()
+      },
+    }
+  })
+}
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (!testInfo.title.startsWith('El regreso a la pestaña') || page.isClosed())
+    return
+  await page.evaluate(() => {
+    ;(window as Partial<OrderRefreshWindow>).orderRefreshFrames?.restore()
+  })
+})
+
+test('El regreso a la pestaña agrupa foco y visibilidad en una lectura y conserva los siguientes refrescos', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  const rows = page.locator('.admin-order-workspace tbody')
+  await expect(rows.locator('tr')).toHaveCount(20)
+  const readCount = () =>
+    ordersNetwork.calls.filter(({ name }) => name === 'admin_orders').length
+  const initialReads = readCount()
+  await holdOrderRefreshFrames(page)
+  for (const [index, events] of [
+    ['focus', 'visibilitychange'],
+    ['focus'],
+    ['focus'],
+  ].entries()) {
+    const customerName = `Cliente refrescado ${index + 1}`
+    ordersNetwork.orders = ordersNetwork.orders.map((order) => ({
+      ...order,
+      customerName,
+    }))
+    await page.evaluate((events) => {
+      for (const event of events)
+        (event === 'focus' ? window : document).dispatchEvent(new Event(event))
+      ;(window as OrderRefreshWindow).orderRefreshFrames.flush()
+    }, events)
+    await expect(rows).toContainText(customerName)
+    expect(readCount()).toBe(initialReads + index + 1)
+  }
+  // Forced focus refresh must still observe immediate server-side revocation.
+  ordersNetwork.denied = true
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    ;(window as OrderRefreshWindow).orderRefreshFrames.flush()
+  })
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(0)
+  expect(readCount()).toBe(initialReads + 4)
+})
+
+test('El regreso a la pestaña cancela la lectura pendiente al ocultarse', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  const initialReads = ordersNetwork.calls.filter(
+    ({ name }) => name === 'admin_orders',
+  ).length
+  await holdOrderRefreshFrames(page)
+  const pending = await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    const frames = (window as OrderRefreshWindow).orderRefreshFrames
+    const pending = frames.pending()
+    frames.flush()
+    return pending
+  })
+  expect(pending).toBe(0)
+  expect(
+    ordersNetwork.calls.filter(({ name }) => name === 'admin_orders'),
+  ).toHaveLength(initialReads)
+})
+
+test('El regreso a la pestaña cancela la lectura pendiente al salir sin errores', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  const initialReads = ordersNetwork.calls.filter(
+    ({ name }) => name === 'admin_orders',
+  ).length
+  await holdOrderRefreshFrames(page)
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    document
+      .querySelector<HTMLAnchorElement>('a[href="/admin/productos"]')!
+      .click()
+  })
+  await expect(page).toHaveURL('/admin/productos')
+  await expect(
+    page.getByRole('heading', { name: 'Productos', exact: true }),
+  ).toBeVisible()
+  const pending = await page.evaluate(() => {
+    const frames = (window as OrderRefreshWindow).orderRefreshFrames
+    const pending = frames.pending()
+    frames.flush()
+    return pending
+  })
+  expect(pending).toBe(0)
+  expect(
+    ordersNetwork.calls.filter(({ name }) => name === 'admin_orders'),
+  ).toHaveLength(initialReads)
+  expect(errors).toEqual([])
+})

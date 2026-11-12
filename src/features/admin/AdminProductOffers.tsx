@@ -1,5 +1,5 @@
 import { variantLabel } from '../../domain/product-type'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/ui/Dialog'
 import type { AdminProduct } from '../../services/admin-service'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
@@ -178,34 +178,61 @@ export function AdminProductOffers() {
     }
   }, [state.products, now])
 
-  const sortedProducts = [...state.products].sort((a, b) => {
-    const brandA =
-      state.brands.find((brand) => brand.id === a.product.brandId)?.name ?? ''
-    const brandB =
-      state.brands.find((brand) => brand.id === b.product.brandId)?.name ?? ''
-    return `${brandA} ${a.product.name}`.localeCompare(
-      `${brandB} ${b.product.name}`,
-      'es',
-    )
-  })
-  const offeredProducts = sortedProducts.filter(
-    (record) => record.product.discount,
+  const brandsById = useMemo(
+    () => new Map(state.brands.map((brand) => [brand.id, brand])),
+    [state.brands],
   )
-  const availableProducts = sortedProducts.filter(
-    (record) => !record.product.discount,
+  const productsById = useMemo(
+    () => new Map(state.products.map((record) => [record.product.id, record])),
+    [state.products],
   )
-  const selectedProduct = draft
-    ? state.products.find((record) => record.product.id === draft.productId)
-    : undefined
-  // A local change reaches the store before its browser write completes.
-  // Keep the selected option available until persistence confirms the save.
-  const selectableProducts =
-    isEditing && selectedProduct
-      ? [selectedProduct]
-      : sortedProducts.filter(
-          (record) =>
-            !record.product.discount || record.product.id === draft?.productId,
+  const sortedProducts = useMemo(
+    () =>
+      [...state.products].sort((a, b) => {
+        const brandA = brandsById.get(a.product.brandId)?.name ?? ''
+        const brandB = brandsById.get(b.product.brandId)?.name ?? ''
+        return `${brandA} ${a.product.name}`.localeCompare(
+          `${brandB} ${b.product.name}`,
+          'es',
         )
+      }),
+    [state.products, brandsById],
+  )
+  const offeredProducts = useMemo(
+    () => sortedProducts.filter((record) => record.product.discount),
+    [sortedProducts],
+  )
+  const availableProducts = useMemo(
+    () => sortedProducts.filter((record) => !record.product.discount),
+    [sortedProducts],
+  )
+  const selectedProduct = draft ? productsById.get(draft.productId) : undefined
+  const selectedProductId = draft?.productId
+  // Keep a just-saved product available until persistence confirms its save.
+  const selectableProducts = useMemo(
+    () =>
+      isEditing && selectedProduct
+        ? [selectedProduct]
+        : sortedProducts.filter(
+            (record) =>
+              !record.product.discount ||
+              record.product.id === selectedProductId,
+          ),
+    [isEditing, selectedProduct, sortedProducts, selectedProductId],
+  )
+  const productOptions = useMemo(
+    () =>
+      selectableProducts.map((record) => {
+        const brand = brandsById.get(record.product.brandId)?.name
+        return (
+          <option key={record.product.id} value={record.product.id}>
+            {brand ? `${brand} · ` : ''}
+            {record.product.name}
+          </option>
+        )
+      }),
+    [selectableProducts, brandsById],
+  )
   const parsedDiscount = draft ? discountFrom(draft) : null
   const previewError =
     draft && selectedProduct
@@ -421,10 +448,8 @@ export function AdminProductOffers() {
                       ? {
                           ...current,
                           productId: event.target.value,
-                          expectedVersion: state.products.find(
-                            (record) =>
-                              record.product.id === event.target.value,
-                          )?.version,
+                          expectedVersion: productsById.get(event.target.value)
+                            ?.version,
                         }
                       : current,
                   )
@@ -432,17 +457,7 @@ export function AdminProductOffers() {
                 required
               >
                 <option value="">Selecciona un producto</option>
-                {selectableProducts.map((record) => {
-                  const brand = state.brands.find(
-                    (item) => item.id === record.product.brandId,
-                  )?.name
-                  return (
-                    <option key={record.product.id} value={record.product.id}>
-                      {brand ? `${brand} · ` : ''}
-                      {record.product.name}
-                    </option>
-                  )
-                })}
+                {productOptions}
               </select>
             </label>
             <label>
@@ -665,9 +680,7 @@ export function AdminProductOffers() {
             const activeVariants = record.product.variants
               .filter((variant) => variant.active !== false)
               .sort((a, b) => (a.ml ?? 0) - (b.ml ?? 0))
-            const brand = state.brands.find(
-              (item) => item.id === record.product.brandId,
-            )?.name
+            const brand = brandsById.get(record.product.brandId)?.name
             return (
               <li key={record.product.id}>
                 <div className="admin-offers-list-heading">

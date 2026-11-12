@@ -21,6 +21,7 @@ export function HeroVideo({
   maximumDurationMs,
 }: HeroVideoProps) {
   const element = useRef<HTMLVideoElement>(null)
+  const cancelPendingPlay = useRef<(() => void) | null>(null)
   const [painted, setPainted] = useState(false)
   const unavailable = useEffectEvent(onUnavailable)
 
@@ -41,6 +42,10 @@ export function HeroVideo({
       }
       if (video.getAttribute('src') !== source) video.src = source
       if (video.currentTime * 1000 >= maximumDurationMs) video.currentTime = 0
+      const cancel = () => {
+        cancelled = true
+      }
+      cancelPendingPlay.current = cancel
       void video
         .play()
         .then(() => {
@@ -50,7 +55,9 @@ export function HeroVideo({
           if (!cancelled) unavailable()
         })
       return () => {
-        cancelled = true
+        cancel()
+        if (cancelPendingPlay.current === cancel)
+          cancelPendingPlay.current = null
         video.pause()
       }
     },
@@ -81,6 +88,9 @@ export function HeroVideo({
       onEnded={onEnded}
       onTimeUpdate={(event) => {
         if (event.currentTarget.currentTime * 1000 < maximumDurationMs) return
+        // pause() can reject a pending play() before React commits playing=false.
+        // Mark this intentional interruption before that rejection is handled.
+        cancelPendingPlay.current?.()
         event.currentTarget.pause()
         onEnded()
       }}

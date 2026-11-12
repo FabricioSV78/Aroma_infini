@@ -14,6 +14,7 @@ import { isRemoteCatalog } from './catalog-source'
 import { authService } from './auth-service'
 import { requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
+import { readAdminPageBatches } from './admin-page-batches'
 import { UserFacingError } from './admin-messages'
 
 import {
@@ -153,6 +154,20 @@ function confirmMutationOrders(records: unknown, history: unknown = []) {
   for (const entry of events) mergedHistory.set(entry.id, entry)
   applyRemoteOrders(orders, [...mergedHistory.values()])
 }
+function invalidateOrderReads() {
+  loadRevision++
+  pending = undefined
+}
+async function command<Result>(
+  request: () => PromiseLike<Result>,
+): Promise<Result> {
+  invalidateOrderReads()
+  try {
+    return await request()
+  } finally {
+    invalidateOrderReads()
+  }
+}
 export async function loadAdminOrders(force = false): Promise<void> {
   if (!isRemoteCatalog) return
   const current = await actor()
@@ -163,14 +178,28 @@ export async function loadAdminOrders(force = false): Promise<void> {
   const operation = (async () => {
     const orders: AdminOrder[] = [],
       history: OrderHistoryEntry[] = []
-    let total = 0
-    for (let offset = 0; offset === 0 || offset < total; offset += 100) {
-      const response = await requireSupabaseClient()
-        .rpc('admin_orders', { p_limit: 100, p_offset: offset })
-        .setHeader('Authorization', `Bearer ${current.token}`)
-      await stillActor(current)
-      check(response.error, response.status)
-      const page = object(response.data)
+    const { pages, total } = await readAdminPageBatches(
+      async (offset) => {
+        await stillActor(current)
+        const response = await requireSupabaseClient()
+          .rpc('admin_orders', { p_limit: 100, p_offset: offset })
+          .setHeader('Authorization', `Bearer ${current.token}`)
+        await stillActor(current)
+        check(response.error, response.status)
+        const page = object(response.data)
+        if (
+          !Array.isArray(page.orders) ||
+          page.orders.length > 100 ||
+          !Array.isArray(page.orderHistory) ||
+          (integer(page.total) > 0 && page.orders.length === 0)
+        )
+          invalid()
+        return page
+      },
+      (page) => page.total,
+      invalid,
+    )
+    for (const [index, page] of pages.entries()) {
       if (
         !Array.isArray(page.orders) ||
         !Array.isArray(page.orderHistory) ||
@@ -180,11 +209,10 @@ export async function loadAdminOrders(force = false): Promise<void> {
       const count = integer(page.total)
       if (
         count > 10000 ||
-        (offset > 0 && count !== total) ||
-        (offset < count && !page.orders.length)
+        count !== total ||
+        (index * 100 < count && !page.orders.length)
       )
         invalid()
-      total = count
       orders.push(...page.orders.map(parseAdminOrder))
       history.push(...page.orderHistory.map(parseOrderHistory))
     }
@@ -264,15 +292,17 @@ export const orderAdminService = {
         kind: 'validation',
         message: 'Selecciona entre uno y mil pedidos por operación.',
       }
-    const response = await requireSupabaseClient()
-      .rpc('admin_set_order_statuses', {
-        p_changes: changes as Json,
-        p_status: target,
-        p_operation_id: options.operationId ?? crypto.randomUUID(),
-        p_delivery_confirmed: options.deliveryConfirmed === true,
-        p_source: options.source ?? 'bulk',
-      })
-      .setHeader('Authorization', `Bearer ${current.token}`)
+    const response = await command(() =>
+      requireSupabaseClient()
+        .rpc('admin_set_order_statuses', {
+          p_changes: changes as Json,
+          p_status: target,
+          p_operation_id: options.operationId ?? crypto.randomUUID(),
+          p_delivery_confirmed: options.deliveryConfirmed === true,
+          p_source: options.source ?? 'bulk',
+        })
+        .setHeader('Authorization', `Bearer ${current.token}`),
+    )
     await stillActor(current)
     check(response.error, response.status)
     const data = object(response.data)
@@ -334,21 +364,23 @@ export const orderAdminService = {
         .orders.find((item) => item.reference === reference)
     if (!order)
       return { kind: 'validation', message: 'El pedido ya no está disponible.' }
-    const response = await requireSupabaseClient()
-      .rpc('admin_save_order_delivery', {
-        p_reference: reference,
-        p_expected_version: expectedVersion ?? order.version ?? 0,
-        p_address: {
-          ...order.address,
-          street: details.street,
-          department: details.department ?? order.address.department,
-          province: details.province ?? order.address.province,
-          district: details.district ?? order.address.district,
-        } as Json,
-        p_contact_phone: details.phone,
-        p_alternate_recipient: (order.alternateRecipient as Json) ?? null,
-      })
-      .setHeader('Authorization', `Bearer ${current.token}`)
+    const response = await command(() =>
+      requireSupabaseClient()
+        .rpc('admin_save_order_delivery', {
+          p_reference: reference,
+          p_expected_version: expectedVersion ?? order.version ?? 0,
+          p_address: {
+            ...order.address,
+            street: details.street,
+            department: details.department ?? order.address.department,
+            province: details.province ?? order.address.province,
+            district: details.district ?? order.address.district,
+          } as Json,
+          p_contact_phone: details.phone,
+          p_alternate_recipient: (order.alternateRecipient as Json) ?? null,
+        })
+        .setHeader('Authorization', `Bearer ${current.token}`),
+    )
     await stillActor(current)
     check(response.error, response.status)
     confirmMutationOrders([object(response.data).order])

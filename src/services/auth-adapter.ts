@@ -62,7 +62,22 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
       throw new AuthError('session')
     // getSession supplies credentials to the SDK; getUser verifies them remotely.
     const captured = cached.data.session
-    const verified = await verifySupabaseUser(captured.access_token)
+    const actorToken = captured.access_token
+    const readActor = () =>
+      client
+        .rpc('current_actor')
+        .setHeader('Authorization', `Bearer ${actorToken}`)
+    // Both authorities receive the same captured credential. Drain both reads,
+    // then retain Auth's error priority before interpreting any actor response.
+    const [verification, initialActor] = await Promise.allSettled([
+      verifySupabaseUser(actorToken),
+      readActor(),
+    ])
+    if (verification.status === 'rejected') {
+      if (isMissingSession(verification.reason)) return null
+      throw verification.reason
+    }
+    const verified = verification.value
     if (verified.error) {
       if (isMissingSession(verified.error)) return null
       throw verified.error
@@ -81,11 +96,7 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
       session.expires_at * 1000 <= Date.now()
     )
       return null
-    const actorToken = session.access_token
-    async function currentActor() {
-      const result = await client
-        .rpc('current_actor')
-        .setHeader('Authorization', `Bearer ${actorToken}`)
+    function parseActor(result: Awaited<ReturnType<typeof readActor>>) {
       if (result.error) throw mapSupabaseAuthError(result.error, 'service')
       const actor = result.data
       if (
@@ -104,7 +115,11 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
         throw new AuthError('service')
       return actor
     }
-    let actor = await currentActor()
+    async function currentActor() {
+      return parseActor(await readActor())
+    }
+    if (initialActor.status === 'rejected') throw initialActor.reason
+    let actor = parseActor(initialActor.value)
     if (
       actor.role === 'admin' &&
       actor.aal !== 'aal2' &&
@@ -127,7 +142,9 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
     if (after.error) throw after.error
     if (
       after.data.session?.user.id !== user.id ||
-      after.data.session.access_token !== session.access_token
+      after.data.session.access_token !== session.access_token ||
+      !after.data.session.expires_at ||
+      after.data.session.expires_at * 1000 <= Date.now()
     )
       return null
     const firstName = user.user_metadata?.firstName

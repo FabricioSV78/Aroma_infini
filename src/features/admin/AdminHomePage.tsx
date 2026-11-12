@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -81,6 +82,7 @@ function sameStringEntries(
 }
 
 function sameFinderContent(left: HomeFinderContent, right: HomeFinderContent) {
+  if (left === right) return true
   const textFields = [
     'eyebrow',
     'title',
@@ -141,6 +143,7 @@ function sameFinderContent(left: HomeFinderContent, right: HomeFinderContent) {
 }
 
 function sameHomeContent(left: HomeContent, right: HomeContent) {
+  if (left === right) return true
   return (
     left.featuredBrandId === right.featuredBrandId &&
     left.hero.length === right.hero.length &&
@@ -225,7 +228,12 @@ export function AdminHomePage() {
   const visibleCategories = categories.filter(
     (category) => category.id !== 'complementos' || features.complementsEnabled,
   )
-  const finderOptions = getFinderOptions(finderSnapshot)
+  const finderOptions = useMemo(
+    () => getFinderOptions(finderSnapshot),
+    // Matching helpers also read the validated vocabulary outside the snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [finderSnapshot, state.olfactoryFamilies],
+  )
   const finderStep = content.finder.steps[selectedFinderStep]
   const catalogFinderOptions =
     selectedFinderStep === 'family'

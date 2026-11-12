@@ -62,7 +62,3 @@ export const builtinMediaService = {
     return operation
   },
 }
-
-export function loadBuiltinMedia(force = false) {
-  return builtinMediaService.load(force)
-}

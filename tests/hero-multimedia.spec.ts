@@ -229,6 +229,13 @@ test('Después de una selección manual el fin no avanza y una reproducción lar
   await page.getByRole('button', { name: 'Ver campaña 2' }).click()
   const player = page.locator('.hero video')
   await expect(player).toHaveAttribute('src', secondVideo)
+  await expect
+    .poll(() =>
+      player.evaluate(
+        (video: HTMLVideoElement) => video.readyState >= 2 && !video.paused,
+      ),
+    )
+    .toBe(true)
   await player.evaluate((video: HTMLVideoElement) => {
     Object.defineProperty(video, 'currentTime', {
       configurable: true,
@@ -246,6 +253,69 @@ test('Después de una selección manual el fin no avanza y una reproducción lar
   await expect(
     page.getByRole('button', { name: 'Reproducir video de campaña' }),
   ).toBeVisible()
+})
+
+test('Una pausa al límite durante la carga conserva el video y permite volver a reproducirlo', async ({
+  page,
+}) => {
+  await campaignFixture(page)
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let response = Promise.resolve()
+  await page.route(`**${secondVideo}`, (route) => {
+    response = gate.then(() =>
+      route.fulfill({ contentType: 'video/mp4', body: videoBytes }),
+    )
+    return response
+  })
+  const player = page.locator('.hero video')
+  const replay = page.getByRole('button', {
+    name: 'Reproducir video de campaña',
+    exact: true,
+  })
+  try {
+    await page.getByRole('button', { name: 'Ver campaña 2' }).click()
+    await expect(player).toHaveAttribute('src', secondVideo)
+    await expect
+      .poll(() =>
+        player.evaluate((video: HTMLVideoElement) => ({
+          ready: video.readyState,
+          paused: video.paused,
+        })),
+      )
+      .toEqual({ ready: 0, paused: false })
+    await player.evaluate((video: HTMLVideoElement) => {
+      Object.defineProperty(video, 'currentTime', {
+        configurable: true,
+        writable: true,
+        value: 16,
+      })
+      video.dispatchEvent(new Event('timeupdate'))
+      delete (video as Partial<HTMLVideoElement>).currentTime
+    })
+    await expect(replay).toBeVisible()
+    await expect(player).toHaveCount(1)
+    await expect
+      .poll(() => player.evaluate((video: HTMLVideoElement) => video.paused))
+      .toBe(true)
+  } finally {
+    release()
+    await response
+  }
+  await replay.click()
+  await expect(player).toHaveAttribute('src', secondVideo)
+  await expect
+    .poll(() =>
+      player.evaluate(
+        (video: HTMLVideoElement) => video.readyState >= 2 && !video.paused,
+      ),
+    )
+    .toBe(true)
+  await expect(page.locator('.hero-slide.is-active .hero-title')).toHaveText(
+    'Segunda película',
+  )
 })
 
 test('Textos y botones son opcionales; un destino eliminado no crea enlaces rotos', async ({

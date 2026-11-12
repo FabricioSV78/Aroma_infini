@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { installAdminPageBatchGate } from './admin-page-batch-fixture'
 import type { HomeContent, HomeMedia } from '../src/types/home'
 import type { Page } from '@playwright/test'
 import type { AdminBrand, AdminProduct } from '../src/types/admin'
@@ -121,6 +122,7 @@ interface CatalogNetwork {
   importResponseLost: boolean
   failCatalogAfterImport: boolean
   catalogReadUnavailable: boolean
+  holdCatalogRead: Promise<void> | null
 }
 
 const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
@@ -150,6 +152,7 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
       importResponseLost: false,
       failCatalogAfterImport: false,
       catalogReadUnavailable: false,
+      holdCatalogRead: null,
     }
     const productVersions = state.productVersions
     const brandVersions = new Map([[remoteBrandId, 1]])
@@ -351,7 +354,7 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
         }
         const offset = Number(body.p_offset ?? 0)
         const limit = Number(body.p_limit ?? 100)
-        await reply({
+        const payload = structuredClone({
           products: state.products.slice(offset, offset + limit),
           brands: state.brands,
           features: { complementsEnabled: state.complementsEnabled },
@@ -367,6 +370,10 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
           settingsVersion: state.settingsVersion,
           total: state.products.length,
         })
+        const hold = state.holdCatalogRead
+        state.holdCatalogRead = null
+        if (hold) await hold
+        await reply(payload)
       } else {
         if (state.holdWrite) await state.holdWrite
         if (state.writeError) {
@@ -674,6 +681,167 @@ async function clientProducts(page: Page) {
       .products.map(({ product }) => ({ id: product.id, name: product.name }))
   })
 }
+
+for (const leave of [false, true]) {
+  test(`El catálogo carga mil registros con cuatro lecturas acotadas y ${leave ? 'descarta el lote al cerrar sesión' : 'publica un snapshot completo'}`, async ({
+    page,
+    context,
+    supabaseNetwork,
+    catalogNetwork,
+  }) => {
+    await signInAdmin(page, supabaseNetwork)
+    catalogNetwork.products = Array.from({ length: 1000 }, (_, index) => {
+      const record = makeProduct()
+      record.product.id = `c4110000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+      record.product.slug = `batch-fixture-${index + 1}`
+      record.product.sku = String(10000 + index)
+      record.product.variants[0].id = `c4120000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+      record.product.variants[0].sku = String(1000 + index)
+      catalogNetwork.productVersions.set(record.product.id, 1)
+      return record
+    })
+    // A document entry in Shipping has no in-memory catalog. Test the initial
+    // thousand-row load, rather than replacing an already complete snapshot.
+    await page.goto('/admin/envios')
+    await expect(page.locator('main h1')).toHaveText('Tarifas de envío')
+    const gate = await installAdminPageBatchGate(
+      context,
+      origin,
+      'admin_catalog_page',
+    )
+    const reading = page.evaluate(async () => {
+      const path = '/src/services/catalog-admin-service.ts'
+      const { loadAdminCatalog } = (await import(
+        path
+      )) as typeof import('../src/services/catalog-admin-service')
+      try {
+        await loadAdminCatalog(true)
+        return 'resolved'
+      } catch {
+        return 'rejected'
+      }
+    })
+    try {
+      await expect.poll(() => gate.started.length).toBe(5)
+      expect(gate.peak()).toBe(4)
+      expect(
+        await page.evaluate(async () => {
+          const path = '/src/services/admin-service.ts'
+          const { adminService } = (await import(
+            path
+          )) as typeof import('../src/services/admin-service')
+          const catalogPath = '/src/services/catalog-admin-service.ts'
+          const { hasCurrentAdminCatalog } = (await import(
+            catalogPath
+          )) as typeof import('../src/services/catalog-admin-service')
+          return {
+            count: adminService.getSnapshot().products.length,
+            reusable: hasCurrentAdminCatalog(),
+          }
+        }),
+      ).toEqual({ count: 0, reusable: false })
+      if (leave) {
+        await page.evaluate(async () => {
+          const path = '/src/services/auth-service.ts'
+          const { authService } = (await import(
+            path
+          )) as typeof import('../src/services/auth-service')
+          await authService.signOut()
+        })
+      }
+      gate.releaseAll()
+      expect(await reading).toBe(leave ? 'rejected' : 'resolved')
+      const result = await page.evaluate(async () => {
+        const path = '/src/services/admin-service.ts'
+        const { adminService } = (await import(
+          path
+        )) as typeof import('../src/services/admin-service')
+        const catalogPath = '/src/services/catalog-admin-service.ts'
+        const { hasCurrentAdminCatalog } = (await import(
+          catalogPath
+        )) as typeof import('../src/services/catalog-admin-service')
+        return {
+          count: adminService.getSnapshot().products.length,
+          reusable: hasCurrentAdminCatalog(),
+        }
+      })
+      expect(result).toEqual({ count: leave ? 0 : 1000, reusable: !leave })
+      expect([...gate.started].sort((a, b) => a - b)).toEqual(
+        Array.from({ length: leave ? 5 : 10 }, (_, index) => index * 100),
+      )
+    } finally {
+      gate.releaseAll()
+      await reading
+    }
+  })
+}
+
+test('Una lectura anterior al guardado no reemplaza el producto canónico confirmado', async ({
+  page,
+  supabaseNetwork,
+  catalogNetwork,
+}) => {
+  await signInAdmin(page, supabaseNetwork)
+  let release!: () => void
+  catalogNetwork.holdCatalogRead = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const before = catalogNetwork.calls.filter(
+    ({ name }) => name === 'admin_catalog_page',
+  ).length
+  const reading = page.evaluate(async () => {
+    const path = '/src/services/catalog-admin-service.ts'
+    const { loadAdminCatalog } = (await import(
+      path
+    )) as typeof import('../src/services/catalog-admin-service')
+    await loadAdminCatalog(true)
+  })
+  try {
+    await expect
+      .poll(
+        () =>
+          catalogNetwork.calls.filter(
+            ({ name }) => name === 'admin_catalog_page',
+          ).length,
+      )
+      .toBe(before + 1)
+    await page.evaluate(async (id) => {
+      const path = '/src/services/catalog-admin-service.ts'
+      const { catalogAdminService } = (await import(
+        path
+      )) as typeof import('../src/services/catalog-admin-service')
+      const record = catalogAdminService
+        .getSnapshot()
+        .products.find((item) => item.product.id === id)!
+      const result = await catalogAdminService.saveProduct({
+        ...record,
+        product: { ...record.product, name: 'Canonical product after write' },
+      })
+      if (result.kind !== 'saved')
+        throw new Error('The canonical fixture mutation did not succeed')
+    }, remoteProductId)
+    expect(catalogNetwork.productVersions.get(remoteProductId)).toBe(2)
+    release()
+    await reading
+    const confirmed = await page.evaluate(async (id) => {
+      const path = '/src/services/admin-service.ts'
+      const { adminService } = (await import(
+        path
+      )) as typeof import('../src/services/admin-service')
+      const record = adminService
+        .getSnapshot()
+        .products.find((item) => item.product.id === id)
+      return { version: record?.version, name: record?.product.name }
+    }, remoteProductId)
+    expect(confirmed).toEqual({
+      version: 2,
+      name: 'Canonical product after write',
+    })
+  } finally {
+    release()
+    await reading
+  }
+})
 
 test('Home y marcas usan proyecciones públicas acotadas sin descargar el snapshot completo', async ({
   page,

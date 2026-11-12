@@ -1,5 +1,7 @@
 # Preparación de producción — Aroma Infini
 
+**Comprobación actual, 12 de noviembre:** consultar la [auditoría de sincronización y limpieza](SUPABASE_SYNC_CLEANUP_2026_11_12.md). Desarrollo tiene 37 migraciones y producción 25; las doce pendientes de producción están preparadas para revisión, sin ejecutar. Los apartados siguientes conservan evidencia histórica y no describen automáticamente el esquema actual. El plan pendiente no autoriza un despliegue o la apertura comercial.
+
 **Última comprobación alojada, 7 de noviembre:** consultar la [auditoría de seguridad y robustez](SECURITY_ROBUSTNESS_AUDIT_2026_11_07.md), además del [checklist de lanzamiento](LAUNCH_AUDIT_2026_11_06.md). Desarrollo tiene 28 migraciones y producción conserva 25. El [mantenimiento del 8 de noviembre](PROJECT_HEALTH_IMPROVEMENTS_2026_11_08.md) es local y no constituye un despliegue ni una autorización de apertura. Los apartados fechados debajo conservan evidencia histórica; sus cifras y afirmaciones no describen automáticamente el estado actual.
 
 **Cierre de auditoría del 4 de noviembre:** véase [auditoría integral vigente](FULL_SITE_AUDIT_2026_11_04.md). Ambas bases tienen 25 migraciones; los respaldos renovados restauraron 68 tablas por entorno. El informe distingue las integraciones de dominio/pagos de la validación del contenido, la transición de respaldos y las pruebas en dispositivos físicos todavía necesarias.

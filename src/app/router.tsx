@@ -1,4 +1,8 @@
-import { createBrowserRouter, redirect } from 'react-router'
+import {
+  createBrowserRouter,
+  redirect,
+  type LoaderFunctionArgs,
+} from 'react-router'
 import { StoreLayout } from '../components/layout/StoreLayout'
 import { HomePage } from '../features/home/HomePage'
 import { PendingPage } from '../pages/PendingPage'
@@ -12,6 +16,7 @@ import {
 } from '../features/auth/auth-loaders'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import {
+  hasCurrentAdminCatalog,
   loadAdminCatalog,
   loadAdminHome,
 } from '../services/catalog-admin-service'
@@ -29,6 +34,22 @@ const loadCatalogPage = async () => {
   const module = await import('../features/catalog/CatalogPage')
   return { Component: module.CatalogPage }
 }
+
+const authorizeAndLoadAdminCatalog = adminDataLoader(loadAdminCatalog)
+const authorizeAndLoadAdminCommerceSettings = adminDataLoader(
+  loadAdminCommerceSettings,
+)
+const adminPromotionsLoader = (args: LoaderFunctionArgs) =>
+  // Only the selected panel mounts. Keep its fresh access check and load the
+  // records it consumes before committing direct links or tab navigation.
+  (new URL(args.request.url).searchParams.get('vista') === 'ofertas'
+    ? authorizeAndLoadAdminCatalog
+    : authorizeAndLoadAdminCommerceSettings)(args)
+const adminCatalogListLoader = (args: LoaderFunctionArgs) =>
+  // Preserve the former warm-list reuse policy. Missing/invalidated owner
+  // snapshots take the full authenticated path; editors and commands do not
+  // use this shortcut, and every remote RPC still enforces SQL authorization.
+  hasCurrentAdminCatalog() ? null : authorizeAndLoadAdminCatalog(args)
 
 export const router = createBrowserRouter([
   {
@@ -288,11 +309,9 @@ export const router = createBrowserRouter([
   ),
   {
     path: 'admin',
-    loader: async (args) => {
-      await requireAuthLoader('admin')(args)
-      await loadAdminCatalog()
-      return null
-    },
+    // Authenticate the shell without downloading unrelated private datasets.
+    // Each workspace loads the complete records it actually consumes below.
+    loader: requireAuthLoader('admin'),
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: (
       <PageLoadingState pathname={window.location.pathname} />
@@ -310,7 +329,9 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        loader: adminDataLoader(loadAdminOrders),
+        loader: adminDataLoader(async () => {
+          await Promise.all([loadAdminCatalog(), loadAdminOrders()])
+        }),
         lazy: async () => {
           const module = await adminRouteModules.dashboard()
           return { Component: module.AdminDashboardPage }
@@ -318,6 +339,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'productos',
+        loader: adminCatalogListLoader,
         lazy: async () => {
           const module = await adminRouteModules.products()
           return { Component: module.AdminProductsPage }
@@ -325,13 +347,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'productos/nuevo',
+        loader: adminDataLoader(loadAdminCatalog),
         lazy: async () => {
-          const module = await adminRouteModules.products()
+          const module = await adminRouteModules.productForm()
           return { Component: module.AdminProductFormPage }
         },
       },
       {
         path: 'productos/:id/fotos',
+        loader: adminDataLoader(loadAdminCatalog),
         lazy: async () => {
           const module = await adminRouteModules.productPhotos()
           return { Component: module.AdminProductPhotoPage }
@@ -339,13 +363,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'productos/:id',
+        loader: adminDataLoader(loadAdminCatalog),
         lazy: async () => {
-          const module = await adminRouteModules.products()
+          const module = await adminRouteModules.productForm()
           return { Component: module.AdminProductFormPage }
         },
       },
       {
         path: 'familias-olfativas',
+        loader: adminCatalogListLoader,
         lazy: async () => {
           const module = await adminRouteModules.families()
           return { Component: module.AdminOlfactoryFamilies }
@@ -360,8 +386,9 @@ export const router = createBrowserRouter([
       },
       {
         path: 'marcas',
+        loader: adminCatalogListLoader,
         lazy: async () => {
-          const module = await adminRouteModules.operations()
+          const module = await adminRouteModules.brands()
           return { Component: module.AdminBrandsPage }
         },
       },
@@ -375,9 +402,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'pedidos/:reference',
-        loader: adminDataLoader(loadAdminOrders),
+        loader: adminDataLoader(async () => {
+          await Promise.all([loadAdminOrders(), loadAdminCommerceSettings()])
+        }),
         lazy: async () => {
-          const module = await adminRouteModules.operations()
+          const module = await adminRouteModules.orderDetail()
           return { Component: module.AdminOrderDetailPage }
         },
       },
@@ -385,15 +414,15 @@ export const router = createBrowserRouter([
         path: 'clientes',
         loader: adminDataLoader(loadAdminOrders),
         lazy: async () => {
-          const module = await adminRouteModules.operations()
+          const module = await adminRouteModules.customers()
           return { Component: module.AdminCustomersPage }
         },
       },
       {
         path: 'promociones',
-        loader: adminDataLoader(loadAdminCommerceSettings),
+        loader: adminPromotionsLoader,
         lazy: async () => {
-          const module = await adminRouteModules.operations()
+          const module = await adminRouteModules.promotions()
           return { Component: module.AdminPromotionsPage }
         },
       },

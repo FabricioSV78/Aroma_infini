@@ -8,7 +8,7 @@ import {
 import type { AdminProduct } from '../../services/admin-service'
 import type { ProductGalleryView } from '../../types/catalog'
 import { isPerfume } from '../../domain/product-type'
-import { imageSource } from '../../services/image-source'
+import { imageSource, imageSourceSet } from '../../services/image-source'
 import { prepareProductPhoto } from '../../services/product-photo-upload'
 import { UserFacingError } from '../../services/admin-messages'
 import { Dialog } from '../../components/ui/Dialog'
@@ -293,7 +293,10 @@ export function AdminProductPhotos({
         {view.image ? (
           <img
             src={imageSource(view.image)}
+            srcSet={imageSourceSet(view.image, [480, 960])}
+            sizes="(max-width: 620px) 70px, 88px"
             alt={photoNames[index]}
+            decoding="async"
             draggable={!locked}
             onDragStart={(event) => {
               event.dataTransfer.setData(

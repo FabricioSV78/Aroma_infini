@@ -20,6 +20,7 @@ import { isRemoteCatalog } from './catalog-source'
 import { authService } from './auth-service'
 import { requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
+import { readAdminPageBatches } from './admin-page-batches'
 import {
   parseCatalogBrand,
   parseCatalogProductRecord,
@@ -63,6 +64,7 @@ let loadedOwner: string | null = null
 let loading: Promise<void> | undefined
 let loadingOwner: string | null = null
 let epoch = 0
+let readRevision = 0
 let settingsVersion: number | null = null
 
 function object(value: unknown): Record<string, unknown> {
@@ -89,6 +91,29 @@ function features(value: unknown): StoreFeatures {
       'No pudimos leer la configuración del catálogo.',
     )
   return { complementsEnabled: settings.complementsEnabled }
+}
+function catalogPage(value: unknown): Record<string, unknown> {
+  const page = object(value)
+  if (
+    !Array.isArray(page.products) ||
+    page.products.length > 100 ||
+    !Array.isArray(page.brands) ||
+    !Array.isArray(page.olfactoryFamilies) ||
+    typeof page.total !== 'number' ||
+    !Number.isSafeInteger(page.total) ||
+    page.total < 0 ||
+    page.total > 10000 ||
+    (page.total > 0 && page.products.length === 0)
+  )
+    throw new UserFacingError(
+      'response',
+      'La respuesta del catálogo está incompleta o no es válida. Vuelve a cargarlo.',
+    )
+  object(page.productVersions)
+  object(page.brandVersions)
+  features(page.features)
+  revision(page.settingsVersion)
+  return page
 }
 function product(value: unknown, version: unknown): AdminProduct {
   const source = object(value)
@@ -222,6 +247,26 @@ async function rpc<N extends RpcName>(
   return response.data
 }
 
+function invalidateCatalogReads() {
+  readRevision++
+  loading = undefined
+  loadingOwner = null
+}
+/** Only the SQL association/write invalidates reads; preparation/R2 uploads do not. */
+async function command<N extends RpcName>(
+  name: N,
+  args: RpcArgs<N> | undefined,
+  expected: Actor,
+): Promise<unknown> {
+  invalidateCatalogReads()
+  try {
+    return await rpc(name, args, expected)
+  } finally {
+    // Also obsolete reads started while the write was awaiting its response.
+    invalidateCatalogReads()
+  }
+}
+
 function clearRemoteCatalog() {
   epoch++
   loadedOwner = null
@@ -233,6 +278,21 @@ function clearRemoteCatalog() {
     brands: [],
     features: { complementsEnabled: false },
   })
+}
+
+/** Reuse only the complete, already-authorized in-memory catalog of this
+ * still-valid owner. This is not an authorization result or a write shortcut. */
+export function hasCurrentAdminCatalog(): boolean {
+  if (!isRemoteCatalog || !loadedOwner) return false
+  const state = authService.getSnapshot()
+  return (
+    state.status === 'authenticated' &&
+    state.session?.user.id === loadedOwner &&
+    state.session.user.role === 'admin' &&
+    state.session.intent === 'account' &&
+    !state.session.mfaRequired &&
+    state.session.expiresAt > Date.now()
+  )
 }
 
 /** Home is loaded only for its editor; other admin lists need no editorial payload. */
@@ -280,6 +340,7 @@ export async function loadAdminCatalog(force = false): Promise<void> {
   if (loadedOwner === current.userId && !force) return
   if (loading && loadingOwner === current.userId) return loading
   const started = ++epoch
+  const startedReadRevision = readRevision
   const operation = (async () => {
     const products: AdminProduct[] = []
     let brands: AdminBrand[] = []
@@ -287,16 +348,26 @@ export async function loadAdminCatalog(force = false): Promise<void> {
     let selectedVersion = 0
     let featuredBrandId: string | null = null
     let olfactoryFamilies: OlfactoryFamilyDefinition[] = []
-    let total: number | undefined
     const ids = new Set<string>()
-    for (let offset = 0; offset <= 10000; offset += 100) {
-      const page = object(
-        await rpc(
-          'admin_catalog_page',
-          { p_limit: 100, p_offset: offset },
-          current,
+    const { pages, total } = await readAdminPageBatches(
+      async (offset) =>
+        catalogPage(
+          await rpc(
+            'admin_catalog_page',
+            { p_limit: 100, p_offset: offset },
+            current,
+          ),
         ),
-      )
+      (page) => page.total,
+      () => {
+        throw new UserFacingError(
+          'response',
+          'El catálogo cambió durante la carga o excede el límite de esta consulta. Vuelve a cargarlo.',
+        )
+      },
+    )
+    for (const [index, page] of pages.entries()) {
+      const offset = index * 100
       if (
         !Array.isArray(page.products) ||
         !Array.isArray(page.brands) ||
@@ -304,13 +375,12 @@ export async function loadAdminCatalog(force = false): Promise<void> {
         !Number.isSafeInteger(page.total) ||
         page.total < 0 ||
         page.total > 10000 ||
-        (total !== undefined && page.total !== total)
+        page.total !== total
       )
         throw new UserFacingError(
           'response',
           'El catálogo cambió durante la carga o excede el límite de esta consulta. Vuelve a cargarlo.',
         )
-      total = page.total
       const versions = object(page.productVersions)
       const pageFamilies = parseOlfactoryFamilyDefinitions(
         page.olfactoryFamilies,
@@ -325,6 +395,7 @@ export async function loadAdminCatalog(force = false): Promise<void> {
           'Las familias cambiaron durante la carga. Vuelve a intentarlo.',
         )
       await stillActor(current)
+      if (startedReadRevision !== readRevision) return
       replaceOlfactoryFamilies(olfactoryFamilies)
       const brandVersions = object(page.brandVersions)
       const records = page.products.map((entry) => {
@@ -364,7 +435,6 @@ export async function loadAdminCatalog(force = false): Promise<void> {
         featuredBrandId =
           typeof page.featuredBrandId === 'string' ? page.featuredBrandId : null
       }
-      if (products.length >= total) break
     }
     if (products.length !== total)
       throw new UserFacingError(
@@ -372,6 +442,7 @@ export async function loadAdminCatalog(force = false): Promise<void> {
         'El catálogo está incompleto. Vuelve a cargarlo.',
       )
     await stillActor(current)
+    if (startedReadRevision !== readRevision) return
     if (started !== epoch) sessionError()
     loadedOwner = current.userId
     settingsVersion = selectedVersion
@@ -559,7 +630,7 @@ export const catalogAdminService = {
     if (invalid) return { kind: 'validation', message: invalid }
     const current = await actor()
     try {
-      await rpc(
+      await command(
         'admin_save_olfactory_family',
         {
           p_label: input.label,
@@ -599,7 +670,7 @@ export const catalogAdminService = {
   ): Promise<AdminSaveResult> {
     if (!isRemoteCatalog) return local.deleteOlfactoryFamily(code, version)
     const current = await actor()
-    await rpc(
+    await command(
       'admin_delete_olfactory_family',
       { p_code: code, p_expected_version: version },
       current,
@@ -627,7 +698,7 @@ export const catalogAdminService = {
       assertCurrent: () => stillActor(current),
     })
     return savedProduct(
-      await rpc(
+      await command(
         'admin_save_product',
         {
           p_record: json(writeRecord(record)),
@@ -666,7 +737,7 @@ export const catalogAdminService = {
       return { kind: 'validation', message: 'El producto ya no existe.' }
     const current = await actor()
     return savedProduct(
-      await rpc(
+      await command(
         'admin_save_offer',
         {
           p_product_id: id,
@@ -681,7 +752,7 @@ export const catalogAdminService = {
   async saveBrand(record: AdminBrand): Promise<AdminSaveResult> {
     if (!isRemoteCatalog) return local.saveBrand(record)
     const current = await actor()
-    await rpc(
+    await command(
       'admin_save_brand',
       {
         p_brand: json({ ...record, id: canonicalId(record.id) }),
@@ -732,7 +803,7 @@ export const catalogAdminService = {
       }
     const current = await actor()
     const response = object(
-      await rpc(
+      await command(
         'admin_register_brands',
         { p_names: preview.rows.map((row) => row.name) },
         current,
@@ -825,7 +896,7 @@ export const catalogAdminService = {
     const current = await actor()
     const requested = records.map(writeRecord)
     try {
-      const response = await rpc(
+      const response = await command(
         'admin_import_products',
         { p_records: json(requested) },
         current,
@@ -871,7 +942,7 @@ export const catalogAdminService = {
     if (!isRemoteCatalog) return local.saveStoreFeatures(value)
     const current = await actor()
     const response = object(
-      await rpc(
+      await command(
         'admin_save_features',
         {
           p_complements_enabled: value.complementsEnabled,
@@ -924,7 +995,7 @@ export const catalogAdminService = {
       assertCurrent: () => stillActor(current),
     })
     const response = object(
-      await rpc(
+      await command(
         'admin_save_home',
         {
           p_media: json(prepared.media),

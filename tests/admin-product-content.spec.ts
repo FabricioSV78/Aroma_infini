@@ -67,6 +67,20 @@ test('la fotografía olfativa y los relacionados se editan por perfume sin campo
   await expect(page.locator('.admin-related-products > summary')).toContainText(
     '4 de 4',
   )
+  // Closing the native details releases its long options list while the
+  // unsaved selection remains in the product draft.
+  const related = page.locator('.admin-related-products')
+  const relatedSummary = related.locator('summary')
+  await relatedSummary.click()
+  await expect(related).not.toHaveAttribute('open')
+  await expect(related.getByRole('checkbox')).toHaveCount(0)
+  await relatedSummary.click()
+  await expect(
+    related.getByRole('checkbox', { name: /Figue Douce/ }),
+  ).toBeChecked()
+  await expect(
+    related.getByRole('checkbox', { name: /Vert Silence/ }),
+  ).not.toBeChecked()
 
   await page.getByRole('button', { name: 'Guardar producto' }).click()
   await expect(page).toHaveURL(/guardado=1/)

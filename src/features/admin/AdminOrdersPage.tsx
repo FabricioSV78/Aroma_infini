@@ -110,19 +110,34 @@ export function AdminOrdersPage() {
   useEffect(() => {
     if (!isRemoteCatalog) return
     let active = true
+    let refreshFrame: number | null = null
+    const cancelRefresh = () => {
+      if (refreshFrame === null) return
+      window.cancelAnimationFrame(refreshFrame)
+      refreshFrame = null
+    }
     const refresh = () => {
-      if (document.visibilityState !== 'visible') return
-      void loadAdminOrders(true).catch(() => {
-        if (active)
-          setError(
-            'No pudimos actualizar la lista. Conservamos los pedidos confirmados; vuelve a abrir este apartado para intentar de nuevo.',
-          )
+      if (document.visibilityState !== 'visible') {
+        cancelRefresh()
+        return
+      }
+      if (refreshFrame !== null) return
+      refreshFrame = window.requestAnimationFrame(() => {
+        refreshFrame = null
+        if (!active || document.visibilityState !== 'visible') return
+        void loadAdminOrders(true).catch(() => {
+          if (active)
+            setError(
+              'No pudimos actualizar la lista. Conservamos los pedidos confirmados; vuelve a abrir este apartado para intentar de nuevo.',
+            )
+        })
       })
     }
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     return () => {
       active = false
+      cancelRefresh()
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
     }

@@ -1,7 +1,6 @@
 import type { Brand, Product, ProductVariant } from './catalog'
 
 export type FinderStep = 'family' | 'occasion' | 'intensity' | 'budget'
-export type FinderPreferenceStep = Exclude<FinderStep, 'budget'>
 export interface FinderOption {
   value: string
   label: string

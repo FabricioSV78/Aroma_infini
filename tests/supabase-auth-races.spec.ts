@@ -62,6 +62,183 @@ async function invoke(page: Page, action: 'enroll' | 'verified') {
   }, action)
 }
 
+async function readyVerifiedCustomer(page: Page) {
+  await signIn(page)
+  await expect(page).toHaveURL('/cuenta')
+  await page.evaluate(async () => {
+    const source = '/src/services/auth-service.ts'
+    const { authService } = await import(source)
+    await authService.initialize()
+  })
+}
+
+for (const first of ['user', 'actor'] as const) {
+  test(`Auth y actor arrancan en paralelo y esperan ambas respuestas: primero ${first}`, async ({
+    page,
+    supabaseNetwork,
+  }) => {
+    void supabaseNetwork
+    await readyVerifiedCustomer(page)
+    const { access_token: token } = await snapshot(page)
+    const release = { user: gate(), actor: gate() }
+    const requests: Array<{ kind: 'user' | 'actor'; bearer: string }> = []
+    const origin = `https://${fixtureProject}.supabase.co`
+    await page.route(`${origin}/auth/v1/user`, async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback()
+      requests.push({
+        kind: 'user',
+        bearer: route.request().headers().authorization ?? '',
+      })
+      await release.user.wait
+      await route.fallback()
+    })
+    await page.route(`${origin}/rest/v1/rpc/current_actor`, async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fallback()
+      requests.push({
+        kind: 'actor',
+        bearer: route.request().headers().authorization ?? '',
+      })
+      await release.actor.wait
+      await route.fallback()
+    })
+    let returned = false
+    const reading = invoke(page, 'verified').then((value) => {
+      returned = true
+      return value
+    })
+    try {
+      await expect
+        .poll(() => requests.filter(({ kind }) => kind === 'user').length)
+        .toBe(1)
+      // In the old sequential implementation this actor request cannot start
+      // until the held getUser response finishes; this is the positive oracle.
+      await expect
+        .poll(() => requests.filter(({ kind }) => kind === 'actor').length)
+        .toBe(1)
+      expect(requests.every(({ bearer }) => bearer === `Bearer ${token}`)).toBe(
+        true,
+      )
+      expect(returned).toBe(false)
+      const url =
+        first === 'user'
+          ? `${origin}/auth/v1/user`
+          : `${origin}/rest/v1/rpc/current_actor`
+      const finished = page.waitForResponse(
+        (response) =>
+          response.url() === url && response.request().method() !== 'OPTIONS',
+      )
+      release[first].resolve()
+      await (await finished).finished()
+      await page.evaluate(() => Promise.resolve())
+      expect(returned).toBe(false)
+      release[first === 'user' ? 'actor' : 'user'].resolve()
+      expect(await reading).toEqual({ succeeded: true, empty: false })
+      expect(requests).toHaveLength(2)
+    } finally {
+      release.user.resolve()
+      release.actor.resolve()
+      await reading
+    }
+  })
+}
+
+test('Auth rechazada prevalece sobre un actor válido y espera terminar la lectura paralela', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  void supabaseNetwork
+  await readyVerifiedCustomer(page)
+  const release = gate()
+  let actorArrived = false
+  const origin = `https://${fixtureProject}.supabase.co`
+  const headers = {
+    'x-supabase-api-version': '2024-01-01',
+    'access-control-expose-headers': 'x-supabase-api-version',
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': '*',
+  }
+  await page.route(`${origin}/auth/v1/user`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    await route.fulfill({
+      status: 401,
+      headers,
+      json: { code: 'bad_jwt', message: 'Isolated revoked Auth user' },
+    })
+  })
+  await page.route(`${origin}/rest/v1/rpc/current_actor`, async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fallback()
+    actorArrived = true
+    await release.wait
+    await route.fulfill({
+      headers,
+      json: {
+        user_id: customerA,
+        role: 'admin',
+        aal: 'aal2',
+        requires_mfa: false,
+      },
+    })
+  })
+  let returned = false
+  const reading = invoke(page, 'verified').then((value) => {
+    returned = true
+    return value
+  })
+  try {
+    await expect.poll(() => actorArrived).toBe(true)
+    expect(returned).toBe(false)
+    release.resolve()
+    expect(await reading).toEqual({ succeeded: true, empty: true })
+  } finally {
+    release.resolve()
+    await reading
+  }
+})
+
+test('Cerrar sesión descarta Auth y actor que ya estaban pendientes en paralelo', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  void supabaseNetwork
+  await readyVerifiedCustomer(page)
+  const release = gate()
+  const arrived = { user: false, actor: false }
+  const origin = `https://${fixtureProject}.supabase.co`
+  await page.route(`${origin}/auth/v1/user`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    arrived.user = true
+    await release.wait
+    await route.fallback()
+  })
+  await page.route(`${origin}/rest/v1/rpc/current_actor`, async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fallback()
+    arrived.actor = true
+    await release.wait
+    await route.fallback()
+  })
+  const reading = invoke(page, 'verified')
+  try {
+    await expect.poll(() => arrived).toEqual({ user: true, actor: true })
+    await page.evaluate(async () => {
+      const source = '/src/services/auth-service.ts'
+      const { authService } = await import(source)
+      await authService.signOut()
+    })
+    release.resolve()
+    expect(await reading).toEqual({ succeeded: true, empty: true })
+    expect(
+      await page.evaluate(async () => {
+        const source = '/src/services/auth-service.ts'
+        const { authService } = await import(source)
+        return authService.getSnapshot().session
+      }),
+    ).toBeNull()
+  } finally {
+    release.resolve()
+    await reading
+  }
+})
+
 test('las verificaciones simultáneas comparten solo el mismo token en vuelo y vuelven a consultar después', async ({
   page,
   supabaseNetwork,

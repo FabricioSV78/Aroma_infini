@@ -232,6 +232,7 @@ function currentAdminOwner(): string | null {
 let sessionEpoch = 0,
   sessionOwner = currentAdminOwner()
 let settingsLoading: { actor: Actor; task: Promise<void> } | undefined
+let readRevision = 0
 if (isRemoteCatalog)
   authService.subscribe(() => {
     const owner = currentAdminOwner()
@@ -339,6 +340,22 @@ async function rpc<N extends RpcName>(
   checkError(response.error, response.status)
   return response.data
 }
+function invalidateSettingsReads() {
+  readRevision++
+  settingsLoading = undefined
+}
+async function command<N extends RpcName>(
+  name: N,
+  args: Database['api']['Functions'][N]['Args'] | undefined,
+  expected: Actor,
+) {
+  invalidateSettingsReads()
+  try {
+    return await rpc(name, args, expected)
+  } finally {
+    invalidateSettingsReads()
+  }
+}
 export async function loadAdminCommerceSettings(): Promise<void> {
   if (!isRemoteCatalog) return
   const current = await actor()
@@ -348,11 +365,13 @@ export async function loadAdminCommerceSettings(): Promise<void> {
     settingsLoading.actor.token === current.token
   )
     return settingsLoading.task
+  const startedReadRevision = readRevision
   const task = (async () => {
     const data = parseAdminSettings(
       await rpc('admin_commerce_settings', undefined, current),
     )
     await stillActor(current)
+    if (startedReadRevision !== readRevision) return
     applyRemoteCommerceSettings(data)
   })()
   settingsLoading = { actor: current, task }
@@ -374,7 +393,7 @@ export const commerceSettingsService = {
     const { configured: _configured, ...payload } = shipping
     void _configured
     const response = object(
-      await rpc(
+      await command(
         'admin_save_shipping',
         { p_shipping: json(payload), p_expected_version: expectedVersion },
         current,
@@ -417,7 +436,7 @@ export const commerceSettingsService = {
       }
     }
     const response = object(
-      await rpc(
+      await command(
         'admin_save_coupon',
         { p_coupon: json(payload), p_expected_version: promotion.version ?? 0 },
         current,
@@ -465,7 +484,7 @@ export const commerceSettingsService = {
   ): Promise<AdminSaveResult> {
     if (!isRemoteCatalog) return adminService.deletePromotion(id)
     const current = await actor()
-    await rpc(
+    await command(
       'admin_delete_coupon',
       { p_id: id, p_expected_version: expectedVersion },
       current,

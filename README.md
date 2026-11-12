@@ -1,5 +1,7 @@
 # Aroma Infini
 
+Estado comprobado el 12 de noviembre de 2026: [sincronización de Supabase y limpieza del proyecto](docs/SUPABASE_SYNC_CLEANUP_2026_11_12.md). Desarrollo tiene 37 migraciones; producción conserva 25 y tiene doce pendientes de autorización. El informe distingue objetos de aplicación, diferencias administrativas del servicio, tipos reales y limpieza verificada. Las auditorías anteriores conservan su fecha y alcance.
+
 Despliegues desde GitHub: [configuración de ramas, staging y aprobación de producción](docs/GITHUB_DEPLOYMENT.md). El flujo está preparado en `.github/workflows/`; requiere configurar los entornos y secretos de GitHub antes de su primera ejecución. Producción permanece cerrada y deshabilitada por defecto.
 
 Estado y mantenimiento: [consolidación técnica del 8 y 9 de noviembre de 2026](docs/PROJECT_HEALTH_IMPROVEMENTS_2026_11_08.md). Para seguridad y condiciones de apertura, consultar la [auditoría del 7 de noviembre](docs/SECURITY_ROBUSTNESS_AUDIT_2026_11_07.md) y el [checklist de lanzamiento](docs/LAUNCH_AUDIT_2026_11_06.md). Cada informe conserva su fecha y el alcance real de sus pruebas; los anteriores son historial.

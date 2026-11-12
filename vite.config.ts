@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createBuildTarget } from './scripts/build-identity.ts'
 import { privilegedPublicValue } from './scripts/public-environment.mjs'
+import { viteTestCache } from './scripts/vite-test-cache.mjs'
 import {
   INDEXABLE_ROBOTS,
   PRIVATE_ROBOTS,
@@ -37,6 +38,7 @@ export default defineConfig(({ mode }) => {
       : PRIVATE_ROBOTS
   return {
     plugins: [
+      viteTestCache(),
       react(),
       tailwindcss(),
       {

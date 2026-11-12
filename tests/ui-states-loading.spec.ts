@@ -4,7 +4,7 @@ test('la navegación del panel indica la carga del módulo sin vaciar la pantall
   page,
 }) => {
   await page.route(
-    (url) => url.pathname === '/src/features/admin/AdminOperations.tsx',
+    (url) => url.pathname === '/src/features/admin/AdminCustomersPage.tsx',
     async (route) => {
       const response = await route.fetch()
       await route.fulfill({

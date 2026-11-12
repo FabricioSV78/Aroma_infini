@@ -17,6 +17,7 @@ import {
   type SiteMediaSlot,
 } from '../../domain/site-media-slots'
 import { assetSource } from '../../services/asset-source'
+import { imageSourceSet } from '../../services/image-source'
 import { getAdminErrorMessage } from '../../services/admin-messages'
 import { isRemoteCatalog } from '../../services/catalog-source'
 import {
@@ -753,8 +754,14 @@ function SiteMediaPlacements() {
               <div className="admin-media-thumbnail">
                 <img
                   src={assetSource(item.asset?.src ?? slot.fallback.src)}
+                  srcSet={imageSourceSet(
+                    item.asset?.src ?? slot.fallback.src,
+                    [480, 960],
+                  )}
+                  sizes="(max-width: 640px) calc(100vw - 64px), (max-width: 1023px) 44vw, 260px"
                   alt=""
                   loading="lazy"
+                  decoding="async"
                   width={slot.fallback.width}
                   height={slot.fallback.height}
                 />
