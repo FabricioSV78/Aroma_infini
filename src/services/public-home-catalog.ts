@@ -14,8 +14,9 @@ import {
 } from './supabase-storefront'
 import { confirmPublicCatalogRecords } from './storefront-repository'
 import { rememberManagedAssets } from './media-registry'
-import { cachedPublicQuery } from './public-query-cache'
-import { requireSupabaseClient } from './supabase-client'
+import { cachedPublicQuery, seedInitialPublicQuery } from './public-query-cache'
+import { requireReadySupabaseClient } from './supabase-client'
+import { takePublicInitialContext } from './public-initial-context'
 import { getFinderOptionsFromProfiles } from './fragrance-matching'
 
 interface HomeCatalogProfile {
@@ -130,23 +131,53 @@ export function parseHomeCatalogContext(value: unknown) {
     settings,
     records,
     brandProfiles: getHomeBrandProfiles(brands, profiles),
-    finderOptions: getFinderOptionsFromProfiles(
-      profiles
-        .filter((profile) => profile.finderAvailable)
-        .map((profile) => ({
-          product: {
-            family: profile.family,
-            olfactoryFamilies: profile.olfactoryFamilies,
-          },
-          detail: { occasion: profile.occasion, intensity: profile.intensity },
-        })),
+    finderOptions: getHomeFinderOptions(profiles, source.finderAvailableCount),
+  }
+}
+
+/** Compact rows preserve option order/labels; SQL supplies the actual eligible
+ * perfume count rather than letting duplicate elimination change that count. */
+export function getHomeFinderOptions(
+  profiles: readonly HomeCatalogProfile[],
+  availableCount?: unknown,
+) {
+  const eligible = profiles.filter((profile) => profile.finderAvailable)
+  const count = availableCount === undefined ? eligible.length : availableCount
+  if (
+    typeof count !== 'number' ||
+    !Number.isSafeInteger(count) ||
+    count < eligible.length ||
+    count > 10000
+  )
+    throw new CatalogReadError()
+  return {
+    ...getFinderOptionsFromProfiles(
+      eligible.map((profile) => ({
+        product: {
+          family: profile.family,
+          olfactoryFamilies: profile.olfactoryFamilies,
+        },
+        detail: { occasion: profile.occasion, intensity: profile.intensity },
+      })),
     ),
+    availableCount: count,
   }
 }
 
 export async function readRemoteHomeCatalog() {
+  const initial = takePublicInitialContext('home')
+  if (initial !== undefined) {
+    try {
+      const result = parseHomeCatalogContext(initial)
+      confirmPublicCatalogRecords(result.records, result)
+      seedInitialPublicQuery('home-catalog', initial, performance.now())
+      return result
+    } catch {
+      /* Invalid initial data must use the ordinary verified read. */
+    }
+  }
   const value = await cachedPublicQuery('home-catalog', async () => {
-    const { data, error } = await requireSupabaseClient().rpc(
+    const { data, error } = await (await requireReadySupabaseClient()).rpc(
       'catalog_home_context',
     )
     if (error) throw new CatalogReadError()
@@ -176,7 +207,7 @@ export function parseBrandPreviews(value: unknown) {
 
 export async function readRemoteBrandPreviews() {
   const value = await cachedPublicQuery('brand-previews', async () => {
-    const { data, error } = await requireSupabaseClient().rpc(
+    const { data, error } = await (await requireReadySupabaseClient()).rpc(
       'catalog_brand_previews',
     )
     if (error) throw new CatalogReadError()

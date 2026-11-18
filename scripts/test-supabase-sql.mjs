@@ -1395,7 +1395,7 @@ try {
       [commerceIds.product, commerceIds.brand],
     )
     await client.query(
-      "insert into app.product_variants(id,product_id,ml,price_cents,stock,active,merchant_sku) values($1,$2,50,12000,5,true,'SQL-RACE-COMMERCE')",
+      "insert into app.product_variants(id,product_id,ml,price_cents,stock,active,merchant_sku) values($1,$2,50,12000,1005,true,'SQL-RACE-COMMERCE')",
       [commerceIds.variant, commerceIds.product],
     )
     await client.query(
@@ -1593,7 +1593,7 @@ try {
       stored.orders !== 100 ||
       stored.operations !== 100 ||
       !stored.pending ||
-      inventory !== 5
+      inventory !== 1005
     )
       throw new Error(
         'Simulation changed real stock/payment or created duplicate operations.',

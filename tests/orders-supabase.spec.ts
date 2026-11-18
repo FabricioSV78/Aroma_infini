@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { randomUUID } from 'node:crypto'
 import { installAdminPageBatchGate } from './admin-page-batch-fixture'
 import { mkdir } from 'node:fs/promises'
@@ -61,6 +62,8 @@ function makeOrder(index: number): AdminOrder {
     totalCents: 11000,
   }
 }
+
+
 interface OrdersFixture {
   orders: AdminOrder[]
   history: OrderHistoryEntry[]
@@ -118,19 +121,24 @@ const test = authTest.extend<{ ordersNetwork: OrdersFixture }>({
       }
       if (name.startsWith('admin_'))
         expect(request.headers().authorization).toMatch(/^Bearer ey/)
-      if (state.unavailable && name === 'admin_orders') {
+      if (state.unavailable && ['admin_orders','admin_order_list','admin_customer_list'].includes(name)) {
         await reply(
           { code: 'PGRST000', message: 'Isolated service unavailable' },
           503,
         )
         return
       }
-      if (state.denied && name === 'admin_orders') {
+      if (state.denied && ['admin_orders','admin_order_list','admin_customer_list'].includes(name)) {
         await reply(
           { code: '42501', message: 'Isolated revoked membership' },
           403,
         )
         return
+      }
+      if (['admin_product_list','admin_order_list','admin_customer_list'].includes(name)) {
+        const payload=structuredClone(adminListFixture(name,body,{orders:state.orders,history:state.history}))
+        if (name==='admin_order_list'&&state.holdNextRead) { const hold=state.holdNextRead;state.holdNextRead=null;await hold }
+        await reply(payload);return
       }
       if (name === 'admin_catalog_page') {
         await reply({
@@ -197,7 +205,7 @@ const test = authTest.extend<{ ordersNetwork: OrdersFixture }>({
         await reply(payload)
         return
       }
-      if (name === 'admin_set_order_statuses') {
+      if (name === 'admin_set_order_statuses' || name === 'admin_set_order_statuses_page') {
         if (state.failWrite) {
           state.failWrite = false
           await reply(
@@ -255,6 +263,7 @@ const test = authTest.extend<{ ordersNetwork: OrdersFixture }>({
           orderHistory: state.history.filter((entry) =>
             changes.some((change) => change.reference === entry.reference),
           ),
+          ...(name === 'admin_set_order_statuses_page' ? { page: adminListFixture('admin_order_list', body, { orders: state.orders }) } : {}),
         })
         return
       }
@@ -382,7 +391,7 @@ for (const revoked of [false, true]) {
           )) as typeof import('../src/services/admin-service')
           return adminService.getSnapshot().orders.length
         }),
-      ).toBe(100)
+      ).toBe(0)
       if (revoked) gate.deny(200)
       gate.releaseAll()
       expect(await reading).toBe(revoked ? 'rejected' : 'resolved')
@@ -441,6 +450,9 @@ test('Una lectura anterior al guardado no reemplaza el estado ni el historial co
       const result = await orderAdminService.bulkSetOrderStatus(
         [reference],
         'preparing',
+        undefined,
+        undefined,
+        { expectedVersions: { [reference]: 1 } },
       )
       if (result.kind !== 'updated' || result.updated.length !== 1)
         throw new Error('The canonical fixture mutation did not succeed')
@@ -502,7 +514,7 @@ test('Cien pedidos remotos mantienen paginación y se actualizan con una sola op
   )
   expect(
     ordersNetwork.calls.filter(
-      (call) => call.name === 'admin_set_order_statuses',
+      (call) => call.name === 'admin_set_order_statuses_page',
     ),
   ).toHaveLength(1)
   expect(
@@ -845,7 +857,7 @@ test('El regreso a la pestaña agrupa foco y visibilidad en una lectura y conser
   const rows = page.locator('.admin-order-workspace tbody')
   await expect(rows.locator('tr')).toHaveCount(20)
   const readCount = () =>
-    ordersNetwork.calls.filter(({ name }) => name === 'admin_orders').length
+    ordersNetwork.calls.filter(({ name }) => name === 'admin_order_list').length
   const initialReads = readCount()
   await holdOrderRefreshFrames(page)
   for (const [index, events] of [
@@ -874,6 +886,25 @@ test('El regreso a la pestaña agrupa foco y visibilidad en una lectura y conser
   })
   await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(0)
   expect(readCount()).toBe(initialReads + 4)
+})
+
+test('Una lectura de foco anterior no reemplaza la página confirmada por la escritura atómica', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  let release!: () => void
+  ordersNetwork.holdNextRead = new Promise<void>(resolve => { release = resolve })
+  const before = ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect.poll(() => ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length).toBe(before + 1)
+  try {
+    await page.getByRole('checkbox', { name: 'Seleccionar pedidos de esta página' }).check()
+    await page.getByRole('button', { name: 'Cambiar estado', exact: true }).click()
+    await page.getByRole('button', { name: 'Confirmar actualización', exact: true }).click()
+    await expect(page.locator('.admin-order-bulk-report')).toContainText('20 actualizados')
+  } finally { release() }
+  await expect(page.locator('.admin-order-workspace tbody tr').first()).toContainText('En preparación')
+  expect(ordersNetwork.history).toHaveLength(20)
 })
 
 test('El regreso a la pestaña cancela la lectura pendiente al ocultarse', async ({
@@ -941,4 +972,247 @@ test('El regreso a la pestaña cancela la lectura pendiente al salir sin errores
     ordersNetwork.calls.filter(({ name }) => name === 'admin_orders'),
   ).toHaveLength(initialReads)
   expect(errors).toEqual([])
+})
+
+test('Paginación remota: seis mil pedidos conservan selección entre páginas sin snapshot completo', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  ordersNetwork.orders = Array.from({ length: 6000 }, (_, index) => makeOrder(index + 1))
+  await admin(page, supabaseNetwork)
+  ordersNetwork.calls.length = 0
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  await expect(page.getByRole('navigation', { name: 'Paginación de pedidos' })).toContainText('Página 1 de 300')
+  expect(ordersNetwork.calls.filter(c => c.name === 'admin_orders')).toHaveLength(0)
+  expect(ordersNetwork.calls.filter(c => c.name === 'admin_order_list' && c.body.p_mode === 'selection')).toHaveLength(0)
+  await page.getByRole('checkbox', { name: 'Seleccionar pedidos de esta página' }).check()
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Paginación de pedidos' })).toContainText('Página 2 de 300')
+  await expect(page.locator('.admin-order-selection-bar')).toContainText('20 pedidos seleccionados')
+  await page.getByRole('checkbox', { name: 'Seleccionar pedidos de esta página' }).check()
+  await expect(page.locator('.admin-order-selection-bar')).toContainText('40 pedidos seleccionados')
+  await page.getByRole('button', { name: 'Cambiar estado', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirmar actualización', exact: true }).click()
+  await expect(page.locator('.admin-order-bulk-report')).toContainText('40 actualizados')
+  expect(ordersNetwork.history).toHaveLength(40)
+  expect(ordersNetwork.calls.filter(c => c.name === 'admin_set_order_statuses_page')).toHaveLength(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+})
+
+test('Una selección de más de cien pedidos conserva datos y explica el límite real del comando', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  ordersNetwork.orders = Array.from({ length: 101 }, (_, index) => makeOrder(index + 1))
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await page.getByRole('checkbox', { name: 'Seleccionar pedidos de esta página' }).check()
+  await page.getByRole('button', { name: 'Seleccionar los 101 pedidos filtrados' }).click()
+  await page.getByRole('button', { name: 'Cambiar estado', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirmar actualización', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('entre uno y cien pedidos')
+  expect(ordersNetwork.history).toHaveLength(0)
+  expect(ordersNetwork.calls.filter(c => c.name.startsWith('admin_set_order_statuses'))).toHaveLength(0)
+})
+
+test('Paginación remota: clientes solicitan 25 filas y conservan búsqueda y destino de pedidos', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  // HTTP/UI scenario only: commercial payments remain disabled in hosted SQL.
+  ordersNetwork.orders = Array.from({ length: 2000 }, (_, index) => ({ ...makeOrder(index + 1), simulation: false, customerId: `50000000-0000-4000-8000-${String(index + 1).padStart(12,'0')}`, customerName: `Cliente ${String(index).padStart(5, '0')}` }))
+  await admin(page, supabaseNetwork)
+  ordersNetwork.calls.length = 0
+  await page.goto('/admin/clientes')
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(25)
+  await expect(page.getByRole('navigation', { name: 'Paginación de clientes' })).toContainText('Página 1 de 80')
+  expect(ordersNetwork.calls.filter(c => c.name === 'admin_orders')).toHaveLength(0)
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Paginación de clientes' })).toContainText('Página 2 de 80')
+  await page.getByRole('searchbox').fill('Cliente 01999')
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(1)
+  await expect(page.locator('.admin-table tbody')).toContainText('Cliente 01999')
+  await page.getByRole('link', { name: 'Ver pedidos de Cliente 01999', exact: true }).click()
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(1)
+})
+
+test('Lecturas protegidas: SQL comienza sin esperar Auth y solo se comparte mientras está pendiente', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  ordersNetwork.calls.length = 0
+  let release!: () => void
+  const identityGate = new Promise<void>(resolve => { release = resolve })
+  let identityCalls = 0
+  await page.route(`${origin}/auth/v1/user`, async route => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    identityCalls++
+    await identityGate
+    await route.fallback()
+  })
+  let finished = false
+  const reading = page.evaluate(async () => {
+    const source = '/src/services/order-admin-service.ts'
+    const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+    const results = await Promise.all([readAdminOrderList({}, 1), readAdminOrderList({}, 1)])
+    return results.map(result => result.total)
+  }).then(value => { finished = true; return value })
+  try {
+    await expect.poll(() => identityCalls).toBe(1)
+    // With the old serial actor(), this cannot happen until identity is released.
+    await expect.poll(() => ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length).toBe(1)
+    expect(finished).toBe(false)
+    release()
+    expect(await reading).toEqual([100, 100])
+    await page.evaluate(async () => {
+      const source = '/src/services/order-admin-service.ts'
+      const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+      return readAdminOrderList({}, 1)
+    })
+    // No completed authorization or page cache: the next read is fresh.
+    expect(identityCalls).toBe(2)
+    expect(ordersNetwork.calls.filter(c => c.name === 'admin_order_list')).toHaveLength(2)
+  } finally {
+    release()
+    await reading.catch(() => {})
+  }
+})
+
+test('Lecturas protegidas: una página SQL correcta no se publica si Auth rechaza la identidad', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  ordersNetwork.calls.length = 0
+  await page.route(`${origin}/auth/v1/user`, async route => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    await route.fulfill({ status: 401, headers, json: { code: 'bad_jwt', message: 'Isolated rejected identity' } })
+  })
+  const result = await page.evaluate(async () => {
+    const source = '/src/services/order-admin-service.ts'
+    const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+    try { return { published: true, total: (await readAdminOrderList({}, 1)).total } }
+    catch (error) { return { published: false, code: error instanceof Error && 'code' in error ? error.code : null } }
+  })
+  expect(ordersNetwork.calls.filter(c => c.name === 'admin_order_list')).toHaveLength(1)
+  expect(result).toEqual({ published: false, code: 'orders-session' })
+})
+
+test('Lecturas protegidas: un guardado invalida una página anterior sin perder la escritura confirmada', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  ordersNetwork.calls.length = 0
+  let release!: () => void
+  ordersNetwork.holdNextRead = new Promise<void>(resolve => { release = resolve })
+  const reading = page.evaluate(async () => {
+    const source = '/src/services/order-admin-service.ts'
+    const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+    try { await readAdminOrderList({}, 1); return 'published' }
+    catch (error) { return error instanceof Error && 'code' in error ? error.code : 'unknown' }
+  })
+  try {
+    await expect.poll(() => ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length).toBe(1)
+    const reference = ordersNetwork.orders[0].reference
+    const saved = await page.evaluate(async reference => {
+      const source = '/src/services/order-admin-service.ts'
+      const { orderAdminService } = await import(source) as typeof import('../src/services/order-admin-service')
+      return orderAdminService.bulkSetOrderStatus([reference], 'preparing', undefined, undefined, { expectedVersions: { [reference]: 1 } })
+    }, reference)
+    expect(saved.kind).toBe('updated')
+    release()
+    expect(await reading).toBe('superseded-read')
+    expect(ordersNetwork.orders[0].version).toBe(2)
+    const fresh = await page.evaluate(async reference => {
+      const source = '/src/services/order-admin-service.ts'
+      const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+      return (await readAdminOrderList({search: reference}, 1)).orders.find(order => order.reference === reference)?.version
+    }, reference)
+    expect(fresh).toBe(2)
+  } finally {
+    release()
+    await reading.catch(() => {})
+  }
+})
+
+for (const revoke of ['logout', 'permissions', 'mfa'] as const)
+  test(`Lecturas protegidas: ${revoke} mientras llega SQL descarta la página privada`, async ({ page, supabaseNetwork, ordersNetwork }) => {
+    await admin(page, supabaseNetwork)
+    await page.goto('/admin/pedidos')
+    await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+    ordersNetwork.calls.length = 0
+    let release!: () => void
+    ordersNetwork.holdNextRead = new Promise<void>(resolve => { release = resolve })
+    const reading = page.evaluate(async () => {
+      const source = '/src/services/order-admin-service.ts'
+      const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+      try { await readAdminOrderList({}, 1); return 'published' }
+      catch (error) { return error instanceof Error && 'code' in error ? error.code : 'unknown' }
+    })
+    try {
+      await expect.poll(() => ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length).toBe(1)
+      if (revoke === 'permissions') supabaseNetwork.adminMembership = false
+      if (revoke === 'mfa') await page.route(`${origin}/rest/v1/rpc/current_actor`, async route => {
+        if (route.request().method() === 'OPTIONS') return route.fallback()
+        await route.fulfill({ headers, json: { user_id: customerA, role: 'admin', aal: 'aal1', requires_mfa: true, trusted_device: false, trusted_until: null } })
+      })
+      await page.evaluate(async revoke => {
+        const source = '/src/services/auth-service.ts'
+        const { authService } = await import(source) as typeof import('../src/services/auth-service')
+        if (revoke === 'logout') await authService.signOut()
+        else await authService.refresh()
+      }, revoke)
+      release()
+      expect(await reading).toBe('orders-session')
+      expect(await page.evaluate(async () => {
+        const source = '/src/services/admin-service.ts'
+        const { adminService } = await import(source) as typeof import('../src/services/admin-service')
+        return adminService.getSnapshot().orders.length
+      })).toBe(0)
+    } finally {
+      release()
+      await reading.catch(() => {})
+    }
+  })
+
+test('Lecturas protegidas: renovar el token del mismo administrador descarta la respuesta sin revocar su acceso', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos')
+  await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+  ordersNetwork.calls.length = 0
+  let release!: () => void
+  ordersNetwork.holdNextRead = new Promise<void>(resolve => { release = resolve })
+  const before = await page.evaluate(async () => {
+    const source = '/src/services/admin-list-access.ts'
+    const { adminListAccess } = await import(source) as typeof import('../src/services/admin-list-access')
+    return adminListAccess.getSnapshot()
+  })
+  const reading = page.evaluate(async () => {
+    const source = '/src/services/order-admin-service.ts'
+    const { readAdminOrderList } = await import(source) as typeof import('../src/services/order-admin-service')
+    try { await readAdminOrderList({}, 1); return 'published' }
+    catch (error) { return error instanceof Error && 'code' in error ? error.code : 'unknown' }
+  })
+  try {
+    await expect.poll(() => ordersNetwork.calls.filter(c => c.name === 'admin_order_list').length).toBe(1)
+    await page.evaluate(async () => {
+      const sdkPath = '/src/services/supabase-client.ts'
+      const authPath = '/src/services/auth-service.ts'
+      const { requireSupabaseClient } = await import(sdkPath) as typeof import('../src/services/supabase-client')
+      const { authService } = await import(authPath) as typeof import('../src/services/auth-service')
+      const client = requireSupabaseClient()
+      const session = (await client.auth.getSession()).data.session!
+      const parts = session.access_token.split('.')
+      const claims = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+      claims.iat += 1
+      const encoded = btoa(JSON.stringify(claims)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+      await client.auth.setSession({ access_token: `${parts[0]}.${encoded}.${parts[2]}`, refresh_token: session.refresh_token })
+      await authService.refresh()
+    })
+    release()
+    expect(await reading).toBe('superseded-read')
+    const after = await page.evaluate(async () => {
+      const accessPath = '/src/services/admin-list-access.ts'
+      const authPath = '/src/services/auth-service.ts'
+      const { adminListAccess } = await import(accessPath) as typeof import('../src/services/admin-list-access')
+      const { authService } = await import(authPath) as typeof import('../src/services/auth-service')
+      return { revision: adminListAccess.getSnapshot(), role: authService.getSnapshot().session?.user.role, status: authService.getSnapshot().status }
+    })
+    expect(after).toEqual({ revision: before, role: 'admin', status: 'authenticated' })
+  } finally {
+    release()
+    await reading.catch(() => {})
+  }
 })

@@ -1,4 +1,5 @@
 import { Link, useLoaderData, useRevalidator } from 'react-router'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { brandsLoader } from './catalog-loaders'
 import { Icon } from '../../components/ui/Icon'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -65,7 +66,7 @@ export function BrandsPage() {
             <Link key={brand.id} to={brandStorePath(brand.slug)}>
               <h2>{brand.name}</h2>
               {brand.previewImage ? (
-                <img
+                <LoadingImage
                   src={imageSource(brand.previewImage)}
                   alt=""
                   width="128"

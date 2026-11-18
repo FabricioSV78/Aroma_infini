@@ -36,6 +36,7 @@ export interface MediaBucket {
 }
 /** Runtime receives these values from generated Env; tests need no forged Env. */
 export interface MediaEnvironment {
+  APP_ENVIRONMENT?: string
   MEDIA_BUCKET: MediaBucket
   SUPABASE_URL: string
   SUPABASE_PUBLISHABLE_KEY: string

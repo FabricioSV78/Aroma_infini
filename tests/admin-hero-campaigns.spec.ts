@@ -236,22 +236,22 @@ test('prepara un MP4 con portada, reproduce una sola vista previa y conserva las
   await expect(
     page.getByRole('button', { name: 'Quitar video', exact: true }),
   ).toBeVisible()
-  const mobileReset = page.getByRole('button', {
-    name: 'Usar video principal',
-    exact: true,
-  })
-  if (await mobileReset.isVisible()) await mobileReset.click()
-  await expect(mobileReset).not.toBeVisible()
   await page
-    .getByLabel('Subir video móvil de campaña 1', { exact: true })
-    .setInputFiles('public/videos/perfume-editorial-mobile.mp4')
-  await expect(
-    page.getByRole('button', { name: 'Usar video principal', exact: true }),
-  ).toBeVisible({ timeout: 60_000 })
+    .getByLabel('Subir imagen móvil de campaña 1', { exact: true })
+    .setInputFiles('public/images/hero-v2-lumiere-mobile-780.webp')
   await expect(
     page.getByText('Preparando archivo…', { exact: true }),
-  ).not.toBeVisible({ timeout: 60_000 })
-  await expect(page.getByRole('alertdialog')).not.toBeVisible()
+  ).not.toBeVisible({ timeout: 30_000 })
+  await page
+    .getByRole('button', { name: 'Abrir vista previa', exact: true })
+    .click()
+  await preview(page)
+    .getByRole('button', { name: 'Móvil', exact: true })
+    .click()
+  await expect(preview(page).locator('video')).toHaveCount(0)
+  await expect(
+    preview(page).locator('.admin-home-hero-preview img'),
+  ).toHaveAttribute('src', /^data:image\/webp;base64,/)
 })
 
 test('rechaza videos incompatibles y demasiado grandes sin perder textos ni la configuración anterior', async ({

@@ -27,7 +27,13 @@ import {
 } from './supabase-storefront'
 import { invalidateSupabaseStorefront } from './storefront-repository'
 import { UserFacingError } from './admin-messages'
+import { adminListAccess } from './admin-list-access'
+import { createAdminProtectedReads } from './admin-protected-read'
+import type { AdminCatalogChoice, AdminCatalogChoices, AdminCatalogChoiceQuery, AdminOfferList } from '../types/admin-catalog-reads'
+import type { ProductImportIdentity, ProductImportConflict, ProductImportConflictReason } from '../domain/product-import-identities'
 import type { HomeContent, HomeMedia } from '../types/home'
+import type { AdminProductListQuery } from '../domain/admin-list-query'
+import type { AdminProductList, AdminDashboardData } from '../types/admin-lists'
 import { validateHomeContent } from '../content/home-editor'
 import { uploadProductMedia } from './media-upload'
 import {
@@ -48,6 +54,7 @@ interface Actor {
   userId: string
   token: string
   epoch: number
+  accessRevision: number
 }
 let sessionEpoch = 0
 function currentAdminOwner(): string | null {
@@ -66,6 +73,23 @@ let loadingOwner: string | null = null
 let epoch = 0
 let readRevision = 0
 let settingsVersion: number | null = null
+const protectedReads = createAdminProtectedReads()
+
+/** Read authorization and protected SQL execute concurrently, but no private
+ * response is parsed or published until both identity checks have completed. */
+async function readRpc<N extends RpcName>(name: N, args?: RpcArgs<N>) {
+  const startedEpoch = sessionEpoch
+  const { value: response, actor: current } = await protectedReads.read(
+    `${name}:${JSON.stringify(args ?? {})}`,
+    expected => requireSupabaseClient().rpc(name, args)
+      .setHeader('Authorization', `Bearer ${expected.token}`),
+  )
+  const verified = { ...current, epoch: startedEpoch }
+  await stillActor(verified)
+  if (response.status === 401 || response.status === 403 || response.error?.code === '42501') clearRemoteCatalog()
+  checkError(response.error, response.status)
+  return { data: response.data, current: verified }
+}
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -82,6 +106,190 @@ function revision(value: unknown): number {
       'No pudimos verificar la versión del catálogo. Vuelve a cargar la página.',
     )
   return value
+}
+function count(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+    throw new UserFacingError('response', 'No pudimos verificar los totales del catálogo.')
+  return value
+}
+
+/** Shared dictionaries are required by the native selectors and batch brand
+ * registration, but no product document is needed to manage those options. */
+export async function loadAdminCatalogContext(): Promise<void> {
+  if (!isRemoteCatalog) return
+  const { data: value, current } = await readRpc('admin_catalog_context')
+  const data = object(value)
+  if (!Array.isArray(data.brands))
+    throw new UserFacingError('response', 'No pudimos verificar las opciones del catálogo.')
+  const versions = object(data.brandVersions)
+  const definitions = parseOlfactoryFamilyDefinitions(data.olfactoryFamilies, true)
+  await stillActor(current)
+  settingsVersion = revision(data.settingsVersion)
+  const snapshot = local.getSnapshot()
+  applyRemoteCatalog({
+    products: snapshot.products,
+    brands: data.brands.map(value => brand(value, versions[String(object(value).id)])),
+    features: features(data.features),
+    featuredBrandId: typeof data.featuredBrandId === 'string' ? data.featuredBrandId : null,
+    olfactoryFamilies: definitions,
+  })
+}
+
+function parseChoice(value: unknown): AdminCatalogChoice {
+  const item = object(value)
+  if (typeof item.id !== 'string' || !uuidPattern.test(item.id) || typeof item.name !== 'string' || typeof item.slug !== 'string' ||
+    typeof item.brandId !== 'string' || typeof item.brandName !== 'string' ||
+    typeof item.active !== 'boolean' || typeof item.published !== 'boolean' || typeof item.hasDiscount !== 'boolean' ||
+    (item.sku !== null && typeof item.sku !== 'string') ||
+    (item.productType !== 'perfume' && item.productType !== 'complemento'))
+    throw new UserFacingError('response', 'No pudimos verificar las opciones de productos.')
+  return { id: item.id, name: item.name, slug: item.slug, sku: item.sku, brandId: item.brandId, brandName: item.brandName,
+    active: item.active, published: item.published, hasDiscount: item.hasDiscount, productType: item.productType, version: revision(item.version) }
+}
+
+export async function readAdminCatalogChoices(query: AdminCatalogChoiceQuery = {}): Promise<AdminCatalogChoices> {
+  const { page = 1, limit = 25, ...filters } = query
+  const { data: value, current } = await readRpc('admin_catalog_choices', {
+    p_query: json(filters), p_page: page, p_limit: limit,
+  })
+  const data = object(value)
+  if (!Array.isArray(data.items) || data.items.length > limit || !Array.isArray(data.selected) || data.selected.length > 100)
+    throw new UserFacingError('response', 'La selección de productos está incompleta.')
+  return { ownerId: current.userId, accessRevision: current.accessRevision,
+    items: data.items.map(parseChoice), selected: data.selected.map(parseChoice), total: count(data.total) }
+}
+
+export async function readAdminOfferList(page: number, limit: number): Promise<AdminOfferList> {
+  const { data: value, current } = await readRpc('admin_offer_list', { p_page: page, p_limit: limit })
+  const data = object(value)
+  if (!Array.isArray(data.products) || data.products.length > limit || !Array.isArray(data.brands) ||
+      typeof data.revision !== 'string' || !/^[a-f0-9]{32}$/.test(data.revision))
+    throw new UserFacingError('response', 'La página de ofertas no es válida.')
+  const versions = object(data.productVersions), brandVersions = object(data.brandVersions)
+  return { ownerId: current.userId, accessRevision: current.accessRevision, revision: data.revision,
+    products: data.products.map(value => product(value, versions[String(object(object(value).product).id)])),
+    brands: data.brands.map(value => brand(value, brandVersions[String(object(value).id)])),
+    total: count(data.total), availableCount: count(data.availableCount) }
+}
+
+/** Explicit IDs for a selected offer or uncertain import outcome. Missing IDs
+ * remove only those records from the private partial store, never other rows. */
+export async function loadAdminProductsByIds(ids: readonly string[]): Promise<AdminProduct[]> {
+  const requested = [...new Set(ids)]
+  if (!isRemoteCatalog) return local.getSnapshot().products.filter(record => requested.includes(record.product.id))
+  if (requested.length > 100 || requested.some(id => !uuidPattern.test(id)))
+    throw new UserFacingError('validation', 'Selecciona hasta cien productos por consulta.')
+  const { data: value, current } = await readRpc('admin_products_by_ids', { p_ids: requested })
+  const data = object(value), versions = object(data.productVersions)
+  if (!Array.isArray(data.products) || data.products.length > requested.length)
+    throw new UserFacingError('response', 'No pudimos verificar los productos seleccionados.')
+  const found = new Set<string>()
+  const records = data.products.map(value => {
+    const id = object(object(value).product).id
+    if (typeof id !== 'string' || !requested.includes(id) || found.has(id))
+      throw new UserFacingError('response', 'El catálogo devolvió un producto inesperado.')
+    found.add(id)
+    return product(value, versions[id])
+  })
+  await stillActor(current)
+  const snapshot = local.getSnapshot()
+  applyRemoteCatalog({ products: [...snapshot.products.filter(record => !requested.includes(record.product.id)), ...records],
+    brands: snapshot.brands, features: snapshot.features })
+  return records
+}
+
+export async function readAdminImportConflicts(identities: readonly ProductImportIdentity[]): Promise<ProductImportConflict[]> {
+  if (!identities.length) return []
+  if (identities.length > 1000)
+    throw new UserFacingError('validation', 'El archivo admite hasta mil filas de productos.')
+  const { data } = await readRpc('admin_import_conflicts', { p_rows: json(identities) })
+  const expected = new Set(identities.map(item => item.row))
+  const seen = new Set<number>()
+  if (!Array.isArray(data) || data.length > identities.length)
+    throw new UserFacingError('response', 'No pudimos verificar los duplicados del archivo.')
+  return data.map(value => {
+    const row = object(value)
+    if (typeof row.row !== 'number' || !expected.has(row.row) || seen.has(row.row) ||
+      !Array.isArray(row.reasons) || !row.reasons.length || row.reasons.length > 3 ||
+      row.reasons.some(reason => !['slug', 'name', 'sku'].includes(String(reason))))
+      throw new UserFacingError('response', 'La validación del archivo no está completa.')
+    seen.add(row.row)
+    return { row: row.row, reasons: row.reasons as ProductImportConflictReason[] }
+  })
+}
+
+/** A page result never masquerades as the complete shared catalog. */
+export async function readAdminProductList(
+  query: AdminProductListQuery, page: number, limit: number,
+): Promise<AdminProductList> {
+  const { data: value, current } = await readRpc('admin_product_list', {
+    p_query: json(query), p_page: page, p_limit: limit,
+  })
+  const data = object(value)
+  return parseProductPage(data, current, limit)
+}
+function parseProductPage(data: Record<string, unknown>, current: Actor, limit: number): AdminProductList {
+  if (!Array.isArray(data.products) || data.products.length > limit || !Array.isArray(data.brands))
+    throw new UserFacingError('response', 'La página del catálogo no es válida.')
+  const versions = object(data.productVersions), brandVersions = object(data.brandVersions)
+  const summary = object(data.summary)
+  return {
+    ownerId: current.userId,
+    accessRevision: current.accessRevision,
+    products: data.products.map(value => product(value, versions[String(object(object(value).product).id)])),
+    brands: data.brands.map(value => brand(value, brandVersions[String(object(value).id)])),
+    features: features(data.features), total: count(data.total),
+    summary: { products: count(summary.products), stock: count(summary.stock), alerts: count(summary.alerts), soldOut: count(summary.soldOut) },
+  }
+}
+
+/** Editors need their own record and defined selector options, not every photo
+ * and variant of every other product. Legacy full-snapshot consumers stay intact. */
+export async function loadAdminProductEditor(id?: string): Promise<void> {
+  if (!isRemoteCatalog) return
+  const { data: value, current } = await readRpc('admin_product_list', {
+    p_query: id ? { id } : {}, p_mode: 'editor',
+  })
+  const data = object(value)
+  if (!Array.isArray(data.products) || data.products.length > 1 || !Array.isArray(data.brands))
+    throw new UserFacingError('response', 'No pudimos verificar la ficha del producto.')
+  const versions = object(data.productVersions), brandVersions = object(data.brandVersions)
+  const records = data.products.map(value => product(value, versions[String(object(object(value).product).id)]))
+  const definitions = parseOlfactoryFamilyDefinitions(data.olfactoryFamilies, true)
+  await stillActor(current)
+  const snapshot = local.getSnapshot()
+  settingsVersion = revision(data.settingsVersion)
+  replaceOlfactoryFamilies(definitions)
+  applyRemoteCatalog({
+    products: [...snapshot.products.filter(record => record.product.id !== id), ...records],
+    brands: data.brands.map(value => brand(value, brandVersions[String(object(value).id)])),
+    features: features(data.features),
+  })
+}
+
+export async function readAdminPhotoQueue(query: AdminProductListQuery): Promise<string[]> {
+  const { data: value } = await readRpc('admin_product_list', {
+    p_query: json(query), p_mode: 'photo-queue',
+  })
+  const data = object(value)
+  if (!Array.isArray(data.photoQueue) || data.photoQueue.some(id => typeof id !== 'string'))
+    throw new UserFacingError('response', 'No pudimos verificar la cola de fotografías.')
+  return data.photoQueue as string[]
+}
+export async function readAdminInventoryDashboard(): Promise<Pick<AdminDashboardData, 'ownerId' | 'accessRevision' | 'stock' | 'alertCount' | 'outAlertCount' | 'alerts'>> {
+  const { data: value, current } = await readRpc('admin_product_list', { p_mode: 'dashboard' })
+  const data = object(value)
+  const summary = object(data.dashboard)
+  if (!Array.isArray(summary.items) || summary.items.length > 5)
+    throw new UserFacingError('response', 'No pudimos verificar el resumen de inventario.')
+  return { ownerId: current.userId, accessRevision: current.accessRevision, stock: count(summary.stock), alertCount: count(summary.alerts), outAlertCount: count(summary.outAlerts),
+    alerts: summary.items.map(value => {
+      const item = object(value)
+      if (typeof item.productId !== 'string' || typeof item.productName !== 'string' || typeof item.variantId !== 'string' || (item.variantLabel !== null && typeof item.variantLabel !== 'string'))
+        throw new UserFacingError('response', 'La alerta de inventario no es válida.')
+      return { productId: item.productId, productName: item.productName, variantId: item.variantId, ml: item.ml === null ? null : count(item.ml),
+        ...(typeof item.variantLabel === 'string' ? { variantLabel: item.variantLabel } : {}), stock: count(item.stock), threshold: count(item.threshold) }
+    }) }
 }
 function features(value: unknown): StoreFeatures {
   const settings = object(value)
@@ -146,6 +354,7 @@ function brand(value: unknown, version: unknown): AdminBrand {
 }
 
 function sessionError(): never {
+  adminListAccess.invalidate()
   throw new UserFacingError(
     'session',
     'Tu sesión administrativa cambió. Inicia sesión de nuevo antes de continuar.',
@@ -153,6 +362,7 @@ function sessionError(): never {
 }
 async function actor(): Promise<Actor> {
   const startedEpoch = sessionEpoch
+  const accessRevision = adminListAccess.getSnapshot()
   const state = authService.getSnapshot()
   if (
     state.status !== 'authenticated' ||
@@ -169,7 +379,7 @@ async function actor(): Promise<Actor> {
   const token = current.session.access_token
   const verified = await verifySupabaseUser(token)
   if (verified.error || verified.data.user?.id !== userId) sessionError()
-  const expected = { userId, token, epoch: startedEpoch }
+  const expected = { userId, token, epoch: startedEpoch, accessRevision }
   await stillActor(expected)
   return expected
 }
@@ -179,6 +389,7 @@ async function stillActor(expected: Actor) {
   if (
     error ||
     expected.epoch !== sessionEpoch ||
+    expected.accessRevision !== adminListAccess.getSnapshot() ||
     state.status !== 'authenticated' ||
     state.session?.user.id !== expected.userId ||
     state.session.user.role !== 'admin' ||
@@ -190,6 +401,11 @@ async function stillActor(expected: Actor) {
 
 function checkError(error: { code?: string } | null, status: number): void {
   if (!error) return
+  if (error.code === 'PT410')
+    throw new UserFacingError(
+      'media-retired',
+      'Una imagen provisional ya fue eliminada. Sube una nueva para ese apartado; tus cambios aún no se han publicado.',
+    )
   if (
     status === 401 ||
     status === 403 ||
@@ -239,15 +455,18 @@ async function rpc<N extends RpcName>(
   )
     clearRemoteCatalog()
   if (response.error?.code === 'PT409' || response.error?.code === '40001') {
-    // Keep the editor's original version, but refresh the list used when the
-    // administrator returns to review the newer record. No automatic retry.
-    await loadAdminCatalog(true).catch(() => {})
+    // A conflict invalidates the private collection marker; the next scoped
+    // route/detail read obtains the current row without downloading everything.
+    loadedOwner = null
+    protectedReads.invalidate()
   }
   checkError(response.error, response.status)
   return response.data
 }
 
 function invalidateCatalogReads() {
+  protectedReads.invalidate()
+  loadedOwner = null
   readRevision++
   loading = undefined
   loadingOwner = null
@@ -268,6 +487,7 @@ async function command<N extends RpcName>(
 }
 
 function clearRemoteCatalog() {
+  protectedReads.invalidate()
   epoch++
   loadedOwner = null
   settingsVersion = null
@@ -298,10 +518,11 @@ export function hasCurrentAdminCatalog(): boolean {
 /** Home is loaded only for its editor; other admin lists need no editorial payload. */
 export async function loadAdminHome(): Promise<void> {
   if (!isRemoteCatalog) return
-  // The catalog continuity check and Home actor check use the same current
-  // credential. Share their in-flight verification instead of serializing it.
-  const [, current] = await Promise.all([loadAdminCatalog(), actor()])
-  const value = await rpc('admin_home_document', undefined, current)
+  // Both protected reads are independent. Await both before applying the Home,
+  // rather than starting its document after the metadata/identity round trip.
+  const [, { data: value, current }] = await Promise.all([
+    loadAdminCatalogContext(), readRpc('admin_home_document'),
+  ])
   const home = parseHomeDocument(
     value,
     local.getSnapshot().homeContent.featuredBrandId,
@@ -322,6 +543,9 @@ if (isRemoteCatalog)
     if (sessionOwner !== currentOwner) {
       sessionOwner = currentOwner
       sessionEpoch++
+      // Editors can hold one verified row without ever loading a full snapshot.
+      // That partial state is just as private as loadedOwner's complete state.
+      clearRemoteCatalog()
     }
     if (
       loadedOwner &&
@@ -690,31 +914,33 @@ export const catalogAdminService = {
     invalidateSupabaseStorefront()
     return { kind: 'saved' }
   },
-  async saveProduct(record: AdminProduct): Promise<AdminSaveResult> {
+  async saveProduct(record: AdminProduct, listContext?: { query: AdminProductListQuery; page: number; limit: number }): Promise<AdminSaveResult & { page?: AdminProductList }> {
     if (!isRemoteCatalog) return local.saveProduct(record)
     const current = await actor()
     record = await uploadProductMedia(record, {
       ...current,
       assertCurrent: () => stillActor(current),
     })
-    return savedProduct(
-      await command(
-        'admin_save_product',
+    const response = await command(
+        listContext ? 'admin_save_product_page' : 'admin_save_product',
         {
           p_record: json(writeRecord(record)),
           p_expected_version: record.version ?? undefined,
+          ...(listContext ? { p_query: json(listContext.query), p_page: listContext.page, p_limit: listContext.limit } : {}),
         },
         current,
-      ),
-      current,
-    )
+      )
+    const result = await savedProduct(response, current)
+    return { ...result, ...(listContext ? { page: parseProductPage(object(object(response).page), current, listContext.limit) } : {}) }
   },
   async setProductActive(
     id: string,
     active: boolean,
-  ): Promise<AdminSaveResult> {
+    currentRecord?: AdminProduct,
+    listContext?: { query: AdminProductListQuery; page: number; limit: number },
+  ): Promise<AdminSaveResult & { page?: AdminProductList }> {
     if (!isRemoteCatalog) return local.setProductActive(id, active)
-    const record = local
+    const record = currentRecord?.product.id === id ? currentRecord : local
       .getSnapshot()
       .products.find((item) => item.product.id === id)
     if (!record)
@@ -722,7 +948,7 @@ export const catalogAdminService = {
         kind: 'validation',
         message: 'El producto ya no existe. Vuelve a cargar el catálogo.',
       }
-    return catalogAdminService.saveProduct({ ...record, active })
+    return catalogAdminService.saveProduct({ ...record, active }, listContext)
   },
   async saveProductDiscount(
     id: string,
@@ -733,7 +959,7 @@ export const catalogAdminService = {
     const record = local
       .getSnapshot()
       .products.find((item) => item.product.id === id)
-    if (!record)
+    if (!record && expectedVersion === undefined)
       return { kind: 'validation', message: 'El producto ya no existe.' }
     const current = await actor()
     return savedProduct(
@@ -742,7 +968,7 @@ export const catalogAdminService = {
         {
           p_product_id: id,
           p_offer: json(discount),
-          p_expected_version: revision(expectedVersion ?? record.version),
+          p_expected_version: revision(expectedVersion ?? record!.version),
         },
         current,
       ),
@@ -761,7 +987,7 @@ export const catalogAdminService = {
       current,
     )
     invalidateSupabaseStorefront()
-    await loadAdminCatalog(true)
+    await loadAdminCatalogContext()
     return { kind: 'saved' }
   },
   async setBrandActive(id: string, active: boolean): Promise<AdminSaveResult> {
@@ -770,16 +996,8 @@ export const catalogAdminService = {
     const record = snapshot.brands.find((item) => item.id === id)
     if (!record)
       return { kind: 'validation', message: 'La marca ya no existe.' }
-    if (
-      !active &&
-      snapshot.products.some(
-        (item) => item.active && item.product.brandId === id,
-      )
-    )
-      return {
-        kind: 'validation',
-        message: 'Desactiva primero los productos visibles de esta marca.',
-      }
+    // A partial private store cannot establish that all associated products
+    // are inactive. The existing atomic SQL command remains the authority.
     return catalogAdminService.saveBrand({ ...record, active })
   },
   async saveBrandsBatch(
@@ -874,7 +1092,7 @@ export const catalogAdminService = {
     }
     for (const row of actual.rows) actual[row.status]++
     invalidateSupabaseStorefront()
-    await loadAdminCatalog(true)
+    await loadAdminCatalogContext()
     return { kind: 'saved', created, preview: actual }
   },
   async saveProductsBatch(
@@ -911,12 +1129,12 @@ export const catalogAdminService = {
       // A lost response can follow a committed transaction. Read the same
       // UUIDs; never manufacture new IDs or repeat a successful import blindly.
       try {
-        await loadAdminCatalog(true)
+        const found = new Map<string, AdminProduct>()
+        for (let offset = 0; offset < requested.length; offset += 100) {
+          const confirmedPage = await loadAdminProductsByIds(requested.slice(offset, offset + 100).map(record => record.product.id))
+          for (const record of confirmedPage) found.set(record.product.id, record)
+        }
         await stillActor(current)
-        const snapshot = local.getSnapshot()
-        const found = new Map(
-          snapshot.products.map((record) => [record.product.id, record]),
-        )
         const confirmed = requested.map((record) =>
           found.get(record.product.id),
         )

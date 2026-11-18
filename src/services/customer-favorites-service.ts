@@ -1,6 +1,6 @@
 import { authService } from './auth-service'
 import { requireSupabaseClient } from './supabase-client'
-import { UserFacingError } from './admin-messages'
+import { UserFacingError } from '../domain/user-facing-error'
 import { isRemoteCatalog } from './catalog-source'
 
 export interface CustomerFavoritesSnapshot {

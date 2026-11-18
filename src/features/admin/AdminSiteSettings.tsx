@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { siteSettingsService } from '../../services/site-settings-service'
 import {
   validateSiteSettings,
@@ -10,6 +10,12 @@ import { useAdminNotice } from './AdminNoticeProvider'
 import { useUnsavedChanges } from './useUnsavedChanges'
 import { AdminContactQr } from './AdminContactQr'
 import { AdminTrustedDevices } from './AdminTrustedDevices'
+
+const SiteImages = lazy(() =>
+  import('./AdminSiteImages').then((module) => ({
+    default: module.AdminSiteImages,
+  })),
+)
 
 type SettingsGroup = 'business' | 'contact' | 'social' | 'policies'
 
@@ -26,8 +32,10 @@ export function AdminSiteSettings() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [imagesOpened, setImagesOpened] = useState(false)
+  const [imagesPending, setImagesPending] = useState(false)
   const dirty = original !== JSON.stringify(document.data)
-  useUnsavedChanges(dirty && !saving)
+  useUnsavedChanges((dirty && !saving) || imagesPending)
   useEffect(() => {
     let active = true
     siteSettingsService
@@ -257,6 +265,19 @@ export function AdminSiteSettings() {
           </button>
         </div>
       </form>
+      <details
+        className="admin-card"
+        onToggle={(event) => {
+          if (event.currentTarget.open) setImagesOpened(true)
+        }}
+      >
+        <summary>Imágenes del sitio</summary>
+        {imagesOpened ? (
+          <Suspense fallback={<p role="status">Cargando imágenes…</p>}>
+            <SiteImages onPendingChange={setImagesPending} />
+          </Suspense>
+        ) : null}
+      </details>
       <AdminTrustedDevices />
     </section>
   )

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { editorialFilm } from '../../content/editorial-film'
 import type { HomeFilmContent } from '../../content/home-editor'
 import { Icon } from '../../components/ui/Icon'
 import { headingText } from '../../utils/heading-text'
 import { assetSource } from '../../services/asset-source'
+import { useDesktopVideo } from '../../components/media/useDesktopVideo'
+import { filmVisualSources } from '../../domain/film-visuals'
 
 function subscribeViewport(onChange: () => void) {
   const query = matchMedia('(min-width: 768px)')
@@ -19,28 +22,15 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
     wideViewport,
     () => false,
   )
-  const selectedVideo = wide
-    ? content.video
-    : (content.mobileVideo ?? content.video)
-  const source = assetSource(
-    selectedVideo ?? (wide ? editorialFilm.src : editorialFilm.mobileSrc),
-  )
-  // A custom clip must retain its own frame, never a poster from the default
-  // film or from a different mobile rendition.
-  const selectedPoster = wide
-    ? content.poster
-    : content.mobileVideo
-      ? content.mobilePoster
-      : content.poster
-  const poster = selectedVideo
-    ? selectedPoster
-      ? assetSource(selectedPoster)
-      : undefined
-    : assetSource(wide ? editorialFilm.poster : editorialFilm.mobilePoster)
+  const desktopVideo = useDesktopVideo()
+  const visuals = filmVisualSources(content)
+  const source = desktopVideo ? assetSource(visuals.video) : null
+  const selectedPoster = desktopVideo ? visuals.desktop : visuals.mobile
+  const poster = selectedPoster ? assetSource(selectedPoster) : undefined
   const frame = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [failedSource, setFailedSource] = useState<string | null>(null)
-  const failed = failedSource === source
+  const failed = source !== null && failedSource === source
   const [playback, setPlayback] = useState<'auto' | 'paused' | 'playing'>(
     'auto',
   )
@@ -49,7 +39,7 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
   useEffect(() => {
     const element = video.current
     const target = frame.current
-    if (!element || !target) return
+    if (!element || !target || !source) return
     const motion = matchMedia('(prefers-reduced-motion: reduce)')
     const connection = (
       navigator as Navigator & {
@@ -60,7 +50,7 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
     let disposed = false
 
     function synchronize() {
-      if (!element) return
+      if (!element || !source) return
       if (
         !inView ||
         document.hidden ||
@@ -106,6 +96,19 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
     }
   }, [source, playback])
 
+  useEffect(
+    function releaseVideoSource() {
+      const element = video.current
+      return () => {
+        if (!element) return
+        element.pause()
+        element.removeAttribute('src')
+        element.load()
+      }
+    },
+    [source],
+  )
+
   return (
     <section
       className="editorial-film"
@@ -131,30 +134,32 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
           </Link>
         </div>
         <div className="editorial-film-media" ref={frame}>
-          <img
+          <LoadingImage
             src={poster}
-            alt={failed ? editorialFilm.description : ''}
+            alt={!desktopVideo || failed ? editorialFilm.description : ''}
             width={wide ? 1920 : 720}
             height={wide ? 926 : 900}
             loading="lazy"
           />
-          <video
-            key={source}
-            ref={video}
-            muted
-            playsInline
-            loop
-            preload="none"
-            aria-label={editorialFilm.description}
-            poster={poster}
-            hidden={failed}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onError={() => {
-              setFailedSource(source)
-            }}
-          />
-          {!failed && (
+          {source ? (
+            <video
+              key={source}
+              ref={video}
+              muted
+              playsInline
+              loop
+              preload="none"
+              aria-label={editorialFilm.description}
+              poster={poster}
+              hidden={failed}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onError={() => {
+                setFailedSource(source)
+              }}
+            />
+          ) : null}
+          {source && !failed && (
             <button
               type="button"
               className="editorial-film-toggle"
@@ -168,7 +173,7 @@ export function EditorialFilm({ content }: { content: HomeFilmContent }) {
               <Icon name={playing ? 'pause' : 'play'} />
             </button>
           )}
-          {failed && (
+          {source && failed && (
             <p className="editorial-film-fallback" role="status">
               El video no está disponible. Puedes seguir explorando la
               colección.

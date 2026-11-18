@@ -8,11 +8,10 @@ import type { HomeContent, HomeMedia } from '../types/home'
 import type { ShippingSettings } from '../types/shipping'
 import type { StoreFeatures } from '../domain/store-features'
 import {
-  adminService,
-  getStoreBrands,
-  getStoreProductRecords,
-  hydrateAdminStore,
-} from './admin-service'
+  adminRuntime,
+  loadAdminRuntime,
+  subscribeAdminState,
+} from './admin-runtime'
 import type { AdminState } from '../types/admin'
 import { isRemoteCatalog } from './catalog-source'
 import { invalidatePublicQueryCache } from './public-query-cache'
@@ -52,16 +51,18 @@ export interface LocalStorefrontRepository extends StorefrontRepository {
   subscribe(listener: () => void): () => void
 }
 
+if (!isRemoteCatalog) await loadAdminRuntime()
+
 let cachedState: AdminState | undefined
 let cachedSnapshot: StorefrontSnapshot | undefined
 
 function peekLocalSnapshot(): StorefrontSnapshot {
-  const state = adminService.getSnapshot()
+  const state = adminRuntime().adminService.getSnapshot()
   if (state === cachedState && cachedSnapshot) return cachedSnapshot
   cachedState = state
   cachedSnapshot = {
-    brands: getStoreBrands(),
-    products: getStoreProductRecords(),
+    brands: adminRuntime().getStoreBrands(),
+    products: adminRuntime().getStoreProductRecords(),
     shipping: state.shipping,
     media: state.homeMedia,
     content: state.homeContent,
@@ -71,9 +72,9 @@ function peekLocalSnapshot(): StorefrontSnapshot {
 }
 
 export const localStorefrontRepository: LocalStorefrontRepository = {
-  subscribe: adminService.subscribe,
+  subscribe: subscribeAdminState,
   async readSnapshot() {
-    await hydrateAdminStore()
+    await adminRuntime().hydrateAdminStore()
     return peekLocalSnapshot()
   },
   peekSnapshot: peekLocalSnapshot,
@@ -91,7 +92,7 @@ const remoteStorefrontRepository = createSupabaseStorefrontRepository({
     }
   },
   subscribeEditorial(listener) {
-    const unsubscribeLocal = adminService.subscribe(listener)
+    const unsubscribeLocal = subscribeAdminState(listener)
     const unsubscribeHome = publicHomeContent.subscribe(listener)
     const unsubscribeShipping = publicShippingSettings.subscribe(listener)
     return () => {

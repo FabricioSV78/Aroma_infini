@@ -276,6 +276,16 @@ create function aroma_query_reference.id(kind integer,n integer) returns uuid
 language sql immutable security invoker set search_path='' as $$
   select ('e030000'||kind::text||'-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid;
 $$;
+-- Home v40 compacts repeated profiles without changing either consumer.
+-- Keep the historical v38 function above frozen; normalize its redundant
+-- rows only at this comparison boundary. Separate tests exercise consumers.
+create function aroma_query_reference.compact_home_profiles(value jsonb) returns jsonb
+language sql immutable security invoker set search_path='' as $$
+  with profiles as (select profile,ordinal from jsonb_array_elements(value->'profiles') with ordinality p(profile,ordinal)),
+  kept as (select min(ordinal) ordinal from profiles group by profile union select max(ordinal) from profiles group by profile)
+  select (value-'profiles')||jsonb_build_object('finderAvailableCount',(select count(*) from profiles where (profile->>'finderAvailable')::boolean),
+    'profiles',coalesce((select jsonb_agg(p.profile order by p.ordinal) from profiles p join kept k using(ordinal)),'[]'::jsonb));
+$$;
 create function aroma_query_reference.compare_matrix(label text) returns text
 language plpgsql security invoker set search_path='' as $$
 declare query jsonb;ordering text;source_slug text;cases integer:=0;products uuid[];variants uuid[];
@@ -297,7 +307,7 @@ begin
       cases:=cases+1;
     end loop;
   end loop;
-  perform aroma_query_reference.equal('select aroma_query_reference.catalog_home_context()','select api.catalog_home_context()',label||' complete Home and profile order');
+  perform aroma_query_reference.equal('select aroma_query_reference.compact_home_profiles(aroma_query_reference.catalog_home_context())','select api.catalog_home_context()',label||' complete Home and effective profile order');
   foreach source_slug in array array['query-1','query-3','query-4','query-6','query-11','query-70','query-82','missing-product','bad/slug'] loop
     perform aroma_query_reference.equal(format('select aroma_query_reference.catalog_product_context(%L)',source_slug),
       format('select api.catalog_product_context(%L)',source_slug),label||' detail '||source_slug);

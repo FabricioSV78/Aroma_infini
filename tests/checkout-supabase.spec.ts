@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { PDFDocument } from 'pdf-lib'
@@ -250,6 +251,8 @@ const test = authTest.extend<{ checkoutNetwork: Network }>({
           coupons: [],
           couponVersions: {},
         })
+      } else if (['admin_product_list','admin_order_list','admin_customer_list'].includes(name)) {
+        await reply(adminListFixture(name,body,{orders:state.order?[state.order]:[]}))
       } else if (name === 'admin_orders') {
         expect(request.headers().authorization).toMatch(/^Bearer ey/)
         await reply({

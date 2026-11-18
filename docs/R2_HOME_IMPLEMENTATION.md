@@ -1,6 +1,12 @@
 # Home remoto — Supabase y R2
 
-**Ampliación vigente, 4 de noviembre:** el [carrusel multimedia](HERO_CAMPAIGNS.md)
+**Registro histórico de la integración inicial.** Se conservan los contratos y
+resultados de las fechas indicadas; sus plazos de limpieza y vídeo móvil no
+describen la operación actual. Para administrar recursos, consultar
+[Operación de medios](R2_MEDIA_OPERATIONS.md) y la
+[política de vídeo exclusivo de escritorio](MOBILE_VIDEO_POLICY.md).
+
+**Ampliación del 4 de noviembre:** el [carrusel multimedia](HERO_CAMPAIGNS.md)
 reutiliza esta arquitectura para campañas dinámicas, vídeos y portadas del Hero,
 destinos configurables y publicación/ocultación. Este informe conserva el alcance
 y los resultados históricos de la integración inicial.

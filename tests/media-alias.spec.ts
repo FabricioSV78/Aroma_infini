@@ -291,7 +291,7 @@ test('El arranque espera un único catálogo público y conserva la composición
   })
   await expect(about).toHaveAttribute(
     'src',
-    '/images/editorial-essential-v3-1536.webp',
+    new URL('/images/editorial-essential-v3-1536.webp', page.url()).href,
   )
   await about.evaluate((image) => (image as HTMLImageElement).decode())
   const fallback = await page.screenshot({

@@ -5,6 +5,10 @@ import { createBuildTarget } from './scripts/build-identity.ts'
 import { privilegedPublicValue } from './scripts/public-environment.mjs'
 import { viteTestCache } from './scripts/vite-test-cache.mjs'
 import {
+  initialSharedModule,
+  verifyPublicStartup,
+} from './scripts/startup-chunks.ts'
+import {
   INDEXABLE_ROBOTS,
   PRIVATE_ROBOTS,
   seoPublicationOrigin,
@@ -44,7 +48,29 @@ export default defineConfig(({ mode }) => {
       {
         name: 'seo-index-defaults',
         transformIndexHtml(html) {
-          return html.replace('__SEO_ROBOTS__', robots)
+          const result = html.replace('__SEO_ROBOTS__', robots)
+          if (env.VITE_CATALOG_SOURCE !== 'supabase') return result
+          try {
+            const origin = new URL(env.VITE_SUPABASE_URL)
+            if (!/^https:\/\/[a-z]{20}\.supabase\.co\/$/.test(origin.href))
+              return result
+            return {
+              html: result,
+              tags: [
+                {
+                  tag: 'link',
+                  attrs: {
+                    rel: 'preconnect',
+                    href: origin.origin,
+                    crossorigin: 'anonymous',
+                  },
+                  injectTo: 'head' as const,
+                },
+              ],
+            }
+          } catch {
+            return result
+          }
         },
       },
       {
@@ -55,6 +81,12 @@ export default defineConfig(({ mode }) => {
             fileName: '_build-target.json',
             source: JSON.stringify(createBuildTarget(mode, env)),
           })
+        },
+      },
+      {
+        name: 'public-startup-boundary',
+        generateBundle(_options, bundle) {
+          verifyPublicStartup(bundle)
         },
       },
     ],
@@ -80,6 +112,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      manifest: true,
       rolldownOptions: {
         output: {
           codeSplitting: {
@@ -87,6 +120,12 @@ export default defineConfig(({ mode }) => {
               {
                 name: 'react-vendor',
                 test: /[\\/]node_modules[\\/](?:react|react-dom|react-router)/,
+                priority: 10,
+              },
+              {
+                name: 'startup-common',
+                tags: ['$initial'],
+                test: initialSharedModule,
               },
             ],
           },

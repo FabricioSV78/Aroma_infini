@@ -1,9 +1,16 @@
 # Fotografías administradas: uso y límites
 
-La ampliación de biblioteca, reutilización entre apartados, gestión de logotipo
-y limpieza a las 24 horas se describe en [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md).
-Requiere activar sus migraciones y el Worker del mismo entorno; no basta con
-actualizar únicamente el frontend.
+Las fotografías se administran directamente desde Productos y Gestión del Home.
+En Configuración → **Imágenes del sitio** se cambian las nueve ubicaciones de
+Nosotros, acceso de clientes, logotipo e imágenes para compartir. Cada editor
+permite subir el archivo, revisar su vista previa y guardar.
+
+Al reemplazar o quitar una imagen, el servidor conserva el archivo mientras
+tenga algún uso. Tras 24 horas sin referencias queda elegible para limpieza.
+La tarea revisa hasta diez archivos cada cinco minutos y comprueba de nuevo sus
+referencias antes de borrar. La cola y los reintentos pueden demorar la retirada.
+Una asociación válida durante el período de seguridad cancela su eliminación.
+El historial de la biblioteca retirada está en [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md).
 
 ## Flujo desde Productos
 
@@ -96,9 +103,21 @@ acepta como prueba de almacenamiento.
 
 Desde Gestión del Home puedes seleccionar imágenes de cada apartado, editar sus textos y guardar. La vista previa conserva el borrador: no publica archivos ni contenido. El guardado confirma los archivos en R2 y el documento versionado en Supabase. Un error o conflicto conserva los cambios para revisarlos.
 
-Hero y recomendador conservan versiones 16:9 para escritorio y 2:3 para móvil; categorías 4:5 y opciones 1:1. El vídeo permite un archivo principal y una exportación móvil opcional del mismo material, cada uno con su póster. R2 no transcodifica.
+Hero y recomendador conservan versiones 16:9 para escritorio y 2:3 para móvil;
+categorías 4:5 y opciones 1:1. Los vídeos se utilizan exclusivamente en
+escritorio. En móviles se muestra la imagen alternativa configurada o su póster,
+sin descargar ni inicializar el vídeo. R2 almacena los archivos preparados.
 
-Los archivos predeterminados permanecen en el proyecto. No se importan automáticamente personalizaciones antiguas del navegador. Los detalles, límites y pruebas se encuentran en [Home remoto](R2_HOME_IMPLEMENTATION.md).
+Los 162 originales revisados se copiaron a R2 de desarrollo con verificación de
+sus bytes y dimensiones. Staging omite las copias estáticas y el Worker controla
+sus rutas. Cuando se reemplaza el último uso, se aplica el mismo período de
+24 horas. Las imágenes compartidas con otra ubicación, SEO o un pedido anterior
+continúan protegidas. Las copias del repositorio y de navegadores que ya las
+descargaron conservan su propio historial.
+
+Las personalizaciones antiguas del navegador requieren guardado explícito.
+Los detalles del Home y sus pruebas se encuentran en
+[Home remoto](R2_HOME_IMPLEMENTATION.md).
 
 ## Pruebas de esta capa
 

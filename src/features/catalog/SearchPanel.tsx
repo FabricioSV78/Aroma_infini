@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Link, useNavigate } from 'react-router'
 import { catalogService } from '../../services/catalog-service'
 import { getProductPresentation } from '../../services/product-presentation'
@@ -124,7 +125,7 @@ export function SearchPanel({ onClose }: { onClose: () => void }) {
                   return (
                     <li key={product.id}>
                       <Link to={'/producto/' + product.slug} onClick={onClose}>
-                        <img
+                        <LoadingImage
                           src={imageSource(product.image)}
                           alt=""
                           width={48}

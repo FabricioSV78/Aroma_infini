@@ -1,4 +1,5 @@
 import { MEDIA_VIDEO_MAX_BYTES } from '../domain/media'
+import { DESKTOP_VIDEO_QUERY } from '../domain/media-playback'
 import { UserFacingError } from './admin-messages'
 
 export interface VideoOptimizationInfo {
@@ -47,6 +48,14 @@ export async function prepareNativeVideo(
   signal?: AbortSignal,
 ): Promise<PreparedVideoRenditions> {
   cancelled(signal)
+  if (
+    typeof window === 'undefined' ||
+    !window.matchMedia(DESKTOP_VIDEO_QUERY).matches
+  )
+    throw new UserFacingError(
+      'video-desktop-only',
+      'Prepara los videos desde una computadora. En móvil puedes gestionar sus imágenes alternativas.',
+    )
   if (file.type !== 'video/mp4')
     throw new UserFacingError(
       'video-format',

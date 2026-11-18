@@ -5,9 +5,9 @@ import type {
   PromotionResult,
   ShippingQuote,
 } from './checkout-service'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { mediaApiBaseUrl } from './asset-source'
-import { UserFacingError } from './admin-messages'
+import { UserFacingError } from '../domain/user-facing-error'
 import { canSimulateCheckout } from './runtime-environment'
 
 export interface ServerCheckoutQuote {
@@ -226,7 +226,7 @@ export async function requestCheckoutQuote(
   code = draft.appliedPromotion,
   signal?: AbortSignal,
 ) {
-  const request = requireSupabaseClient().rpc(
+  const request = (await requireReadySupabaseClient()).rpc(
     'checkout_quote',
     checkoutQuery(items, draft, code),
   )
@@ -276,7 +276,7 @@ export async function submitSimulatedOrder(
       'checkout-unavailable',
       'El pago en línea no está disponible en este momento.',
     )
-  const client = requireSupabaseClient(),
+  const client = (await requireReadySupabaseClient()),
     before = await client.auth.getSession()
   if (before.error)
     throw new UserFacingError(

@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { mkdir } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { DEFAULT_OLFACTORY_FAMILIES } from '../src/domain/olfactory-family'
@@ -69,6 +70,14 @@ const test = authTest.extend<{ settingsNetwork: SettingsNetwork }>({
           'catalog_home_context',
           'catalog_brand_previews',
           'catalog_brands',
+          'admin_product_list',
+          'admin_order_list',
+          'admin_customer_list',
+          'admin_catalog_context',
+          'admin_catalog_choices',
+          'admin_offer_list',
+          'admin_products_by_ids',
+          'admin_import_conflicts',
           'admin_catalog_page',
           'admin_orders',
           'admin_commerce_settings',
@@ -126,6 +135,7 @@ const test = authTest.extend<{ settingsNetwork: SettingsNetwork }>({
         else if (name === 'catalog_brand_previews')
           await reply({ brands: [], mediaAssets: [] })
         else if (name === 'catalog_brands') await reply([])
+        else if (['admin_product_list','admin_order_list','admin_customer_list','admin_catalog_context','admin_catalog_choices','admin_offer_list','admin_products_by_ids','admin_import_conflicts'].includes(name)) await reply(adminListFixture(name,route.request().postDataJSON() as Record<string,unknown>))
         else if (name === 'admin_catalog_page')
           await reply({
             ...metadata,

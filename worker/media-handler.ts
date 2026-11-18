@@ -2,6 +2,7 @@ import type { MediaEnvironment, VerifiedImage } from './media-types'
 import { webpDimensions } from './media-webp-header'
 import { inspectMp4 } from './media-mp4'
 import { inspectStaticSvg } from './media-svg'
+import { publicReadTiming } from './public-read-timing'
 import {
   MEDIA_UPLOAD_MAX_BYTES,
   MEDIA_VARIANT_MAX_BYTES,
@@ -195,6 +196,10 @@ interface Dependencies {
   fetch?: typeof fetch
   decodeWebp(bytes: ArrayBuffer): Promise<VerifiedImage>
   requestSignal?: () => AbortSignal
+  publicImageCache?: () => Pick<Cache, 'match' | 'put'>
+}
+interface MediaReadContext {
+  waitUntil(task: Promise<unknown>): void
 }
 /** No privileged client or mutable request state is shared between requests. */
 export function createMediaHandler(dependencies: Dependencies) {
@@ -203,61 +208,71 @@ export function createMediaHandler(dependencies: Dependencies) {
     url: string,
     headers: HeadersInit,
     body?: unknown,
+    timing?: ReturnType<typeof publicReadTiming>,
   ) {
     const deadline = AbortSignal.timeout(15000)
-    const response = await transport(url, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: deadline,
-      redirect: 'manual',
-    })
-    const value: unknown = await readProviderJson(response, deadline).catch(
-      (error: unknown) => {
-        if (response.ok) throw error
-        return null
-      },
-    )
-    if (!response.ok) {
-      const code =
-        value && typeof value === 'object' && 'code' in value ? value.code : ''
-      if (response.status === 401)
-        throw new MediaError(
-          401,
-          'session',
-          'Tu sesión terminó. Inicia sesión de nuevo antes de subir fotografías.',
-        )
-      if (response.status === 403 || code === '42501')
-        throw new MediaError(
-          403,
-          'permission',
-          'Inicia sesión con una cuenta administrativa y completa la verificación en dos pasos.',
-        )
-      if (response.status === 429 || code === 'PT429')
-        throw new MediaError(
-          429,
-          'rate-limit',
-          'Realizaste varias cargas seguidas. Espera un momento y vuelve a intentarlo.',
-        )
-      if (code === 'PT409')
-        throw new MediaError(
-          409,
-          'conflict',
-          'Esta operación ya tiene otro contenido o dejó de estar disponible. Vuelve a revisar las fotografías.',
-        )
-      if (response.status === 400)
-        throw new MediaError(
-          400,
-          'validation',
-          'No pudimos registrar la fotografía. Revisa sus dimensiones y vuelve a intentarlo.',
-        )
-      throw new MediaError(
-        503,
-        'storage',
-        'No pudimos confirmar el almacenamiento. Conserva tus fotografías y vuelve a intentarlo.',
+    const observed = timing ? timing.fetch.bind(null, transport) : transport
+    let outcome: 'ok' | 'error' = 'error'
+    try {
+      const response = await observed(url, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: deadline,
+        redirect: 'manual',
+      })
+      const value: unknown = await readProviderJson(response, deadline).catch(
+        (error: unknown) => {
+          if (response.ok) throw error
+          return null
+        },
       )
+      if (!response.ok) {
+        const code =
+          value && typeof value === 'object' && 'code' in value
+            ? value.code
+            : ''
+        if (response.status === 401)
+          throw new MediaError(
+            401,
+            'session',
+            'Tu sesión terminó. Inicia sesión de nuevo antes de subir fotografías.',
+          )
+        if (response.status === 403 || code === '42501')
+          throw new MediaError(
+            403,
+            'permission',
+            'Inicia sesión con una cuenta administrativa y completa la verificación en dos pasos.',
+          )
+        if (response.status === 429 || code === 'PT429')
+          throw new MediaError(
+            429,
+            'rate-limit',
+            'Realizaste varias cargas seguidas. Espera un momento y vuelve a intentarlo.',
+          )
+        if (code === 'PT409')
+          throw new MediaError(
+            409,
+            'conflict',
+            'Esta operación ya tiene otro contenido o dejó de estar disponible. Vuelve a revisar las fotografías.',
+          )
+        if (response.status === 400)
+          throw new MediaError(
+            400,
+            'validation',
+            'No pudimos registrar la fotografía. Revisa sus dimensiones y vuelve a intentarlo.',
+          )
+        throw new MediaError(
+          503,
+          'storage',
+          'No pudimos confirmar el almacenamiento. Conserva tus fotografías y vuelve a intentarlo.',
+        )
+      }
+      outcome = 'ok'
+      return value
+    } finally {
+      timing?.finish(outcome)
     }
-    return value
   }
   function config(env: MediaEnvironment) {
     const url = new URL(env.SUPABASE_URL)
@@ -282,6 +297,7 @@ export function createMediaHandler(dependencies: Dependencies) {
     name: string,
     body: unknown,
     token?: string,
+    timing?: ReturnType<typeof publicReadTiming>,
   ) {
     const publicCall = token === 'public'
     const secret = token
@@ -296,7 +312,12 @@ export function createMediaHandler(dependencies: Dependencies) {
     if (token && !publicCall) headers.Authorization = `Bearer ${token}`
     else if (secret.startsWith('eyJ'))
       headers.Authorization = `Bearer ${secret}`
-    return jsonRequest(`${config(env)}/rest/v1/rpc/${name}`, headers, body)
+    return jsonRequest(
+      `${config(env)}/rest/v1/rpc/${name}`,
+      headers,
+      body,
+      timing,
+    )
   }
   async function actor(request: Request, env: MediaEnvironment) {
     const authorization = request.headers.get('Authorization') ?? ''
@@ -307,13 +328,20 @@ export function createMediaHandler(dependencies: Dependencies) {
         'Inicia sesión antes de subir fotografías.',
       )
     const token = authorization.slice(7)
-    const user = object(
-      await jsonRequest(`${config(env)}/auth/v1/user`, {
+    // Independent, fresh read-only checks of the same captured bearer. Await
+    // both, even on failure, before any reservation or privileged operation.
+    const [verified, authorized] = await Promise.allSettled([
+      jsonRequest(`${config(env)}/auth/v1/user`, {
         apikey: env.SUPABASE_PUBLISHABLE_KEY,
         Authorization: authorization,
       }),
-    )
-    const current = object(await rpc(env, 'current_actor', {}, token))
+      rpc(env, 'current_actor', {}, token),
+    ])
+    // Preserve the Auth error when both checks fail (for example HTTP 401).
+    if (verified.status === 'rejected') throw verified.reason
+    if (authorized.status === 'rejected') throw authorized.reason
+    const user = object(verified.value)
+    const current = object(authorized.value)
     const userId =
       typeof user.id === 'string' && uuid.test(user.id) ? user.id : ''
     if (
@@ -975,32 +1003,14 @@ export function createMediaHandler(dependencies: Dependencies) {
     return new Response(stored.body, { status: range ? 206 : 200, headers })
   }
 
-  async function serve(request: Request, env: MediaEnvironment) {
-    if (!['GET', 'HEAD'].includes(request.method))
-      return new Response(null, {
-        status: 405,
-        headers: { Allow: 'GET, HEAD' },
-      })
+  async function serveImage(
+    request: Request,
+    env: MediaEnvironment,
+    key: string,
+    supplied: unknown,
+  ) {
     const pathname = new URL(request.url).pathname
-    const match =
-      pathname.match(imagePath) ??
-      pathname.match(videoPath) ??
-      pathname.match(vectorPath)
-    if (!match || !uuid.test(match[2])) return answer({ code: 'missing' }, 404)
-    const key = match[1],
-      assetId = match[2]
-    const publicAsset = await rpc(
-      env,
-      'media_public_asset',
-      { p_asset_id: assetId },
-      'public',
-    )
-    if (!publicAsset) return answer({ code: 'missing' }, 404)
-    if (videoPath.test(pathname))
-      return serveVideo(request, env, key, publicAsset)
-    if (vectorPath.test(pathname))
-      return serveSvg(request, env, key, publicAsset)
-    const asset = object(publicAsset)
+    const asset = object(supplied)
     const variants = Array.isArray(asset.variants) ? asset.variants : []
     if (
       ![asset.src, ...variants.map((variant) => object(variant).src)].includes(
@@ -1044,9 +1054,123 @@ export function createMediaHandler(dependencies: Dependencies) {
         : answer({ code: 'missing' }, 404)
     return new Response(stored.body, { headers })
   }
+  async function serve(
+    request: Request,
+    env: MediaEnvironment,
+    context?: MediaReadContext,
+  ) {
+    if (!['GET', 'HEAD'].includes(request.method))
+      return new Response(null, {
+        status: 405,
+        headers: { Allow: 'GET, HEAD' },
+      })
+    const pathname = new URL(request.url).pathname
+    const match =
+      pathname.match(imagePath) ??
+      pathname.match(videoPath) ??
+      pathname.match(vectorPath)
+    if (!match || !uuid.test(match[2])) return answer({ code: 'missing' }, 404)
+    const key = match[1],
+      assetId = match[2]
+    const started = performance.now()
+    const timing = publicReadTiming(env.APP_ENVIRONMENT, 'media_public_asset')
+    const publicAsset = await rpc(
+      env,
+      'media_public_asset',
+      { p_asset_id: assetId },
+      'public',
+      timing,
+    )
+    const checked = performance.now()
+    if (!publicAsset) return answer({ code: 'missing' }, 404)
+    // Only immutable image BYTES may be cached, after a new authoritative SQL
+    // manifest read on EVERY request. Never cache publication decisions, HTML,
+    // commercial data, errors, uploads, video ranges or conditional responses.
+    const asset = object(publicAsset)
+    const variants = Array.isArray(asset.variants) ? asset.variants : []
+    const isVector = vectorPath.test(pathname)
+    const expectedType = isVector ? 'image/svg+xml' : 'image/webp'
+    // SVG receipts must pass the same parser as a fresh R2 delivery, including
+    // exact path and byte size. A cached object cannot authorize a new receipt.
+    const vector = isVector ? parseManagedSvgAsset(publicAsset) : undefined
+    const eligible =
+      env.APP_ENVIRONMENT === 'staging' &&
+      context &&
+      dependencies.publicImageCache &&
+      (imagePath.test(pathname) || isVector) &&
+      !request.headers.has('If-None-Match') &&
+      [asset.src, ...variants.map((variant) => object(variant).src)].includes(
+        pathname,
+      )
+    const cache = eligible ? dependencies.publicImageCache!() : undefined
+    // An internal cache namespace, with no caller headers, query or credentials.
+    const cacheUrl = new URL(request.url)
+    // Keep the internal key under run_worker_first /media/* too: even a direct
+    // request for this namespace must run the handler and fail its path grammar.
+    cacheUrl.pathname = `/media/__verified-image-bytes-v1${pathname}`
+    cacheUrl.search = ''
+    const cacheKey = new Request(cacheUrl)
+    let cached: Response | undefined
+    if (cache) {
+      try {
+        cached = await cache.match(cacheKey)
+      } catch {
+        /* R2 remains authoritative. */
+      }
+    }
+    if (
+      cached &&
+      (cached.status !== 200 ||
+        cached.headers.get('Content-Type') !== expectedType ||
+        (vector &&
+          (cached.headers.get('Content-Length') !== String(vector.byteSize) ||
+            cached.headers.get('Content-Security-Policy') !==
+              "sandbox; default-src 'none'; style-src 'none'")))
+    ) {
+      await cached.body?.cancel()
+      cached = undefined
+    }
+    // Always verify the current SQL manifest before storage, including HEAD
+    // and conditional GET. These timings retain no data or cross-request cache.
+    // HEAD can reuse the verified immutable representation's metadata, but
+    // never stream its body. Conditional requests keep their existing R2 path.
+    if (cached?.body && request.method === 'HEAD')
+      context!.waitUntil(cached.body.cancel().catch(() => {}))
+    const response =
+      (cached && request.method === 'HEAD'
+        ? new Response(null, { status: 200, headers: cached.headers })
+        : cached) ??
+      (await (videoPath.test(pathname)
+        ? serveVideo(request, env, key, publicAsset)
+        : vectorPath.test(pathname)
+          ? serveSvg(request, env, key, publicAsset)
+          : serveImage(request, env, key, publicAsset)))
+    if (
+      cache &&
+      !cached &&
+      request.method === 'GET' &&
+      response.status === 200 &&
+      response.headers.get('Content-Type') === expectedType
+    ) {
+      // waitUntil binds the bounded response clone to this request's lifetime.
+      // A cache failure never loses or delays the successful R2 representation.
+      context!.waitUntil(cache.put(cacheKey, response.clone()).catch(() => {}))
+    }
+    if (env.APP_ENVIRONMENT !== 'staging') return response
+    const headers = new Headers(response.headers)
+    if (cache) headers.set('X-Aroma-Byte-Cache', cached ? 'HIT' : 'MISS')
+    for (const [name, value] of timing.headers()) headers.append(name, value)
+    headers.append(
+      'Server-Timing',
+      `media_manifest;dur=${(checked - started).toFixed(1)}, media_storage;dur=${(performance.now() - checked).toFixed(1)}`,
+    )
+    headers.set('Timing-Allow-Origin', '*')
+    return new Response(response.body, { status: response.status, headers })
+  }
   return async (
     request: Request,
     env: MediaEnvironment,
+    context?: MediaReadContext,
   ): Promise<Response | null> => {
     const url = new URL(request.url)
     if (
@@ -1062,7 +1186,8 @@ export function createMediaHandler(dependencies: Dependencies) {
           'configuration',
           'El almacenamiento de fotografías aún no está configurado.',
         )
-      if (url.pathname.startsWith('/media/')) return await serve(request, env)
+      if (url.pathname.startsWith('/media/'))
+        return await serve(request, env, context)
       origin = request.headers.get('Origin')
       const allowed = (env.MEDIA_ALLOWED_ORIGINS ?? '')
         .split(',')

@@ -10,14 +10,21 @@ import {
   PRODUCT_TYPES,
   variantLabel,
 } from '../../domain/product-type'
-import { ProductDetailPreview } from '../product/ProductPage'
 import {
   getEditorialPrimaryFamily,
   getProductOlfactoryFamilies,
   OLFACTORY_FAMILIES,
   type OlfactoryFamily,
 } from '../../domain/olfactory-family'
-import { useEffect, useRef, useState, type FormEvent, useMemo } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  useMemo,
+} from 'react'
 import {
   Link,
   useBlocker,
@@ -36,6 +43,9 @@ import {
   type AdminProduct,
 } from '../../services/admin-service'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
+import { readAdminCatalogChoices } from '../../services/catalog-admin-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import type { AdminCatalogChoice } from '../../types/admin-catalog-reads'
 import type { ProductVariant } from '../../types/catalog'
 import { AdminBadge, AdminPageHeader } from './AdminShared'
 import { getVariantInventory } from './admin-utils'
@@ -46,6 +56,11 @@ import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { useAdminNotice } from './AdminNoticeProvider'
 
 const noteFields = ['top', 'heart', 'base'] as const
+const ProductDetailPreview = lazy(() =>
+  import('../product/ProductPage').then((module) => ({
+    default: module.ProductDetailPreview,
+  })),
+)
 
 type NoteField = (typeof noteFields)[number]
 
@@ -169,6 +184,38 @@ export function AdminProductFormPage() {
   const mediaUploadRef = useRef(false)
   const [showPreview, setShowPreview] = useState(false)
   const [relatedOpen, setRelatedOpen] = useState(false)
+  const [relatedLookup, setRelatedLookup] = useState<{id: string; includeIds: string[]} | null>(null)
+  const [relatedChoices, setRelatedChoices] = useState<AdminCatalogChoice[] | null>(null)
+  const relatedSentinel = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!isRemoteCatalog || !relatedOpen || !relatedLookup) return
+    let current = true, loading = false, page = 1, received = 0, total = Infinity
+    const byId = new Map<string, AdminCatalogChoice>()
+    async function loadNext() {
+      if (!current || loading || received >= total || !relatedLookup) return
+      loading = true
+      try {
+        const result = await readAdminCatalogChoices({ page, limit: 100, activeOnly: true,
+          excludeId: relatedLookup.id, includeIds: relatedLookup.includeIds })
+        if (!current) return
+        total = result.total
+        received += result.items.length
+        page++
+        for (const item of [...result.selected, ...result.items]) byId.set(item.id, item)
+        setRelatedChoices([...byId.values()])
+      } catch (error) {
+        if (current) { total = received; notice.error(error) }
+      } finally {
+        loading = false
+      }
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadNext()
+    }, {rootMargin: '600px'})
+    if (relatedSentinel.current) observer.observe(relatedSentinel.current)
+    void loadNext()
+    return () => { current = false; observer.disconnect() }
+  }, [notice, relatedLookup, relatedOpen])
   const persistence = useAdminSave({ catalog: true })
   const saving = persistence.saving
   const perfume = isPerfume(form.product)
@@ -181,7 +228,7 @@ export function AdminProductFormPage() {
     }
     return byId
   }, [state.brands])
-  const relatedProducts = useMemo(
+  const localRelatedProducts = useMemo(
     () =>
       relatedOpen
         ? state.products
@@ -204,6 +251,11 @@ export function AdminProductFormPage() {
       form.detail.recommendationIds,
     ],
   )
+  const relatedProducts = isRemoteCatalog
+    ? (relatedChoices ?? []).filter(item => item.active || form.detail.recommendationIds.includes(item.id))
+      .map(item => ({id: item.id, name: item.name, brandName: item.brandName, active: item.active, productType: item.productType}))
+    : localRelatedProducts.map(({record, brandName}) => ({id: record.product.id, name: record.product.name,
+      brandName, active: record.active, productType: getProductType(record.product)}))
   const familyConflict = Boolean(
     selectedFamilies.length &&
     editorialPrimaryFamily &&
@@ -896,7 +948,14 @@ export function AdminProductFormPage() {
           </div>
           <details
             className="admin-related-products"
-            onToggle={(event) => setRelatedOpen(event.currentTarget.open)}
+            onToggle={(event) => {
+              const open = event.currentTarget.open
+              setRelatedOpen(open)
+              if (open && isRemoteCatalog) {
+                setRelatedChoices(null)
+                setRelatedLookup({id: form.product.id, includeIds: [...form.detail.recommendationIds]})
+              }
+            }}
           >
             <summary>
               <span>También te puede gustar</span>
@@ -912,12 +971,12 @@ export function AdminProductFormPage() {
                   Elige hasta 4 productos o deja la selección automática.
                 </legend>
                 <div className="admin-related-products__options">
-                  {relatedProducts.map(({ record, brandName }) => {
+                  {relatedProducts.map((record) => {
                     const checked = form.detail.recommendationIds.includes(
-                      record.product.id,
+                      record.id,
                     )
                     return (
-                      <label key={record.product.id}>
+                      <label key={record.id}>
                         <input
                           type="checkbox"
                           checked={checked}
@@ -934,22 +993,22 @@ export function AdminProductFormPage() {
                                 recommendationIds: isChecked
                                   ? [
                                       ...current.detail.recommendationIds,
-                                      record.product.id,
+                                      record.id,
                                     ]
                                   : current.detail.recommendationIds.filter(
-                                      (id) => id !== record.product.id,
+                                      (id) => id !== record.id,
                                     ),
                               },
                             }))
                           }}
                         />
                         <span>
-                          <strong>{record.product.name}</strong>
+                          <strong>{record.name}</strong>
                           <small>
-                            {brandName}
+                            {record.brandName}
                             {record.active &&
                             (state.features.complementsEnabled ||
-                              isPerfume(record.product))
+                              record.productType === 'perfume')
                               ? ''
                               : ' · Oculto en tienda'}
                           </small>
@@ -958,8 +1017,9 @@ export function AdminProductFormPage() {
                     )
                   })}
                 </div>
+                {isRemoteCatalog ? <span ref={relatedSentinel} aria-hidden="true" /> : null}
                 {!relatedProducts.length ? (
-                  <p>No hay otros productos disponibles para relacionar.</p>
+                  <p>{isRemoteCatalog && relatedChoices === null ? 'Cargando productos…' : 'No hay otros productos disponibles para relacionar.'}</p>
                 ) : null}
               </fieldset>
             ) : null}
@@ -1214,6 +1274,12 @@ export function AdminProductFormPage() {
           <button
             type="button"
             className="button button--secondary admin-product-preview-open"
+            onPointerEnter={() => {
+              void import('../product/ProductPage').catch(() => {})
+            }}
+            onFocus={() => {
+              void import('../product/ProductPage').catch(() => {})
+            }}
             onClick={() => {
               if (!mediaUploadRef.current) setShowPreview(true)
             }}
@@ -1239,19 +1305,21 @@ export function AdminProductFormPage() {
         onClose={() => setShowPreview(false)}
       >
         {showPreview ? (
-          <ProductDetailPreview
-            record={{
-              product: form.product,
-              detail: {
-                ...form.detail,
-                notes: parseNoteDraft(noteDraft),
-              },
-            }}
-            brands={state.brands.filter(
-              (brand) => brand.active || brand.id === form.product.brandId,
-            )}
-            products={getStoreProducts()}
-          />
+          <Suspense fallback={<p role="status">Preparando vista previa…</p>}>
+            <ProductDetailPreview
+              record={{
+                product: form.product,
+                detail: {
+                  ...form.detail,
+                  notes: parseNoteDraft(noteDraft),
+                },
+              }}
+              brands={state.brands.filter(
+                (brand) => brand.active || brand.id === form.product.brandId,
+              )}
+              products={getStoreProducts()}
+            />
+          </Suspense>
         ) : null}
       </Dialog>
     </div>

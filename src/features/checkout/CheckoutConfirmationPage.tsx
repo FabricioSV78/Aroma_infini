@@ -57,7 +57,7 @@ export function CheckoutConfirmationPage() {
         <h1>Tu selección quedó guardada</h1>
         <p>
           {order.simulation
-            ? 'Tu pedido de prueba quedó guardado. No se realizó ningún cobro ni se reservaron unidades.'
+            ? 'Tu pedido de prueba quedó guardado. No se realizó ningún cobro.'
             : 'La información está disponible durante esta sesión. No se realizó ningún cobro.'}
         </p>
         <div className="checkout-confirmation-tracking">

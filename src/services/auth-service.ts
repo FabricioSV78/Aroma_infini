@@ -90,6 +90,19 @@ async function refreshSession(): Promise<void> {
   return request
 }
 
+/** INITIAL_SESSION or another SDK/storage event can supersede a verification
+ * already awaited by route loaders. Drain the replacement verification before
+ * resolving; the obsolete promise cannot establish that Auth is ready. This
+ * shares unfinished requests only and never caches an authorization decision. */
+async function settleCurrentSession(): Promise<void> {
+  await refreshSession()
+  while (!lockedAfterSignOut && request) {
+    const current = request
+    await current
+    if (request === current) break
+  }
+}
+
 export const authService = {
   get configured() {
     return authAdapter.configured
@@ -122,9 +135,9 @@ export const authService = {
         void refreshSession()
       })
     }
-    await refreshSession()
+    await settleCurrentSession()
   },
-  refresh: refreshSession,
+  refresh: settleCurrentSession,
   async signIn(input: { email: string; password: string }) {
     lockedAfterSignOut = false
     explicitOperation++

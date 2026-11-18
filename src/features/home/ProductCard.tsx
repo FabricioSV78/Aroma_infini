@@ -12,6 +12,9 @@ import { OfferBadge } from '../../components/ui/OfferBadge'
 import { useOfferPriceRevision } from '../../services/offer-price-clock'
 import { storefrontRepository } from '../../services/storefront-repository'
 import { isRemoteCatalog } from '../../services/catalog-source'
+import { PRODUCT_CARD_IMAGE_SIZES } from '../../domain/product-card-image'
+import { useImageStatus } from '../../components/media/useImageStatus'
+import { ImagePlaceholder } from '../../components/media/ImagePlaceholder'
 
 interface ProductCardProps {
   product: Product
@@ -68,10 +71,24 @@ export function ProductCard({
   const imageSizes =
     imageSizesOverride ??
     (variant === 'standard'
-      ? '(min-width: 1440px) 296px, (min-width: 768px) 23vw, 46vw'
+      ? PRODUCT_CARD_IMAGE_SIZES
       : '(min-width: 1024px) 120px, 76px')
   const gallery = getCatalogProductGallery(product.id)
   const alternateImage = gallery?.[1]?.image
+  const primarySource = imageSource(product.image)
+  const primarySourceSet = imageSourceSet(product.image, [480, 960])
+  const { ref: primaryImageRef, state: primaryImageState } = useImageStatus(
+    primarySource,
+    primarySourceSet,
+  )
+  const alternateSource = alternateImage ? imageSource(alternateImage) : ''
+  const alternateSourceSet = alternateImage
+    ? imageSourceSet(alternateImage, [480, 960])
+    : undefined
+  const { ref: alternateImageRef, state: alternateImageState } = useImageStatus(
+    alternateSource,
+    alternateSourceSet,
+  )
   const productImageAlt =
     gallery[0]?.alt.trim() ||
     `${isPerfume(product) ? 'Frasco de ' : ''}${product.name}${brand ? ` de ${brand.name}` : ''}`
@@ -114,9 +131,9 @@ export function ProductCard({
       <div className="product-photo">
         <Link
           className={
-            alternateImage
-              ? 'product-image-link product-image-link--swap'
-              : 'product-image-link'
+            alternateImage && alternateImageState === 'ready'
+              ? 'product-image-link media-loading-frame product-image-link--swap'
+              : 'product-image-link media-loading-frame'
           }
           to={`/producto/${product.slug}`}
           aria-label={`Ver ${product.name}`}
@@ -124,21 +141,27 @@ export function ProductCard({
           tabIndex={preview ? -1 : undefined}
         >
           <img
-            className="product-image-primary"
-            src={imageSource(product.image)}
-            srcSet={imageSourceSet(product.image, [480, 960])}
+            ref={primaryImageRef}
+            className="product-image-primary media-image"
+            data-media-state={primaryImageState}
+            aria-busy={primaryImageState === 'pending' ? true : undefined}
+            src={primarySource}
+            srcSet={primarySourceSet}
             sizes={imageSizes}
             width={1024}
             height={1280}
             loading="lazy"
             decoding="async"
-            alt={productImageAlt}
+            alt={primaryImageState === 'error' ? '' : productImageAlt}
+            aria-hidden={primaryImageState === 'error' ? true : undefined}
           />
           {alternateImage && (
             <img
-              className="product-image-alternate"
-              src={imageSource(alternateImage)}
-              srcSet={imageSourceSet(alternateImage, [480, 960])}
+              ref={alternateImageRef}
+              className="product-image-alternate media-image"
+              data-media-state={alternateImageState}
+              src={alternateSource}
+              srcSet={alternateSourceSet}
               sizes={imageSizes}
               width={1024}
               height={1280}
@@ -148,6 +171,10 @@ export function ProductCard({
               aria-hidden="true"
             />
           )}
+          <ImagePlaceholder
+            state={primaryImageState}
+            label={`Imagen no disponible: ${productImageAlt}`}
+          />
         </Link>
         <OfferBadge
           discount={product.discount}

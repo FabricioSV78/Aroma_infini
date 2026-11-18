@@ -10,6 +10,7 @@ import {
 } from './admin-device-service'
 import {
   commitSupabaseMfaSession,
+  initializeSupabaseClient,
   getSupabaseClient,
   getSupabasePublicConfig,
   isSupabaseConfigured,
@@ -24,11 +25,40 @@ let pendingEnrollment: {
 // An obsolete PASSWORD_RECOVERY event must not become an ordinary session.
 let rejectedRecoveryToken: string | null = null
 
+function requestActor(token: string) {
+  return requireSupabaseClient()
+    .rpc('current_actor')
+    .setHeader('Authorization', `Bearer ${token}`)
+}
+const actorRequests = new Map<
+  string,
+  Promise<Awaited<ReturnType<typeof requestActor>>>
+>()
+let actorReadRevision = 0
+function invalidateActorRequests() {
+  actorReadRevision++
+  actorRequests.clear()
+}
+// INITIAL_SESSION and nested route loaders can verify the same credential
+// together. Share unfinished reads only; every caller still checks session
+// continuity and interprets role/MFA independently. Never cache the decision.
+function readActorCredential(token: string) {
+  const key = JSON.stringify([token, actorReadRevision])
+  const pending = actorRequests.get(key)
+  if (pending) return pending
+  const operation = Promise.resolve(requestActor(token)).finally(() => {
+    if (actorRequests.get(key) === operation) actorRequests.delete(key)
+  })
+  actorRequests.set(key, operation)
+  return operation
+}
+
 async function safe<T>(
   task: () => Promise<T>,
   fallback: AuthErrorCode = 'credentials',
 ): Promise<T> {
   try {
+    await initializeSupabaseClient()
     return await task()
   } catch (error) {
     throw mapSupabaseAuthError(error, fallback)
@@ -49,7 +79,7 @@ function isMissingSession(error: unknown) {
 }
 
 async function getVerifiedSession(): Promise<AuthSession | null> {
-  if (!getSupabaseClient()) return null
+  if (!isSupabaseConfigured) return null
   return safe(async () => {
     const client = requireSupabaseClient()
     const cached = await client.auth.getSession()
@@ -63,10 +93,7 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
     // getSession supplies credentials to the SDK; getUser verifies them remotely.
     const captured = cached.data.session
     const actorToken = captured.access_token
-    const readActor = () =>
-      client
-        .rpc('current_actor')
-        .setHeader('Authorization', `Bearer ${actorToken}`)
+    const readActor = () => readActorCredential(actorToken)
     // Both authorities receive the same captured credential. Drain both reads,
     // then retain Auth's error priority before interpreting any actor response.
     const [verification, initialActor] = await Promise.allSettled([
@@ -135,7 +162,10 @@ async function getVerifiedSession(): Promise<AuthSession | null> {
         // Older deployments or a missing cookie preserve ordinary TOTP login.
         // The identity/token checks below still discard delayed replies.
       }
-      if (resumed) actor = await currentActor()
+      if (resumed) {
+        invalidateActorRequests()
+        actor = await currentActor()
+      }
     }
     // Do not publish a reply to an operation begun under another SDK identity.
     const after = await client.auth.getSession()
@@ -303,9 +333,25 @@ export const authAdapter: AuthAdapter = {
   },
   onSessionChange(listener) {
     const client = getSupabaseClient()
+    if (!client && isSupabaseConfigured) {
+      let active = true
+      let unsubscribe = () => {}
+      void initializeSupabaseClient()
+        .then(() => {
+          if (active) unsubscribe = authAdapter.onSessionChange(listener)
+        })
+        .catch(() => {
+          // getVerifiedSession reports initialization failures through AuthState.
+        })
+      return () => {
+        active = false
+        unsubscribe()
+      }
+    }
     if (!client) return () => undefined
     const timers = new Set<ReturnType<typeof setTimeout>>()
     const notify = (hint?: AuthSessionChange) => {
+        invalidateActorRequests()
       const timer = setTimeout(() => {
         timers.delete(timer)
         listener(hint)

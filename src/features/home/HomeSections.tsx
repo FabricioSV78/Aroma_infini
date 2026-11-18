@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import '../../styles/home-categories.css'
 import { SectionHeading } from '../../components/ui/SectionHeading'
 import { Icon } from '../../components/ui/Icon'
@@ -50,7 +51,7 @@ export function Categories({
               key={category.title}
             >
               <div className="category-image">
-                <img
+                <LoadingImage
                   src={imageSource(image, 480)}
                   srcSet={imageSourceSet(
                     image,

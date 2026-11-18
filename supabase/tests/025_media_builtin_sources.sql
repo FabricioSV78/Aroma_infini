@@ -41,16 +41,16 @@ insert into app.media_assets(id,storage_kind,object_key,mime_type,width,height,s
  'video/mp4',720,900,'ready',now(),aroma_alias_test.id(113),'film-video',2000,repeat('b',64),5000,now()+interval '24 hours');
 select set_config('request.jwt.claims',jsonb_build_object('sub',aroma_alias_test.id(1),'aal','aal2')::text,true);
 set local role authenticated;
-insert into aroma_alias_test.saved values('first',api.admin_save_media_alias('/images/ambre-480.webp',aroma_alias_test.id(10),1));
+insert into aroma_alias_test.saved values('first',api.admin_save_media_alias('/images/discovery-bois-category-480.webp',aroma_alias_test.id(10),1));
 select aroma_alias_test.ok((select value->>'version'='2' and value->'asset'->>'id'=aroma_alias_test.id(10)::text from aroma_alias_test.saved where key='first'),
  'Import aliases bind only verified manifests and increment their own version');
-select api.admin_save_media_alias('/images/cedre-480.webp',aroma_alias_test.id(10),1);
+select api.admin_save_media_alias('/images/discovery-complements-v1-category-480.webp',aroma_alias_test.id(10),1);
 select aroma_alias_test.ok(api.admin_media_detail(aroma_alias_test.id(10))->>'useCount'='2'
  and (select count(*)=2 from jsonb_array_elements(api.admin_media_detail(aroma_alias_test.id(10))->'usages') u where u->>'key' like 'builtin:%'),
  'Every built-in alias contributes a separate central usage reference');
-select aroma_alias_test.error('select api.admin_save_media_alias(''/images/ambre-480.webp'',aroma_alias_test.id(12),1)',
+select aroma_alias_test.error('select api.admin_save_media_alias(''/images/discovery-bois-category-480.webp'',aroma_alias_test.id(12),1)',
  'PT409','A stale importer cannot replace a newer source binding');
-select aroma_alias_test.error('select api.admin_save_media_alias(''/images/ambre-480.webp'',aroma_alias_test.id(11),2)',
+select aroma_alias_test.error('select api.admin_save_media_alias(''/images/discovery-bois-category-480.webp'',aroma_alias_test.id(11),2)',
  '22023','Alias imports preserve exact original width and height');
 select aroma_alias_test.error('select api.admin_save_media_alias(''/videos/perfume-editorial-mobile.mp4'',aroma_alias_test.id(10),1)',
  '22023','An image cannot replace a built-in MP4');
@@ -61,9 +61,9 @@ select aroma_alias_test.error('select api.admin_media_retire(aroma_alias_test.id
 select api.admin_save_media_alias('/videos/perfume-editorial-mobile.mp4',aroma_alias_test.id(13),1);
 reset role;
 select aroma_alias_test.ok(private.media_has_references(aroma_alias_test.id(10))
- and private.media_has_references(aroma_alias_test.id(13))
+ and not private.media_has_references(aroma_alias_test.id(13))
  and (select retire_after is null from app.media_assets where id=aroma_alias_test.id(10)),
- 'Image and video alias references cancel scheduled cleanup using the shared retention trigger');
+ 'Effective category aliases protect their image; unused mobile video aliases do not retain bytes');
 set local role anon;
 select aroma_alias_test.ok(jsonb_array_length(api.public_media_aliases()->'items')=3
  and not(api.public_media_aliases()->'items'->0 ?|array['updated_by','operation_id','uploader_id']),
@@ -74,18 +74,18 @@ update app.media_assets set retire_after=clock_timestamp()-interval '1 second' w
 set local role service_role;
 insert into aroma_alias_test.saved values('claims',api.media_gc_claim(50));
 select aroma_alias_test.ok(not exists(select 1 from jsonb_array_elements((select value from aroma_alias_test.saved where key='claims')) entry
- where entry->>'id' in(aroma_alias_test.id(10)::text,aroma_alias_test.id(13)::text))
+ where entry->>'id'=aroma_alias_test.id(10)::text)
  and exists(select 1 from jsonb_array_elements((select value from aroma_alias_test.saved where key='claims')) entry where entry->>'id'=aroma_alias_test.id(11)::text),
- 'GC protects live built-in image and video sources even if their timestamps are erroneously expired');
+ 'GC protects effective category fallbacks even when timestamps expire');
 reset role;
 set local role authenticated;
-select api.admin_save_media_alias('/images/ambre-480.webp',aroma_alias_test.id(12),2);
+select api.admin_save_media_alias('/images/discovery-bois-category-480.webp',aroma_alias_test.id(12),2);
 reset role;
 select aroma_alias_test.ok((select retire_after is null from app.media_assets where id=aroma_alias_test.id(10)),
  'Replacing one built-in usage retains an image shared by another source');
 set local role authenticated;
-select api.admin_save_media_alias('/images/cedre-480.webp',aroma_alias_test.id(12),2);
-select aroma_alias_test.error('select api.admin_save_media_alias(''/images/ambre-960.webp'',aroma_alias_test.id(11),1)',
+select api.admin_save_media_alias('/images/discovery-complements-v1-category-480.webp',aroma_alias_test.id(12),2);
+select aroma_alias_test.error('select api.admin_save_media_alias(''/images/discovery-bois-category-960.webp'',aroma_alias_test.id(11),1)',
  '22023','A terminally claimed asset cannot be revived by a built-in source importer');
 reset role;
 select aroma_alias_test.ok((select status='ready' and retire_after>clock_timestamp()+interval '23 hours'

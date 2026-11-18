@@ -1,6 +1,8 @@
 import './admin-operations.css'
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState, useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router'
+import { useAdminListData } from './useAdminListData'
+import type { AdminCustomerList } from '../../types/admin-lists'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
 import { type AdminOrder } from '../../services/admin-service'
 import { AdminPagination } from './AdminPagination'
@@ -23,10 +25,27 @@ function searchText(value: string) {
 
 export function AdminCustomersPage() {
   const state = useAdminStore()
-  const [search, setSearch] = useState('')
+  const remote = useAdminListData<AdminCustomerList>()
+  const [params, setParams] = useSearchParams()
+  const currentQuery = params.get('q') ?? ''
+  const [draft, setDraft] = useState({ base: currentQuery, value: currentQuery })
+  const search = remote && draft.base !== currentQuery ? currentQuery : draft.value
+  const setSearch = (value: string) => setDraft({ base: currentQuery, value })
+  useEffect(() => {
+    if (!remote || search === currentQuery) return
+    const timer = window.setTimeout(() => {
+      const next = new URLSearchParams(params)
+      next.delete('page')
+      if (search.trim()) next.set('q', search.trim())
+      else next.delete('q')
+      setParams(next, { replace: true })
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [remote, search, currentQuery, params, setParams])
   const { orderCountByCustomer, latestOrderByCustomer } = useMemo(() => {
     const orderCountByCustomer = new Map<string, number>()
     const latestOrderByCustomer = new Map<string, AdminOrder>()
+    if (remote) return { orderCountByCustomer: new Map(remote.customers.map(c => [c.id, c.orderCount])), latestOrderByCustomer }
     getCommercialOrders(state.orders).forEach((order) => {
       orderCountByCustomer.set(
         order.customerId,
@@ -37,9 +56,9 @@ export function AdminCustomersPage() {
         latestOrderByCustomer.set(order.customerId, order)
     })
     return { orderCountByCustomer, latestOrderByCustomer }
-  }, [state.orders])
+  }, [remote, state.orders])
   const customerSearchRows = useMemo(
-    () =>
+    () => remote ? [] :
       getCommercialCustomerRecords(state.customers, state.orders)
         .map((customer) => {
           const address = latestOrderByCustomer.get(customer.id)?.address
@@ -53,17 +72,18 @@ export function AdminCustomersPage() {
         .sort((first, second) =>
           first.customer.name.localeCompare(second.customer.name, 'es'),
         ),
-    [state.customers, state.orders, latestOrderByCustomer],
+    [remote, state.customers, state.orders, latestOrderByCustomer],
   )
   const query = searchText(search)
   const customers = useMemo(
-    () =>
+    () => remote?.customers ??
       customerSearchRows
         .filter((row) => !query || row.text.includes(query))
         .map((row) => row.customer),
-    [customerSearchRows, query],
+    [remote, customerSearchRows, query],
   )
-  const pagination = useAdminPagination(customers, 25)
+  const total = remote?.total ?? customers.length
+  const pagination = useAdminPagination(customers, 25, remote?.total)
   return (
     <div className="admin-page admin-customers-page">
       <AdminPageHeader
@@ -82,7 +102,7 @@ export function AdminCustomersPage() {
           />
         </label>
         <div className="admin-customer-result" role="status" aria-live="polite">
-          {customers.length} {customers.length === 1 ? 'cliente' : 'clientes'}
+          {total} {total === 1 ? 'cliente' : 'clientes'}
           {search ? (
             <button type="button" onClick={() => setSearch('')}>
               Limpiar búsqueda
@@ -112,7 +132,7 @@ export function AdminCustomersPage() {
             </thead>
             <tbody>
               {pagination.items.map((customer) => {
-                const address = latestOrderByCustomer.get(customer.id)?.address
+                const address = remote ? remote.customers.find(c => c.id === customer.id) : latestOrderByCustomer.get(customer.id)?.address
                 return (
                   <tr key={customer.id}>
                     <th scope="row">

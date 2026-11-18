@@ -1,9 +1,13 @@
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { variantSkuSummary } from '../../domain/product-identity'
 import { getProductPhotoStatus } from '../../domain/product-photos'
 import { hasProductMainImage } from '../../domain/product-publication'
 import { isPerfume, variantLabel } from '../../domain/product-type'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router'
+import { Link, useLocation, useRevalidator, useSearchParams } from 'react-router'
+import { useAdminListData } from './useAdminListData'
+import type { AdminProductList } from '../../types/admin-lists'
+import { adminListPage, adminProductListQuery } from '../../domain/admin-list-query'
 import { Icon } from '../../components/ui/Icon'
 import { type AdminBrand, type AdminProduct } from '../../services/admin-service'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
@@ -42,16 +46,29 @@ function productPrice(record: AdminProduct) {
 
 export function AdminProductsPage() {
   const state = useAdminStore()
+  const routed = useAdminListData<AdminProductList>()
+  const [confirmedPage, setConfirmedPage] = useState<{ base: AdminProductList; page: AdminProductList } | null>(null)
+  // An explicit import already verified the complete catalog for SKU/duplicate
+  // checks and merged its canonical result. Reuse that snapshot until the next
+  // route read, without making a confirmed import depend on another HTTP read.
+  const [importedFor, setImportedFor] = useState<AdminProductList | null>(null)
+  const remote = routed && importedFor === routed ? null : confirmedPage?.base === routed ? confirmedPage.page : routed
+  const revalidator = useRevalidator()
+  const catalogProducts = remote?.products ?? state.products
+  const features = remote?.features ?? state.features
   const notice = useAdminNotice()
   const [pageSize, setPageSize] = useState(() =>
     window.matchMedia('(max-width: 767px)').matches ? 4 : 12,
   )
   useEffect(() => {
     const mobile = window.matchMedia('(max-width: 767px)')
-    const updatePageSize = () => setPageSize(mobile.matches ? 4 : 12)
+    const updatePageSize = () => {
+      setPageSize(mobile.matches ? 4 : 12)
+      if (remote) void revalidator.revalidate()
+    }
     mobile.addEventListener('change', updatePageSize)
     return () => mobile.removeEventListener('change', updatePageSize)
-  }, [])
+  }, [remote, revalidator])
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const confirmingVisibility = useRef(false)
@@ -71,21 +88,22 @@ export function AdminProductsPage() {
   const normalizedSearch = search.trim().toLocaleLowerCase('es')
   const brandsById = useMemo(() => {
     const byId = new Map<string, AdminBrand>()
-    for (const brand of state.brands) {
+    for (const brand of remote?.brands ?? state.brands) {
       if (!byId.has(brand.id)) byId.set(brand.id, brand)
     }
     return byId
-  }, [state.brands])
+  }, [remote, state.brands])
   const productRows = useMemo(
     () =>
-      state.products.map((record) => ({
+      catalogProducts.map((record) => ({
         record,
         brand: brandsById.get(record.product.brandId),
         inventory: getProductInventory(record),
       })),
-    [state.products, brandsById],
+    [catalogProducts, brandsById],
   )
   const { totalStock, productsWithAlerts, soldOutProducts } = useMemo(() => {
+    if (remote) return { totalStock: remote.summary.stock, productsWithAlerts: remote.summary.alerts, soldOutProducts: remote.summary.soldOut }
     const activeInventory = productRows
       .filter(({ record }) => record.active)
       .map(({ inventory }) => inventory)
@@ -103,9 +121,9 @@ export function AdminProductsPage() {
         ({ inventory }) => inventory.fullyOutOfStock,
       ).length,
     }
-  }, [productRows])
+  }, [remote, productRows])
   const products = useMemo(
-    () =>
+    () => remote ? productRows :
       productRows
         .filter(({ record, brand, inventory }) => {
           const matchesSearch =
@@ -138,9 +156,10 @@ export function AdminProductsPage() {
             )
           )
         }),
-    [productRows, normalizedSearch, stockFilter, visibilityFilter],
+    [remote, productRows, normalizedSearch, stockFilter, visibilityFilter],
   )
-  const pagination = useAdminPagination(products, pageSize)
+  const total = remote?.total ?? products.length
+  const pagination = useAdminPagination(products, pageSize, remote?.total)
   const hasFilters =
     Boolean(search) || stockFilter !== 'all' || visibilityFilter !== 'all'
 
@@ -176,14 +195,19 @@ export function AdminProductsPage() {
       setParams(next, { replace: true })
     }
     const result = await visibilityPersistence.save(
-      () => adminService.setProductActive(record.product.id, !record.active),
+      async () => {
+        const result = await adminService.setProductActive(record.product.id, !record.active, record,
+          remote ? { query: adminProductListQuery(params), page: adminListPage(params), limit: pageSize } : undefined)
+        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
+        return result
+      },
       () => {
         const updatedRecord = adminService
           .getSnapshot()
           .products.find((item) => item.product.id === record.product.id)
         if (
           updatedRecord?.active &&
-          !state.features.complementsEnabled &&
+          !features.complementsEnabled &&
           !isPerfume(record.product)
         ) {
           notice.show({
@@ -218,7 +242,7 @@ export function AdminProductsPage() {
         description="Controla la tienda, las presentaciones y el inventario desde un solo lugar."
         action={{ label: 'Nuevo producto', to: '/admin/productos/nuevo' }}
       />
-      <AdminProductImport />
+      <AdminProductImport onImported={() => setImportedFor(routed)} />
       <AdminSaveFeedback {...visibilityPersistence} />
 
       <section
@@ -227,11 +251,11 @@ export function AdminProductsPage() {
       >
         <div>
           <span>Productos registrados</span>
-          <strong>{state.products.length}</strong>
+          <strong>{remote?.summary.products ?? state.products.length}</strong>
         </div>
         <div>
           <span>Unidades en productos activos</span>
-          <strong>{totalStock}</strong>
+          <strong>{remote?.summary.stock ?? totalStock}</strong>
         </div>
         <Link
           className="is-warning"
@@ -239,7 +263,7 @@ export function AdminProductsPage() {
           aria-label={`Ver ${productsWithAlerts} ${productsWithAlerts === 1 ? 'producto con alerta de inventario' : 'productos con alertas de inventario'}`}
         >
           <span>Con alertas</span>
-          <strong>{productsWithAlerts}</strong>
+          <strong>{remote?.summary.alerts ?? productsWithAlerts}</strong>
         </Link>
         <Link
           className="is-danger"
@@ -247,7 +271,7 @@ export function AdminProductsPage() {
           aria-label={`Ver ${soldOutProducts} ${soldOutProducts === 1 ? 'producto agotado' : 'productos agotados'}`}
         >
           <span>Agotados</span>
-          <strong>{soldOutProducts}</strong>
+          <strong>{remote?.summary.soldOut ?? soldOutProducts}</strong>
         </Link>
       </section>
 
@@ -308,7 +332,7 @@ export function AdminProductsPage() {
         </div>
         <div className="admin-filter-result" aria-live="polite">
           <span>
-            {products.length} {products.length === 1 ? 'producto' : 'productos'}
+            {total} {total === 1 ? 'producto' : 'productos'}
           </span>
           {hasFilters && products.length > 0 ? (
             <button type="button" onClick={clearFilters}>
@@ -339,7 +363,7 @@ export function AdminProductsPage() {
                       <span className="admin-cell-label">Producto</span>
                       <div className="admin-product-identity">
                         {record.product.image ? (
-                          <img
+                          <LoadingImage fallback="inline"
                             src={imageSource(record.product.image)}
                             srcSet={imageSourceSet(
                               record.product.image,
@@ -399,7 +423,7 @@ export function AdminProductsPage() {
                         <AdminBadge tone="warning">
                           Pendiente de fotos
                         </AdminBadge>
-                      ) : !state.features.complementsEnabled &&
+                      ) : !features.complementsEnabled &&
                         !isPerfume(record.product) ? (
                         <AdminBadge tone="neutral">Categoría oculta</AdminBadge>
                       ) : (
@@ -414,13 +438,13 @@ export function AdminProductsPage() {
                           aria-label={`Gestionar fotos de ${record.product.name}`}
                           state={{
                             returnTo: `${location.pathname}${location.search}`,
-                            photoQueue: products
+                            ...(remote ? { photoQueueQuery: location.search } : { photoQueue: products
                               .filter(
                                 ({ record: item }) =>
                                   getProductPhotoStatus(item).status !==
                                   'complete',
                               )
-                              .map(({ record: item }) => item.product.id),
+                              .map(({ record: item }) => item.product.id) }),
                           }}
                         >
                           Fotografías

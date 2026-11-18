@@ -30,6 +30,8 @@ test('Los cuatro perfumes añadidos tienen ficha y se pueden añadir al carrito'
   ]) {
     await page.goto(`/producto/${slug}`)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
+    await expect(page.locator('.product-review-list > li')).toHaveCount(0)
+    await page.locator('#product-info-tab-reviews').click()
     await expect(page.locator('.product-review-list > li')).toHaveCount(3)
     await page.getByRole('button', { name: 'Añadir al carrito' }).click()
     await expect(page.locator('.cart-notice')).toContainText(

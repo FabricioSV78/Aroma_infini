@@ -1,0 +1,5 @@
+/* Administrative rules stay out of public page loads. The declarations and
+   their relative order are unchanged. All selectors are admin-scoped. */
+@import './admin-product-preview.css';
+@import './admin-home-editor.css';
+@import './admin-shipping.css';

@@ -12,6 +12,8 @@ import {
   type AdminTone,
 } from './admin-utils'
 import { useAdminStore } from './useAdminStore'
+import { useAdminListData } from './useAdminListData'
+import type { AdminDashboardData } from '../../types/admin-lists'
 
 interface DashboardMetric {
   label: string
@@ -26,15 +28,19 @@ interface DashboardMetric {
 
 export function AdminDashboardPage() {
   const state = useAdminStore()
-  const commercialOrders = getCommercialOrders(state.orders)
+  const remote = useAdminListData<AdminDashboardData>()
+  const commercialOrders = remote?.recentOrders ?? getCommercialOrders(state.orders)
   const activeBrandIds = new Set(
     state.brands.filter((brand) => brand.active).map((brand) => brand.id),
   )
-  const activeProducts = state.products.filter(
+  const activeProducts = remote ? [] : state.products.filter(
     (record) => record.active && activeBrandIds.has(record.product.brandId),
   )
-  const inventoryAlerts = getInventoryAlerts(state.products)
-  const totalStock = activeProducts.reduce(
+  const inventoryAlerts = remote ? remote.alerts.map(item => ({ ...item,
+    tone: item.stock === 0 ? 'danger' as const : 'warning' as const,
+  })) : getInventoryAlerts(state.products)
+  const alertCount = remote?.alertCount ?? inventoryAlerts.length
+  const totalStock = remote?.stock ?? activeProducts.reduce(
     (total, record) => total + getProductInventory(record).totalStock,
     0,
   )
@@ -58,35 +64,35 @@ export function AdminDashboardPage() {
   const metrics: DashboardMetric[] = [
     {
       label: 'Pedidos por preparar',
-      value: ordersToPrepare.length,
+      value: remote?.toPrepare ?? ordersToPrepare.length,
       detail: 'Aprobados y aún no enviados',
       action: 'Ver pedidos',
       to: '/admin/pedidos?preparacion=atencion',
       icon: 'orders',
-      tone: ordersToPrepare.length ? 'info' : 'success',
+      tone: (remote?.toPrepare ?? ordersToPrepare.length) ? 'info' : 'success',
     },
     {
       label: 'Alertas de stock',
-      value: inventoryAlerts.length,
+      value: alertCount,
       detail: 'Presentaciones bajas o agotadas',
       action: 'Ver alertas',
       to: '/admin/productos?stock=alert',
       icon: 'alert',
-      tone: inventoryAlerts.some((item) => item.tone === 'danger')
+      tone: (remote ? remote.outAlertCount > 0 : inventoryAlerts.some((item) => item.tone === 'danger'))
         ? 'danger'
-        : inventoryAlerts.length
+        : alertCount
           ? 'warning'
           : 'success',
     },
     {
       label: 'Envíos en curso',
-      value: shipmentsInProgress.length,
+      value: remote?.counts.shipped ?? shipmentsInProgress.length,
       detail: 'Pedidos despachados por entregar',
       action: 'Ver envíos',
       ariaLabel: 'Envíos en curso: ver detalle',
       to: '/admin/pedidos?preparacion=shipped',
       icon: 'truck',
-      tone: shipmentsInProgress.length ? 'info' : 'success',
+      tone: (remote?.counts.shipped ?? shipmentsInProgress.length) ? 'info' : 'success',
     },
     {
       label: 'Unidades disponibles',
@@ -99,7 +105,7 @@ export function AdminDashboardPage() {
     },
   ]
 
-  const orderCounts = {
+  const orderCounts = remote?.counts ?? {
     received: commercialOrders.filter((order) => order.status === 'received')
       .length,
     preparing: commercialOrders.filter((order) => order.status === 'preparing')

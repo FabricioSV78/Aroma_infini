@@ -42,6 +42,35 @@ test('unrelated routes stay with the application router', async () => {
   expect(fixture.bucket.writes).toHaveLength(0)
 })
 
+test('staging media timings separate manifest and storage without caching authorization', async () => {
+  const fixture = setup()
+  const asset = await readAsset(
+    await fixture.handle(await uploadRequest({ widths: [960] })),
+  )
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  fixture.calls.length = 0
+  const response = await fixture.handle(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+  )
+  expect(response?.status).toBe(200)
+  expect(response?.headers.get('Server-Timing')).toMatch(
+    /media_manifest;dur=\d+\.\d, media_storage;dur=\d+\.\d$/,
+  )
+  expect(response?.headers.get('Cache-Control')).toBe(
+    'public, max-age=31536000, immutable',
+  )
+  expect((await response!.arrayBuffer()).byteLength).toBeGreaterThan(0)
+  fixture.environment.APP_ENVIRONMENT = 'production'
+  const next = await fixture.handle(
+    new Request(`${mediaTestOrigin}${asset.src}`, { method: 'HEAD' }),
+  )
+  expect(next?.headers.has('Server-Timing')).toBe(false)
+  expect(next?.headers.has('X-Aroma-Request-Id')).toBe(false)
+  expect(
+    fixture.calls.filter((call) => call.name === 'media_public_asset'),
+  ).toHaveLength(2)
+})
+
 test('upload refuses anonymous or invalid sessions without writing any object', async () => {
   const fixture = setup()
   const anonymous = await fixture.handle(
@@ -55,6 +84,304 @@ test('upload refuses anonymous or invalid sessions without writing any object', 
   expect(
     fixture.calls.some((call) => call.name === 'media_upload_complete'),
   ).toBe(false)
+})
+
+test('immutable byte cache still authorizes every GET and denies revoked or unavailable manifests', async () => {
+  const fixture = mediaWorkerHarness()
+  const entries = new Map<string, Response>()
+  const tasks: Promise<unknown>[] = []
+  let matches = 0
+  const handler = createMediaHandler({
+    fetch: fixture.upstream,
+    decodeWebp: decodeFixture,
+    publicImageCache: () => ({
+      async match(request) {
+        matches++
+        return entries.get(String((request as Request).url))?.clone()
+      },
+      async put(request, response) {
+        expect(new Headers((request as Request).headers).has('Cookie')).toBe(
+          false,
+        )
+        expect(response.headers.has('X-Aroma-Request-Id')).toBe(false)
+        entries.set(
+          String((request as Request).url),
+          new Response(await response.arrayBuffer(), response),
+        )
+      },
+    }),
+  })
+  const context = {
+    waitUntil(task: Promise<unknown>) {
+      tasks.push(task)
+    },
+  }
+  const asset = await readAsset(
+    await handler(await uploadRequest(), fixture.environment),
+  )
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  fixture.calls.length = 0
+  fixture.bucket.reads.length = 0
+  const first = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+    fixture.environment,
+    context,
+  )
+  const bytes = await first!.arrayBuffer()
+  await Promise.all(tasks)
+  expect(first!.headers.get('X-Aroma-Byte-Cache')).toBe('MISS')
+  const second = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`, {
+      headers: { Cookie: 'must-not-enter-cache' },
+    }),
+    fixture.environment,
+    context,
+  )
+  expect(second!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+  expect(await second!.arrayBuffer()).toEqual(bytes)
+  expect(fixture.bucket.reads).toHaveLength(1)
+  expect(
+    fixture.calls.filter((c) => c.name === 'media_public_asset'),
+  ).toHaveLength(2)
+  expect(second!.headers.get('X-Aroma-Request-Id')).not.toBe(
+    first!.headers.get('X-Aroma-Request-Id'),
+  )
+  fixture.state.privateResponse = true
+  const hidden = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+    fixture.environment,
+    context,
+  )
+  expect(hidden!.status).toBe(404)
+  expect(matches).toBe(2)
+  fixture.state.privateResponse = false
+  fixture.state.publicUnavailable = true
+  const unavailable = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+    fixture.environment,
+    context,
+  )
+  expect(unavailable!.status).toBe(503)
+  expect(matches).toBe(2)
+  expect(unavailable!.headers.get('Cache-Control')).toBe('no-store')
+  expect(entries.size).toBe(1)
+  const internal = await handler(
+    new Request(
+      `${mediaTestOrigin}/media/__verified-image-bytes-v1${asset.src}`,
+    ),
+    fixture.environment,
+    context,
+  )
+  expect(internal!.status).toBe(404)
+  expect(matches).toBe(2)
+})
+
+test('byte-cache errors fall back to R2; conditional GET and production preserve existing paths', async () => {
+  const fixture = mediaWorkerHarness()
+  let cacheReads = 0
+  const tasks: Promise<unknown>[] = []
+  const handler = createMediaHandler({
+    fetch: fixture.upstream,
+    decodeWebp: decodeFixture,
+    publicImageCache: () => ({
+      async match() {
+        cacheReads++
+        throw new Error('isolated-cache-error')
+      },
+      async put() {
+        throw new Error('isolated-cache-error')
+      },
+    }),
+  })
+  const context = {
+    waitUntil(task: Promise<unknown>) {
+      tasks.push(task)
+    },
+  }
+  const asset = await readAsset(
+    await handler(await uploadRequest(), fixture.environment),
+  )
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  const first = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+    fixture.environment,
+    context,
+  )
+  expect(first!.status).toBe(200)
+  await first!.arrayBuffer()
+  await Promise.all(tasks)
+  const conditional = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`, {
+      headers: { 'If-None-Match': first!.headers.get('ETag')! },
+    }),
+    fixture.environment,
+    context,
+  )
+  expect(conditional!.status).toBe(304)
+  const head = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`, { method: 'HEAD' }),
+    fixture.environment,
+    context,
+  )
+  expect(head!.status).toBe(200)
+  fixture.environment.APP_ENVIRONMENT = 'production'
+  const production = await handler(
+    new Request(`${mediaTestOrigin}${asset.src}`),
+    fixture.environment,
+    context,
+  )
+  expect(production!.status).toBe(200)
+  await production!.arrayBuffer()
+  expect(production!.headers.has('X-Aroma-Byte-Cache')).toBe(false)
+  expect(cacheReads).toBe(2)
+})
+
+test('a cached HEAD rechecks publication and returns metadata without another R2 read or body', async () => {
+  const fixture = mediaWorkerHarness()
+  const entries = new Map<string, Response>()
+  const tasks: Promise<unknown>[] = []
+  const handle = createMediaHandler({
+    fetch: fixture.upstream,
+    decodeWebp: decodeFixture,
+    publicImageCache: () => ({
+      async match(request) {
+        return entries.get((request as Request).url)?.clone()
+      },
+      async put(request, response) {
+        entries.set(
+          (request as Request).url,
+          new Response(await response.arrayBuffer(), response),
+        )
+      },
+    }),
+  })
+  const context = {
+    waitUntil(task: Promise<unknown>) {
+      tasks.push(task)
+    },
+  }
+  const asset = await readAsset(
+    await handle(await uploadRequest(), fixture.environment),
+  )
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  const url = `${mediaTestOrigin}${asset.src}`
+  const first = await handle(new Request(url), fixture.environment, context)
+  await first!.arrayBuffer()
+  await Promise.all(tasks)
+  fixture.bucket.reads.length = 0
+  fixture.bucket.heads.length = 0
+  fixture.calls.length = 0
+  const head = await handle(
+    new Request(url, { method: 'HEAD' }),
+    fixture.environment,
+    context,
+  )
+  expect(head!.status).toBe(200)
+  expect(head!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+  expect(head!.headers.get('ETag')).toBe(first!.headers.get('ETag'))
+  expect(head!.headers.get('Content-Length')).toBe(
+    first!.headers.get('Content-Length'),
+  )
+  expect((await head!.arrayBuffer()).byteLength).toBe(0)
+  expect(fixture.bucket.heads).toHaveLength(0)
+  expect(fixture.bucket.reads).toHaveLength(0)
+  expect(
+    fixture.calls.filter((call) => call.name === 'media_public_asset'),
+  ).toHaveLength(1)
+  fixture.state.privateResponse = true
+  expect(
+    (await handle(
+      new Request(url, { method: 'HEAD' }),
+      fixture.environment,
+      context,
+    ))!.status,
+  ).toBe(404)
+})
+
+test('upload Auth and actor reads overlap and both must finish before any reservation', async () => {
+  const fixture = mediaWorkerHarness()
+  let releaseAuth!: () => void
+  let releaseActor!: () => void
+  const authGate = new Promise<void>((resolve) => {
+    releaseAuth = resolve
+  })
+  const actorGate = new Promise<void>((resolve) => {
+    releaseActor = resolve
+  })
+  let authStarted = false
+  let actorStarted = false
+  const handle = createMediaHandler({
+    fetch: async (input, init) => {
+      const path = new URL(String(input)).pathname
+      if (path.endsWith('/auth/v1/user')) {
+        authStarted = true
+        await authGate
+      }
+      if (path.endsWith('/current_actor')) {
+        actorStarted = true
+        await actorGate
+      }
+      return fixture.upstream(input, init)
+    },
+    decodeWebp: decodeFixture,
+  })
+  const pending = handle(
+    await uploadRequest({ widths: [960] }),
+    fixture.environment,
+  )
+  try {
+    await expect.poll(() => authStarted && actorStarted).toBe(true)
+    releaseAuth()
+    await expect.poll(() => fixture.state.authCalls).toBe(1)
+    expect(fixture.reservations.size).toBe(0)
+    expect(fixture.bucket.writes).toHaveLength(0)
+  } finally {
+    releaseAuth()
+    releaseActor()
+  }
+  expect((await pending)!.status).toBe(200)
+  expect(fixture.state.authCalls).toBe(2)
+  expect(fixture.state.actorCalls).toBe(2)
+})
+
+test('failed parallel Auth keeps its error and waits for actor without writing', async () => {
+  const fixture = mediaWorkerHarness()
+  fixture.state.authValid = false
+  let releaseActor!: () => void
+  const actorGate = new Promise<void>((resolve) => {
+    releaseActor = resolve
+  })
+  let actorStarted = false
+  let settled = false
+  const handle = createMediaHandler({
+    fetch: async (input, init) => {
+      if (new URL(String(input)).pathname.endsWith('/current_actor')) {
+        actorStarted = true
+        await actorGate
+        return Response.json({ code: 'upstream' }, { status: 503 })
+      }
+      return fixture.upstream(input, init)
+    },
+    decodeWebp: decodeFixture,
+  })
+  const pending = handle(
+    await uploadRequest({ widths: [960] }),
+    fixture.environment,
+  ).then((result) => {
+    settled = true
+    return result
+  })
+  try {
+    await expect
+      .poll(() => actorStarted && fixture.state.authCalls === 1)
+      .toBe(true)
+    expect(settled).toBe(false)
+    expect(fixture.reservations.size).toBe(0)
+  } finally {
+    releaseActor()
+  }
+  expect((await pending)!.status).toBe(401)
+  expect(fixture.bucket.writes).toHaveLength(0)
 })
 
 for (const [description, role, aal] of [
@@ -118,7 +445,10 @@ for (const declared of [false, true])
     expect(response?.headers.get('Cache-Control')).toBe('no-store')
     expect(await response?.text()).not.toContain('PRIVATE_PROVIDER_DETAILS')
     expect(cancelled).toBe(true)
-    expect(fixture.calls).toHaveLength(0)
+    // The independent read-only actor check now starts alongside Auth. An
+    // invalid Auth document must still prevent every reservation and write.
+    expect(fixture.calls.map((call) => call.name)).toEqual(['current_actor'])
+    expect(fixture.reservations.size).toBe(0)
     expect(fixture.bucket.writes).toHaveLength(0)
   })
 

@@ -1,4 +1,4 @@
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { authService } from './auth-service'
 import { UserFacingError } from './admin-messages'
 import type { ProductReview } from '../types/review'
@@ -94,7 +94,7 @@ export async function readProductReviews(
   rating = 0,
   order: ReviewOrder = 'recent',
 ) {
-  const response = await requireSupabaseClient()
+  const response = await (await requireReadySupabaseClient())
     .rpc('product_reviews', {
       p_product_id: productId,
       p_page: page,
@@ -122,7 +122,7 @@ async function verifiedOwner() {
       'reviews-session',
       'Inicia sesión para compartir tu opinión.',
     )
-  const client = requireSupabaseClient()
+  const client = (await requireReadySupabaseClient())
   const { data, error } = await client.auth.getSession()
   const token = data.session?.access_token
   if (error || !token || data.session?.user.id !== id)
@@ -140,7 +140,7 @@ async function verifiedOwner() {
 }
 export async function readOwnProductReview(productId: string) {
   const owner = await verifiedOwner()
-  const response = await requireSupabaseClient()
+  const response = await (await requireReadySupabaseClient())
     .rpc('customer_product_review', { p_product_id: productId })
     .setHeader('Authorization', `Bearer ${owner.token}`)
     .abortSignal(AbortSignal.timeout(15000))
@@ -166,7 +166,7 @@ export async function submitProductReview(
   },
 ) {
   const owner = await verifiedOwner()
-  const response = await requireSupabaseClient()
+  const response = await (await requireReadySupabaseClient())
     .rpc('submit_product_review', {
       p_product_id: productId,
       p_rating: input.rating,

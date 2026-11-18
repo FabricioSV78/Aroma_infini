@@ -18,6 +18,8 @@ const authRoutes = [
 test('los accesos y callbacks son rutas de aplicación, nunca páginas inexistentes o indexables', () => {
   for (const path of authRoutes) expect(classifyRoute(path), path).toBe('app')
   expect(classifyRoute('/admin/acceso-inexistente')).toBe('missing')
+  expect(classifyRoute('/admin/biblioteca')).toBe('missing')
+  expect(classifyRoute('/admin/biblioteca/')).toBe('missing')
   expect(classifyRoute('/admin/pedidos/123/fotos')).toBe('missing')
   expect(classifyRoute('/admin/productos/123/fotos/extra')).toBe('missing')
 })

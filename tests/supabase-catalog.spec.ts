@@ -1,4 +1,17 @@
+import { adminListFixture } from './admin-list-fixture'
+import {
+  catalogRefreshCount,
+  installCatalogRefreshCounter,
+  settleCatalogRefreshRender,
+} from './catalog-refresh-fixture'
 import { Buffer } from 'node:buffer'
+import { productBootstrapJson } from '../src/domain/product-bootstrap'
+import { publicMediaBootstrapJson } from '../src/domain/public-media-bootstrap'
+import { homeBootstrapJson } from '../src/domain/home-bootstrap'
+import {
+  HERO_MOBILE_QUERY,
+  HERO_DESKTOP_QUERY,
+} from '../src/domain/hero-visuals'
 import { installAdminPageBatchGate } from './admin-page-batch-fixture'
 import type { HomeContent, HomeMedia } from '../src/types/home'
 import type { Page } from '@playwright/test'
@@ -93,6 +106,7 @@ function makeProduct(): AdminProduct {
     },
   }
 }
+
 
 interface CatalogCall {
   name: string
@@ -201,7 +215,10 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
         homeVersion: state.home.version,
       }
       const publicProducts = state.products.filter((record) => record.active)
-      if (name === 'admin_orders') {
+      if (['admin_product_list','admin_order_list','admin_customer_list','admin_catalog_context','admin_catalog_choices','admin_products_by_ids','admin_offer_list','admin_import_conflicts'].includes(name)) {
+        if (state.catalogReadUnavailable) { await reply({code:'PGRST000'},503); return }
+        await reply(adminListFixture(name,body,{products:state.products,brands:state.brands,productVersions,brandVersions,features:metadata.features,olfactoryFamilies:state.olfactoryFamilies,settingsVersion:state.settingsVersion,featuredBrandId:state.featuredBrandId}))
+      } else if (name === 'admin_orders') {
         // Signing into the dashboard now reads the persistent order module.
         // This catalog suite has no orders; keep every request isolated.
         await reply({ orders: [], orderHistory: [], total: 0 })
@@ -418,7 +435,7 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
             : [...state.brands, record]
           brandVersions.set(record.id, version)
           await reply({ record, version })
-        } else if (name === 'admin_save_product') {
+        } else if (name === 'admin_save_product' || name === 'admin_save_product_page') {
           const record = body.p_record as AdminProduct
           record.product.discount ??= null
           record.product.olfactoryFamilies ??= []
@@ -439,7 +456,7 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
               )
             : [...state.products, record]
           productVersions.set(record.product.id, version)
-          await reply({ record, version })
+          await reply({ record, version, ...(name === 'admin_save_product_page' ? { page: adminListFixture('admin_product_list', body, { products: state.products, brands: state.brands, productVersions, features: { complementsEnabled: state.complementsEnabled } }) } : {}) })
         } else if (name === 'admin_save_offer') {
           const record = state.products.find(
             ({ product }) => product.id === body.p_product_id,
@@ -783,6 +800,12 @@ test('Una lectura anterior al guardado no reemplaza el producto canónico confir
 }) => {
   await signInAdmin(page, supabaseNetwork)
   let release!: () => void
+  // Paged dashboard/list reads intentionally do not seed the complete store.
+  await page.evaluate(async (id) => {
+    const path = '/src/services/catalog-admin-service.ts'
+    const { loadAdminProductEditor } = await import(path)
+    await loadAdminProductEditor(id)
+  }, remoteProductId)
   catalogNetwork.holdCatalogRead = new Promise<void>((resolve) => {
     release = resolve
   })
@@ -1004,6 +1027,329 @@ test('El arranque carga rutas y consultas mientras resuelve alias sin renderizar
   await expect(page.locator('.home')).toBeVisible()
 })
 
+test('La precarga del Hero y picture seleccionan una sola orientación en cada pantalla', async ({
+  page,
+  catalogNetwork,
+}) => {
+  await page.goto('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  expect(catalogNetwork.calls.some((c) => c.name === 'catalog_browse')).toBe(
+    true,
+  )
+  for (const [width, height, mobile] of [
+    [390, 844, true],
+    [768, 1024, true],
+    [1024, 768, false],
+    [1440, 900, false],
+    [844, 390, false],
+    [599, 500, true],
+    [600, 500, false],
+    [600, 501, true],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    const matches = await page.evaluate(
+      ([m, d]) => [matchMedia(m).matches, matchMedia(d).matches],
+      [HERO_MOBILE_QUERY, HERO_DESKTOP_QUERY],
+    )
+    expect(matches).toEqual([mobile, !mobile])
+  }
+})
+
+for (const scenario of [
+  'fresh-home',
+  'wrong-home-project',
+  'invalid-home',
+] as const) {
+  test(`El Home inicial conserva el contrato público y evita duplicados: ${scenario}`, async ({
+    page,
+    catalogNetwork,
+  }) => {
+    const raw =
+      scenario === 'invalid-home'
+        ? { version: 'invalid' }
+        : { version: 0, content: null, media: null, mediaAssets: [] }
+    const json = homeBootstrapJson(
+      scenario === 'wrong-home-project'
+        ? 'https://wrongproject.supabase.co'
+        : origin,
+      raw,
+    )!
+    await page.route('**/', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback()
+      const response = await route.fetch()
+      await route.fulfill({
+        response,
+        body: (await response.text()).replace(
+          '</head>',
+          () =>
+            `<script type="application/json" id="aroma-public-home">${json}</script></head>`,
+        ),
+      })
+    })
+    await page.goto('/')
+    await expect(page.locator('.hero')).toBeVisible()
+    const reads = catalogNetwork.calls.filter(
+      (c) => c.name === 'home_document',
+    ).length
+    expect(reads).toBe(scenario === 'fresh-home' ? 0 : 1)
+    await expect(page.locator('#aroma-public-home')).toHaveCount(0)
+    await page.goto('/tienda')
+    await expect(page.locator('.product-card')).toHaveCount(1)
+  })
+}
+
+for (const scenario of [
+  'fresh',
+  'wrong-project',
+  'invalid-aliases',
+  'invalid-document',
+] as const) {
+  test(`Los metadatos iniciales de medios conservan validación y lecturas forzadas: ${scenario}`, async ({
+    page,
+    context,
+    catalogNetwork,
+  }) => {
+    let reads = 0
+    for (const operation of ['site_media_document', 'public_media_aliases'])
+      await context.route(`**/rest/v1/rpc/${operation}`, async (route) => {
+        if (route.request().method() === 'OPTIONS')
+          return route.fulfill({ status: 204, headers })
+        reads++
+        await route.fulfill({ headers, json: { items: [] } })
+      })
+    const json = publicMediaBootstrapJson(
+      scenario === 'wrong-project'
+        ? 'https://wrongproject.supabase.co'
+        : origin,
+      scenario === 'invalid-document'
+        ? { items: [{ invalid: true }] }
+        : { items: [] },
+      scenario === 'invalid-aliases'
+        ? { items: [{ path: '/unknown.webp', asset: {} }] }
+        : { items: [] },
+    )!
+    await page.route('**/tienda', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback()
+      const response = await route.fetch()
+      await route.fulfill({
+        response,
+        body: (await response.text()).replace(
+          '</head>',
+          () =>
+            `<script type="application/json" id="aroma-public-media">${json}</script></head>`,
+        ),
+      })
+    })
+    await page.goto('/tienda')
+    await expect(page.locator('.product-card')).toHaveCount(1)
+    expect(
+      catalogNetwork.calls.some((call) => call.name === 'catalog_browse'),
+    ).toBe(true)
+    await page.evaluate(async () => {
+      const a = '/src/services/builtin-media-service.ts',
+        b = '/src/services/site-media-service.ts'
+      const { builtinMediaService } = (await import(
+        a
+      )) as typeof import('../src/services/builtin-media-service')
+      const { siteMediaService } = (await import(
+        b
+      )) as typeof import('../src/services/site-media-service')
+      await Promise.all([builtinMediaService.load(), siteMediaService.load()])
+    })
+    const initial =
+      scenario === 'fresh' ? 0 : scenario === 'wrong-project' ? 2 : 1
+    expect(reads).toBe(initial)
+    await expect(page.locator('#aroma-public-media')).toHaveCount(0)
+    await page.evaluate(async () => {
+      const a = '/src/services/builtin-media-service.ts',
+        b = '/src/services/site-media-service.ts'
+      const { builtinMediaService } = (await import(
+        a
+      )) as typeof import('../src/services/builtin-media-service')
+      const { siteMediaService } = (await import(
+        b
+      )) as typeof import('../src/services/site-media-service')
+      await Promise.all([
+        builtinMediaService.load(true),
+        siteMediaService.load(true),
+      ])
+    })
+    expect(reads).toBe(initial + 2)
+  })
+}
+
+test('La intención de abrir una ficha precarga código, sin consultar datos ni ejecutar permisos administrativos', async ({
+  page,
+  catalogNetwork,
+}) => {
+  let imports = 0
+  await page.route('**/src/features/product/ProductPage.tsx', async (route) => {
+    imports++
+    await route.continue()
+  })
+  await page.goto('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(1)
+  const link = page.locator('a[href="/producto/fleur-de-test"]').first()
+  await link.hover()
+  await expect.poll(() => imports).toBe(1)
+  expect(
+    catalogNetwork.calls.filter(
+      (c) =>
+        c.name === 'catalog_product_context' || c.name.startsWith('admin_'),
+    ),
+  ).toHaveLength(0)
+  await link.click()
+  await expect(page.locator('#product-title')).toHaveText('Fleur de Test')
+  expect(
+    catalogNetwork.calls.filter((c) => c.name === 'catalog_product_context'),
+  ).toHaveLength(1)
+  expect(imports).toBe(1)
+})
+
+for (const scenario of [
+  'fresh',
+  'expired',
+  'invalidated',
+  'wrong-path',
+] as const) {
+  test(`El documento inicial es efímero y no sobrevive invalidaciones: ${scenario}`, async ({
+    page,
+    catalogNetwork,
+  }) => {
+    void catalogNetwork
+    await page.goto('/contacto')
+    await expect(page.locator('main h1')).toHaveText('Contacto')
+    const result = await page.evaluate(async (scenario) => {
+      const path = '/src/services/product-bootstrap.ts'
+      const { takeProductBootstrap } = (await import(
+        path
+      )) as typeof import('../src/services/product-bootstrap')
+      if (scenario === 'invalidated') {
+        const cache = '/src/services/public-query-cache.ts'
+        ;(
+          (await import(
+            cache
+          )) as typeof import('../src/services/public-query-cache')
+        ).invalidatePublicQueryCache()
+      }
+      history.replaceState(
+        {},
+        '',
+        scenario === 'wrong-path' ? '/contacto' : '/producto/fleur-de-test',
+      )
+      const script = document.createElement('script')
+      script.id = 'aroma-public-product'
+      script.type = 'application/json'
+      script.textContent = JSON.stringify({
+        version: 1,
+        project: 'https://abcdefghijklmnopqrst.supabase.co',
+        slug: 'fleur-de-test',
+        value: { marker: 'public' },
+      })
+      document.head.append(script)
+      Object.defineProperty(performance, 'now', {
+        configurable: true,
+        value: () => (scenario === 'expired' ? 5001 : 500),
+      })
+      try {
+        return {
+          first: takeProductBootstrap('fleur-de-test'),
+          second: takeProductBootstrap('fleur-de-test'),
+          removed: !script.isConnected,
+        }
+      } finally {
+        Reflect.deleteProperty(performance, 'now')
+      }
+    }, scenario)
+    expect(result.first).toEqual(
+      scenario === 'fresh' ? { marker: 'public' } : undefined,
+    )
+    expect(result.second).toBeUndefined()
+    expect(result.removed).toBe(true)
+  })
+}
+
+for (const scenario of [
+  'fresh',
+  'wrong-project',
+  'invalid-record',
+  'remote-family-bootstrap',
+  'remote-family-network',
+] as const) {
+  test(`La ficha usa una sola vez el DTO inicial público y rechaza HTML inválido: ${scenario}`, async ({
+    page,
+    catalogNetwork,
+  }) => {
+    if (scenario.startsWith('remote-family')) {
+      catalogNetwork.olfactoryFamilies = [
+        {
+          value: 'resina-bootstrap',
+          label: 'Resina de prueba',
+          aromaLabel: 'Resina de prueba',
+          aliases: [],
+          active: true,
+          version: 1,
+          productCount: 1,
+        },
+      ]
+      catalogNetwork.products[0].product.olfactoryFamilies = [
+        'resina-bootstrap',
+      ]
+    }
+    const value = {
+      brands: catalogNetwork.brands.filter((b) => b.active),
+      features: { complementsEnabled: false },
+      featuredBrandId: remoteBrandId,
+      olfactoryFamilies: catalogNetwork.olfactoryFamilies,
+      homeAnnouncement: null,
+      homeVersion: 0,
+      record:
+        scenario === 'invalid-record'
+          ? { invalid: true }
+          : catalogNetwork.products[0],
+      recommendations: [],
+    }
+    const json = productBootstrapJson(
+      scenario === 'wrong-project' || scenario === 'remote-family-network'
+        ? 'https://wrongproject.supabase.co'
+        : origin,
+      'fleur-de-test',
+      value,
+    )!
+    await page.route('**/producto/fleur-de-test', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback()
+      const response = await route.fetch()
+      await route.fulfill({
+        response,
+        body: (await response.text()).replace(
+          '</head>',
+          () =>
+            `<script type="application/json" id="aroma-public-product">${json}</script></head>`,
+        ),
+      })
+    })
+    await page.goto('/producto/fleur-de-test')
+    await expect(page.locator('#product-title')).toHaveText('Fleur de Test')
+    expect(
+      catalogNetwork.calls.filter((c) => c.name === 'catalog_product_context'),
+    ).toHaveLength(
+      scenario === 'fresh' || scenario === 'remote-family-bootstrap' ? 0 : 1,
+    )
+    await expect(page.locator('#aroma-public-product')).toHaveCount(0)
+    catalogNetwork.calls.length = 0
+    catalogNetwork.products[0].product.name = 'Lectura posterior actualizada'
+    await page.evaluate(() =>
+      document.dispatchEvent(new Event('visibilitychange')),
+    )
+    await expect(page.locator('#product-title')).toHaveText(
+      'Lectura posterior actualizada',
+    )
+    expect(
+      catalogNetwork.calls.filter((c) => c.name === 'catalog_product_context'),
+    ).toHaveLength(1)
+  })
+}
+
 test('Actualizar una ficha reutiliza su metadata y agrupa avisos de visibilidad simultáneos', async ({
   page,
   catalogNetwork,
@@ -1027,6 +1373,30 @@ test('Actualizar una ficha reutiliza su metadata y agrupa avisos de visibilidad 
       ({ name }) => name === 'catalog_brands' || name === 'catalog_settings',
     ),
   ).toBe(false)
+})
+
+test('Actualizar Tienda remota ejecuta una sola vez el loader y conserva precios y ofertas frescos', async ({ page, catalogNetwork }) => {
+  await page.goto('/tienda?marca=maison-de-test&orden=precio-asc')
+  const perfume = page.locator('.product-card').first()
+  await expect(perfume).toContainText('S/ 420')
+  await installCatalogRefreshCounter(page)
+  catalogNetwork.calls.length = 0
+  catalogNetwork.products[0].product.variants[0].priceCents = 50000
+  catalogNetwork.products[0].product.discount = {
+    type: 'percent', value: 20, active: true, startsAt: '', endsAt: '',
+  }
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(perfume).toContainText('S/ 400')
+  await expect(perfume).toContainText('S/ 500')
+  await expect(page.locator('.catalog-results')).toHaveAttribute('aria-busy', 'false')
+  await settleCatalogRefreshRender(page)
+  expect(await catalogRefreshCount(page)).toEqual({ started: 1, completed: 1, revalidation: 'idle' })
+  expect(catalogNetwork.calls.filter(({ name }) => name === 'catalog_browse')).toHaveLength(1)
+  expect(catalogNetwork.calls.some(({ name }) => ['catalog_settings', 'catalog_brands'].includes(name))).toBe(false)
+  await expect(page).toHaveURL('/tienda?marca=maison-de-test&orden=precio-asc')
 })
 
 test('Actualizar Contacto conserva su lectura de metadata sin consultar productos ni duplicar avisos', async ({
@@ -1732,7 +2102,7 @@ test('QA-AROMA Excel remoto importa 500 productos y 1000 presentaciones con una 
   )
 })
 
-test('el editor del Home no descarga el catálogo público hasta abrir el recomendador', async ({
+test('el editor del Home consulta solo opciones agregadas al abrir el recomendador', async ({
   page,
   supabaseNetwork,
   catalogNetwork,
@@ -1745,7 +2115,7 @@ test('el editor del Home no descarga el catálogo público hasta abrir el recome
     catalogNetwork.calls
       .slice(begin)
       .filter((call) =>
-        ['catalog_products', 'catalog_brands', 'catalog_settings'].includes(
+        ['catalog_products', 'catalog_brands', 'catalog_settings', 'catalog_home_context'].includes(
           call.name,
         ),
       )
@@ -1753,7 +2123,9 @@ test('el editor del Home no descarga el catálogo público hasta abrir el recome
   await page
     .getByRole('button', { name: 'Encuentra tu perfume ideal', exact: true })
     .click()
-  await expect.poll(() => publicReads().length).toBe(3)
+  await expect.poll(() => publicReads().length).toBe(1)
+  expect(publicReads()[0].name).toBe('catalog_home_context')
+  expect(catalogNetwork.calls.slice(begin).some(call => call.name === 'admin_catalog_page')).toBe(false)
   await expect(
     page.getByRole('button', {
       name: 'Encuentra tu perfume ideal',
@@ -2597,3 +2969,135 @@ for (const viewport of viewports) {
     await capture('admin-product')
   })
 }
+
+test('Home, Tienda y ficha remotos no descargan ni inicializan el almacén administrativo', async ({
+  page,
+  catalogNetwork,
+}) => {
+  const requested: string[] = []
+  page.on('request', (request) =>
+    requested.push(new URL(request.url()).pathname),
+  )
+  for (const [path, selector] of [
+    ['/', '.hero-image img'],
+    ['/tienda', '.product-card'],
+    ['/producto/fleur-de-test', '.product-page'],
+  ]) {
+    await page.goto(path)
+    await expect(page.locator(selector).first()).toBeVisible()
+    const initialized = await page.evaluate(async () => {
+      const modulePath = '/src/services/admin-runtime.ts'
+      const { adminRuntime } = (await import(
+        modulePath
+      )) as typeof import('../src/services/admin-runtime')
+      try {
+        adminRuntime()
+        return true
+      } catch {
+        return false
+      }
+    })
+    expect(initialized).toBe(false)
+  }
+  expect(requested.some((path) => path.endsWith('/admin-service.ts'))).toBe(
+    false,
+  )
+  expect(
+    catalogNetwork.calls.some((call) => call.name.startsWith('admin_')),
+  ).toBe(false)
+})
+
+test('Paginación remota: tres mil productos envían solo la página y buscan SKU fuera de ella', async ({ page, supabaseNetwork, catalogNetwork }) => {
+  catalogNetwork.products = Array.from({ length: 3000 }, (_, index) => {
+    const record = makeProduct(), suffix = String(index + 1).padStart(12, '0')
+    record.product = { ...record.product, id: `30000000-0000-4000-8000-${suffix}`, name: `Perfume ${suffix}`, slug: `scale-${index}`, variants: [{ ...record.product.variants[0], id: `40000000-0000-4000-8000-${suffix}`, sku: `SCALE-${index}` }] }
+    catalogNetwork.productVersions.set(record.product.id, 1)
+    return record
+  })
+  await signInAdmin(page, supabaseNetwork)
+  catalogNetwork.calls.length = 0
+  await page.goto('/admin/productos')
+  await expect(page.locator('.admin-table--products tbody tr')).toHaveCount(12)
+  await expect(page.getByRole('navigation', { name: 'Paginación de productos' })).toContainText('Página 1 de 250')
+  expect(catalogNetwork.calls.filter(c => c.name === 'admin_catalog_page')).toHaveLength(0)
+  expect(catalogNetwork.calls.filter(c => c.name === 'admin_product_list' && c.body.p_mode !== 'dashboard')).toHaveLength(1)
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Paginación de productos' })).toContainText('Página 2 de 250')
+  await page.getByRole('searchbox').fill('SCALE-2999')
+  await page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click()
+  await expect(page.locator('.admin-table--products tbody tr')).toHaveCount(1)
+  await expect(page.locator('.admin-table--products tbody')).toContainText('SCALE-2999')
+  expect(catalogNetwork.calls.filter(c => c.name === 'admin_catalog_page')).toHaveLength(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/admin/productos')
+  await expect(page.locator('.admin-table--products tbody tr')).toHaveCount(4)
+  await expect(page.getByRole('navigation', { name: 'Paginación de productos' })).toContainText('Página 1 de 750')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+})
+
+test('Metadatos y Excel: tres mil productos no se descargan para administrar mil marcas ni validar SKU', async ({page,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.brands = Array.from({length:1000},(_,index)=>({id:`20000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`,name:`Marca ${index}`,slug:`marca-${index}`,active:true,version:1}))
+  catalogNetwork.products = Array.from({length:3000},(_,index)=>{
+    const record=makeProduct();record.product.id=`30000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`
+    record.product.name=`Perfume ${index}`;record.product.slug=`perfume-${index}`;record.product.variants[0].sku=`TARGET-${index}`
+    return record
+  })
+  await signInAdmin(page,supabaseNetwork)
+  catalogNetwork.calls.length=0
+  await page.goto('/admin/marcas')
+  await expect(page.locator('.admin-table tbody tr')).toHaveCount(12)
+  expect(catalogNetwork.calls.filter(call=>call.name==='admin_catalog_page')).toHaveLength(0)
+  expect(catalogNetwork.calls.filter(call=>call.name==='admin_catalog_context')).toHaveLength(1)
+  await page.goto('/admin/productos')
+  const file=await importFile([importRecord({nombre:'Nuevo producto',marca:'Marca 0',sku:'TARGET-2999'})])
+  await openImport(page)
+  const preview = await reviewFile(page,file)
+  await expect(preview).toContainText('El SKU ya existe en el catálogo.')
+  const checks=catalogNetwork.calls.filter(call=>call.name==='admin_import_conflicts')
+  expect(checks).toHaveLength(1)
+  expect(JSON.stringify(checks[0].body)).not.toContain('gallery')
+  expect(catalogNetwork.calls.filter(call=>call.name==='admin_catalog_page')).toHaveLength(0)
+})
+
+test('Ofertas cargan doce fichas por grupo y completan la lista al desplazarse', async ({page,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.products=Array.from({length:36},(_,index)=>{
+    const record=makeProduct();record.product.id=`30000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`
+    record.product.name=`Oferta ${String(index).padStart(3,'0')}`;record.product.slug=`oferta-${index}`
+    record.product.discount={type:'percent',value:10,active:true,startsAt:'',endsAt:''}
+    return record
+  })
+  await signInAdmin(page,supabaseNetwork)
+  catalogNetwork.calls.length=0
+  await page.goto('/admin/promociones?vista=ofertas')
+  await expect(page.locator('.admin-offers-toolbar')).toContainText('36 productos con oferta')
+  await expect(page.locator('.admin-offers-list > li')).toHaveCount(12)
+  await page.locator('.admin-offers-list > li').last().scrollIntoViewIfNeeded()
+  await expect(page.locator('.admin-offers-list > li')).toHaveCount(24)
+  await page.locator('.admin-offers-list > li').last().scrollIntoViewIfNeeded()
+  await expect(page.locator('.admin-offers-list > li')).toHaveCount(36)
+  expect(catalogNetwork.calls.filter(call=>call.name==='admin_offer_list').map(call=>call.body.p_page)).toEqual([1,2,3])
+  expect(catalogNetwork.calls.some(call=>call.name==='admin_catalog_page')).toBe(false)
+})
+
+test('Crear oferta usa identidades y recupera únicamente la ficha seleccionada entre mil productos', async ({page,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.products=Array.from({length:1000},(_,index)=>{
+    const record=makeProduct();record.product.id=`30000000-0000-4000-8000-${String(index+1).padStart(12,'0')}`
+    record.product.name=`Producto ${String(index).padStart(4,'0')}`;record.product.slug=`producto-${index}`
+    return record
+  })
+  for (const record of catalogNetwork.products) catalogNetwork.productVersions.set(record.product.id, 1)
+  await signInAdmin(page,supabaseNetwork)
+  catalogNetwork.calls.length=0
+  await page.goto('/admin/promociones?vista=ofertas')
+  expect(catalogNetwork.calls.some(call=>call.name==='admin_catalog_choices')).toBe(false)
+  await page.getByRole('button',{name:'Crear oferta de producto',exact:true}).click()
+  const selector=page.getByRole('combobox',{name:'Producto',exact:true})
+  await expect(selector.locator('option')).toHaveCount(1001)
+  const selected=catalogNetwork.products[999].product.id
+  await selector.selectOption(selected)
+  await expect(page.getByRole('button',{name:'Guardar oferta',exact:true})).toBeEnabled()
+  expect(catalogNetwork.calls.filter(call=>call.name==='admin_products_by_ids').map(call=>call.body.p_ids)).toEqual([[selected]])
+  await page.getByRole('button',{name:'Guardar oferta',exact:true}).click()
+  await expect(page.locator('.admin-offers-list')).toContainText('Producto 0999')
+  expect(catalogNetwork.calls.some(call=>call.name==='admin_catalog_page')).toBe(false)
+})

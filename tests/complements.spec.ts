@@ -190,6 +190,10 @@ test('Excel importa complementos con variantes nominales y admite las plantillas
   page,
 }) => {
   await page.goto('/admin/productos')
+  // Navigation's load event precedes the asynchronous route/store bootstrap.
+  // Capture the import revision only once the real administrative UI is ready,
+  // as happens when an administrator opens the Excel dialog.
+  await expect(page.getByRole('heading', { name: 'Productos', exact: true })).toBeVisible()
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Productos')
   sheet.addRow([

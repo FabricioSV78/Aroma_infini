@@ -72,7 +72,7 @@ test.beforeAll(async () => {
             const payload=JSON.parse(init.body);
             const record={
               product:{id:${JSON.stringify(productId)},name:'Rosa Clara',slug:payload.p_slug,brandId:brand.id,image:asset.src},
-              detail:{shortDescription:'Una fragancia floral, suave y luminosa.'},
+              detail:{shortDescription:'Una fragancia floral, suave y luminosa.',gallery:[{image:asset.src}]},
               mediaAssets:[asset],
             };
             if(scenario==='malformed') record.product.name=42;
@@ -191,6 +191,37 @@ test('a direct product has current metadata before JavaScript while its app body
   expect(html.match(/<body>([\s\S]*?)<\/body>/i)?.[1]).toBe(body)
   expect(html).toContain('/assets/index-fixture.css')
   expect(response.headers.get('X-Test-Upstream-Requests')).toBe('1')
+  const initial = html.match(
+    /<script type="application\/json" id="aroma-public-product">([\s\S]*?)<\/script>/,
+  )?.[1]
+  expect(initial).toBeTruthy()
+  expect(JSON.parse(initial!)).toMatchObject({
+    version: 1,
+    project: 'https://tkxvexfapszilzhogvgu.supabase.co',
+    slug: 'rosa-clara',
+    value: { record: { product: { name: 'Rosa Clara' } } },
+  })
+  expect(html).toContain('rel="preload" as="image"')
+  expect(html).toContain('imagesrcset=')
+  expect(response.headers.get('cache-control')).toBe('no-store')
+})
+
+test('the initial anonymous DTO remains inert even when product text contains script markup', async () => {
+  const { html } = await request('/producto/rosa-clara', 'escaped')
+  const json = html.match(
+    /<script type="application\/json" id="aroma-public-product">([\s\S]*?)<\/script>/,
+  )?.[1]
+  expect(json).toBeTruthy()
+  expect(json).not.toContain('<')
+  expect(JSON.parse(json!).value.record.product.name).toContain(
+    '<script>alert(1)</script>',
+  )
+  expect(html).not.toContain('<script>alert(1)</script>')
+  for (const scenario of ['malformed', 'upstream-error', 'healthy-missing']) {
+    const failed = await request('/producto/rosa-clara', scenario)
+    expect(failed.html).not.toContain('id="aroma-public-product"')
+    expect(failed.html).not.toContain('rel="preload" as="image"')
+  }
 })
 
 test('product canonical excludes tracking and presentation queries and optional tags support SPA cleanup', async () => {

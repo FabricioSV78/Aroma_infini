@@ -2,7 +2,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react'
@@ -17,6 +16,8 @@ import {
 import { Icon } from '../../components/ui/Icon'
 import { HERO_SLIDE_INTERVAL_MS, useHeroRotation } from './useHeroRotation'
 import { HeroVideo } from './HeroVideo'
+import { useDesktopVideo } from '../../components/media/useDesktopVideo'
+import { ImagePlaceholder } from '../../components/media/ImagePlaceholder'
 import { headingText } from '../../utils/heading-text'
 import { assetSource } from '../../services/asset-source'
 import { imageSourceSet } from '../../services/image-source'
@@ -24,17 +25,15 @@ import {
   heroImageSource,
   heroImageSourceSet,
 } from '../../services/hero-image-source'
+import {
+  HERO_MOBILE_WIDTHS,
+  HERO_DESKTOP_WIDTHS,
+  heroVisualSources,
+  heroVisualQueries,
+} from '../../domain/hero-visuals'
 import '../../styles/hero-video.css'
 
 export const HERO_VIDEO_INTERVAL_MS = 15000
-const mobileQuery =
-  '(max-width: 599px), (max-width: 1023px) and (min-height: 501px)'
-function subscribeViewport(onChange: () => void) {
-  const query = matchMedia(mobileQuery)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-const mobileViewport = () => matchMedia(mobileQuery).matches
 
 interface HeroProps {
   content: HomeHeroContent[]
@@ -74,11 +73,7 @@ function HeroCarousel({
       title: slide.title.split('\n').filter(Boolean).map(headingText),
     }
   })
-  const mobile = useSyncExternalStore(
-    subscribeViewport,
-    mobileViewport,
-    () => false,
-  )
+  const desktopVideo = useDesktopVideo()
   const [active, setActive] = useState(0)
   const [preparedCount, setPreparedCount] = useState(1)
   const [readySlides, setReadySlides] = useState<ReadonlySet<number>>(
@@ -248,15 +243,11 @@ function HeroCarousel({
           const isActive = index === active
           const Heading = isActive ? 'h1' : 'h2'
           const videoCampaign = slide.mediaType === 'video'
-          const mobileImage = videoCampaign
-            ? slide.mobileVideo
-              ? slide.mobilePoster
-              : slide.poster
-            : (slide.mobileImage ?? slide.desktopImage)
-          const desktopImage = videoCampaign ? slide.poster : slide.desktopImage
-          const source =
-            mobile && slide.mobileVideo ? slide.mobileVideo : slide.video
-          const selectedPoster = mobile ? mobileImage : desktopImage
+          const { mobile: mobileImage, desktop: desktopImage } =
+            heroVisualSources(slide)
+          const source = desktopVideo ? slide.video : null
+          const selectedPoster = desktopImage
+          const imageQueries = heroVisualQueries(slide)
           const destination = resolveHeroDestination(slide.destination, {
             products,
             complementsEnabled,
@@ -289,19 +280,26 @@ function HeroCarousel({
               aria-hidden={!isActive}
               inert={!isActive}
             >
-              {index < preparedCount && !failedSlides.has(index) ? (
+              {index < preparedCount ? (
                 <div className="hero-image">
-                  <picture>
+                  <ImagePlaceholder
+                    state={
+                      failedSlides.has(index) ? 'error' :
+                        readySlides.has(index) ? 'ready' : 'pending'
+                    }
+                    label={slide.alt}
+                  />
+                  {!failedSlides.has(index) ? <picture>
                     <source
-                      media={mobileQuery}
+                      media={imageQueries.mobile}
                       srcSet={
                         mobileImage
-                          ? (imageSourceSet(mobileImage, [480, 780, 1024]) ??
+                          ? (imageSourceSet(mobileImage, HERO_MOBILE_WIDTHS) ??
                             assetSource(mobileImage))
                           : heroImageSourceSet(
                               slide.image,
                               'mobile',
-                              [480, 780, 1024],
+                              HERO_MOBILE_WIDTHS,
                             )
                       }
                       sizes="100vw"
@@ -343,11 +341,11 @@ function HeroCarousel({
                       )}
                       srcSet={
                         desktopImage
-                          ? imageSourceSet(desktopImage, [960, 1536, 2048])
+                          ? imageSourceSet(desktopImage, HERO_DESKTOP_WIDTHS)
                           : heroImageSourceSet(
                               slide.image,
                               'desktop',
-                              [960, 1536, 2048],
+                              HERO_DESKTOP_WIDTHS,
                             )
                       }
                       sizes="100vw"
@@ -357,7 +355,7 @@ function HeroCarousel({
                       fetchPriority={index === 0 ? 'high' : 'low'}
                       decoding="async"
                     />
-                  </picture>
+                  </picture> : null}
                   {isActive &&
                   videoCampaign &&
                   source &&

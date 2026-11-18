@@ -1,12 +1,15 @@
 import { classifyRoute } from './route-policy'
 import { createMediaHandler, cleanupMedia } from './media-handler'
+import { createBuiltinMediaHandler } from './builtin-media-handler'
 import { createCheckoutHandler } from './checkout-handler'
 import { createCatalogSeoHandler } from './catalog-seo'
 import { createSitemapHandler } from './sitemap'
 import { createSiteMediaSeoHandler } from './site-media-seo'
+import { filterPublicRouteHints } from './public-route-hints'
 import { createComplaintsHandler } from './complaints-handler'
 import { createAdminPushHandler, dispatchAdminPush } from './admin-push-handler'
 import { createAdminDeviceHandler } from './admin-device-handler'
+import { expireStockReservations } from './stock-reservations'
 import {
   seoPageRobots,
   seoPublicationOrigin,
@@ -19,10 +22,12 @@ const siteMediaSeo = createSiteMediaSeoHandler()
 const complaintsRequest = createComplaintsHandler()
 const adminPushRequest = createAdminPushHandler()
 const adminDeviceRequest = createAdminDeviceHandler()
+const builtinMediaRequest = createBuiltinMediaHandler()
 
 // SEO, ordinary page requests and cleanup do not need the image decoder.
 // Load it only after the upload handler has authorized and bounded the file.
 const mediaRequest = createMediaHandler({
+  publicImageCache: () => caches.default,
   async decodeWebp(bytes) {
     const { decodeWebp } = await import('./media-codec')
     return decodeWebp(bytes)
@@ -44,6 +49,7 @@ async function withPagePolicy(
   indexable = false,
   follow = false,
 ) {
+  response = filterPublicRouteHints(response, request)
   const url = new URL(request.url)
   const publicationOrigin = seoPublicationOrigin(
     {
@@ -91,11 +97,22 @@ async function withPagePolicy(
       ? siteMediaSeo(page, request, env)
       : page
   }
-  return new Response(response.body, { status, headers })
+  const page = new Response(response.body, { status, headers })
+  return classifyRoute(url.pathname) === 'public'
+    ? siteMediaSeo(page, request, env)
+    : page
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
+    const builtin = await builtinMediaRequest(request, env)
+    if (builtin) return builtin
+    // Environments not yet migrated, and unrelated technical assets, retain
+    // their existing static delivery. Reviewed retired originals never reach it.
+    if (
+      /^(?:\/images\/|\/videos\/|\/brand\/)/.test(new URL(request.url).pathname) &&
+      (request.method === 'GET' || request.method === 'HEAD')
+    ) return env.ASSETS.fetch(request)
     const adminDevice = await adminDeviceRequest(request, env)
     if (adminDevice) return adminDevice
     const adminPush = await adminPushRequest(request, env)
@@ -104,7 +121,7 @@ export default {
     if (complaint) return complaint
     const checkout = await checkoutRequest(request, env)
     if (checkout) return checkout
-    const media = await mediaRequest(request, env)
+    const media = await mediaRequest(request, env, ctx)
     if (media) return media
     const sitemap = await sitemapRequest(request, env)
     if (sitemap) return sitemap
@@ -122,8 +139,18 @@ export default {
       return Response.redirect(destination.toString(), 308)
     }
 
-    const catalogPage = await catalogSeoRequest(request, env)
-    if (catalogPage) return siteMediaSeo(catalogPage, request, env)
+    const prepared = siteMediaSeo.prepareSettings(request, env)
+    const catalogPage = await catalogSeoRequest(request, env, prepared?.diagnostics.fetch)
+    if (catalogPage) {
+      if (catalogPage.status !== 200) prepared?.cancel()
+      return siteMediaSeo(
+        filterPublicRouteHints(catalogPage, request),
+        request,
+        env,
+        prepared,
+      )
+    }
+    prepared?.cancel()
 
     if (url.pathname === '/tienda') {
       const asset = await env.ASSETS.fetch(request)
@@ -169,6 +196,7 @@ export default {
     // One-minute outbox ticks; bounded media cleanup every five minutes.
     const results = await Promise.allSettled([
       dispatchAdminPush(env),
+      expireStockReservations(env),
       ...(new Date(event.scheduledTime).getUTCMinutes() % 5 === 3 &&
       env.SUPABASE_MEDIA_SECRET_KEY
         ? [cleanupMedia(env)]

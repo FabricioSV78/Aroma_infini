@@ -67,6 +67,9 @@ test.beforeAll(async () => {
         if(!handlers.has(scenario)) handlers.set(scenario,createSiteMediaSeoHandler({now:()=>now,fetch:async(input,init)=>{
           const url=new URL(input instanceof Request?input.url:input);
           const headers=new Headers(init?.headers);
+          if(scenario==='streamed-initial'&&url.pathname.endsWith('/catalog_browse')){
+            await new Promise(resolve=>setTimeout(resolve,250));return Response.json({items:[]});
+          }
           if(url.origin!==bindings.SUPABASE_URL||init?.method!=='POST'||init.redirect!=='manual'||
             headers.has('authorization')||headers.get('apikey')!==bindings.SUPABASE_PUBLISHABLE_KEY||
             headers.get('Content-Profile')!=='api'||JSON.stringify(JSON.parse(init.body))!=='{}'||
@@ -96,6 +99,16 @@ test.beforeAll(async () => {
               'https://www.aromainfini.pe'+productImage.src,'https://outside.invalid/images/cedre-480.webp'
             ])) : original;
         const response=await handlers.get(scenario)(new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8',ETag:'old', 'Content-Length':String(html.length)}}),request,bindings);
+        if(scenario==='streamed-initial'){
+          // Inspect native stream chunks before Miniflare's local HTTP proxy,
+          // which coalesces small network responses regardless of the producer.
+          const reader=response.body.getReader(),decoder=new TextDecoder();
+          const first=await reader.read();let prefix=decoder.decode(first.value,{stream:true});
+          while(!prefix.includes('</head>')){const next=await reader.read();if(next.done)break;prefix+=decoder.decode(next.value,{stream:true})}
+          let html=prefix;
+          for(;;){const next=await reader.read();if(next.done)break;html+=decoder.decode(next.value,{stream:true})}
+          html+=decoder.decode();return Response.json({prefix,html,cacheControl:response.headers.get('Cache-Control')});
+        }
         const headers=new Headers(response.headers);headers.set('X-Test-Calls',String(counts.get(scenario)||0));
         return new Response(response.body,{status:response.status,headers});
       }};
@@ -152,6 +165,23 @@ test('El Worker actualiza imágenes sociales y logo SVG antes de JavaScript sin 
   expect(html.match(/<body>([\s\S]*?)<\/body>/)?.[1]).toBe(body)
   expect(response.headers.get('etag')).toBeNull()
   expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(html.match(/rel="preconnect"/g)).toHaveLength(1)
+  expect(html).toContain(
+    'href="https://abcdefghijklmnopqrst.supabase.co" crossorigin',
+  )
+  const json = html.match(
+    /<script type="application\/json" id="aroma-public-media">([\s\S]*?)<\/script>/,
+  )?.[1]
+  expect(json).toBeTruthy()
+  const initial = JSON.parse(json!)
+  expect(initial.version).toBe(1)
+  expect(Array.isArray(initial.document.items)).toBe(true)
+  expect(Array.isArray(initial.aliases.items)).toBe(true)
+  expect(json).not.toContain('<')
+  expect(json).not.toMatch(/sb_(secret|publishable)_/)
+  expect(html).toContain(
+    `rel="preload" as="image" href="${origin}${logoSource}"`,
+  )
 })
 
 test('Las asociaciones importadas resuelven las rutas originales sin recortar ni cambiar su composición', async () => {
@@ -204,4 +234,21 @@ test('Las fichas y marcas reutilizan solo alias de imágenes propias y conservan
     ])
     expect(html.match(/<body>([\s\S]*?)<\/body>/)?.[1]).toBe(body)
   }
+})
+
+test('el encabezado se transmite antes del catálogo y la proyección llega antes de cerrar el cuerpo', async () => {
+  const response = await runtime.dispatchFetch(`${origin}/tienda`, {
+    headers: { 'X-Test-Scenario': 'streamed-initial' },
+  })
+  const { prefix, html, cacheControl } = (await response.json()) as {
+    prefix: string
+    html: string
+    cacheControl: string
+  }
+  expect(prefix).toContain('<head>')
+  expect(prefix).not.toContain('id="aroma-public-initial-context"')
+  const projection = html.indexOf('id="aroma-public-initial-context"')
+  expect(projection).toBeGreaterThan(html.indexOf(body))
+  expect(projection).toBeLessThan(html.indexOf('</body>'))
+  expect(cacheControl).toBe('no-store')
 })

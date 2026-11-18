@@ -1,5 +1,14 @@
 # Editorial film
 
+**Historical source and derivative record.** These files and regeneration notes
+preserve provenance and test inputs. They do not define the current playback or
+administration policy. Videos are loaded only at desktop widths (1024 px and
+above); mobile receives its configured alternative image or poster and never
+initializes or downloads video. Editors upload replacements through the admin,
+without changing the source files described below. See
+[current media operations](../../docs/R2_MEDIA_OPERATIONS.md) and
+[the mobile video policy](../../docs/MOBILE_VIDEO_POLICY.md).
+
 Desktop and tablet: `perfume-editorial-wide.mp4`, Woman Spraying Perfume on Herself,
 Roman Odintsov / Pexels.
 Source: https://www.pexels.com/video/woman-spraying-perfume-on-herself-6810589/

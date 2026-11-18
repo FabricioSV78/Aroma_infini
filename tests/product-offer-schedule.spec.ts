@@ -1,6 +1,11 @@
 ﻿import { expect, test } from './test'
 import type { Product, ProductDiscount } from '../src/types/catalog'
 import { getNextProductDiscountChange } from '../src/services/product-discounts'
+import {
+  catalogRefreshCount,
+  installCatalogRefreshCounter,
+  settleCatalogRefreshRender,
+} from './catalog-refresh-fixture'
 
 const now = Date.parse('2030-01-02T12:00:00.000Z')
 
@@ -72,4 +77,31 @@ test('Offer refresh preserves distant timestamps for the existing capped timer',
   expect(getNextProductDiscountChange([record({ endsAt: distant })], now)).toBe(
     Date.parse(distant),
   )
+})
+
+test('El catálogo local revalida una vez al vencer la oferta y vuelve a aplicar el filtro de precio', async ({ page }) => {
+  await page.clock.install({ time: new Date('2030-02-01T10:00:00') })
+  await page.goto('/tienda')
+  await expect(page.locator('.product-card').first()).toBeVisible()
+  await page.evaluate(async () => {
+    const path = '/src/services/admin-runtime.ts'
+    const { adminRuntime } = (await import(path)) as typeof import('../src/services/admin-runtime')
+    const saved = adminRuntime().adminService.saveProductDiscount('cedre', {
+      type: 'percent', value: 20, active: true, startsAt: '',
+      endsAt: '2030-02-01T10:01:00',
+    })
+    if (saved.kind !== 'saved') throw new Error('No se guardó la oferta de prueba')
+  })
+  await page.goto('/tienda?marca=atelier-01&max=350')
+  const perfume = page.locator('.product-card').filter({
+    has: page.getByRole('heading', { name: 'Bois Clair', exact: true }),
+  })
+  await expect(perfume).toContainText('S/ 312')
+  await installCatalogRefreshCounter(page)
+  await page.clock.runFor(61_000)
+  await expect(perfume).toHaveCount(0)
+  await expect(page.locator('.catalog-results')).toHaveAttribute('aria-busy', 'false')
+  await settleCatalogRefreshRender(page)
+  expect(await catalogRefreshCount(page)).toEqual({ started: 1, completed: 1, revalidation: 'idle' })
+  await expect(page).toHaveURL('/tienda?marca=atelier-01&max=350')
 })

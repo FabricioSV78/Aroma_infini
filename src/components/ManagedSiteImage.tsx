@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react'
 import type { SiteMediaSlot } from '../domain/site-media-slots'
 import { siteMediaImage, useSiteMedia } from '../services/site-media-service'
+import { LoadingImage } from './media/LoadingImage'
 
 interface ManagedSiteImageProps extends Omit<
   ComponentPropsWithoutRef<'img'>,
@@ -15,7 +16,7 @@ export function ManagedSiteImage({
   ...props
 }: ManagedSiteImageProps) {
   const image = siteMediaImage(useSiteMedia(), slot)
-  return <img {...image} {...props} alt={alt ?? image.alt} />
+  return <LoadingImage {...image} {...props} alt={alt ?? image.alt} />
 }
 
 interface ManagedSiteSourceProps extends Omit<

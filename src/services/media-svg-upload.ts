@@ -88,7 +88,7 @@ export function uploadManagedSvg(
       if (origin === null)
         throw new UserFacingError(
           'svg-config',
-          'La biblioteca no está configurada correctamente.',
+          'La subida de imágenes no está configurada correctamente.',
         )
       const body = new FormData()
       body.append('operationId', saved.operationId)

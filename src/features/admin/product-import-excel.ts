@@ -23,6 +23,7 @@ import {
 } from '../../services/admin-service'
 import { validateProductDiscount } from '../../services/product-discounts'
 import type { ProductDiscount } from '../../types/catalog'
+import type { ProductImportConflictLookup, ProductImportIdentity } from '../../domain/product-import-identities'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const MAX_DATA_ROWS = 1000
@@ -319,7 +320,7 @@ function makeRecord(
 export async function parseProductImport(
   file: File,
   brands: readonly AdminBrand[],
-  existingProducts: readonly AdminProduct[],
+  existingProducts: readonly AdminProduct[] | ProductImportConflictLookup,
 ): Promise<ProductImportPreview> {
   if (!/\.xlsx$/i.test(file.name))
     throw new UserFacingError(
@@ -407,17 +408,19 @@ export async function parseProductImport(
     brandsByKey.set(normalized(brand.id), brand)
     brandsByKey.set(normalized(brand.name), brand)
   }
+  const localProducts = typeof existingProducts === 'function' ? [] : existingProducts
+  const importIdentities: ProductImportIdentity[] = []
   const existingSlugs = new Set(
-    existingProducts.map((record) => normalized(record.product.slug)),
+    localProducts.map((record) => normalized(record.product.slug)),
   )
   const existingNames = new Set(
-    existingProducts.map(
+    localProducts.map(
       (record) =>
         `${record.product.brandId}:${normalized(record.product.name)}`,
     ),
   )
   const existingSkus = new Set(
-    existingProducts.flatMap((record) =>
+    localProducts.flatMap((record) =>
       record.product.variants
         .map((variant) => normalizeSku(variant.sku ?? ''))
         .filter(Boolean),
@@ -543,6 +546,13 @@ export async function parseProductImport(
       ...(warnings.length ? { warnings } : {}),
     }
     rows.push(result)
+    if (typeof existingProducts === 'function') importIdentities.push({
+      row: number,
+      slug: slug.length <= 240 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '',
+      name: values.nombre.length <= 140 ? values.nombre : '',
+      brandId: brand?.id ?? '',
+      sku: values.sku && isValidSku(values.sku) ? values.sku : '',
+    })
     if (existingSlugs.has(normalized(slug)))
       duplicate(result, 'El slug ya existe en el catálogo.')
     if (existingNames.has(`${brand?.id ?? ''}:${normalized(values.nombre)}`))
@@ -624,6 +634,20 @@ export async function parseProductImport(
       'excel-empty',
       'La hoja no contiene productos. Completa al menos una fila.',
     )
+  if (typeof existingProducts === 'function') {
+    const conflicts = await existingProducts(importIdentities)
+    const byNumber = new Map(rows.map(row => [row.number, row]))
+    const messages = {
+      slug: 'El slug ya existe en el catálogo.',
+      name: 'El producto ya existe con esa marca y nombre.',
+      sku: 'El SKU ya existe en el catálogo.',
+    }
+    for (const conflict of conflicts) {
+      const row = byNumber.get(conflict.row)
+      if (!row) throw new UserFacingError('response', 'No pudimos verificar los duplicados del archivo.')
+      for (const reason of conflict.reasons) duplicate(row, messages[reason])
+    }
+  }
   const sheetNames = new Map<string, string>()
   for (const [slug, group] of groups) {
     const key = `${group.brandId}:${normalized(group.values.nombre)}`

@@ -425,7 +425,8 @@
   line-height: 1.5;
 }
 
-.admin-home-film-preview video {
+.admin-home-film-preview video,
+.admin-home-film-preview > img {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;

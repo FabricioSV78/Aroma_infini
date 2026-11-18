@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Icon } from '../../components/ui/Icon'
 import {
   familyVisualFor,
@@ -56,7 +57,7 @@ export function PerfumeFinder({
               sizes="100vw"
             />
           )}
-          <img
+          <LoadingImage
             className="finder-scene-image"
             src={assetSource(
               content.desktopImage ?? '/images/olfactory-cedre.webp',
@@ -115,7 +116,7 @@ export function PerfumeFinder({
                   aria-haspopup="dialog"
                 >
                   {visual?.image ? (
-                    <img
+                    <LoadingImage
                       src={assetSource(visual.image)}
                       srcSet={imageSourceSet(visual.image, [160, 320])}
                       sizes="(max-width: 600px) 36px, (max-width: 900px) 40px, 48px"

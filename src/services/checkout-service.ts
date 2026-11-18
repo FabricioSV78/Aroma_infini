@@ -1,18 +1,13 @@
 import type { ResolvedCart } from './commerce-service'
-import {
-  adminService,
-  getPromotionByCode,
-  getShippingSettings,
-  getShippingZoneForAddress,
-  resolveShippingZone,
-} from './admin-service'
+import { adminRuntime, loadAdminRuntime } from './admin-runtime'
+import { resolveShippingZone } from './shipping-rates'
 import {
   getPeruDepartmentLabel,
   getDeliveryArea,
   isCoveredDeliveryLocation,
   deliveryAreas,
   peruDepartments,
-} from '../content/peru'
+} from '../content/peru-core'
 import { isShippingDestinationEnabled } from './shipping-rates'
 import { isRemoteCatalog } from './catalog-source'
 import { shippingService } from './shipping-service'
@@ -29,6 +24,8 @@ import type {
   PaymentProvider,
   PurchasedLine,
 } from '../types/commerce'
+
+if (!isRemoteCatalog) await loadAdminRuntime()
 
 export { isValidAlternateRecipient } from './shipping-recipient'
 
@@ -147,7 +144,7 @@ export function quoteShipping(
   if (!normalized) return { kind: 'pending' }
   const shipping = isRemoteCatalog
     ? shippingService.getSnapshot()
-    : getShippingSettings()
+    : adminRuntime().getShippingSettings()
   if (shipping.configured === false) return { kind: 'unavailable' }
   const area = getDeliveryArea(normalized)
   if (
@@ -162,7 +159,7 @@ export function quoteShipping(
   if (!isCapital && method === 'motorizado') return { kind: 'unavailable' }
   const zone = isRemoteCatalog
     ? resolveShippingZone(shipping, normalized, province, district)
-    : getShippingZoneForAddress(normalized, province, district)
+    : adminRuntime().getShippingZoneForAddress(normalized, province, district)
   if (!zone) return { kind: 'unavailable' }
   if (method === 'motorizado' && zone.motorizadoFeeCents === null)
     return { kind: 'unavailable' }
@@ -187,7 +184,7 @@ export function quoteShipping(
 export function getDeliveryZoneOptions(): DeliveryZoneOption[] {
   return (isRemoteCatalog
     ? shippingService.getSnapshot()
-    : getShippingSettings()
+    : adminRuntime().getShippingSettings()
   ).provinceShippingEnabled
     ? peruDepartments
     : deliveryAreas.map((area) => ({
@@ -218,7 +215,7 @@ export function evaluatePromotion(
       kind: 'error',
       message: 'No se pudo validar el código. Inténtalo de nuevo.',
     }
-  const promotion = getPromotionByCode(code)
+  const promotion = adminRuntime().getPromotionByCode(code)
   if (!promotion)
     return {
       kind: 'not-found',
@@ -351,10 +348,12 @@ export function createMockOrder(
 export async function persistDemoCheckout(order: MockOrder): Promise<boolean> {
   if (!canSimulateCheckout) return false
   if (isRemoteCatalog) return false
-  const registration = adminService.recordApprovedCheckout(order)
+  const registration = adminRuntime().adminService.recordApprovedCheckout(order)
   if (registration.kind === 'validation') return false
   // The in-memory order remains usable if private browsing blocks IndexedDB.
-  await adminService.flush().catch(() => undefined)
+  await adminRuntime()
+    .adminService.flush()
+    .catch(() => undefined)
   return true
 }
 

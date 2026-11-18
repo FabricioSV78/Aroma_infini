@@ -1,6 +1,7 @@
 import { getLocalImageVariants } from '../content/image-variants'
 import { assetSource } from './asset-source'
 import { getManagedMedia } from './media-registry'
+import { managedImageCandidates } from '../domain/managed-image-candidates'
 
 export function isUploadedImage(image: string) {
   return image.startsWith('data:image/webp;base64,')
@@ -36,21 +37,10 @@ export function imageSourceSet(image: string, widths: readonly number[]) {
   if (managed) {
     // Include the real nearest candidate for every requested size, including
     // a smaller original when a requested width would otherwise upscale it.
-    const candidates = new Map<number, string>()
-    for (const width of widths) {
-      const candidate =
-        managed.variants.find((variant) => variant.width >= width) ??
-        managed.variants.at(-1)
-      if (candidate) candidates.set(candidate.width, candidate.src)
-    }
-    // Retain the verified original as the high-DPI candidate. The component's
-    // sizes attribute still lets the browser avoid downloading it needlessly.
-    const master = managed.variants.at(-1)
-    if (master && widths.length) candidates.set(master.width, master.src)
-    return candidates.size
-      ? [...candidates]
-          .sort(([a], [b]) => a - b)
-          .map(([width, src]) => `${assetSource(src)} ${width}w`)
+    const candidates = managedImageCandidates(managed, widths)
+    return candidates.length
+      ? candidates
+          .map(({ width, src }) => `${assetSource(src)} ${width}w`)
           .join(', ')
       : undefined
   }

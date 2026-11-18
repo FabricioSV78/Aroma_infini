@@ -1,4 +1,5 @@
 import { variantLabel } from '../../domain/product-type'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Link } from 'react-router'
 import type { ResolvedCartLine } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
@@ -57,7 +58,7 @@ export function CartLine({ line, compact = false }: CartLineProps) {
         to={`/producto/${product.slug}`}
         aria-label={`Ver ${product.name}`}
       >
-        <img
+        <LoadingImage
           src={imageSource(product.image)}
           width={480}
           height={600}

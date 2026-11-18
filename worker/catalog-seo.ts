@@ -13,6 +13,11 @@ import {
   seoPublicationOrigin,
 } from '../src/domain/seo-publication'
 import { readPublicCatalog } from './public-catalog-http'
+import { PRODUCT_GALLERY_SIZES } from '../src/domain/product-gallery'
+import {
+  PRODUCT_BOOTSTRAP_ID,
+  productBootstrapJson,
+} from '../src/domain/product-bootstrap'
 
 type SeoEnvironment = Pick<
   Env,
@@ -133,6 +138,28 @@ function escape(value: string) {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
 }
+function productImageHint(value: unknown): string {
+  try {
+    const record = object(object(value).record),
+      product = object(record.product)
+    const gallery = object(record.detail).gallery
+    if (
+      !Array.isArray(gallery) ||
+      object(gallery[0]).image !== product.image ||
+      !Array.isArray(record.mediaAssets)
+    )
+      return ''
+    const image = record.mediaAssets.find(
+      (item) => object(item).src === product.image,
+    )
+    if (!image) return ''
+    const asset = parseManagedMediaAsset(image)
+    const sources = asset.variants.map((v) => `${v.src} ${v.width}w`).join(', ')
+    return `<link rel="preload" as="image" href="${escape(asset.src)}" imagesrcset="${escape(sources)}" imagesizes="${escape(PRODUCT_GALLERY_SIZES)}" fetchpriority="high">`
+  } catch {
+    return ''
+  }
+}
 function headMarkup(
   metadata: CatalogPageMetadata,
   origin: string,
@@ -199,6 +226,7 @@ async function render(
   env: SeoEnvironment,
   metadata: CatalogPageMetadata,
   status: number,
+  initialProduct?: { slug: string; value: unknown },
 ) {
   const requestUrl = new URL(request.url)
   const publicationOrigin = seoPublicationOrigin(
@@ -284,7 +312,22 @@ async function render(
   rewriter.on('head', {
     element(element) {
       element.append(
-        headMarkup(metadata, publicationOrigin ?? requestUrl.origin, robots),
+        headMarkup(metadata, publicationOrigin ?? requestUrl.origin, robots) +
+          (initialProduct && status === 200
+            ? (() => {
+                const json = productBootstrapJson(
+                  env.SUPABASE_URL,
+                  initialProduct.slug,
+                  initialProduct.value,
+                )
+                return (
+                  productImageHint(initialProduct.value) +
+                  (json
+                    ? `<script type="application/json" id="${PRODUCT_BOOTSTRAP_ID}">${json}</script>`
+                    : '')
+                )
+              })()
+            : ''),
         {
           html: true,
         },
@@ -302,6 +345,7 @@ export function createCatalogSeoHandler(
   return async (
     request: Request,
     env: SeoEnvironment,
+    requestTransport: typeof fetch = transport,
   ): Promise<Response | null> => {
     if (!['GET', 'HEAD'].includes(request.method)) return null
     const url = new URL(request.url)
@@ -321,20 +365,28 @@ export function createCatalogSeoHandler(
       return filtered ? null : render(request, env, errorMetadata(404), 404)
     let metadata: CatalogPageMetadata | null,
       status = 200
+    let initialProduct: { slug: string; value: unknown } | undefined
+    let upstreamMs = 0
     try {
       const endpoint =
         direct?.[1] === 'producto'
           ? 'catalog_product_context'
           : 'catalog_brands'
+      const started = performance.now()
       const document = await readPublicCatalog(
         env,
         endpoint,
         endpoint === 'catalog_product_context' ? { p_slug: requested } : {},
-        transport,
+        requestTransport,
       )
-      if (endpoint === 'catalog_product_context')
+      upstreamMs = performance.now() - started
+      if (endpoint === 'catalog_product_context') {
         metadata = productMetadata(document, requested)
-      else {
+        // Do not serialize a response whose primary image could not pass the
+        // existing public-media boundary (external, temporary or unverified).
+        if (metadata?.imagePath)
+          initialProduct = { slug: requested, value: document }
+      } else {
         const brand = brands(document).find((entry) => entry.slug === requested)
         if (!brand && filtered) return null
         metadata = brand ? brandPageMetadata(brand) : null
@@ -347,6 +399,19 @@ export function createCatalogSeoHandler(
       metadata = errorMetadata(503)
       status = 503
     }
-    return render(request, env, metadata, status)
+    const response = await render(
+      request,
+      env,
+      metadata,
+      status,
+      initialProduct,
+    )
+    if (env.APP_ENVIRONMENT !== 'staging') return response
+    const headers = new Headers(response.headers)
+    headers.append(
+      'Server-Timing',
+      `catalog_context;dur=${upstreamMs.toFixed(1)}`,
+    )
+    return new Response(response.body, { status: response.status, headers })
   }
 }

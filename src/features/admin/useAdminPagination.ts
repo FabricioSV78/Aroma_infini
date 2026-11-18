@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { paginate } from './admin-pagination-utils'
 
-export function useAdminPagination<T>(items: readonly T[], pageSize: number) {
+export function useAdminPagination<T>(items: readonly T[], pageSize: number, remoteTotal?: number) {
   const [searchParams, setSearchParams] = useSearchParams()
   const pageParameter = searchParams.get('page')
   const requestedPage = Number(pageParameter ?? 1)
-  const result = paginate(items, requestedPage, pageSize)
+  const result = paginate(items, requestedPage, pageSize, remoteTotal)
 
   useEffect(() => {
     if (pageParameter === null) return

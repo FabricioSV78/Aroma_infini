@@ -1,3 +1,4 @@
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
@@ -11,13 +12,17 @@ import {
 } from '../../domain/hero-content'
 import type { AdminProduct } from '../../types/admin'
 import type { Product } from '../../types/catalog'
+import type { AdminCatalogChoices } from '../../types/admin-catalog-reads'
+import { readAdminCatalogChoices } from '../../services/catalog-admin-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import type { HomeHeroContent, HomeHeroDestination } from '../../types/home'
 import { assetSource } from '../../services/asset-source'
+import { useDesktopVideo } from '../../components/media/useDesktopVideo'
+import { heroVisualSources } from '../../domain/hero-visuals'
 import { heroImageSource } from '../../services/hero-image-source'
 import { homeImagePresets, prepareImageFile } from './prepareImageFile'
 import { prepareVideoFile } from './prepareVideoFile'
 import { useAdminNotice } from './AdminNoticeProvider'
-import { AdminMediaPicker } from './AdminMediaPicker'
 import './admin-hero-editor.css'
 
 interface AdminHeroEditorProps {
@@ -52,6 +57,7 @@ export function AdminHeroEditor({
   endMediaPreparation,
 }: AdminHeroEditorProps) {
   const notice = useAdminNotice()
+  const desktopVideo = useDesktopVideo()
   const videoPreparationAbort = useRef<AbortController | null>(null)
   useEffect(function cancelVideoOnUnmount() {
     return () => videoPreparationAbort.current?.abort()
@@ -62,22 +68,34 @@ export function AdminHeroEditor({
     'desktop',
   )
   const [productSearch, setProductSearch] = useState('')
+  const [remoteProducts, setRemoteProducts] = useState<{key: string; choices: AdminCatalogChoices} | null>(null)
   const [previewPlaying, setPreviewPlaying] = useState(false)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
   const current = slides.find((slide) => slide.id === selectedId) ?? ordered[0]
+  const selectedProductId = current?.destination.type === 'product' ? current.destination.productId : ''
+  const needsProductChoices = current?.showButton && current.destination.type === 'product'
+  const choiceKey = JSON.stringify([productSearch, selectedProductId])
+  useEffect(() => {
+    if (!isRemoteCatalog || !needsProductChoices) return
+    let active = true
+    const timer = window.setTimeout(() => {
+      void readAdminCatalogChoices({ search: productSearch, limit: 100,
+        ...(selectedProductId ? { includeIds: [selectedProductId] } : {}) }).then(choices => {
+        if (active) setRemoteProducts({key: choiceKey, choices})
+      }).catch(error => { if (active) notice.error(error) })
+    }, productSearch ? 200 : 0)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [choiceKey, needsProductChoices, notice, productSearch, selectedProductId])
   if (!current) return null
   const index = ordered.findIndex((slide) => slide.id === current.id)
   const visibleNumber = index + 1
   const fallback = getHeroFallback(current.fallbackIndex)
   const destination = resolveHeroDestination(current.destination, {
-    products: publicProducts,
+    products: isRemoteCatalog
+      ? [...(remoteProducts?.choices.items ?? []), ...(remoteProducts?.choices.selected ?? [])].filter(item => item.published)
+      : publicProducts,
     complementsEnabled,
   })
-  const selectedProductId =
-    current.destination.type === 'product' ? current.destination.productId : ''
-  const selectedProduct = products.find(
-    (record) => record.product.id === selectedProductId,
-  )
   const normalizedQuery = productSearch
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -96,33 +114,33 @@ export function AdminHeroEditor({
       .toLocaleLowerCase('es')
     return !normalizedQuery || haystack.includes(normalizedQuery)
   })
-  const filteredProducts = matchingProducts.slice(0, 100)
+  const localProducts = matchingProducts.slice(0, 100).map(record => ({ id: record.product.id,
+    name: record.product.name, sku: record.product.variants[0]?.sku, active: record.active }))
+  const remoteChoices = remoteProducts?.key === choiceKey ? remoteProducts.choices : null
+  const selectedProduct = isRemoteCatalog
+    ? remoteChoices?.selected.find(item => item.id === selectedProductId)
+    : products.find(record => record.product.id === selectedProductId)
+  const filteredProducts: {id: string; name: string; sku?: string | null; active: boolean}[] = isRemoteCatalog ? [...(remoteChoices?.items ?? [])] : localProducts
   if (
     selectedProduct &&
-    !filteredProducts.some((record) => record.product.id === selectedProductId)
+    !filteredProducts.some((record) => record.id === selectedProductId)
   ) {
-    filteredProducts.splice(99, 1, selectedProduct)
+    const selected = isRemoteCatalog ? remoteChoices?.selected.find(item => item.id === selectedProductId)
+      : products.filter(record => record.product.id === selectedProductId).map(record => ({ id: record.product.id,
+        name: record.product.name, sku: record.product.variants[0]?.sku, active: record.active }))[0]
+    if (selected) filteredProducts.splice(99, 1, selected)
   }
   const isMobile = previewFormat === 'mobile'
-  const previewVideo = isMobile
-    ? (current.mobileVideo ?? current.video)
-    : current.video
-  const previewPoster =
-    isMobile && current.mobileVideo
-      ? (current.mobilePoster ?? current.poster)
-      : current.poster
-  const image =
-    current.mediaType === 'video'
-      ? previewPoster
-      : isMobile
-        ? (current.mobileImage ?? current.desktopImage)
-        : current.desktopImage
+  const mobilePreview = isMobile || !desktopVideo
+  const previewVideo = !mobilePreview ? current.video : null
+  const visuals = heroVisualSources(current)
+  const image = mobilePreview ? visuals.mobile : visuals.desktop
   const previewFallback =
     current.fallbackIndex !== null
       ? heroImageSource(
           fallback.image,
-          isMobile ? 'mobile' : 'desktop',
-          isMobile ? 780 : 1536,
+          mobilePreview ? 'mobile' : 'desktop',
+          mobilePreview ? 780 : 1536,
         )
       : null
   const previewImage =
@@ -256,27 +274,19 @@ export function AdminHeroEditor({
     }
   }
 
-  async function uploadVideo(id: string, mobile: boolean, file: File) {
+  async function uploadVideo(id: string, file: File) {
     if (!beginMediaPreparation()) return
     const cancellation = new AbortController()
     videoPreparationAbort.current = cancellation
     try {
       const prepared = await prepareVideoFile(file, cancellation.signal)
       if (cancellation.signal.aborted) return
-      update(
-        id,
-        mobile
-          ? {
-              mobileVideo: prepared.mobileVideo ?? prepared.video,
-              mobilePoster: prepared.mobilePoster ?? prepared.poster,
-            }
-          : {
-              video: prepared.video,
-              poster: prepared.poster,
-              mobileVideo: prepared.mobileVideo ?? null,
-              mobilePoster: prepared.mobilePoster ?? null,
-            },
-      )
+      update(id, {
+        video: prepared.video,
+        poster: prepared.poster,
+        mobileVideo: prepared.mobileVideo ?? null,
+        mobilePoster: prepared.mobilePoster ?? null,
+      })
       notice.toast(
         `${prepared.optimization.message} Guarda los cambios para publicarlo.`,
       )
@@ -297,10 +307,10 @@ export function AdminHeroEditor({
     event.target.value = ''
     if (file) void uploadImage(current.id, field, file)
   }
-  function videoChanged(mobile: boolean, event: ChangeEvent<HTMLInputElement>) {
+  function videoChanged(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (file) void uploadVideo(current.id, mobile, file)
+    if (file) void uploadVideo(current.id, file)
   }
 
   function chooseDestination(type: HomeHeroDestination['type']) {
@@ -340,27 +350,6 @@ export function AdminHeroEditor({
             onChange={(event) => imageChanged(field, event)}
           />
         </label>
-        <AdminMediaPicker
-          purpose={
-            field === 'desktopImage'
-              ? 'hero-desktop'
-              : field === 'mobileImage'
-                ? 'hero-mobile'
-                : 'film-poster'
-          }
-          label={`${title} de campaña ${visibleNumber}`}
-          onSelect={(item) => {
-            if (item.asset && 'variants' in item.asset) {
-              update(current.id, {
-                [field]: item.asset.src,
-                ...(item.alt ? { alt: item.alt.slice(0, 160) } : {}),
-              })
-              notice.toast(
-                'Imagen seleccionada. Guarda los cambios para publicarla.',
-              )
-            }
-          }}
-        />
         {resource ? (
           <button
             type="button"
@@ -427,7 +416,7 @@ export function AdminHeroEditor({
               data-default-image={!current.desktopImage}
               data-has-copy={current.showText || current.showButton}
             >
-              {previewImage ? <img src={previewImage} alt="" /> : null}
+              {previewImage ? <LoadingImage fallback="inline" src={previewImage} alt="" /> : null}
               {current.mediaType === 'video' && previewVideo ? (
                 <video
                   key={previewVideo}
@@ -496,7 +485,7 @@ export function AdminHeroEditor({
                 Sube una imagen para revisar esta campaña.
               </p>
             ) : null}
-            {current.mediaType === 'video' && !previewVideo ? (
+            {current.mediaType === 'video' && !current.video ? (
               <p className="admin-hero-warning" role="status">
                 Sube un video para revisar esta campaña.
               </p>
@@ -648,26 +637,9 @@ export function AdminHeroEditor({
                     type="file"
                     accept="video/mp4"
                     aria-label={`Subir video de campaña ${visibleNumber}`}
-                    onChange={(event) => videoChanged(false, event)}
+                    onChange={(event) => videoChanged(event)}
                   />
                 </label>
-                <AdminMediaPicker
-                  purpose="film-video"
-                  label={`Video de campaña ${visibleNumber}`}
-                  onSelect={(item) => {
-                    if (item.asset) {
-                      update(current.id, {
-                        video: item.asset.src,
-                        poster: null,
-                        mobileVideo: null,
-                        mobilePoster: null,
-                      })
-                      notice.toast(
-                        'Video seleccionado. Elige su portada y guarda los cambios.',
-                      )
-                    }
-                  }}
-                />
                 {current.video ? (
                   <button
                     type="button"
@@ -685,64 +657,14 @@ export function AdminHeroEditor({
                 'Portada del video',
                 'Se genera al subir el video. Puedes reemplazarla por una imagen 16:9 de al menos 960 × 540 px.',
               )}
-              <div className="admin-home-image-control">
-                <div>
-                  <strong>Video móvil (opcional)</strong>
-                  <small>
-                    Otra exportación del mismo material. Sin ella se utiliza el
-                    video principal.
-                  </small>
-                </div>
-                <label className="admin-home-file-button">
-                  {current.mobileVideo ? 'Cambiar video' : 'Subir video'}
-                  <input
-                    type="file"
-                    accept="video/mp4"
-                    aria-label={`Subir video móvil de campaña ${visibleNumber}`}
-                    onChange={(event) => videoChanged(true, event)}
-                  />
-                </label>
-                <AdminMediaPicker
-                  purpose="film-video"
-                  label={`Video móvil de campaña ${visibleNumber}`}
-                  onSelect={(item) => {
-                    if (item.asset) {
-                      update(current.id, {
-                        mobileVideo: item.asset.src,
-                        mobilePoster: null,
-                      })
-                      notice.toast(
-                        'Video móvil seleccionado. Elige su portada y guarda los cambios.',
-                      )
-                    }
-                  }}
-                />
-                {current.mobileVideo ? (
-                  <button
-                    type="button"
-                    className="admin-home-reset"
-                    onClick={() =>
-                      update(current.id, {
-                        mobileVideo: null,
-                        mobilePoster: null,
-                      })
-                    }
-                  >
-                    Usar video principal
-                  </button>
-                ) : null}
-              </div>
-              {current.mobileVideo
-                ? imageControl(
-                    'mobilePoster',
-                    'Portada móvil del video',
-                    'Se genera al subir el video móvil. Para reemplazarla, usa una imagen 2:3 de al menos 640 × 960 px.',
-                  )
-                : null}
+              {imageControl(
+                'mobileImage',
+                'Imagen alternativa para móvil',
+                '2:3 · mínimo 780 × 1170 px. En móvil solo se muestra esta imagen; si no la eliges, se usa la portada del video.',
+              )}
               <p className="admin-hero-help">
-                Se prepara el video y su portada. Cuando se obtiene un archivo
-                más ligero, también se ofrece una versión móvil del mismo clip.
-                Revisa ambas vistas antes de guardar.
+                El video se reproduce solo en escritorio. Revisa ambas vistas
+                antes de guardar.
               </p>
             </>
           )}
@@ -873,10 +795,10 @@ export function AdminHeroEditor({
                       </option>
                     ) : null}
                     {filteredProducts.map((record) => (
-                      <option key={record.product.id} value={record.product.id}>
-                        {record.product.name}
-                        {record.product.variants[0]?.sku
-                          ? ` · SKU ${record.product.variants[0].sku}`
+                      <option key={record.id} value={record.id}>
+                        {record.name}
+                        {record.sku
+                          ? ` · SKU ${record.sku}`
                           : ''}
                         {!record.active ? ' · Oculto' : ''}
                       </option>
@@ -885,10 +807,10 @@ export function AdminHeroEditor({
                 </label>
                 {filteredProducts.length === 0 ? (
                   <p className="admin-hero-help" role="status">
-                    No hay productos que coincidan con la búsqueda.
+                    {isRemoteCatalog && !remoteChoices ? 'Buscando productos…' : 'No hay productos que coincidan con la búsqueda.'}
                   </p>
                 ) : null}
-                {products.length > 100 && !productSearch ? (
+                {(isRemoteCatalog ? (remoteChoices?.total ?? 0) : products.length) > 100 && !productSearch ? (
                   <p className="admin-hero-help">
                     Se muestran hasta 100 productos. Busca por nombre o SKU para
                     encontrar otro.

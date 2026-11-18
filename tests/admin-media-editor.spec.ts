@@ -77,6 +77,14 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
   await page
     .getByLabel('Subir video editorial', { exact: true })
     .setInputFiles('public/videos/perfume-editorial-wide.mp4')
+  await expect(page.locator('.admin-notice-dialog')).toContainText(
+    'Prepara los videos desde una computadora',
+  )
+  await answerAdminNotice(page, 'dismiss')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page
+    .getByLabel('Subir video editorial', { exact: true })
+    .setInputFiles('public/videos/perfume-editorial-wide.mp4')
   await expect(
     page.getByRole('button', { name: 'Usar video original', exact: true }),
   ).toBeVisible({ timeout: 60_000 })
@@ -118,6 +126,12 @@ test('El panel publica cinco campañas editables y el video editorial tras guard
     /^data:video\/mp4;base64,/,
   )
   await expect(page.locator('.editorial-film-fallback')).toHaveCount(0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator('.editorial-film-media video')).toHaveCount(0)
+  await expect(page.locator('.editorial-film-media img')).toHaveAttribute(
+    'src',
+    /^data:image\/webp;base64,/,
+  )
   await page.getByRole('button', { name: 'Ver campaña 5' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Quinta campaña',

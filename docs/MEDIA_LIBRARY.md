@@ -1,11 +1,23 @@
-# Biblioteca multimedia — implementación y operación
+# Biblioteca multimedia — registro histórico
+
+**Histórico — biblioteca retirada el 17 de noviembre de 2026.** La biblioteca,
+sus selectores y su acceso en el menú se retiraron del panel. Las fotografías
+se suben desde Productos y Gestión del Home. Configuración → **Imágenes del
+sitio** reúne las nueve ubicaciones de Nosotros, acceso de clientes, logotipo
+e imágenes para compartir. Las instrucciones vigentes están en
+[Operación de recursos](R2_MEDIA_OPERATIONS.md).
+
+La limpieza segura de R2 continúa en el servidor. Los recursos sin referencias
+quedan elegibles tras 24 horas; la tarea revisa hasta diez por ejecución, cada
+cinco minutos. El borrado depende de las referencias, la cola y los reintentos.
+Este documento conserva las decisiones y evidencias de la entrega original.
 
 11 de noviembre de 2026. Inventario completo en [MEDIA_ASSET_INVENTORY.md](MEDIA_ASSET_INVENTORY.md).
 
 ## Alcance y estado
 
-La implementación añade **Biblioteca multimedia** al panel y mantiene las
-composiciones públicas existentes. R2 guarda los archivos; Supabase conserva
+La entrega del 11 de noviembre añadió **Biblioteca multimedia** al panel.
+R2 guarda los archivos; Supabase conserva
 metadatos, manifiestos verificados, versiones, ubicaciones y actividad.
 
 Se auditaron **162 archivos comerciales activos: 159 WebP, 2 MP4 y 1 SVG**,
@@ -14,35 +26,23 @@ iconos de controles, QR operacionales, fuentes y recursos técnicos de la PWA
 siguen versionados con la aplicación; no son archivos comerciales editables.
 No se eliminaron los recursos históricos ni los originales del repositorio.
 
-**Estado de esta entrega:** código y pruebas locales. Estas pruebas no aplican
+**Estado de la entrega original:** código y pruebas locales. Estas pruebas no aplican
 migraciones ni publican cambios en servicios alojados. La importación solo se
 ejecuta mediante una acción explícita del administrador en el entorno elegido;
 el inventario no acredita que esos 162 archivos ya estén subidos a R2.
 
-## Uso del panel
+## Gestión actual
 
-- **Archivos:** buscar por nombre o ALT, filtrar por sección/estado, paginar,
-  abrir la vista previa, editar metadatos, consultar usos y actividad.
-- **Ubicaciones de la tienda:** cambiar las imágenes de Nosotros, acceso de
-  clientes, logotipo e imágenes para compartir. Es posible elegir un archivo
-  existente, subir otro o recuperar el recurso original.
-- **Home y Productos:** conservan sus editores. El botón **Biblioteca** permite
-  reutilizar archivos compatibles sin volver a subirlos. Se mantienen galería,
-  imagen olfativa, categorías, recomendador, campañas y portadas de vídeo.
-- **Centralizar recursos actuales:** importa los originales sin cambiar bytes,
-  dimensiones, recortes ni los descriptores de sus candidatos adaptativos.
-  Muestra progreso, se puede pausar y continúa desde las asociaciones ya
-  confirmadas. La salida del apartado cancela el trabajo restante.
-
-La importación utiliza una lista cerrada y revisada, no descarga URLs
-arbitrarias. Está limitada a cargas secuenciales separadas al menos 1,8 s.
-La copia compilada y el inventario público se verifican mediante una prueba de
-igualdad. Las asociaciones importadas también protegen los recursos que aún
-forman parte del contenido original recuperable.
-
-El ALT de biblioteca se ofrece al reutilizar el archivo. No reemplaza
-silenciosamente el ALT específico de ubicaciones existentes. Las imágenes
+Los editores de Productos, Home e Imágenes del sitio permiten subir y reemplazar
+sus archivos directamente. El ALT corresponde a cada ubicación; las imágenes
 decorativas conservan ALT vacío.
+
+En desarrollo se copiaron los 162 originales revisados a R2 con verificación
+SHA-256 y dimensiones intactas. Sus asociaciones efectivas incluyen variantes
+responsive, opciones ocultas y fotografías de pedidos anteriores. Sustituir una
+ubicación libera un original únicamente cuando desaparece su último uso.
+Las copias del repositorio conservan su historia; el paquete de staging omite
+los archivos ya gestionados y sus rutas pasan por el Worker verificado.
 
 Las ubicaciones muestran su resolución mínima. El selector y el comando SQL
 rechazan imágenes rasterizadas demasiado pequeñas; no se amplían para ocultar
@@ -101,8 +101,7 @@ mientras otro Worker pueda estar borrándolo. La cancelación automática se
 aplica antes de esa reclamación, durante las 24 horas de seguridad. No hay
 un borrado de emergencia desde el navegador.
 
-**Pendientes de limpieza** permite consultar recursos y fecha prevista. La
-actividad registra programación, cancelación, reclamación, comprobación,
+La actividad del servidor registra programación, cancelación, reclamación, comprobación,
 fallo y eliminación. Las filas eliminadas son historial, no archivos R2.
 Un archivo que sigue usado no puede programarse para eliminación.
 
@@ -111,23 +110,15 @@ otra URL. Eliminar un archivo de R2 no revoca las copias ya cacheadas: esta
 biblioteca no sirve para documentos privados. La recuperación posterior al
 borrado requiere una copia de SQL y de los objetos R2 correspondientes.
 
-## Activación por entorno
+## Historial de activación
 
-1. Revisar y aplicar las migraciones pendientes en el entorno autorizado:
-   `20261111000200_media_library.sql`, `20261111000300_media_builtin_sources.sql`
-   y `20261111000400_media_static_vectors.sql`, después de sus dependencias.
-2. Publicar mediante el flujo GitHub existente el Worker y su frontend del
-   mismo entorno. Mantener separados Supabase, bucket, secretos y orígenes.
-3. Comprobar con una cuenta administrativa verificada: subir, reutilizar,
-   reemplazar, consultar referencias y revisar la proyección pública.
-4. Ejecutar **Centralizar recursos actuales** una vez. Si se interrumpe,
-   volver a pulsarlo: no se repiten las asociaciones ya confirmadas.
-5. Comprobar desde una sesión independiente que las imágenes y vídeos salen
-   de las rutas verificadas del Worker y revisar el cron y los respaldos.
+Las migraciones de biblioteca, fuentes originales y vectores permanecen en el
+historial de Supabase. La migración `20261117000100_builtin_retirement.sql`
+incorpora la retirada de originales según sus referencias efectivas y protege
+las sustituciones frente a la limpieza concurrente.
 
-La migración concede a los recursos antiguos sin referencias un nuevo plazo
-de 24 horas; no provoca su eliminación inmediata. No se han ejecutado estas
-acciones en producción como parte de las pruebas locales.
+La preparación de esta retirada corresponde a desarrollo y staging. Esta
+intervención conserva la configuración de producción y de indexación existente.
 
 ## Verificación
 

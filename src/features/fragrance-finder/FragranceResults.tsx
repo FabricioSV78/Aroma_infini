@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Icon } from '../../components/ui/Icon'
 import { getVariantPrice } from '../../services/product-discounts'
 import { useOfferPriceRevision } from '../../services/offer-price-clock'
@@ -42,7 +43,7 @@ export function FragranceResults({
             return (
               <article className="finder-result" key={product.id}>
                 <div className="finder-result-photo">
-                  <img
+                  <LoadingImage
                     src={imageSource(product.image)}
                     width="480"
                     height="600"

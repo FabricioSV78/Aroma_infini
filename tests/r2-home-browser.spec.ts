@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
@@ -99,7 +100,9 @@ const test = authTest.extend<{ homeNetwork: HomeFixture }>({
         homeAnnouncement: state.content?.announcement ?? null,
         homeVersion: state.version,
       }
-      if (name === 'admin_home_document' || name === 'home_document') {
+      if (['admin_product_list','admin_order_list','admin_customer_list','admin_catalog_context','admin_catalog_choices','admin_offer_list','admin_products_by_ids','admin_import_conflicts'].includes(name)) {
+        await route.fulfill({json:adminListFixture(name,body,{settingsVersion:state.settingsVersion}),headers})
+      } else if (name === 'admin_home_document' || name === 'home_document') {
         await route.fulfill({
           json: document(name === 'home_document'),
           headers,
@@ -419,7 +422,7 @@ test('Home guarda referencias canónicas y puede leerse de nuevo sin publicar la
     .toBe(mediaOrigin + selected.desktopImage)
 })
 
-test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el origen de medios tras recargar', async ({
+test('el vídeo y la imagen móvil independiente se guardan por UUID y se resuelven tras recargar', async ({
   page,
   supabaseNetwork,
   homeNetwork,
@@ -442,17 +445,15 @@ test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el o
   await expect(
     page.getByText('Preparando archivo…', { exact: true }),
   ).not.toBeVisible({ timeout: 60000 })
-  await page.getByLabel('Subir video editorial para celular').setInputFiles({
-    name: 'movil.mp4',
-    mimeType: 'video/mp4',
-    buffer: await readFile('public/videos/perfume-editorial-mobile.mp4'),
-  })
+  await page
+    .getByLabel('Subir imagen editorial para móvil')
+    .setInputFiles('public/images/hero-v2-lumiere-mobile-780.webp')
   await expect(
-    page.getByRole('button', { name: 'Usar el video principal', exact: true }),
-  ).toBeVisible({ timeout: 60000 })
+    page.getByRole('button', { name: 'Usar portada del video', exact: true }),
+  ).toBeVisible({ timeout: 30000 })
   await expect(
     page.getByText('Preparando archivo…', { exact: true }),
-  ).not.toBeVisible({ timeout: 60000 })
+  ).not.toBeVisible()
   await page.getByRole('button', { name: 'Abrir vista previa' }).click()
   expect(homeNetwork.uploads).toBe(0)
   expect(homeNetwork.videoUploads).toBe(0)
@@ -478,35 +479,27 @@ test('Los dos MP4 y sus pósteres se guardan por UUID y se reproducen desde el o
   await page.goto('/')
   const section = page.locator('.editorial-film')
   await section.scrollIntoViewIfNeeded()
-  await expect(section.locator('video')).toHaveAttribute(
-    'poster',
+  await expect(section.locator('video')).toHaveCount(0)
+  await expect(section.locator('img')).toHaveAttribute(
+    'src',
     mediaOrigin + film.mobilePoster,
   )
-  await expect(section.locator('video')).not.toHaveAttribute('src')
-  await page.getByRole('button', { name: 'Reproducir video editorial' }).click()
-  await expect(section.locator('video')).toHaveAttribute(
-    'src',
-    mediaOrigin + film.mobileVideo,
-  )
-  await expect
-    .poll(() =>
-      section
-        .locator('video')
-        .evaluate((video: HTMLVideoElement) => video.readyState),
-    )
-    .toBeGreaterThanOrEqual(2)
+  await expect(section.locator('img')).toBeVisible()
   await page.setViewportSize({ width: 1440, height: 900 })
   await expect(section.locator('video')).toHaveAttribute(
     'poster',
     mediaOrigin + film.poster,
   )
+  await page
+    .getByRole('button', { name: 'Reproducir video editorial', exact: true })
+    .click()
   await expect(section.locator('video')).toHaveAttribute(
     'src',
     mediaOrigin + film.video,
   )
 })
 
-test('Una campaña de video conserva UUIDs, portada y versión móvil en el adaptador remoto tras recargar', async ({
+test('una campaña conserva su vídeo de escritorio e imagen móvil en el adaptador remoto tras recargar', async ({
   page,
   supabaseNetwork,
   homeNetwork,
@@ -530,18 +523,11 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
     page.getByText('Preparando archivo…', { exact: true }),
   ).not.toBeVisible({ timeout: 60000 })
   await page
-    .getByLabel('Subir video móvil de campaña 1', { exact: true })
-    .setInputFiles({
-      name: 'campana-movil.mp4',
-      mimeType: 'video/mp4',
-      buffer: await readFile('public/videos/perfume-editorial-mobile.mp4'),
-    })
-  await expect(
-    page.getByRole('button', { name: 'Usar video principal', exact: true }),
-  ).toBeVisible({ timeout: 60000 })
+    .getByLabel('Subir imagen móvil de campaña 1', { exact: true })
+    .setInputFiles('public/images/hero-v2-lumiere-mobile-780.webp')
   await expect(
     page.getByText('Preparando archivo…', { exact: true }),
-  ).not.toBeVisible({ timeout: 60000 })
+  ).not.toBeVisible({ timeout: 30000 })
   await page
     .getByRole('button', { name: 'Abrir vista previa', exact: true })
     .click()
@@ -556,13 +542,14 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
     timeout: 20000,
   })
   expect(homeNetwork.videoUploads).toBe(2)
-  expect(homeNetwork.uploads).toBe(2)
+  expect(homeNetwork.uploads).toBe(3)
   const written = (homeNetwork.writes[0].p_content as HomeContent).hero[0]
   for (const field of [
     'video',
     'mobileVideo',
     'poster',
     'mobilePoster',
+    'mobileImage',
   ] as const)
     expect(written[field]).toMatch(/^[0-9a-f]{8}-[0-9a-f-]{27}$/)
   const campaign = homeNetwork.content!.hero[0]
@@ -573,27 +560,20 @@ test('Una campaña de video conserva UUIDs, portada y versión móvil en el adap
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   const active = page.locator('.hero-slide.is-active')
-  await expect(active.locator('video')).toHaveAttribute(
-    'poster',
-    mediaOrigin + campaign.mobilePoster,
-  )
-  await expect(active.locator('video')).not.toHaveAttribute('src')
-  const mobileImages = [...homeNetwork.assets.values()].find(
-    (asset) => asset.src === campaign.mobilePoster,
-  )
-  expect(mobileImages).toHaveProperty('variants')
-  await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await expect(active.locator('video')).toHaveAttribute(
-    'src',
-    mediaOrigin + campaign.mobileVideo,
-  )
+  await expect(active.locator('video')).toHaveCount(0)
   await expect
     .poll(() =>
       active
-        .locator('video')
-        .evaluate((video: HTMLVideoElement) => video.readyState),
+        .locator('img')
+        .evaluate((image: HTMLImageElement) => image.currentSrc),
     )
-    .toBeGreaterThanOrEqual(2)
+    .toContain('/media/public/dynamic/')
+  const mobileImage = [...homeNetwork.assets.values()].find(
+    (asset) => asset.src === campaign.mobileImage,
+  )
+  expect(mobileImage).toHaveProperty('variants')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await expect(active.locator('video')).toHaveCount(0)
   await page.setViewportSize({ width: 1440, height: 900 })
   await expect(active.locator('video')).toHaveAttribute(
     'src',

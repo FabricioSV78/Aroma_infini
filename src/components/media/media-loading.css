@@ -1,0 +1,246 @@
+/* Place loading surfaces behind photographs so native image paint never waits
+   for React, decode(), or an extra reveal animation. */
+.media-loading-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.media-placeholder {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: var(--color-surface, #f4f4f1);
+  color: var(--color-muted, #646b69);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}
+
+.media-placeholder[data-state='pending'] {
+  display: block;
+}
+
+.media-placeholder .media-placeholder__skeleton {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.media-placeholder > svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.35;
+}
+
+.media-managed-image[data-media-state='pending'] {
+  background: var(--color-surface, #f4f4f1);
+}
+
+.media-managed-image[data-media-state='error'][data-media-fallback] {
+  opacity: 1;
+  object-fit: contain;
+  background: var(--color-surface, #f4f4f1);
+}
+
+.media-image[data-media-state='error'] {
+  visibility: hidden;
+}
+
+/* Managed images stay direct children of their existing picture/link/figure.
+   The existing box supplies the fallback, without invalid picture children. */
+:where(
+  .about-story-media,
+  .wordmark,
+  .category-image,
+  .olfactory-profile-visual,
+  .finder-result-photo,
+  .cart-line-image,
+  .account-order-product-image,
+  .finder-entry-option,
+  .search-suggestions li a,
+  .checkout-summary-lines li,
+  .brands-directory > a
+) {
+  position: relative;
+}
+
+:is(
+    .about-hero-media,
+    .about-story-media,
+    .wordmark,
+    .category-image,
+    .olfactory-profile-visual,
+    .finder-result-photo,
+    .cart-line-image,
+    .account-order-product-image,
+    .editorial-film-media,
+    .finder-option--photo,
+    .finder-entry-option,
+    .search-suggestions li a,
+    .checkout-summary-lines li,
+    .brands-directory > a
+  )[data-media-error],
+.auth-editorial[data-media-error] {
+  --media-fallback-copy: 'Imagen no disponible';
+}
+
+:is(
+    .about-hero-media,
+    .about-story-media,
+    .wordmark,
+    .category-image,
+    .olfactory-profile-visual,
+    .finder-result-photo,
+    .cart-line-image,
+    .account-order-product-image,
+    .editorial-film-media,
+    .finder-option--photo,
+    .finder-entry-option,
+    .search-suggestions li a,
+    .checkout-summary-lines li,
+    .brands-directory > a
+  )[data-media-error],
+.auth-editorial[data-media-error] {
+  isolation: isolate;
+}
+
+:is(
+    .about-hero-media,
+    .about-story-media,
+    .wordmark,
+    .category-image,
+    .olfactory-profile-visual,
+    .finder-result-photo,
+    .cart-line-image,
+    .account-order-product-image,
+    .editorial-film-media,
+    .finder-option--photo,
+    .finder-entry-option,
+    .search-suggestions li a,
+    .checkout-summary-lines li,
+    .brands-directory > a
+  )[data-media-error]::before,
+.auth-editorial[data-media-error]::before,
+.finder-scene[data-media-error]::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  background: var(--color-surface, #f4f4f1);
+  color: var(--color-muted, #646b69);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  content: var(--media-fallback-copy, '');
+  pointer-events: none;
+}
+
+.finder-scene[data-media-error]::before {
+  z-index: -3;
+}
+
+.wordmark[data-media-error]::before {
+  color: var(--color-brand, #003935);
+  font-size: 14px;
+  letter-spacing: -0.04em;
+  content: 'Aroma Infini';
+}
+
+.media-managed-image[data-media-state='error'] {
+  opacity: 0;
+  transition: none;
+}
+
+/* Mixed content keeps its original layout; fallback covers only the photo. */
+.finder-option--photo[data-media-error]::before {
+  bottom: auto;
+  height: 160px;
+}
+
+.finder-entry-option[data-media-error]::before,
+.search-suggestions li a[data-media-error]::before {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  content: '';
+}
+
+.finder-entry-option[data-media-error]::before {
+  left: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.search-suggestions li a[data-media-error]::before {
+  width: 48px;
+  height: 60px;
+}
+
+.checkout-summary-lines li[data-media-error]::before {
+  top: 14px;
+  right: auto;
+  bottom: auto;
+  width: 60px;
+  height: 75px;
+  content: '';
+}
+
+.brands-directory > a[data-media-error]::before {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 100%;
+  height: 76px;
+  content: '';
+}
+
+@media (min-width: 768px) {
+  .brands-directory > a[data-media-error]::before {
+    grid-row: 1;
+    height: 96px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .brands-directory > a[data-media-error]::before {
+    grid-row: 1 / 3;
+    height: clamp(120px, 11vw, 160px);
+  }
+}
+
+@media (max-width: 900px) {
+  .finder-entry-option[data-media-error]::before {
+    left: 8px;
+    width: 40px;
+    height: 40px;
+  }
+  .finder-option--photo[data-media-error]::before {
+    height: 140px;
+  }
+}
+
+@media (max-width: 639px) {
+  .checkout-summary-lines li[data-media-error]::before {
+    width: 52px;
+    height: 65px;
+  }
+}
+
+@media (max-width: 600px) {
+  .finder-entry-option[data-media-error]::before {
+    width: 36px;
+    height: 36px;
+  }
+  .finder-option--photo[data-media-error]::before {
+    height: 125px;
+  }
+}

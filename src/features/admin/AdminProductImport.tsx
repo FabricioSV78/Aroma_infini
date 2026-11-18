@@ -4,6 +4,8 @@ import { Dialog } from '../../components/ui/Dialog'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { isPerfume } from '../../domain/product-type'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
+import { loadAdminCatalogContext, readAdminImportConflicts } from '../../services/catalog-admin-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
 import { useAdminStore } from './useAdminStore'
 import { useUnsavedChanges } from './useUnsavedChanges'
 import { useAdminNotice } from './AdminNoticeProvider'
@@ -24,7 +26,7 @@ const PREVIEW_PAGE_SIZE = 25
 type RowFilter = 'all' | 'invalid' | 'valid' | 'duplicate'
 type ImportAction = 'reading' | 'importing' | 'retrying' | 'template' | null
 
-export function AdminProductImport() {
+export function AdminProductImport({ onImported }: { onImported?: () => void }) {
   const notice = useAdminNotice()
   const state = useAdminStore()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -76,6 +78,7 @@ export function AdminProductImport() {
   )
 
   function reportSuccess(count: number) {
+    onImported?.()
     setMessage(
       `${count} ${count === 1 ? 'producto importado como borrador pendiente de imágenes.' : 'productos importados como borradores pendientes de imágenes.'} Añade las fotos y revisa cada producto antes de publicarlo.`,
     )
@@ -115,12 +118,15 @@ export function AdminProductImport() {
     setError('')
     setMessage('')
     setBusy('reading')
-    const snapshot = adminService.getSnapshot()
     try {
+      // Only the proposed workbook identities are checked against SQL. Existing
+      // product documents, galleries and variants never need to be downloaded.
+      await loadAdminCatalogContext()
+      const snapshot = adminService.getSnapshot()
       const result = await parseProductImport(
         file,
         snapshot.brands,
-        snapshot.products,
+        isRemoteCatalog ? readAdminImportConflicts : snapshot.products,
       )
       setPreview({
         ...result,
@@ -151,7 +157,9 @@ export function AdminProductImport() {
     setBusy('template')
     setError('')
     try {
-      await downloadProductTemplate(state.brands, state.features)
+      await loadAdminCatalogContext()
+      const snapshot = adminService.getSnapshot()
+      await downloadProductTemplate(snapshot.brands, snapshot.features)
     } catch (cause) {
       notice.error(cause, 'download')
     } finally {

@@ -22,6 +22,7 @@ import { isRemoteCatalog } from '../../services/catalog-source'
 import { OfferPriceClockContext } from '../../services/offer-price-clock'
 import { getNextProductDiscountChange } from '../../services/product-discounts'
 import { isCustomerAuthModeSwitch } from '../../domain/auth-navigation'
+import { preloadPublicRoute } from '../../app/public-route-modules'
 
 function StoreFrame() {
   const [helpOffset, setHelpOffset] = useState(16)
@@ -39,6 +40,27 @@ function StoreFrame() {
   const previousPath = useRef(location.pathname)
   const storeRef = useRef<HTMLDivElement>(null)
   useStoreReveal(storeRef, location.key)
+  useEffect(function hintPublicRouteCode() {
+    function hint(event: Event) {
+      if (document.hidden || !(event.target instanceof Element)) return
+      const link = event.target.closest<HTMLAnchorElement>('a[href]')
+      if (!link || link.hasAttribute('download') || link.target === '_blank')
+        return
+      const url = new URL(link.href)
+      if (
+        url.origin === locationOrigin &&
+        url.pathname !== window.location.pathname
+      )
+        preloadPublicRoute(url.pathname)
+    }
+    const locationOrigin = window.location.origin
+    for (const event of ['pointerover', 'focusin', 'pointerdown'])
+      document.addEventListener(event, hint, { passive: true })
+    return () => {
+      for (const event of ['pointerover', 'focusin', 'pointerdown'])
+        document.removeEventListener(event, hint)
+    }
+  }, [])
   useEffect(() => {
     // Navigation also needs public brands/settings on non-catalog pages.
     // A failed background read keeps the confirmed cache empty; route loaders

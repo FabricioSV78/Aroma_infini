@@ -1,9 +1,14 @@
 # R2 de productos — entrega de desarrollo
 
-> Actualización local del 11 de noviembre de 2026: la biblioteca centralizada
-> amplía esta entrega y sustituye la retención de siete días por 24 horas al
-> activar sus migraciones. Véase [MEDIA_LIBRARY.md](MEDIA_LIBRARY.md) para el
-> alcance, los recursos del sitio y el estado de activación por entorno.
+> Actualización del 17 de noviembre de 2026: la biblioteca del panel se retiró.
+> Productos y Home conservan sus cargas directas; Configuración → Imágenes del
+> sitio reúne nueve ubicaciones. Los 162 originales revisados se copiaron a R2
+> de desarrollo con los mismos bytes y dimensiones. El paquete de staging
+> omite sus copias estáticas y el Worker resuelve sus rutas verificadas.
+> La retirada queda elegible tras 24 horas sin referencias y se procesa cada
+> cinco minutos, hasta diez archivos por ejecución, con comprobación final y
+> reintentos. La configuración de producción y de indexación se conserva.
+> Véase [Operación de recursos](R2_MEDIA_OPERATIONS.md).
 
 Este informe conserva la entrega del 29 de octubre. El Home remoto posterior
 se documenta en [R2 del Home](R2_HOME_IMPLEMENTATION.md); el bucket independiente
@@ -87,9 +92,12 @@ sobrescriben el trabajo de otro administrador.
 
 ## Retirada y limpieza
 
-Quitar una foto retira su asociación. Los archivos permanentes sin ninguna
-referencia conservan siete días de recuperación. Las reservas pendientes
-expiran tras 24 horas; preparar un reintento activo renueva ese plazo.
+Quitar una foto retira su asociación. La entrega del 29 de octubre conservaba
+siete días de recuperación para archivos sin referencias. Las migraciones
+posteriores establecen 24 horas desde su último uso antes de hacerlos elegibles
+para limpieza. Su eliminación se procesa en lotes y puede requerir reintentos.
+Las reservas pendientes expiran tras 24 horas; preparar un reintento activo
+renueva ese plazo.
 
 La asociación y la reclamación de limpieza bloquean la misma fila. Una
 reclamación es terminal: ni una concesión vencida ni un reintento pueden
@@ -173,9 +181,12 @@ La entrega inicial documentada arriba conecta fotografías de productos.
 Su continuación conecta también Hero, categorías, recomendador, franja y
 vídeo: véase [Home remoto — Supabase y R2](R2_HOME_IMPLEMENTATION.md).
 Incluye contenido versionado, asociaciones protegidas frente a limpieza,
-perfiles WebP propios y vídeo principal/móvil con póster y GET/HEAD/Range.
-Los recursos locales siguen intactos y no se importan automáticamente los
-borradores del navegador. R2 almacena los MP4 suministrados, sin transcodificar;
+perfiles WebP propios y vídeo de escritorio con póster y GET/HEAD/Range.
+En móviles se selecciona exclusivamente una imagen alternativa o de portada.
+Los 162 originales de desarrollo están copiados a R2 y staging omite esas
+copias del paquete estático. Los archivos fuente del repositorio conservan su
+historia. Los borradores antiguos del navegador requieren guardado explícito.
+R2 almacena los MP4 suministrados, sin transcodificar;
 no se activaron Images o Stream. Mercado Pago continúa simulado.
 
 ## Operación y producción posterior

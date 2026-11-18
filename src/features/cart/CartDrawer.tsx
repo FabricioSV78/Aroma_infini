@@ -1,4 +1,6 @@
 import { Link } from 'react-router'
+import { useEffect } from 'react'
+import { preloadPublicRoute } from '../../app/public-route-modules'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -11,6 +13,9 @@ import { useCart } from './cart-context'
 export function CartDrawer() {
   useOfferPriceRevision()
   const { items, drawerOpen, closeCart, persistence } = useCart()
+  useEffect(() => {
+    if (drawerOpen) preloadPublicRoute('/carrito')
+  }, [drawerOpen])
   const cart = resolveCart(items)
   return (
     <Dialog

@@ -62,6 +62,11 @@ export function resolveMediaAlias(source: string): string | undefined {
   return aliases.get(source)
 }
 
+/** The reviewed inventory is closed; unknown URLs keep their existing routing. */
+export function isBuiltinMediaSource(source: string): boolean {
+  return originals.has(source)
+}
+
 export function getMediaAliasSnapshot(): MediaAliasDocument {
   return snapshot
 }

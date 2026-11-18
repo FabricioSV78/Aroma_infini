@@ -4,7 +4,6 @@ import {
   type LoaderFunctionArgs,
 } from 'react-router'
 import { StoreLayout } from '../components/layout/StoreLayout'
-import { HomePage } from '../features/home/HomePage'
 import { PendingPage } from '../pages/PendingPage'
 import { RouteErrorPage } from '../pages/RouteErrorPage'
 import { homeService } from '../services/home-service'
@@ -14,42 +13,32 @@ import {
   adminDataLoader,
   requireAuthLoader,
 } from '../features/auth/auth-loaders'
-import { RequireAuth } from '../features/auth/RequireAuth'
-import {
-  hasCurrentAdminCatalog,
-  loadAdminCatalog,
-  loadAdminHome,
-} from '../services/catalog-admin-service'
-import { loadSelectionProducts } from '../services/selection-catalog-service'
 import { loadAdminCommerceSettings } from '../services/commerce-settings-service'
+import { RequireAuth } from '../features/auth/RequireAuth'
+import { loadSelectionProducts } from '../services/selection-catalog-service'
 import { adminRouteModules } from '../features/admin/admin-route-modules'
-import { loadAdminOrders } from '../services/order-admin-service'
+import { publicRouteModules } from './public-route-modules'
 import { isProductionEnvironment } from '../services/runtime-environment'
 import {
   catalogLoader,
   brandsLoader,
 } from '../features/catalog/catalog-loaders'
 
-const loadCatalogPage = async () => {
-  const module = await import('../features/catalog/CatalogPage')
-  return { Component: module.CatalogPage }
-}
+const loadCatalogPage = publicRouteModules.catalog
 
-const authorizeAndLoadAdminCatalog = adminDataLoader(loadAdminCatalog)
-const authorizeAndLoadAdminCommerceSettings = adminDataLoader(
-  loadAdminCommerceSettings,
-)
+function adminLoader(
+  key: keyof typeof import('./admin-route-loaders').adminLoaders,
+) {
+  return async (args: LoaderFunctionArgs) =>
+    (await import('./admin-route-loaders')).adminLoaders[key](args)
+}
+// Shipping configuration is already part of the public runtime. Keep this
+// shared loader synchronous at dispatch; only the catalog module is deferred.
+const authorizeAndLoadCommerce = adminDataLoader(loadAdminCommerceSettings)
 const adminPromotionsLoader = (args: LoaderFunctionArgs) =>
-  // Only the selected panel mounts. Keep its fresh access check and load the
-  // records it consumes before committing direct links or tab navigation.
-  (new URL(args.request.url).searchParams.get('vista') === 'ofertas'
-    ? authorizeAndLoadAdminCatalog
-    : authorizeAndLoadAdminCommerceSettings)(args)
-const adminCatalogListLoader = (args: LoaderFunctionArgs) =>
-  // Preserve the former warm-list reuse policy. Missing/invalidated owner
-  // snapshots take the full authenticated path; editors and commands do not
-  // use this shortcut, and every remote RPC still enforces SQL authorization.
-  hasCurrentAdminCatalog() ? null : authorizeAndLoadAdminCatalog(args)
+  new URL(args.request.url).searchParams.get('vista') === 'ofertas'
+    ? adminLoader('offers')(args)
+    : authorizeAndLoadCommerce(args)
 
 let router: ReturnType<typeof createBrowserRouter> | undefined
 
@@ -102,7 +91,7 @@ export function getRouter() {
         {
           index: true,
           loader: () => homeService.getHome(),
-          Component: HomePage,
+          lazy: publicRouteModules.home,
         },
         { path: 'tienda', loader: catalogLoader, lazy: loadCatalogPage },
         {
@@ -116,19 +105,13 @@ export function getRouter() {
         {
           path: 'marcas',
           loader: brandsLoader,
-          lazy: async () => {
-            const module = await import('../features/catalog/BrandsPage')
-            return { Component: module.BrandsPage }
-          },
+          lazy: publicRouteModules.brands,
         },
         { path: 'marcas/:slug', loader: catalogLoader, lazy: loadCatalogPage },
         {
           path: 'producto/:slug',
           loader: productLoader,
-          lazy: async () => {
-            const module = await import('../features/product/ProductPage')
-            return { Component: module.ProductPage }
-          },
+          lazy: publicRouteModules.product,
         },
         {
           path: 'favoritos',
@@ -141,18 +124,12 @@ export function getRouter() {
         {
           path: 'carrito',
           loader: () => loadSelectionProducts('cart').then(() => null),
-          lazy: async () => {
-            const module = await import('../features/cart/CartPage')
-            return { Component: module.CartPage }
-          },
+          lazy: publicRouteModules.cart,
         },
         {
           path: 'checkout',
           loader: () => loadSelectionProducts('cart').then(() => null),
-          lazy: async () => {
-            const module = await import('../features/checkout/CheckoutPage')
-            return { Component: module.CheckoutPage }
-          },
+          lazy: publicRouteModules.checkout,
         },
         {
           path: 'checkout/confirmacion',
@@ -335,9 +312,7 @@ export function getRouter() {
       children: [
         {
           index: true,
-          loader: adminDataLoader(async () => {
-            await Promise.all([loadAdminCatalog(), loadAdminOrders()])
-          }),
+          loader: adminLoader('dashboard'),
           lazy: async () => {
             const module = await adminRouteModules.dashboard()
             return { Component: module.AdminDashboardPage }
@@ -345,7 +320,7 @@ export function getRouter() {
         },
         {
           path: 'productos',
-          loader: adminCatalogListLoader,
+          loader: adminLoader('productList'),
           lazy: async () => {
             const module = await adminRouteModules.products()
             return { Component: module.AdminProductsPage }
@@ -353,7 +328,7 @@ export function getRouter() {
         },
         {
           path: 'productos/nuevo',
-          loader: adminDataLoader(loadAdminCatalog),
+          loader: adminLoader('productEditor'),
           lazy: async () => {
             const module = await adminRouteModules.productForm()
             return { Component: module.AdminProductFormPage }
@@ -361,7 +336,7 @@ export function getRouter() {
         },
         {
           path: 'productos/:id/fotos',
-          loader: adminDataLoader(loadAdminCatalog),
+          loader: adminLoader('productEditor'),
           lazy: async () => {
             const module = await adminRouteModules.productPhotos()
             return { Component: module.AdminProductPhotoPage }
@@ -369,7 +344,7 @@ export function getRouter() {
         },
         {
           path: 'productos/:id',
-          loader: adminDataLoader(loadAdminCatalog),
+          loader: adminLoader('productEditor'),
           lazy: async () => {
             const module = await adminRouteModules.productForm()
             return { Component: module.AdminProductFormPage }
@@ -377,7 +352,7 @@ export function getRouter() {
         },
         {
           path: 'familias-olfativas',
-          loader: adminCatalogListLoader,
+          loader: adminLoader('catalogList'),
           lazy: async () => {
             const module = await adminRouteModules.families()
             return { Component: module.AdminOlfactoryFamilies }
@@ -392,7 +367,7 @@ export function getRouter() {
         },
         {
           path: 'marcas',
-          loader: adminCatalogListLoader,
+          loader: adminLoader('catalogList'),
           lazy: async () => {
             const module = await adminRouteModules.brands()
             return { Component: module.AdminBrandsPage }
@@ -400,7 +375,7 @@ export function getRouter() {
         },
         {
           path: 'pedidos',
-          loader: adminDataLoader(loadAdminOrders),
+          loader: adminLoader('orderList'),
           lazy: async () => {
             const module = await adminRouteModules.orders()
             return { Component: module.AdminOrdersPage }
@@ -408,9 +383,7 @@ export function getRouter() {
         },
         {
           path: 'pedidos/:reference',
-          loader: adminDataLoader(async () => {
-            await Promise.all([loadAdminOrders(), loadAdminCommerceSettings()])
-          }),
+          loader: adminLoader('orderDetail'),
           lazy: async () => {
             const module = await adminRouteModules.orderDetail()
             return { Component: module.AdminOrderDetailPage }
@@ -418,7 +391,7 @@ export function getRouter() {
         },
         {
           path: 'clientes',
-          loader: adminDataLoader(loadAdminOrders),
+          loader: adminLoader('customers'),
           lazy: async () => {
             const module = await adminRouteModules.customers()
             return { Component: module.AdminCustomersPage }
@@ -434,7 +407,7 @@ export function getRouter() {
         },
         {
           path: 'envios',
-          loader: adminDataLoader(loadAdminCommerceSettings),
+          loader: authorizeAndLoadCommerce,
           lazy: async () => {
             const module = await adminRouteModules.shipping()
             return { Component: module.AdminShippingPage }
@@ -442,7 +415,7 @@ export function getRouter() {
         },
         {
           path: 'home',
-          loader: adminDataLoader(loadAdminHome),
+          loader: adminLoader('home'),
           lazy: async () => {
             const module = await adminRouteModules.home()
             return { Component: module.AdminHomePage }
@@ -453,13 +426,6 @@ export function getRouter() {
           lazy: async () => {
             const module = await adminRouteModules.settings()
             return { Component: module.AdminSiteSettings }
-          },
-        },
-        {
-          path: 'biblioteca',
-          lazy: async () => {
-            const module = await adminRouteModules.media()
-            return { Component: module.AdminMediaLibrary }
           },
         },
         {

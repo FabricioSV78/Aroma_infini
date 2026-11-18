@@ -7,14 +7,15 @@ import {
   type SiteMediaSlot,
 } from '../domain/site-media-slots'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { registerManagedMedia } from './media-registry'
 import { assetSource, assetSourceSet } from './asset-source'
 import {
   cachedPublicQuery,
   invalidatePublicQueryCache,
 } from './public-query-cache'
-import { UserFacingError } from './admin-messages'
+import { UserFacingError } from '../domain/user-facing-error'
+import { takeInitialPublicMedia } from './public-media-bootstrap'
 
 let snapshot: SiteMediaDocument = { items: [] }
 let loaded = false
@@ -23,6 +24,11 @@ const listeners = new Set<() => void>()
 
 function adminError(error: { code?: string } | null, status: number): void {
   if (!error) return
+  if (error.code === 'PT410')
+    throw new UserFacingError(
+      'site-media-retired',
+      'La imagen provisional ya fue eliminada. Sube una nueva imagen para este apartado; la imagen publicada se conserva.',
+    )
   if (
     [401, 403].includes(status) ||
     ['42501', 'PGRST301', 'PGRST302', 'PGRST303'].includes(error.code ?? '')
@@ -69,6 +75,17 @@ function confirm(value: unknown): SiteMediaDocument {
 }
 
 export const siteMediaService = {
+  hydrateInitial() {
+    if (!isRemoteCatalog || loaded) return
+    const initial = takeInitialPublicMedia('document')
+    if (initial !== undefined) {
+      try {
+        confirm(initial)
+      } catch {
+        /* Normal load retains its retry/error path. */
+      }
+    }
+  },
   getSnapshot: () => snapshot,
   subscribe(listener: () => void) {
     listeners.add(listener)
@@ -81,7 +98,7 @@ export const siteMediaService = {
     if (!isRemoteCatalog || (loaded && !force)) return snapshot
     if (pending) return pending
     const read = async () => {
-      const result = await requireSupabaseClient().rpc('site_media_document')
+      const result = await (await requireReadySupabaseClient()).rpc('site_media_document')
       if (result.error)
         throw new UserFacingError(
           'site-media-network',
@@ -101,9 +118,9 @@ export const siteMediaService = {
   },
   async loadAdmin(): Promise<SiteMediaDocument> {
     if (!isRemoteCatalog) return snapshot
-    const { mediaLibraryActor } = await import('./media-library-service')
-    const actor = await mediaLibraryActor()
-    const result = await requireSupabaseClient()
+    const { mediaAdminActor } = await import('./media-admin-service')
+    const actor = await mediaAdminActor()
+    const result = await (await requireReadySupabaseClient())
       .rpc('admin_site_media_document')
       .setHeader('Authorization', `Bearer ${actor.token}`)
     await actor.assertCurrent?.()
@@ -121,9 +138,9 @@ export const siteMediaService = {
         'site-media-config',
         'La publicación de imágenes requiere la conexión administrativa.',
       )
-    const { mediaLibraryActor } = await import('./media-library-service')
-    const actor = await mediaLibraryActor()
-    const result = await requireSupabaseClient()
+    const { mediaAdminActor } = await import('./media-admin-service')
+    const actor = await mediaAdminActor()
+    const result = await (await requireReadySupabaseClient())
       .rpc('admin_save_site_media', {
         p_slot: slot,
         // NULL restores the fallback; generated RPC types omit nullability.

@@ -2,8 +2,8 @@ import type { CheckoutMode, MockOrder } from './checkout-service'
 import type { OrderStatus } from '../types/commerce'
 import { orderStatusService } from './order-status-service'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
-import { UserFacingError } from './admin-messages'
+import { requireReadySupabaseClient } from './supabase-client'
+import { UserFacingError } from '../domain/user-facing-error'
 
 const STORAGE_KEY = 'aroma-infini:order-tracking:v1'
 const REFERENCE_PATTERN = /^AI-(?:DEMO-|TEST-|SIM-)?[A-F0-9]{16,32}$/
@@ -121,7 +121,7 @@ export async function loadTrackingRecord(
     trackingToken && TOKEN_PATTERN.test(trackingToken)
       ? trackingToken
       : saved?.trackingToken
-  const response = await requireSupabaseClient().rpc('order_tracking', {
+  const response = await (await requireReadySupabaseClient()).rpc('order_tracking', {
     p_reference: normalized,
     p_token: token ?? undefined,
   })

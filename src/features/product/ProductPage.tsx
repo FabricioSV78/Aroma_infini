@@ -85,6 +85,7 @@ function ProductReady({
   const [openInfoPanel, setOpenInfoPanel] = useState<ProductInfoPanel | null>(
     isPerfume(product) ? null : 'description',
   )
+  const [reviewsOpened, setReviewsOpened] = useState(false)
   const [previewMessage, setPreviewMessage] = useState('')
   const selectedVariant =
     product.variants.find(
@@ -116,6 +117,7 @@ function ProductReady({
   const olfactoryFamilies = perfume ? getProductOlfactoryFamilies(product) : []
 
   function toggleInfoPanel(panel: ProductInfoPanel) {
+    if (panel === 'reviews') setReviewsOpened(true)
     setOpenInfoPanel((current) => (current === panel ? null : panel))
   }
 
@@ -377,7 +379,10 @@ function ProductReady({
             </a>
             <a
               href="#informacion-producto"
-              onClick={() => setOpenInfoPanel('reviews')}
+              onClick={() => {
+                setReviewsOpened(true)
+                setOpenInfoPanel('reviews')
+              }}
             >
               Reseñas <span aria-hidden="true">↓</span>
             </a>
@@ -464,18 +469,20 @@ function ProductReady({
           aria-labelledby="product-info-tab-reviews"
           hidden={openInfoPanel !== 'reviews'}
         >
-          <ProductReviewsPreview
-            productId={product.id}
-            productType={product.productType}
-            sizes={[
-              ...new Set(
-                product.variants
-                  .map((variant) => variant.ml)
-                  .filter((ml): ml is number => ml !== null),
-              ),
-            ]}
-            readOnly={preview}
-          />
+          {reviewsOpened ? (
+            <ProductReviewsPreview
+              productId={product.id}
+              productType={product.productType}
+              sizes={[
+                ...new Set(
+                  product.variants
+                    .map((variant) => variant.ml)
+                    .filter((ml): ml is number => ml !== null),
+                ),
+              ]}
+              readOnly={preview}
+            />
+          ) : null}
         </div>
       </section>
       {product.image ? (

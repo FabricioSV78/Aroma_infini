@@ -1,8 +1,10 @@
 # Comprobaciones reproducibles
 
-Las comprobaciones no necesitan credenciales. No despliegan, no consultan
-proyectos alojados y no realizan cobros. Las pruebas del navegador utilizan
-la aplicación y el SDK reales con transportes y datos aislados.
+Las pruebas aisladas no necesitan credenciales, no consultan proyectos
+alojados y no realizan cobros. Utilizan la aplicación y el SDK reales con
+transportes y datos aislados. Una compilación configurada para Supabase puede
+consultar sus referencias públicas para preparar los recursos; no escribe
+datos ni despliega por sí sola.
 
 ```powershell
 npm.cmd ci
@@ -33,10 +35,14 @@ No ejecutes grupos distintos simultáneamente en el mismo equipo: también
 pueden compartir puertos entre grupos. CI los ejecuta en máquinas separadas.
 
 El runner descubre los archivos `tests/*.test.mjs`. Una prueba comprueba que
-las 25 configuraciones Playwright estén incluidas en el plan, sin perder las
-suites específicas de Auth, catálogo, checkout, medios o administración.
+todas las configuraciones Playwright estén incluidas en el plan, sin perder
+las suites específicas de Auth, catálogo, checkout, medios o administración.
 `test:e2e` conserva su suite histórica; por sí sola no representa todas las
 regresiones del proyecto. TypeScript ahora revisa todos los configs root.
+
+Los contratos puros de dominio y Worker se ejecutan en sus configuraciones
+dedicadas. La suite general de interfaz los excluye para evitar repetirlos;
+las configuraciones específicas se conservan para diagnóstico individual.
 
 La suite SQL crea PostgreSQL desechable en loopback, aplica las migraciones y
 comprueba RLS, permisos y concurrencia. Actualmente requiere Windows x64:

@@ -21,7 +21,7 @@ import {
   publicShippingSettings,
 } from './commerce-settings-service'
 import type { ShippingSettings } from '../types/shipping'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { parseManagedMediaPath } from '../domain/media'
 import { rememberManagedAssets } from './media-registry'
 import { readPublicBatches } from './public-read-batches'
@@ -194,6 +194,7 @@ function parseGallery(value: unknown): ProductGalleryView {
 export function parseCatalogProductRecord(
   value: unknown,
   allowDraft = false,
+  familyCodes?: ReadonlySet<string>,
 ): StorefrontProductRecord {
   const source = record(value)
   const raw = record(source.product)
@@ -207,7 +208,11 @@ export function parseCatalogProductRecord(
     list(
       raw.olfactoryFamilies,
       (family) => {
-        if (!isOlfactoryFamily(family)) throw new CatalogReadError()
+        if (
+          typeof family !== 'string' ||
+          (familyCodes ? !familyCodes.has(family) : !isOlfactoryFamily(family))
+        )
+          throw new CatalogReadError()
         return family
       },
       MAX_PRODUCT_OLFACTORY_FAMILIES,
@@ -622,7 +627,7 @@ export function createSupabaseStorefrontRepository({
 export function createRemoteStorefrontTransport() {
   return {
     async readPage(limit: number, offset: number) {
-      const { data, error } = await requireSupabaseClient().rpc(
+      const { data, error } = await (await requireReadySupabaseClient()).rpc(
         'catalog_products',
         { p_limit: limit, p_offset: offset },
       )
@@ -631,13 +636,13 @@ export function createRemoteStorefrontTransport() {
     },
     async readBrands() {
       const { data, error } =
-        await requireSupabaseClient().rpc('catalog_brands')
+        await (await requireReadySupabaseClient()).rpc('catalog_brands')
       if (error) throw new CatalogReadError()
       return data
     },
     async readSettings() {
       const { data, error } =
-        await requireSupabaseClient().rpc('catalog_settings')
+        await (await requireReadySupabaseClient()).rpc('catalog_settings')
       if (error) throw new CatalogReadError()
       return data
     },

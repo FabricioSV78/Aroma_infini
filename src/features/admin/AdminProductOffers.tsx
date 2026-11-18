@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Dialog } from '../../components/ui/Dialog'
 import type { AdminProduct } from '../../services/admin-service'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
+import { loadAdminProductsByIds, readAdminCatalogChoices } from '../../services/catalog-admin-service'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import type { AdminCatalogChoice } from '../../types/admin-catalog-reads'
+import { useRevalidator } from 'react-router'
+import { useAdminOfferCollection } from './useAdminOfferCollection'
 import { formatPEN } from '../../services/currency'
 import {
   getNextProductDiscountChange,
@@ -119,6 +124,8 @@ function previewProduct(record: AdminProduct, discount: ProductDiscount) {
 export function AdminProductOffers() {
   const notice = useAdminNotice()
   const state = useAdminStore()
+  const remote = useAdminOfferCollection()
+  const revalidator = useRevalidator()
   const [draft, setDraft] = useState<OfferDraft | null>(null)
   const [originalDraft, setOriginalDraft] = useState<OfferDraft | null>(null)
   const [error, setError] = useState('')
@@ -127,12 +134,21 @@ export function AdminProductOffers() {
     'finish',
   )
   const [now, setNow] = useState(() => Date.now())
+  const [choices, setChoices] = useState<AdminCatalogChoice[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<AdminProduct | null>(null)
+  const selectionRevision = useRef(0)
+  const choicesRevision = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const productRef = useRef<HTMLSelectElement>(null)
   const focusProductAfterSave = useRef(false)
   const sectionRef = useRef<HTMLElement>(null)
   const removingRef = useRef(false)
   const persistence = useAdminSave({ catalog: true })
+  const records = isRemoteCatalog ? remote.products : state.products
+  useEffect(() => () => {
+    selectionRevision.current++
+    choicesRevision.current++
+  }, [])
   useEffect(() => {
     if (
       !focusProductAfterSave.current ||
@@ -158,7 +174,7 @@ export function AdminProductOffers() {
   )
   useEffect(() => {
     const next = getNextProductDiscountChange(
-      state.products.map(({ product }) => product),
+      records.map(({ product }) => product),
       now,
     )
     const timer =
@@ -176,19 +192,19 @@ export function AdminProductOffers() {
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [state.products, now])
+  }, [records, now])
 
   const brandsById = useMemo(
-    () => new Map(state.brands.map((brand) => [brand.id, brand])),
-    [state.brands],
+    () => new Map([...state.brands, ...remote.brands].map((brand) => [brand.id, brand])),
+    [state.brands, remote.brands],
   )
   const productsById = useMemo(
-    () => new Map(state.products.map((record) => [record.product.id, record])),
-    [state.products],
+    () => new Map([...records, ...(selectedRecord ? [selectedRecord] : [])].map((record) => [record.product.id, record])),
+    [records, selectedRecord],
   )
   const sortedProducts = useMemo(
     () =>
-      [...state.products].sort((a, b) => {
+      [...records].sort((a, b) => {
         const brandA = brandsById.get(a.product.brandId)?.name ?? ''
         const brandB = brandsById.get(b.product.brandId)?.name ?? ''
         return `${brandA} ${a.product.name}`.localeCompare(
@@ -196,7 +212,7 @@ export function AdminProductOffers() {
           'es',
         )
       }),
-    [state.products, brandsById],
+    [records, brandsById],
   )
   const offeredProducts = useMemo(
     () => sortedProducts.filter((record) => record.product.discount),
@@ -207,6 +223,8 @@ export function AdminProductOffers() {
     [sortedProducts],
   )
   const selectedProduct = draft ? productsById.get(draft.productId) : undefined
+  const totalOffers = isRemoteCatalog ? remote.total : offeredProducts.length
+  const availableCount = isRemoteCatalog ? remote.availableCount : availableProducts.length
   const selectedProductId = draft?.productId
   // Keep a just-saved product available until persistence confirms its save.
   const selectableProducts = useMemo(
@@ -221,8 +239,14 @@ export function AdminProductOffers() {
     [isEditing, selectedProduct, sortedProducts, selectedProductId],
   )
   const productOptions = useMemo(
-    () =>
-      selectableProducts.map((record) => {
+    () => isRemoteCatalog
+      ? (isEditing && selectedProduct
+          ? [{id: selectedProduct.product.id, name: selectedProduct.product.name,
+              brandName: brandsById.get(selectedProduct.product.brandId)?.name ?? ''}]
+          : choices).map(choice => <option key={choice.id} value={choice.id}>
+            {choice.brandName ? `${choice.brandName} · ` : ''}{choice.name}
+          </option>)
+      : selectableProducts.map((record) => {
         const brand = brandsById.get(record.product.brandId)?.name
         return (
           <option key={record.product.id} value={record.product.id}>
@@ -231,7 +255,7 @@ export function AdminProductOffers() {
           </option>
         )
       }),
-    [selectableProducts, brandsById],
+    [selectableProducts, brandsById, choices, isEditing, selectedProduct],
   )
   const parsedDiscount = draft ? discountFrom(draft) : null
   const previewError =
@@ -249,10 +273,61 @@ export function AdminProductOffers() {
       .sort((a, b) => (a.ml ?? 0) - (b.ml ?? 0)) ?? []
 
   function openEditor(next: OfferDraft) {
+    selectionRevision.current++
     setError('')
+    setSelectedRecord(next.productId ? productsById.get(next.productId) ?? null : null)
     setDraft(next)
     setOriginalDraft({ ...next })
+    if (isRemoteCatalog && !next.productId) void loadChoices()
     window.requestAnimationFrame(() => headingRef.current?.focus())
+  }
+
+  async function loadChoices() {
+    const started = ++choicesRevision.current
+    try {
+      const first = await readAdminCatalogChoices({ withoutOffer: true, page: 1, limit: 100 })
+      const items = [...first.items]
+      // The existing native selector and its keyboard type-ahead require all
+      // names. Fetch identities only on explicit creation, never product DTOs.
+      if (first.total > 10000) throw new Error('Hay demasiadas opciones para este selector.')
+      for (let page = 2; items.length < first.total; page++) {
+        if (started !== choicesRevision.current) return
+        const next = await readAdminCatalogChoices({ withoutOffer: true, page, limit: 100 })
+        if (next.ownerId !== first.ownerId || next.accessRevision !== first.accessRevision ||
+            next.total !== first.total || !next.items.length ||
+            next.items.some(item => items.some(previous => previous.id === item.id)))
+          throw new Error('La lista de productos cambió. Vuelve a abrir la oferta para actualizarla.')
+        items.push(...next.items)
+      }
+      if (started === choicesRevision.current) setChoices(items)
+    } catch (error) {
+      if (started === choicesRevision.current) notice.error(error)
+    }
+  }
+
+  async function selectProduct(id: string) {
+    const started = ++selectionRevision.current
+    setSelectedRecord(null)
+    setDraft(current => current ? { ...current, productId: id,
+      expectedVersion: isRemoteCatalog ? undefined : productsById.get(id)?.version } : current)
+    if (!isRemoteCatalog || !id) return
+    try {
+      const [record] = await loadAdminProductsByIds([id])
+      if (started !== selectionRevision.current) return
+      if (!record || record.product.discount) {
+        setError('El producto ya no está disponible para crear esta oferta. Actualiza la selección.')
+        return
+      }
+      setSelectedRecord(record)
+      setError('')
+      setDraft(current => current?.productId === id ? { ...current, expectedVersion: record.version } : current)
+    } catch (error) {
+      if (started === selectionRevision.current) notice.error(error)
+    }
+  }
+
+  function refreshOffers() {
+    if (isRemoteCatalog) void revalidator.revalidate()
   }
 
   async function closeEditor() {
@@ -268,6 +343,9 @@ export function AdminProductOffers() {
     )
       return
     setDraft(null)
+    selectionRevision.current++
+    choicesRevision.current++
+    setSelectedRecord(null)
     setOriginalDraft(null)
     setPreviewOpen(false)
     setError('')
@@ -294,11 +372,15 @@ export function AdminProductOffers() {
           draft.expectedVersion,
         ),
       () => {
+        refreshOffers()
         if (createAnother) {
           focusProductAfterSave.current = true
           setDraft({ ...emptyDraft })
           setOriginalDraft({ ...emptyDraft })
           setError('')
+          selectionRevision.current++
+          setSelectedRecord(null)
+          if (isRemoteCatalog) void loadChoices()
         } else {
           setDraft(null)
           setOriginalDraft(null)
@@ -328,10 +410,12 @@ export function AdminProductOffers() {
           },
           record.version,
         ),
-      () =>
+      () => {
+        refreshOffers()
         notice.toast(
           `Oferta de ${record.product.name} ${discount.active ? 'desactivada' : 'activada'}.`,
-        ),
+        )
+      },
     )
     if (!result) return
     if (result.kind === 'validation') {
@@ -370,6 +454,7 @@ export function AdminProductOffers() {
             fromEditor ? draft?.expectedVersion : record.version,
           ),
         () => {
+          refreshOffers()
           if (fromEditor) {
             setDraft(null)
             setOriginalDraft(null)
@@ -396,12 +481,12 @@ export function AdminProductOffers() {
     >
       <div className="admin-offers-toolbar">
         <p>
-          {offeredProducts.length}{' '}
-          {offeredProducts.length === 1
+          {totalOffers}{' '}
+          {totalOffers === 1
             ? 'producto con oferta'
             : 'productos con oferta'}
         </p>
-        {!draft && availableProducts.length > 0 ? (
+        {!draft && availableCount > 0 ? (
           <button
             className="button button--primary"
             type="button"
@@ -442,18 +527,7 @@ export function AdminProductOffers() {
                 ref={productRef}
                 value={draft.productId}
                 disabled={isEditing}
-                onChange={(event) =>
-                  setDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          productId: event.target.value,
-                          expectedVersion: productsById.get(event.target.value)
-                            ?.version,
-                        }
-                      : current,
-                  )
-                }
+                onChange={(event) => void selectProduct(event.target.value)}
                 required
               >
                 <option value="">Selecciona un producto</option>
@@ -745,6 +819,7 @@ export function AdminProductOffers() {
           })}
         </ul>
       ) : null}
+      {isRemoteCatalog && !draft && remote.canLoadMore ? <div ref={remote.sentinel} aria-hidden="true" /> : null}
     </section>
   )
 }

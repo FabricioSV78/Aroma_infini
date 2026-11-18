@@ -1,4 +1,33 @@
-import { expect, test } from './test'
+import { expect, test, type Page } from './test'
+
+const navigationDiagnostics = new WeakMap<Page, unknown[]>()
+test.beforeEach(async ({ page }) => {
+  const events: unknown[] = []
+  navigationDiagnostics.set(page, events)
+  const session = await page.context().newCDPSession(page)
+  await session.send('Page.enable')
+  await session.send('Network.enable')
+  session.on('Page.frameRequestedNavigation', ({ reason, url }) => {
+    events.push({ kind: 'document-navigation', reason, url })
+  })
+  session.on('Network.webSocketFrameReceived', ({ response }) => {
+    try {
+      const value = JSON.parse(response.payloadData) as {
+        type?: string
+        path?: string
+      }
+      if (value.type === 'full-reload')
+        events.push({ kind: 'vite-full-reload', path: value.path })
+    } catch { /* Non-JSON websocket messages are not navigation signals. */ }
+  })
+})
+test.afterEach(async ({ page }, info) => {
+  await info.attach('document-navigation-diagnostics', {
+    body: JSON.stringify(navigationDiagnostics.get(page) ?? []),
+    contentType: 'application/json',
+  })
+  navigationDiagnostics.delete(page)
+})
 
 for (const width of [320, 390, 768, 1024, 1440]) {
   test(`Precio: campos, aplicación y limpieza a ${width}px`, async ({

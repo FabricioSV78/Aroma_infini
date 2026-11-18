@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { mkdir } from 'node:fs/promises'
 import {
   publicBrandPreviewsFixture,
@@ -115,7 +116,8 @@ const test = authTest.extend<{ auditNetwork: AuditNetwork }>({
           await reply({ code: 'PGRST000' }, 503)
           return
         }
-        if (name === 'catalog_settings') await reply(metadata)
+        if (['admin_product_list','admin_order_list','admin_customer_list','admin_catalog_context','admin_catalog_choices','admin_offer_list','admin_products_by_ids','admin_import_conflicts'].includes(name)) await reply(adminListFixture(name,route.request().postDataJSON() as Record<string,unknown>,{products:items,brands:metadata.brands,orders:state.orders}))
+        else if (name === 'catalog_settings') await reply(metadata)
         else if (name === 'catalog_home_context')
           await reply(publicHomeCatalogFixture(metadata, items))
         else if (name === 'catalog_brand_previews')

@@ -21,6 +21,7 @@ import { Dialog } from '../../components/ui/Dialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { PRODUCT_TYPES } from '../../domain/product-type'
+import { isRemoteCatalog } from '../../services/catalog-source'
 
 type FilterGroupId = 'type' | 'brand' | 'gender' | 'family' | 'price'
 
@@ -93,7 +94,9 @@ export function CatalogPage() {
   useEffect(() => {
     if (previousOfferPriceRevision.current === offerPriceRevision) return
     previousOfferPriceRevision.current = offerPriceRevision
-    revalidator.revalidate()
+    // StoreFrame already awaited the fresh remote loader before publishing this
+    // revision. Local time-based prices still need the query/filter to run again.
+    if (!isRemoteCatalog) revalidator.revalidate()
   }, [offerPriceRevision, revalidator])
   useEffect(
     function closeMobileFiltersOnDesktop() {

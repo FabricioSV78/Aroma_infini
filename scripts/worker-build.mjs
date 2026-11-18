@@ -8,6 +8,7 @@ import ts from 'typescript'
 import { loadEnv } from 'vite'
 import { createBuildTarget } from './build-identity.ts'
 import { privilegedPublicValue } from './public-environment.mjs'
+import builtinInventory from '../src/content/media-default-inventory.json' with { type: 'json' }
 
 const manifestName = '_build-manifest.json'
 const maximumBytes = 512 * 1024 * 1024
@@ -138,6 +139,11 @@ export async function verifyWorkerBuild({
       assert(safePath(file.path) && file.path !== manifestName)
       assert(Number.isSafeInteger(file.bytes) && file.bytes >= 0)
       assert.match(file.sha256, /^[a-f0-9]{64}$/)
+    }
+    if (selected.vars.MEDIA_BUILTIN_STORAGE === 'r2') {
+      const originalPaths = new Set(builtinInventory.map((item) => item.path.slice(1)))
+      assert(manifest.files.every((file) => !originalPaths.has(file.path)),
+        'Managed originals must not remain in immutable deployed Assets')
     }
     assert.deepEqual(await inventory(directory), manifest.files)
     return {

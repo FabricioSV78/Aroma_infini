@@ -1,13 +1,21 @@
+import { publicReadTiming } from './public-read-timing'
+
 type PublicCatalogEnvironment = Pick<
   Env,
   'SUPABASE_URL' | 'SUPABASE_PUBLISHABLE_KEY'
->
+> &
+  Partial<Pick<Env, 'APP_ENVIRONMENT'>>
 type PublicCatalogOperation =
   | 'catalog_products'
   | 'catalog_product_context'
   | 'catalog_brands'
   | 'site_media_document'
   | 'public_media_aliases'
+  | 'home_document'
+  | 'catalog_home_context'
+  | 'catalog_browse'
+  | 'builtin_media_resolve'
+  | 'site_settings'
 
 function publicConfiguration(env: PublicCatalogEnvironment) {
   const origin = new URL(env.SUPABASE_URL)
@@ -39,6 +47,8 @@ export async function readPublicCatalog(
   body: Record<string, unknown>,
   transport: typeof fetch = fetch,
   maximumBytes = 2 * 1024 * 1024,
+  timeoutMs = 10000,
+  requestSignal?: AbortSignal,
 ): Promise<unknown> {
   if (
     ![
@@ -47,62 +57,94 @@ export async function readPublicCatalog(
       'catalog_brands',
       'site_media_document',
       'public_media_aliases',
+      'home_document',
+      'catalog_home_context',
+      'catalog_browse',
+      'builtin_media_resolve',
+      'site_settings',
     ].includes(operation) ||
     !Number.isSafeInteger(maximumBytes) ||
     maximumBytes < 1 ||
-    maximumBytes > 8 * 1024 * 1024
+    maximumBytes > 8 * 1024 * 1024 ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > 10000
   )
     throw new Error('catalog-operation')
   const configuration = publicConfiguration(env)
-  const response = await transport(
-    `${configuration.origin}/rest/v1/rpc/${operation}`,
-    {
-      method: 'POST',
-      redirect: 'manual',
-      headers: {
-        apikey: configuration.key,
-        'Content-Type': 'application/json',
-        'Content-Profile': 'api',
-        'Accept-Profile': 'api',
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10000),
-    },
-  )
-  const reader = response.body?.getReader()
+  const timing = publicReadTiming(env.APP_ENVIRONMENT, operation)
+  const signal = requestSignal
+    ? AbortSignal.any([requestSignal, AbortSignal.timeout(timeoutMs)])
+    : AbortSignal.timeout(timeoutMs)
+  let outcome: 'ok' | 'error' = 'error'
   try {
-    if (
-      response.status !== 200 ||
-      !/^application\/json\b/i.test(response.headers.get('Content-Type') ?? '')
+    signal.throwIfAborted()
+    const response = await timing.fetch(
+      transport,
+      `${configuration.origin}/rest/v1/rpc/${operation}`,
+      {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          apikey: configuration.key,
+          'Content-Type': 'application/json',
+          'Content-Profile': 'api',
+          'Accept-Profile': 'api',
+        },
+        body: JSON.stringify(body),
+        signal,
+      },
     )
-      throw new Error('catalog-response')
-    const declared = response.headers.get('Content-Length')
-    if (
-      declared !== null &&
-      (!/^\d+$/.test(declared) || Number(declared) > maximumBytes)
-    )
-      throw new Error('catalog-size')
-    if (!reader) throw new Error('catalog-response')
-    let length = 0
-    const chunks: Uint8Array[] = []
-    while (true) {
-      const next = await reader.read()
-      if (next.done) break
-      length += next.value.byteLength
-      if (length > maximumBytes) throw new Error('catalog-size')
-      chunks.push(next.value)
+    const reader = response.body?.getReader()
+    let stop: (() => void) | undefined
+    const aborted = new Promise<never>((_, reject) => {
+      stop = () => reject(signal.reason)
+      if (signal.aborted) stop()
+      else signal.addEventListener('abort', stop, { once: true })
+    })
+    // The signal can settle while headers are being checked, before the race.
+    void aborted.catch(() => {})
+    try {
+      if (
+        response.status !== 200 ||
+        !/^application\/json\b/i.test(
+          response.headers.get('Content-Type') ?? '',
+        )
+      )
+        throw new Error('catalog-response')
+      const declared = response.headers.get('Content-Length')
+      if (
+        declared !== null &&
+        (!/^\d+$/.test(declared) || Number(declared) > maximumBytes)
+      )
+        throw new Error('catalog-size')
+      if (!reader) throw new Error('catalog-response')
+      let length = 0
+      const chunks: Uint8Array[] = []
+      while (true) {
+        const next = await Promise.race([reader.read(), aborted])
+        if (next.done) break
+        length += next.value.byteLength
+        if (length > maximumBytes) throw new Error('catalog-size')
+        chunks.push(next.value)
+      }
+      const bytes = new Uint8Array(length)
+      let offset = 0
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+      const value: unknown = JSON.parse(new TextDecoder().decode(bytes))
+      outcome = 'ok'
+      return value
+    } finally {
+      if (stop) signal.removeEventListener('abort', stop)
+      if (reader) {
+        await reader.cancel().catch(() => {})
+        reader.releaseLock()
+      }
     }
-    const bytes = new Uint8Array(length)
-    let offset = 0
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset)
-      offset += chunk.byteLength
-    }
-    return JSON.parse(new TextDecoder().decode(bytes))
   } finally {
-    if (reader) {
-      await reader.cancel().catch(() => {})
-      reader.releaseLock()
-    }
+    timing.finish(outcome)
   }
 }

@@ -5,6 +5,9 @@ declare const process: { env: Record<string, string | undefined> }
 const stage = process.env.ADMIN_AUDIT_STAGE
 const shouldCapture = stage === 'before' || stage === 'after'
 const onlyViewport = process.env.ADMIN_AUDIT_VIEWPORT
+const outputRoot = process.env.ADMIN_AUDIT_OUTPUT_ROOT ?? 'artifacts/admin-audit'
+if (!/^artifacts(?:\/[a-zA-Z0-9_-]+)+$/.test(outputRoot))
+  throw new Error('Admin captures must stay inside a named artifacts folder.')
 
 const viewports = [
   { name: 'monitor-1920', width: 1920, height: 1080 },
@@ -58,7 +61,7 @@ test('Capturas completas del panel administrativo en cinco tamaños', async ({
   for (const viewport of viewports) {
     if (onlyViewport && viewport.name !== onlyViewport) continue
     await page.setViewportSize(viewport)
-    const base = `artifacts/admin-audit/${stage}/${viewport.name}`
+    const base = `${outputRoot}/${stage}/${viewport.name}`
 
     for (const route of routes) {
       await page.goto(route.path)
@@ -103,7 +106,7 @@ test('Estados interactivos del panel administrativo en cinco tamaños', async ({
   for (const viewport of viewports) {
     if (onlyViewport && viewport.name !== onlyViewport) continue
     await page.setViewportSize(viewport)
-    const base = `artifacts/admin-audit/${stage}/${viewport.name}`
+    const base = `${outputRoot}/${stage}/${viewport.name}`
 
     await page.goto('/admin/productos')
     await page
@@ -160,7 +163,7 @@ test('Formularios de marcas, promociones y vista previa de producto', async ({
   for (const viewport of viewports) {
     if (onlyViewport && viewport.name !== onlyViewport) continue
     await page.setViewportSize(viewport)
-    const base = `artifacts/admin-audit/${stage}/${viewport.name}`
+    const base = `${outputRoot}/${stage}/${viewport.name}`
 
     await page.goto('/admin/marcas')
     await page

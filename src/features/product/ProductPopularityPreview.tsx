@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { imageSource } from '../../services/image-source'
+import { LoadingImage } from '../../components/media/LoadingImage'
+import { imageSource, imageSourceSet } from '../../services/image-source'
+import { PRODUCT_GALLERY_SIZES } from '../../domain/product-gallery'
 
 interface ProductPopularityPreviewProps {
   productImage: string
@@ -81,8 +83,10 @@ export function ProductPopularityPreview({
       className="product-popularity-preview"
       aria-label={`Sobre ${productName}`}
     >
-      <img
+      <LoadingImage
         src={imageSource(productImage)}
+        srcSet={imageSourceSet(productImage, [480, 960])}
+        sizes={PRODUCT_GALLERY_SIZES}
         width={480}
         height={600}
         decoding="async"

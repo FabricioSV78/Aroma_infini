@@ -4,7 +4,11 @@ import { defineConfig } from '@playwright/test'
 // the test fixture and cannot reach the hosted development project.
 export default defineConfig({
   testDir: './tests',
-  testMatch: ['supabase-catalog.spec.ts', 'admin-workspace-loading.spec.ts'],
+  testMatch: [
+    'supabase-catalog.spec.ts',
+    'admin-workspace-loading.spec.ts',
+    'public-initial-browser.spec.ts',
+  ],
   outputDir: 'artifacts/supabase-catalog-test-results',
   fullyParallel: false,
   workers: 1,

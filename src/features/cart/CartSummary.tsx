@@ -1,8 +1,14 @@
 import { Link } from 'react-router'
+import { useEffect } from 'react'
+import { preloadPublicRoute } from '../../app/public-route-modules'
 import type { ResolvedCart } from '../../services/commerce-service'
 import { formatPEN } from '../../services/currency'
 
 export function CartSummary({ cart }: { cart: ResolvedCart }) {
+  useEffect(() => {
+    // Code only: no checkout loader, quotation, identity check or order runs.
+    preloadPublicRoute('/checkout')
+  }, [])
   return (
     <aside className="cart-summary" aria-labelledby="cart-summary-title">
       <p className="eyebrow">Resumen</p>

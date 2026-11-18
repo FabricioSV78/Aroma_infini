@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
@@ -320,7 +321,7 @@ export function FragranceQuiz({
                             }}
                           />
                           {visual?.image && (
-                            <img
+                            <LoadingImage
                               src={assetSource(visual.image)}
                               srcSet={imageSourceSet(
                                 visual.image,

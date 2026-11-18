@@ -76,6 +76,12 @@ export async function auditCommerceConcurrency({
       )
     ).rows[0]
   const prepare = async (stock) => {
+    // This function is guarded above by loopback + local-fixture. Retire only
+    // this fixture's prior holds before starting an independent scenario.
+    await client.query(
+      "update private.order_stock_reservations set state='released',closed_at=clock_timestamp() where variant_id=$1 and state='active'",
+      [ids.variant],
+    )
     await client.query('update app.product_variants set stock=$2 where id=$1', [
       ids.variant,
       stock,
@@ -140,13 +146,15 @@ export async function auditCommerceConcurrency({
       await prepare(initialStock)
       const body = await payload()
       const start = performance.now()
-      const attempts = await Promise.all(
+      const attempts = await Promise.allSettled(
         Array.from({ length: customers }, (_, index) =>
           create(body, owners[index]),
         ),
       )
       const after = await state()
-      const orderIds = attempts.map((entry) => entry.order.id)
+      const accepted = attempts.filter((entry) => entry.status === 'fulfilled')
+      const rejected = attempts.filter((entry) => entry.status === 'rejected')
+      const orderIds = accepted.map((entry) => entry.value.order.id)
       const rows = (
         await client.query(
           'select count(*)::int as count,bool_and(simulation and payment_status=$2 and payment_verified_at is null) as simulated from app.orders where id=any($1::uuid[])',
@@ -154,22 +162,25 @@ export async function auditCommerceConcurrency({
         )
       ).rows[0]
       requireState(
-        rows.count === customers &&
+        rows.count === initialStock &&
+          rejected.length === customers - initialStock &&
+          rejected.every((entry) => entry.reason.code === '22023') &&
           rows.simulated &&
           after.stock === initialStock,
-        'The simulation changed real inventory or approved a payment.',
+        'Concurrent reservations exceeded availability, changed physical inventory or approved a payment.',
       )
       report.scenarios[name] = {
         initialStock,
         distinctCustomers: customers,
         concurrentRequests: customers,
         acceptedPendingSimulations: rows.count,
+        unavailableRejected: rejected.length,
         committedCommercialUnits: 0,
         finalStock: after.stock,
         negativeStock: after.stock < 0,
         elapsedMs: Math.round(performance.now() - start),
-        commercialOversellProtection:
-          'BLOCKED: reservation/settlement not implemented; simulations do not commit stock.',
+        reservationOversellProtection: 'PASS: live holds never exceed physical stock.',
+        paymentSettlement: 'Not implemented: Mercado Pago remains disabled.',
       }
     }
 
@@ -488,7 +499,10 @@ export async function auditCommerceConcurrency({
     report.finalInvariants = {
       pendingSimulations: final.count,
       realPayments: 0,
-      reservations: 0,
+      reservations: Number((await client.query(
+        'select count(*) as count from private.order_stock_reservations where order_id in(select id from app.orders where user_id=any($1::uuid[]))',
+        [owners],
+      )).rows[0].count),
       stock: 5,
       negativeStock: false,
       couponRedemptions: 0,

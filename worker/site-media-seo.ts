@@ -11,6 +11,21 @@ import {
   type SiteMediaSlot,
 } from '../src/domain/site-media-slots'
 import { readPublicCatalog } from './public-catalog-http'
+import {
+  initialCatalogProjection,
+  readInitialPublicContext,
+  readInitialSettings,
+} from './public-initial-context'
+import {
+  parseMediaAliasDocument,
+  type MediaAliasDocument,
+} from '../src/services/media-alias-registry'
+import {
+  PUBLIC_MEDIA_BOOTSTRAP_ID,
+  publicMediaBootstrapJson,
+} from '../src/domain/public-media-bootstrap'
+import { initialHomeMarkup, readInitialHome } from './home-initial'
+import { publicDocumentTiming } from './public-document-timing'
 
 type SiteMediaSeoEnvironment = Pick<
   Env,
@@ -20,6 +35,7 @@ type SiteMediaSeoEnvironment = Pick<
 interface PublicSiteMedia {
   document: SiteMediaDocument
   aliases: Map<string, string>
+  aliasDocument: MediaAliasDocument
 }
 
 const originals = new Map(inventory.map((entry) => [entry.path, entry]))
@@ -160,10 +176,14 @@ export function createSiteMediaSeoHandler(
   const transport = dependencies.fetch ?? fetch
   const now = dependencies.now ?? Date.now
   const cache = new Map<string, { expires: number; value: PublicSiteMedia }>()
-  return async (
+  const handler = async (
     response: Response,
     request: Request,
     env: SiteMediaSeoEnvironment,
+    prepared?: {
+      settings: ReturnType<typeof readInitialSettings>
+      diagnostics: ReturnType<typeof publicDocumentTiming>
+    },
   ): Promise<Response> => {
     if (
       request.method !== 'GET' ||
@@ -172,39 +192,64 @@ export function createSiteMediaSeoHandler(
     )
       return response
     const key = `${env.APP_ENVIRONMENT}:${env.SUPABASE_URL}:${env.SUPABASE_PUBLISHABLE_KEY}`
+    const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/'
+    const diagnostics = prepared?.diagnostics ?? publicDocumentTiming(env.APP_ENVIRONMENT, env.SUPABASE_URL, transport)
     let content = cache.get(key)
-    if (!content || content.expires <= now()) {
-      try {
-        const [document, aliases] = await Promise.all([
-          readPublicCatalog(
-            env,
-            'site_media_document',
-            {},
-            transport,
-            128 * 1024,
-          ),
-          readPublicCatalog(
-            env,
-            'public_media_aliases',
-            {},
-            transport,
-            512 * 1024,
-          ),
-        ])
-        content = {
-          expires: now() + 30000,
-          value: {
-            document: parseSiteMediaDocument(document),
-            aliases: parseAliases(aliases),
-          },
-        }
-        if (cache.size >= 8) cache.delete(cache.keys().next().value!)
-        cache.set(key, content)
-      } catch {
-        // A public metadata outage must not prevent rendering the storefront.
-        return response
-      }
+    const contextStarted = performance.now()
+    const streamInitial = Boolean(initialCatalogProjection(path))
+    let home: Awaited<ReturnType<typeof readInitialHome>>
+    // Start fresh public reads immediately, but do not hold the head, Hero
+    // hints, styles or modulepreloads behind them. Deferred module scripts run
+    // after parsing, so the inert body-end projection remains available first.
+    const initialPromise = readInitialPublicContext(
+      request,
+      env,
+      diagnostics.fetch,
+      prepared?.settings,
+    ).catch(() => undefined)
+    try {
+      ;[home] = await Promise.all([
+        path === '/' ? readInitialHome(env, diagnostics.fetch) : undefined,
+        (async () => {
+          if (content && content.expires > now()) return
+          const [document, aliases] = await Promise.all([
+            readPublicCatalog(
+              env,
+              'site_media_document',
+              {},
+              diagnostics.fetch,
+              128 * 1024,
+              1000,
+            ),
+            readPublicCatalog(
+              env,
+              'public_media_aliases',
+              {},
+              diagnostics.fetch,
+              512 * 1024,
+              1000,
+            ),
+          ])
+          content = {
+            expires: now() + 30000,
+            value: {
+              document: parseSiteMediaDocument(document),
+              aliases: parseAliases(aliases),
+              aliasDocument: parseMediaAliasDocument(aliases),
+            },
+          }
+          if (cache.size >= 8) cache.delete(cache.keys().next().value!)
+          cache.set(key, content)
+        })(),
+      ])
+    } catch {
+      // A public metadata outage must not prevent rendering the storefront.
+      return response
     }
+    if (!content) return response
+    // The catalog experiment improved with early resource discovery. Product
+    // pages did not: retain their simpler, measured head insertion path.
+    const initialForHead = streamInitial ? undefined : await initialPromise
     const { document, aliases } = content.value
     const origin = new URL(request.url).origin
     const aliasImage = (source: string) => {
@@ -232,7 +277,6 @@ export function createSiteMediaSeoHandler(
         src: new URL(aliases.get(image.src) ?? image.src, origin).href,
       }
     }
-    const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/'
     const slot = socialSlots[path]
     const image = slot ? resolve(slot) : undefined
     const logo = resolve('identity.logo').src
@@ -245,7 +289,72 @@ export function createSiteMediaSeoHandler(
     ])
       headers.delete(name)
     headers.set('Cache-Control', 'no-store')
+    const publicReads = diagnostics.header()
+    if (publicReads) headers.set('X-Aroma-Public-Reads', publicReads)
+    if (env.APP_ENVIRONMENT === 'staging')
+      headers.append(
+        'Server-Timing',
+        `public_context;dur=${(performance.now() - contextStarted).toFixed(1)}`,
+      )
+    if (env.APP_ENVIRONMENT === 'staging' && initialForHead?.timings.length)
+      headers.append('Server-Timing', initialForHead.timings.join(', '))
     const rewriter = new HTMLRewriter()
+    const bootstrap = publicMediaBootstrapJson(
+      env.SUPABASE_URL,
+      document,
+      content.value.aliasDocument,
+    )
+    const backendOrigin = /^https:\/\/[a-z]{20}\.supabase\.co\/?$/.test(
+      env.SUPABASE_URL,
+    )
+      ? env.SUPABASE_URL.replace(/\/$/, '')
+      : undefined
+    rewriter.on('head', {
+      element(element) {
+        // The initial public reads now happen at the edge. Keep the browser's
+        // first subsequent SDK request from paying a cold TLS connection.
+        // This opens only a connection to our existing essential backend.
+        if (backendOrigin)
+          element.append(
+            `<link rel="preconnect" href="${attribute(backendOrigin)}" crossorigin>`,
+            { html: true },
+          )
+        if (initialForHead?.timings.length)
+          element.append(initialForHead.markup, { html: true })
+        if (home)
+          element.append(initialHomeMarkup(home, env.SUPABASE_URL, aliases), {
+            html: true,
+          })
+        // SVG identity has no raster srcset ambiguity; configured bitmaps keep
+        // the image component's existing adaptive candidate selection.
+        if (new URL(logo).pathname.endsWith('.svg'))
+          element.append(
+            `<link rel="preload" as="image" href="${attribute(logo)}" fetchpriority="high">`,
+            { html: true },
+          )
+        if (bootstrap)
+          element.append(
+            `<script type="application/json" id="${PUBLIC_MEDIA_BOOTSTRAP_ID}">${bootstrap}</script>`,
+            { html: true },
+          )
+      },
+    })
+    if (streamInitial)
+      rewriter.on('body', {
+        element(element) {
+          element.onEndTag((end) => {
+            end.remove()
+          })
+        },
+      })
+    if (streamInitial)
+      rewriter.on('html', {
+        element(element) {
+          element.onEndTag((end) => {
+            end.remove()
+          })
+        },
+      })
     if (image) {
       const tags = [
         ['property', 'og:image', image.src],
@@ -303,8 +412,64 @@ export function createSiteMediaSeoHandler(
       'head script[type="application/ld+json"]',
       structuredMediaHandler(logo, aliasImage),
     )
-    return rewriter.transform(
+    const shell = rewriter.transform(
       new Response(response.body, { status: response.status, headers }),
     )
+    if (!streamInitial) return shell
+    const reader = shell.body!.getReader()
+    // These owned documents have canonical body/html end tags. Stream the
+    // complete shell first, then the inert projection and those end tags. An
+    // async HTMLRewriter handler retains a small input chunk until it settles;
+    // pumping the shell avoids holding its styles and preload hints that way.
+    let shellComplete = false
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          if (!shellComplete) {
+            const chunk = await reader.read()
+            if (!chunk.done) {
+              controller.enqueue(chunk.value)
+              return
+            }
+            shellComplete = true
+          }
+          const initial = await initialPromise
+          controller.enqueue(
+            new TextEncoder().encode(
+              (initial?.timings.length ? initial.markup : '') +
+                '</body></html>',
+            ),
+          )
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+      cancel(reason) {
+        return reader.cancel(reason)
+      },
+    })
+    return new Response(body, { status: shell.status, headers: shell.headers })
   }
+  return Object.assign(handler, {
+    prepareSettings(request: Request, env: SiteMediaSeoEnvironment) {
+      const url = new URL(request.url)
+      const product = url.pathname.match(/^\/producto\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/)
+      // No speculative reads for arbitrary, private, filtered or malformed URLs.
+      // A syntactically valid missing product may incur this one public read;
+      // the caller cancels it when SEO resolves to a non-success response.
+      if (request.method !== 'GET' || url.search.length > 8192 ||
+          !product || product[1].length > 512) return undefined
+      const cancel = new AbortController()
+      const scopedRequest = new Request(request, {
+        signal: AbortSignal.any([request.signal, cancel.signal]),
+      })
+      const diagnostics = publicDocumentTiming(env.APP_ENVIRONMENT, env.SUPABASE_URL, transport)
+      return {
+        diagnostics,
+        settings: readInitialSettings(scopedRequest, env, diagnostics.fetch),
+        cancel: () => cancel.abort(),
+      }
+    },
+  })
 }

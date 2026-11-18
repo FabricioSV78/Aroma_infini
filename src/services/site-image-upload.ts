@@ -10,10 +10,8 @@ import { UserFacingError } from './admin-messages'
 import { prepareImageFile, type ImagePreset } from './prepare-image-file'
 import {
   uploadManagedImage,
-  uploadManagedVideo,
   type ExpectedMediaActor,
 } from './media-upload'
-import { registerManagedVideo } from './media-registry'
 
 function dataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -37,7 +35,7 @@ function requireMinimumDimensions(
     )
 }
 
-export async function prepareAndUploadLibraryImage(
+export async function prepareAndUploadSiteImage(
   file: File,
   purpose: ImageMediaPurpose,
   actor: ExpectedMediaActor,
@@ -132,49 +130,4 @@ export async function prepareAndUploadLibraryImage(
       await actor.assertCurrent?.()
     },
   })
-}
-
-export async function prepareAndUploadLibraryVideo(
-  file: File,
-  actor: ExpectedMediaActor,
-  signal?: AbortSignal,
-) {
-  if (signal?.aborted) throw new DOMException('Subida cancelada', 'AbortError')
-  const { prepareVideoFile } =
-    await import('../features/admin/prepareVideoFile')
-  const scopedActor = {
-    ...actor,
-    assertCurrent: async () => {
-      if (signal?.aborted)
-        throw new DOMException('Subida cancelada', 'AbortError')
-      await actor.assertCurrent?.()
-    },
-  }
-  const prepared = await prepareVideoFile(file, signal)
-  const video = registerManagedVideo(
-    await uploadManagedVideo(prepared.video, scopedActor),
-  )
-  const poster = await uploadManagedImage(
-    prepared.poster,
-    'film-poster',
-    scopedActor,
-  )
-  const mobileVideo = prepared.mobileVideo
-    ? registerManagedVideo(
-        await uploadManagedVideo(prepared.mobileVideo, scopedActor),
-      )
-    : undefined
-  const mobilePoster = prepared.mobilePoster
-    ? await uploadManagedImage(
-        prepared.mobilePoster,
-        'film-poster',
-        scopedActor,
-      )
-    : undefined
-  return {
-    video,
-    poster,
-    ...(mobileVideo && mobilePoster ? { mobileVideo, mobilePoster } : {}),
-    optimization: prepared.optimization,
-  }
 }

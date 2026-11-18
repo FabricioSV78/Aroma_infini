@@ -1,5 +1,11 @@
 # Carrusel multimedia del Home
 
+**Registro histórico de la entrega del 4 de noviembre.** La estructura de
+campañas se conserva; las referencias a exportaciones de vídeo móvil pertenecen
+a esa entrega. Actualmente los móviles reciben una imagen alternativa o póster,
+sin inicializar ni descargar vídeo. La operación vigente está en
+[Medios](R2_MEDIA_OPERATIONS.md) y [Política de vídeo](MOBILE_VIDEO_POLICY.md).
+
 4 de noviembre de 2026. Ampliación del Hero y del editor existentes; no cambia
 la composición aprobada ni los demás apartados del Home.
 

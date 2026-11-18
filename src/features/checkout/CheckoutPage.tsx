@@ -499,7 +499,7 @@ export function CheckoutPage() {
                 <h3 id="checkout-gateway-title">Resumen de tu selección</h3>
                 <p>
                   {isRemoteCatalog
-                    ? 'Registrarás un pedido de prueba. No se realizará ningún cobro ni se reservarán unidades.'
+                    ? 'Registrarás un pedido de prueba y reservaremos sus unidades durante 15 minutos. No se realizará ningún cobro.'
                     : 'Al continuar, la selección se guardará en este navegador. No se realizará ningún cobro.'}
                 </p>
               </section>

@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import sharp from 'sharp'
@@ -129,7 +130,9 @@ const test = authTest.extend<{ mediaNetwork: BrowserMediaFixture }>({
           ),
         }
       }
-      if (name === 'catalog_home_context') {
+      if (['admin_product_list','admin_order_list','admin_customer_list','admin_catalog_context','admin_catalog_choices','admin_offer_list','admin_products_by_ids','admin_import_conflicts'].includes(name)) {
+        await route.fulfill({json:adminListFixture(name,body,{products:[document()],brands:[brand],productVersions:new Map([[productId,state.version]])}),headers:cors})
+      } else if (name === 'catalog_home_context') {
         await route.fulfill({
           json: publicHomeCatalogFixture(
             {

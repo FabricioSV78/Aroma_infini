@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Icon } from '../../components/ui/Icon'
 import { NoteBottleIcon } from '../../components/ui/NoteBottleIcon'
 import type { ProductDetail } from '../../types/catalog'
@@ -35,7 +36,7 @@ export function OlfactoryProfile({
     <div className={`olfactory-profile-card${image ? ' has-image' : ''}`}>
       {image ? (
         <figure className="olfactory-profile-visual">
-          <img
+          <LoadingImage
             src={assetSource(image)}
             alt=""
             width={960}

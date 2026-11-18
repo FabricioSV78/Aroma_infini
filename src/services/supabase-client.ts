@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database.generated'
 import { AuthError } from './auth-errors'
 
@@ -118,30 +118,55 @@ if (typeof window !== 'undefined') {
 }
 
 let client: SupabaseClient<Database, 'api'> | null = null
-if (config && typeof window !== 'undefined') {
-  client = createClient<Database, 'api'>(config.url, config.publishableKey, {
-    db: { schema: 'api' },
-    auth: {
-      flowType: 'pkce',
-      detectSessionInUrl: false,
-      persistSession: true,
-      autoRefreshToken: true,
-      storageKey: supabaseStorageKey,
-      storage: authStorage,
-      debug: false,
-    },
-    global: {
-      fetch: (input, init) => {
-        const timeout = AbortSignal.timeout(15000)
-        return fetch(input, {
-          ...init,
-          signal: init?.signal
-            ? AbortSignal.any([init.signal, timeout])
-            : timeout,
-        })
+let clientRequest: Promise<void> | undefined
+
+/** Load the unchanged SDK independently of the public React module graph.
+ * All callers share this initialization, never a session/authorization result. */
+export function initializeSupabaseClient(): Promise<void> {
+  if (client || !config || typeof window === 'undefined')
+    return Promise.resolve()
+  if (clientRequest) return clientRequest
+  const configuration = config
+  const operation = import('@supabase/supabase-js').then(({ createClient }) => {
+    client = createClient<Database, 'api'>(
+      configuration.url,
+      configuration.publishableKey,
+      {
+        db: { schema: 'api' },
+        auth: {
+          flowType: 'pkce',
+          detectSessionInUrl: false,
+          persistSession: true,
+          autoRefreshToken: true,
+          storageKey: supabaseStorageKey,
+          storage: authStorage,
+          debug: false,
+        },
+        global: {
+          fetch: (input, init) => {
+            const timeout = AbortSignal.timeout(15000)
+            return fetch(input, {
+              ...init,
+              signal: init?.signal
+                ? AbortSignal.any([init.signal, timeout])
+                : timeout,
+            })
+          },
+        },
       },
-    },
+    )
   })
+  clientRequest = operation
+  void operation.catch(() => {
+    if (clientRequest === operation) clientRequest = undefined
+  })
+  return operation
+}
+
+/** A public RPC may be requested before background Auth has initialized. */
+export async function requireReadySupabaseClient() {
+  await initializeSupabaseClient()
+  return requireSupabaseClient()
 }
 
 export function getSupabaseClient() {

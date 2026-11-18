@@ -8,7 +8,7 @@ import type {
   OrderHistoryEntry,
   OrderOperator,
 } from '../types/order-workflow'
-import type { Json } from '../types/database.generated'
+import type { Database, Json } from '../types/database.generated'
 import { adminService as local, applyRemoteOrders } from './admin-service'
 import { isRemoteCatalog } from './catalog-source'
 import { authService } from './auth-service'
@@ -16,6 +16,10 @@ import { requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import { readAdminPageBatches } from './admin-page-batches'
 import { UserFacingError } from './admin-messages'
+import type { AdminOrderListQuery } from '../domain/admin-list-query'
+import type { AdminCustomerList, AdminOrderList, AdminOrderSelection, AdminDashboardData } from '../types/admin-lists'
+import { adminListAccess } from './admin-list-access'
+import { createAdminProtectedReads } from './admin-protected-read'
 
 import {
   invalidOrderResponse as invalid,
@@ -25,6 +29,7 @@ import {
   orderResponseUuid as uuid,
   parseAdminOrder,
   parseOrderHistory,
+  parseAdminOrderSelection,
 } from './order-response'
 export {
   parseAdminOrder,
@@ -36,12 +41,14 @@ interface Actor {
   userId: string
   token: string
   generation: number
+  accessRevision: number
 }
 let generation = 0,
   loadedOwner: string | null = null,
   pending: Promise<void> | undefined
 let loadRevision = 0
 let loadedAt = -Infinity
+const pageReads = createAdminProtectedReads()
 function owner(): string | null {
   const state = authService.getSnapshot()
   return state.status === 'authenticated' &&
@@ -62,10 +69,13 @@ if (isRemoteCatalog)
       loadedOwner = null
       loadedAt = -Infinity
       pending = undefined
+      pageReads.invalidate()
       applyRemoteOrders([], [])
     }
   })
 function sessionError(): never {
+  adminListAccess.invalidate()
+  pageReads.invalidate()
   generation++
   loadRevision++
   loadedOwner = null
@@ -79,7 +89,7 @@ function sessionError(): never {
 }
 async function actor(): Promise<Actor> {
   const userId = owner(),
-    started = generation
+    started = generation, accessRevision = adminListAccess.getSnapshot()
   if (!userId) sessionError()
   const client = requireSupabaseClient(),
     session = await client.auth.getSession()
@@ -87,7 +97,7 @@ async function actor(): Promise<Actor> {
   const token = session.data.session.access_token
   const verified = await verifySupabaseUser(token)
   if (verified.error || verified.data.user?.id !== userId) sessionError()
-  const result = { userId, token, generation: started }
+  const result = { userId, token, generation: started, accessRevision }
   await stillActor(result)
   return result
 }
@@ -95,6 +105,7 @@ async function stillActor(expected: Actor) {
   const session = await requireSupabaseClient().auth.getSession()
   if (
     expected.generation !== generation ||
+    expected.accessRevision !== adminListAccess.getSnapshot() ||
     owner() !== expected.userId ||
     session.error ||
     session.data.session?.user.id !== expected.userId
@@ -157,6 +168,26 @@ function confirmMutationOrders(records: unknown, history: unknown = []) {
 function invalidateOrderReads() {
   loadRevision++
   pending = undefined
+  pageReads.invalidate()
+}
+
+type OrderReadRpc = 'admin_order_list' | 'admin_customer_list'
+async function readProtectedPage<N extends OrderReadRpc>(
+  name: N,
+  args: Database['api']['Functions'][N]['Args'],
+) {
+  const started = generation
+  const result = await pageReads.read(JSON.stringify([name, args]), current =>
+    requireSupabaseClient().rpc(name, args)
+      .setHeader('Authorization', `Bearer ${current.token}`),
+  ).catch((error: unknown) => {
+    if (error instanceof UserFacingError && error.code === 'session') sessionError()
+    throw error
+  })
+  const current = { ...result.actor, generation: started }
+  await stillActor(current)
+  check(result.value.error, result.value.status)
+  return { current, data: result.value.data }
 }
 async function command<Result>(
   request: () => PromiseLike<Result>,
@@ -237,18 +268,94 @@ export async function loadAdminOrders(force = false): Promise<void> {
   }
 }
 
+/** Route-scoped responses never replace/label the shared complete snapshot. */
+export async function readAdminOrderList(
+  query: AdminOrderListQuery, page: number, limit = 20,
+): Promise<AdminOrderList> {
+  const { current, data } = await readProtectedPage('admin_order_list', {
+    p_query: query as Json, p_page: page, p_limit: limit,
+  })
+  return parseOrderPage(data, current, limit)
+}
+function parseOrderPage(value: unknown, current: Actor, limit: number): AdminOrderList {
+  const data = object(value), counts = object(data.counts)
+  if (!Array.isArray(data.orders) || data.orders.length > limit) invalid()
+  const customer = data.customer === null ? null : object(data.customer)
+  return {
+    ownerId: current.userId,
+    accessRevision: current.accessRevision,
+    orders: data.orders.map(parseAdminOrder), total: integer(data.total),
+    customer: customer ? { id: text(customer.id, 64), name: text(customer.name, 200), email: text(customer.email, 254), phone: text(customer.phone, 30) } : null,
+    counts: { received: integer(counts.received), preparing: integer(counts.preparing), shipped: integer(counts.shipped), delivered: integer(counts.delivered) },
+  }
+}
+
+export async function readAdminOrderSelection(query: AdminOrderListQuery): Promise<AdminOrderSelection[]> {
+  const { data: response } = await readProtectedPage('admin_order_list', {
+    p_query: query as Json, p_mode: 'selection',
+  })
+  const data = object(response)
+  if (!Array.isArray(data.selection) || data.selection.length !== integer(data.total) || data.selection.length > 10000) invalid()
+  const records = data.selection.map(parseAdminOrderSelection)
+  if (new Set(records.map(r => r.reference)).size !== records.length) invalid()
+  return records
+}
+
+/** Full lines/history are needed only by an explicit detail/PDF request. */
+export async function loadAdminOrdersByReferences(references: readonly string[]): Promise<void> {
+  if (!isRemoteCatalog) return
+  const ids = [...new Set(references)]
+  for (let index = 0; index < ids.length; index += 100) {
+    const { data: response } = await readProtectedPage('admin_order_list', {
+      p_query: { references: ids.slice(index, index + 100) }, p_mode: 'details', p_limit: 100,
+    })
+    const data = object(response)
+    if (!Array.isArray(data.orders) || data.orders.length > 100 || !Array.isArray(data.orderHistory)) invalid()
+    const requested = new Set(ids.slice(index, index + 100)), found = new Set(data.orders.map(value => parseAdminOrder(value).reference))
+    if (found.size !== data.orders.length || [...found].some(reference => !requested.has(reference))) invalid()
+    const missing = new Set([...requested].filter(reference => !found.has(reference)))
+    if (missing.size) {
+      const snapshot = local.getSnapshot()
+      applyRemoteOrders(snapshot.orders.filter(order => !missing.has(order.reference)), snapshot.orderHistory.filter(event => !missing.has(event.reference)))
+    }
+    confirmMutationOrders(data.orders, data.orderHistory)
+  }
+}
+
+export async function readAdminCustomerList(search: string, page: number): Promise<AdminCustomerList> {
+  const { current, data: response } = await readProtectedPage('admin_customer_list', {
+    p_search: search, p_page: page, p_limit: 25,
+  })
+  const data = object(response)
+  if (!Array.isArray(data.customers) || data.customers.length > 25) invalid()
+  return { ownerId: current.userId, accessRevision: current.accessRevision, total: integer(data.total), customers: data.customers.map(value => {
+    const c = object(value)
+    return { id: text(c.id, 64), name: text(c.name, 200), email: text(c.email, 254), phone: text(c.phone, 30), province: text(c.province, 100), district: text(c.district, 100), orderCount: integer(c.orderCount) }
+  }) }
+}
+export async function readAdminOrdersDashboard(): Promise<Pick<AdminDashboardData, 'ownerId' | 'accessRevision' | 'recentOrders' | 'toPrepare' | 'counts'>> {
+  const { current, data: response } = await readProtectedPage('admin_order_list', {
+    p_mode: 'dashboard', p_limit: 4,
+  })
+  const data = object(response), counts = object(data.counts)
+  if (!Array.isArray(data.orders) || data.orders.length > 4) invalid()
+  return { ownerId: current.userId, accessRevision: current.accessRevision, recentOrders: data.orders.map(parseAdminOrder), toPrepare: integer(data.toPrepare),
+    counts: { received: integer(counts.received), preparing: integer(counts.preparing), shipped: integer(counts.shipped), delivered: integer(counts.delivered) } }
+}
+
 export interface OrderMutationOptions {
   deliveryConfirmed?: boolean
   expectedVersions?: Record<string, number>
   operationId?: string
   source?: 'individual' | 'bulk'
+  listContext?: { query: AdminOrderListQuery; page: number; limit: number }
 }
 export const orderAdminService = {
   async setOrderStatus(
     reference: string,
     target: AdminOrderStatus,
     options: OrderMutationOptions = {},
-  ): Promise<AdminSaveResult> {
+  ): Promise<AdminSaveResult & { page?: AdminOrderList }> {
     if (!isRemoteCatalog) return local.setOrderStatus(reference, target)
     const result = await orderAdminService.bulkSetOrderStatus(
       [reference],
@@ -261,7 +368,7 @@ export const orderAdminService = {
     const issue = result.errors[0] ?? result.skipped[0]
     return issue && !result.updated.length
       ? { kind: 'validation', message: issue.message }
-      : { kind: 'saved' }
+      : { kind: 'saved', page: result.page }
   },
   async bulkSetOrderStatus(
     references: string[],
@@ -269,7 +376,7 @@ export const orderAdminService = {
     operator?: OrderOperator,
     expectedStatuses?: Record<string, AdminOrderStatus>,
     options: OrderMutationOptions = {},
-  ): Promise<BulkOrderStatusResult> {
+  ): Promise<BulkOrderStatusResult & { page?: AdminOrderList }> {
     if (!isRemoteCatalog)
       return local.bulkSetOrderStatus(
         references,
@@ -287,19 +394,24 @@ export const orderAdminService = {
           options.expectedVersions?.[reference] ?? order?.version ?? 0,
       }
     })
-    if (!changes.length || changes.length > 1000)
+    if (!changes.length || changes.length > 100)
       return {
         kind: 'validation',
-        message: 'Selecciona entre uno y mil pedidos por operación.',
+        message: 'Selecciona entre uno y cien pedidos por operación.',
       }
     const response = await command(() =>
       requireSupabaseClient()
-        .rpc('admin_set_order_statuses', {
+        .rpc(options.listContext ? 'admin_set_order_statuses_page' : 'admin_set_order_statuses', {
           p_changes: changes as Json,
           p_status: target,
           p_operation_id: options.operationId ?? crypto.randomUUID(),
           p_delivery_confirmed: options.deliveryConfirmed === true,
           p_source: options.source ?? 'bulk',
+          ...(options.listContext ? {
+            p_query: options.listContext.query as Json,
+            p_page: options.listContext.page,
+            p_limit: options.listContext.limit,
+          } : {}),
         })
         .setHeader('Authorization', `Bearer ${current.token}`),
     )
@@ -342,7 +454,7 @@ export const orderAdminService = {
     )
       invalid()
     confirmMutationOrders(data.orders, data.orderHistory)
-    return result
+    return { ...result, ...(options.listContext ? { page: parseOrderPage(data.page, current, options.listContext.limit) } : {}) }
   },
   async saveOrderDelivery(
     reference: string,

@@ -141,9 +141,73 @@ function setup() {
     ...fixture,
     prepared,
     completed,
+    transport,
     handle: (request: Request) => handler(request, fixture.environment),
   }
 }
+
+test('verified SVG bytes reuse cache while every read revalidates the manifest and preserves CSP', async () => {
+  const fixture = setup()
+  const uploaded = await fixture.handle(request())
+  const asset = parseManagedSvgAsset((await uploaded!.json()).asset)
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  const entries = new Map<string, Response>()
+  const tasks: Promise<unknown>[] = []
+  let manifests = 0
+  const handle = createMediaHandler({
+    decodeWebp: async () => {
+      throw new Error('SVG must not enter WebP decoder')
+    },
+    fetch: async (input, init) => {
+      if (new URL(String(input)).pathname.endsWith('/media_public_asset'))
+        manifests++
+      return fixture.transport(input, init)
+    },
+    publicImageCache: () => ({
+      async match(input) {
+        return entries.get((input as Request).url)?.clone()
+      },
+      async put(input, response) {
+        entries.set(
+          (input as Request).url,
+          new Response(await response.arrayBuffer(), response),
+        )
+      },
+    }),
+  })
+  const context = {
+    waitUntil(task: Promise<unknown>) {
+      tasks.push(task)
+    },
+  }
+  const url = `${mediaTestOrigin}${asset.src}`
+  const first = await handle(new Request(url), fixture.environment, context)
+  expect(first!.headers.get('X-Aroma-Byte-Cache')).toBe('MISS')
+  expect(await first!.text()).toBe(minimal)
+  await Promise.all(tasks)
+  fixture.bucket.reads.length = 0
+  for (const method of ['GET', 'HEAD']) {
+    const response = await handle(
+      new Request(url, { method }),
+      fixture.environment,
+      context,
+    )
+    expect(response!.status).toBe(200)
+    expect(response!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+    expect(response!.headers.get('Content-Security-Policy')).toBe(
+      "sandbox; default-src 'none'; style-src 'none'",
+    )
+    expect(response!.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(await response!.text()).toBe(method === 'GET' ? minimal : '')
+  }
+  expect(manifests).toBe(3)
+  expect(fixture.bucket.reads).toHaveLength(0)
+  fixture.state.privateResponse = true
+  expect(
+    (await handle(new Request(url), fixture.environment, context))!.status,
+  ).toBe(404)
+  expect(manifests).toBe(4)
+})
 function request(
   source = minimal,
   operation = randomUUID(),

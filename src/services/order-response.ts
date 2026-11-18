@@ -1,8 +1,9 @@
 import type { AdminOrder, AdminOrderStatus } from '../types/admin'
 import type { AccountOrder } from '../types/account'
 import type { OrderHistoryEntry } from '../types/order-workflow'
+import type { AdminOrderSelection } from '../types/admin-lists'
 import { ORDER_STATUSES } from '../domain/order-workflow'
-import { UserFacingError } from './admin-messages'
+import { UserFacingError } from '../domain/user-facing-error'
 
 /** Validates private order responses without initializing administrative state. */
 export function invalidOrderResponse(): never {
@@ -106,6 +107,20 @@ function payment(value: unknown) {
   if (!['pending', 'approved', 'rejected', 'refunded'].includes(String(value)))
     invalidOrderResponse()
   return value as AdminOrder['paymentStatus']
+}
+export function parseAdminOrderSelection(value: unknown): AdminOrderSelection {
+  const source = orderResponseObject(value)
+  if (typeof source.simulation !== 'boolean') invalidOrderResponse()
+  return {
+    reference: orderResponseText(source.reference, 64),
+    version: orderResponseInteger(source.version, 1),
+    status: status(source.status), paymentStatus: payment(source.paymentStatus),
+    simulation: source.simulation,
+    customerId: orderResponseText(source.customerId, 64),
+    customerName: orderResponseText(source.customerName, 200),
+    customerEmail: orderResponseText(source.customerEmail, 254),
+    contactPhone: orderResponseText(source.contactPhone, 30), address: address(source.address),
+  }
 }
 export function parseAdminOrder(value: unknown): AdminOrder {
   const source = orderResponseObject(value)

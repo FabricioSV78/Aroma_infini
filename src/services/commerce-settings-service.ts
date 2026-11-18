@@ -1,21 +1,25 @@
 import type { AdminPromotion, AdminSaveResult } from '../types/admin'
 import type { ShippingSettings, ShippingZone } from '../types/shipping'
 import type { Database, Json } from '../types/database.generated'
-import { adminService, applyRemoteCommerceSettings } from './admin-service'
+import {
+  adminRuntime,
+  loadAdminRuntime,
+  applyLoadedCommerceSettings,
+} from './admin-runtime'
 import { authService } from './auth-service'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import {
   cachedPublicQuery,
   invalidatePublicQueryCache,
 } from './public-query-cache'
-import { UserFacingError } from './admin-messages'
+import { UserFacingError } from '../domain/user-facing-error'
 import {
   isValidPeruLocation,
   getPeruProvinceOptions,
   peruDepartments,
-} from '../content/peru'
+} from '../content/peru-core'
 import { emptyShippingSettings } from './shipping-rates'
 export { emptyShippingSettings } from './shipping-rates'
 
@@ -173,6 +177,8 @@ function parseAdminSettings(value: unknown) {
   return { ...shipping, promotions }
 }
 
+if (!isRemoteCatalog) await loadAdminRuntime()
+
 let publicState: ShippingEnvelope = {
   shipping: emptyShippingSettings(),
   shippingVersion: 0,
@@ -195,12 +201,13 @@ export const publicShippingSettings = {
     publicListeners.forEach((listener) => listener())
   },
   async load() {
-    if (!isRemoteCatalog) return adminService.getSnapshot().shipping
+    if (!isRemoteCatalog)
+      return adminRuntime().adminService.getSnapshot().shipping
     const value = await cachedPublicQuery(
       'commerce-settings',
       async () => {
         const { data, error } =
-          await requireSupabaseClient().rpc('commerce_settings')
+          await (await requireReadySupabaseClient()).rpc('commerce_settings')
         if (error)
           throw new UserFacingError(
             'network',
@@ -231,7 +238,16 @@ function currentAdminOwner(): string | null {
 }
 let sessionEpoch = 0,
   sessionOwner = currentAdminOwner()
-let settingsLoading: { actor: Actor; task: Promise<void> } | undefined
+let settingsReads: ReturnType<typeof import('./admin-protected-read').createAdminProtectedReads> | undefined
+let invalidatePrivateAccess: (() => void) | undefined
+async function adminSettingsReads() {
+  const [reads, access] = await Promise.all([import('./admin-protected-read'), import('./admin-list-access')])
+  settingsReads ??= reads.createAdminProtectedReads()
+  invalidatePrivateAccess = () => access.adminListAccess.invalidate()
+  return settingsReads
+}
+// A shared unfinished read is applied once. Weak keys retain no completed DTO.
+const appliedSettingsReads = new WeakSet<object>()
 let readRevision = 0
 if (isRemoteCatalog)
   authService.subscribe(() => {
@@ -239,8 +255,8 @@ if (isRemoteCatalog)
     if (owner !== sessionOwner) {
       sessionOwner = owner
       sessionEpoch++
-      settingsLoading = undefined
-      applyRemoteCommerceSettings({
+      settingsReads?.invalidate()
+      applyLoadedCommerceSettings({
         shipping: emptyShippingSettings(),
         shippingVersion: 0,
         promotions: [],
@@ -248,9 +264,10 @@ if (isRemoteCatalog)
     }
   })
 function sessionError(): never {
+  invalidatePrivateAccess?.()
   sessionEpoch++
-  settingsLoading = undefined
-  applyRemoteCommerceSettings({
+  settingsReads?.invalidate()
+  applyLoadedCommerceSettings({
     shipping: emptyShippingSettings(),
     shippingVersion: 0,
     promotions: [],
@@ -262,7 +279,7 @@ function sessionError(): never {
 }
 async function stillActor(expected: Actor) {
   const state = authService.getSnapshot(),
-    { data, error } = await requireSupabaseClient().auth.getSession()
+    { data, error } = await (await requireReadySupabaseClient()).auth.getSession()
   if (
     error ||
     expected.epoch !== sessionEpoch ||
@@ -276,6 +293,7 @@ async function stillActor(expected: Actor) {
     sessionError()
 }
 async function actor(): Promise<Actor> {
+  await adminSettingsReads()
   const startedEpoch = sessionEpoch,
     state = authService.getSnapshot()
   if (
@@ -285,7 +303,7 @@ async function actor(): Promise<Actor> {
     state.session.intent !== 'account'
   )
     sessionError()
-  const { data, error } = await requireSupabaseClient().auth.getSession()
+  const { data, error } = await (await requireReadySupabaseClient()).auth.getSession()
   if (error || data.session?.user.id !== state.session.user.id) sessionError()
   const expected = {
     userId: state.session.user.id,
@@ -295,6 +313,7 @@ async function actor(): Promise<Actor> {
   const verified = await verifySupabaseUser(expected.token)
   if (verified.error || verified.data.user?.id !== expected.userId)
     sessionError()
+  await loadAdminRuntime()
   await stillActor(expected)
   return expected
 }
@@ -333,7 +352,7 @@ async function rpc<N extends RpcName>(
   expected: Actor,
 ) {
   await stillActor(expected)
-  const response = await requireSupabaseClient()
+  const response = await (await requireReadySupabaseClient())
     .rpc(name, args)
     .setHeader('Authorization', `Bearer ${expected.token}`)
   await stillActor(expected)
@@ -342,7 +361,7 @@ async function rpc<N extends RpcName>(
 }
 function invalidateSettingsReads() {
   readRevision++
-  settingsLoading = undefined
+  settingsReads?.invalidate()
 }
 async function command<N extends RpcName>(
   name: N,
@@ -358,28 +377,32 @@ async function command<N extends RpcName>(
 }
 export async function loadAdminCommerceSettings(): Promise<void> {
   if (!isRemoteCatalog) return
-  const current = await actor()
-  if (
-    settingsLoading?.actor.userId === current.userId &&
-    settingsLoading.actor.epoch === current.epoch &&
-    settingsLoading.actor.token === current.token
-  )
-    return settingsLoading.task
+  const startedEpoch = sessionEpoch
   const startedReadRevision = readRevision
-  const task = (async () => {
-    const data = parseAdminSettings(
-      await rpc('admin_commerce_settings', undefined, current),
-    )
-    await stillActor(current)
-    if (startedReadRevision !== readRevision) return
-    applyRemoteCommerceSettings(data)
-  })()
-  settingsLoading = { actor: current, task }
-  try {
-    await task
-  } finally {
-    if (settingsLoading?.task === task) settingsLoading = undefined
-  }
+  const reads = await adminSettingsReads()
+  const [result] = await Promise.all([
+    reads.read('admin_commerce_settings', async current =>
+      (await requireReadySupabaseClient()).rpc('admin_commerce_settings')
+        .setHeader('Authorization', `Bearer ${current.token}`),
+    ).catch((error: unknown) => {
+      if (error instanceof UserFacingError && error.code === 'session') sessionError()
+      // A confirmed configuration write has already supplied canonical data.
+      // An older background read may retire quietly, preserving this method's
+      // existing void contract; renewal without a write still rejects.
+      if (error instanceof UserFacingError && error.code === 'superseded-read' &&
+          startedReadRevision !== readRevision) return undefined
+      throw error
+    }),
+    loadAdminRuntime(),
+  ])
+  if (!result) return
+  const current = { ...result.actor, epoch: startedEpoch }
+  await stillActor(current)
+  checkError(result.value.error, result.value.status)
+  const data = parseAdminSettings(result.value.data)
+  if (startedReadRevision !== readRevision || appliedSettingsReads.has(result)) return
+  appliedSettingsReads.add(result)
+  applyLoadedCommerceSettings(data)
 }
 const json = (value: unknown) => value as Json
 
@@ -388,7 +411,8 @@ export const commerceSettingsService = {
     shipping: ShippingSettings,
     expectedVersion: number,
   ): Promise<AdminSaveResult> {
-    if (!isRemoteCatalog) return adminService.saveShipping(shipping)
+    if (!isRemoteCatalog)
+      return adminRuntime().adminService.saveShipping(shipping)
     const current = await actor()
     const { configured: _configured, ...payload } = shipping
     void _configured
@@ -406,10 +430,10 @@ export const commerceSettingsService = {
       shippingVersion: version,
     })
     await stillActor(current)
-    applyRemoteCommerceSettings({
+    applyLoadedCommerceSettings({
       shipping: canonical,
       shippingVersion: version,
-      promotions: adminService.getSnapshot().promotions,
+      promotions: adminRuntime().adminService.getSnapshot().promotions,
     })
     invalidatePublicQueryCache()
     publicShippingSettings.confirm({
@@ -419,7 +443,8 @@ export const commerceSettingsService = {
     return { kind: 'saved' }
   },
   async savePromotion(promotion: AdminPromotion): Promise<AdminSaveResult> {
-    if (!isRemoteCatalog) return adminService.savePromotion(promotion)
+    if (!isRemoteCatalog)
+      return adminRuntime().adminService.savePromotion(promotion)
     const current = await actor()
     const { used: _used, version: _version, ...payload } = promotion
     void _used
@@ -444,8 +469,8 @@ export const commerceSettingsService = {
     )
     const canonical = couponFromDto(response.coupon, response.version)
     await stillActor(current)
-    const snapshot = adminService.getSnapshot()
-    applyRemoteCommerceSettings({
+    const snapshot = adminRuntime().adminService.getSnapshot()
+    applyLoadedCommerceSettings({
       shipping: snapshot.shipping,
       shippingVersion: snapshot.shippingVersion ?? 0,
       promotions: [
@@ -461,11 +486,11 @@ export const commerceSettingsService = {
     expectedVersion?: number,
   ): Promise<AdminSaveResult> {
     if (!isRemoteCatalog) {
-      adminService.setPromotionActive(id, active)
+      adminRuntime().adminService.setPromotionActive(id, active)
       return { kind: 'saved' }
     }
-    const item = adminService
-      .getSnapshot()
+    const item = adminRuntime()
+      .adminService.getSnapshot()
       .promotions.find((value) => value.id === id)
     if (!item)
       return {
@@ -482,15 +507,15 @@ export const commerceSettingsService = {
     id: string,
     expectedVersion: number,
   ): Promise<AdminSaveResult> {
-    if (!isRemoteCatalog) return adminService.deletePromotion(id)
+    if (!isRemoteCatalog) return adminRuntime().adminService.deletePromotion(id)
     const current = await actor()
     await command(
       'admin_delete_coupon',
       { p_id: id, p_expected_version: expectedVersion },
       current,
     )
-    const snapshot = adminService.getSnapshot()
-    applyRemoteCommerceSettings({
+    const snapshot = adminRuntime().adminService.getSnapshot()
+    applyLoadedCommerceSettings({
       shipping: snapshot.shipping,
       shippingVersion: snapshot.shippingVersion ?? 0,
       promotions: snapshot.promotions.filter((item) => item.id !== id),

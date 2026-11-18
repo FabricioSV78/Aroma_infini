@@ -3,7 +3,10 @@ import {
   parseManagedVideoPath,
   parseManagedSvgPath,
 } from '../domain/media'
-import { resolveMediaAlias } from './media-alias-registry'
+import {
+  isBuiltinMediaSource,
+  resolveMediaAlias,
+} from './media-alias-registry'
 
 const managedAssetPath = /^\/(?:images|videos|brand)\//
 
@@ -32,7 +35,7 @@ export function mediaApiBaseUrl(
   }
 }
 
-/** Local URLs today; an optional public media origin can host the same keys later. */
+/** Verified R2 media uses its Worker origin; other static keys can use a public origin. */
 export function assetSource(
   source: string,
   publicMediaBase: string | undefined = import.meta.env?.VITE_MEDIA_BASE_URL,
@@ -46,6 +49,13 @@ export function assetSource(
   ) {
     const origin = mediaApiBaseUrl(mediaApiBase)
     return origin ? `${origin}${source}` : source
+  }
+  // A retired or not-yet-resolved original still belongs to the verified
+  // backend. In Vite development, falling back to public/ would resurrect its
+  // bundled bytes after R2 cleanup; let the Worker return its current state.
+  if (isBuiltinMediaSource(source)) {
+    const origin = mediaApiBaseUrl(mediaApiBase)
+    if (origin) return `${origin}${source}`
   }
   if (!publicMediaBase || !managedAssetPath.test(source)) return source
   try {

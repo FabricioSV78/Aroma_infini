@@ -71,6 +71,9 @@
     "run_worker_first": [
       "/api/*",
       "/media/*",
+      "/images/*",
+      "/videos/*",
+      "/brand/*",
       "/",
       "/marcas",
       "/robots.txt",
@@ -127,6 +130,7 @@
       ],
       "vars": {
         "APP_ENVIRONMENT": "staging",
+        "MEDIA_BUILTIN_STORAGE": "r2",
         "PUSH_ENVIRONMENT": "staging",
         "ADMIN_PUSH_ENABLED": "true",
         "SEO_ALLOW_INDEXING": "false",

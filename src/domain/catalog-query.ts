@@ -41,6 +41,30 @@ function priceParam(value: string | null) {
     ? value
     : ''
 }
+
+/** Bounded request syntax before the server confirms catalog vocabularies.
+ * Shared by the browser and the anonymous initial-document projection. */
+export function catalogRequestQuery(
+  params: URLSearchParams,
+  brandSlug?: string,
+): CatalogQuery {
+  const parsed = parseCatalogQuery(params, [], { complementsEnabled: true })
+  return {
+    productTypes: params.getAll('tipo').filter(isProductType),
+    brands: brandSlug ? [brandSlug] : params.getAll('marca').slice(0, 100),
+    genders: params
+      .getAll('genero')
+      .filter((value): value is CatalogGender =>
+        ['hombre', 'mujer', 'unisex'].includes(value),
+      ),
+    families: params.getAll('familia').slice(0, 32),
+    min: parsed.min,
+    max: parsed.max,
+    order: parsed.order,
+    page: parsed.page,
+    search: parsed.search,
+  }
+}
 export function parseCatalogQuery(
   params: URLSearchParams,
   brands: readonly Brand[],

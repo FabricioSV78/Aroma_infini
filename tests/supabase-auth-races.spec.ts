@@ -20,6 +20,119 @@ function gate() {
   return { wait, resolve }
 }
 
+test('las verificaciones simultáneas comparten el actor pendiente sin guardar permisos terminados', async ({ page, supabaseNetwork }) => {
+  await supabaseNetwork.seedSession(page)
+  await page.goto('/contacto')
+  await page.evaluate(async () => {
+    const source = '/src/services/auth-service.ts'
+    const { authService } = await import(source)
+    await authService.initialize()
+  })
+  const arrived = gate(), release = gate()
+  let calls = 0
+  await page.route(`https://${fixtureProject}.supabase.co/rest/v1/rpc/current_actor`, async route => {
+    calls++
+    arrived.resolve()
+    await release.wait
+    await route.fallback()
+  })
+  const verification = page.evaluate(async () => {
+    const source = '/src/services/auth-adapter.ts'
+    const { authAdapter } = await import(source)
+    const sessions = await Promise.all(Array.from({length:3}, () => authAdapter.getVerifiedSession()))
+    return sessions.map(session => session?.user.id)
+  })
+  try {
+    await arrived.wait
+    release.resolve()
+    expect(await verification).toEqual([customerA,customerA,customerA])
+    expect(calls).toBe(1)
+    supabaseNetwork.actorOwnerMismatch = true
+    const rejected = await page.evaluate(async () => {
+      const source = '/src/services/auth-adapter.ts'
+      const { authAdapter } = await import(source)
+      try { await authAdapter.getVerifiedSession(); return false } catch { return true }
+    })
+    expect(rejected).toBe(true)
+    expect(calls).toBe(2)
+  } finally { release.resolve(); await verification.catch(() => {}) }
+})
+
+test('la interfaz pública no espera el SDK y una sesión guardada no obtiene acceso sin verificación', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  await supabaseNetwork.seedSession(page)
+  const download = gate()
+  let sdkRequests = 0
+  await page.route(
+    /\/deps\/@supabase_supabase-js\.js(?:\?|$)/,
+    async (route) => {
+      sdkRequests++
+      await download.wait
+      await route.continue()
+    },
+  )
+  try {
+    await page.goto('/contacto', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('main h1')).toHaveText('Contacto')
+    expect(sdkRequests).toBe(1)
+    const status = await page.evaluate(async () => {
+      const path = '/src/services/auth-service.ts'
+      const { authService } = await import(path)
+      return authService.getSnapshot().status
+    })
+    expect(status).toBe('checking')
+    expect(
+      supabaseNetwork.requests.filter(
+        (request) => request.path === '/auth/v1/user',
+      ),
+    ).toHaveLength(0)
+    download.resolve()
+    const verified = await page.evaluate(async () => {
+      const path = '/src/services/auth-service.ts'
+      const { authService } = await import(path)
+      await authService.initialize()
+      return authService.getSnapshot().status
+    })
+    expect(verified).toBe('authenticated')
+    expect(
+      supabaseNetwork.requests.some(
+        (request) => request.path === '/auth/v1/user',
+      ),
+    ).toBe(true)
+    expect(
+      supabaseNetwork.requests.some(
+        (request) => request.path === '/rest/v1/rpc/current_actor',
+      ),
+    ).toBe(true)
+    expect(sdkRequests).toBe(1)
+  } finally {
+    download.resolve()
+  }
+})
+
+test('si falla la descarga del SDK, la página pública sigue visible y Auth permanece cerrado', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  await supabaseNetwork.seedSession(page)
+  await page.route(/\/deps\/@supabase_supabase-js\.js(?:\?|$)/, (route) =>
+    route.abort('failed'),
+  )
+  await page.goto('/contacto', { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('main h1')).toHaveText('Contacto')
+  const state = await page.evaluate(async () => {
+    const path = '/src/services/auth-service.ts'
+    const { authService } = await import(path)
+    await authService.initialize()
+    const current = authService.getSnapshot()
+    return { status: current.status, hasSession: current.session !== null }
+  })
+  expect(state).toEqual({ status: 'error', hasSession: false })
+  expect(supabaseNetwork.requests).toHaveLength(0)
+})
+
 async function snapshot(page: Page) {
   const raw = await page.evaluate(
     (key) => localStorage.getItem(key),
@@ -71,6 +184,77 @@ async function readyVerifiedCustomer(page: Page) {
     await authService.initialize()
   })
 }
+
+test('initialize espera la verificación vigente si un evento del SDK reemplaza la lectura inicial', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  void supabaseNetwork
+  await readyVerifiedCustomer(page)
+  const release = [gate(), gate()],
+    arrived = [gate(), gate()]
+  let calls = 0,
+    returned = false
+  await page.route(
+    `https://${fixtureProject}.supabase.co/rest/v1/rpc/current_actor`,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fallback()
+      const index = calls++
+      if (index < 2) {
+        arrived[index].resolve()
+        await release[index].wait
+      }
+      await route.fallback()
+    },
+  )
+  const reading = page
+    .evaluate(async () => {
+      const path = '/src/services/auth-service.ts'
+      const { authService } = await import(path)
+      await authService.initialize()
+      return authService.getSnapshot().status
+    })
+    .then((value) => {
+      returned = true
+      return value
+    })
+  try {
+    await arrived[0].wait
+    await page.evaluate((key) => {
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+    }, fixtureStorageKey)
+    await arrived[1].wait
+    const obsoleteResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/rest/v1/rpc/current_actor') &&
+        response.request().method() !== 'OPTIONS',
+    )
+    release[0].resolve()
+    // Ensure the obsolete response has completed, rather than relying on a
+    // sleep: it is insufficient while the new actor verification is held.
+    await (await obsoleteResponse).finished()
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const path = '/src/services/auth-service.ts'
+          const { authService } = await import(path)
+          return authService.getSnapshot().status
+        }),
+      )
+      .toBe('checking')
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    )
+    expect(returned).toBe(false)
+    release[1].resolve()
+    expect(await reading).toBe('authenticated')
+    expect(calls).toBe(2)
+  } finally {
+    release.forEach((item) => item.resolve())
+    await reading
+  }
+})
 
 for (const first of ['user', 'actor'] as const) {
   test(`Auth y actor arrancan en paralelo y esperan ambas respuestas: primero ${first}`, async ({

@@ -349,12 +349,13 @@ test('Campañas ocultas no descargan su video; los enlaces a categoría son HTML
   )
 })
 
-test('La versión móvil usa su propio archivo y su póster; cambiar tamaño sustituye un solo player', async ({
+test('La versión móvil usa solo su imagen; cambiar a escritorio monta un solo player principal', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await campaignFixture(page, { alternateMobile: true })
-  await expect(page.locator('.hero video')).toHaveAttribute('src', mobileVideo)
+  const requested = await campaignFixture(page, { alternateMobile: true })
+  await expect(page.locator('.hero video')).toHaveCount(0)
+  expect(requested).toEqual([])
   await page.setViewportSize({ width: 1440, height: 900 })
   await expect(page.locator('.hero video')).toHaveCount(1)
   await expect(page.locator('.hero video')).toHaveAttribute('src', firstVideo)

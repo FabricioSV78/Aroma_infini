@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import '../../styles/admin-workspace.css'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { Icon, type IconName } from '../../components/ui/Icon'
 import { SeoManager } from '../../seo/SeoManager'
@@ -16,6 +17,7 @@ import { AdminNotificationBell } from './AdminNotificationBell'
 import { disableAdminPushOnSignOut } from '../../services/admin-notifications'
 import { preloadAdminRoute } from './admin-route-modules'
 import { consumeAdminDeviceNotice } from '../../services/admin-device-service'
+import { useAuth } from '../auth/useAuth'
 
 const adminGroups = [
   {
@@ -49,7 +51,6 @@ const adminGroups = [
     sections: [
       { to: '/admin/promociones', label: 'Promociones', icon: 'percent' },
       { to: '/admin/home', label: 'Contenido del Home', icon: 'home' },
-      { to: '/admin/biblioteca', label: 'Biblioteca multimedia', icon: 'package' },
     ],
   },
   {
@@ -75,8 +76,9 @@ const adminGroups = [
 }>
 
 export function AdminLayout() {
+  const auth = useAuth()
   return (
-    <AdminNoticeProvider>
+    <AdminNoticeProvider key={auth.session?.user.id ?? 'signed-out'}>
       <AdminLayoutContent />
     </AdminNoticeProvider>
   )

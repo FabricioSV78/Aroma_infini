@@ -1,17 +1,39 @@
+# Local credentials; sanitized examples remain versioned.
+.env*
+!.env.example
+.dev.vars*
+!.dev.vars.example
+
+# Dependencies, builds and generated types.
 node_modules/
 dist/
+worker-configuration.d.ts
+*.tsbuildinfo
+
+# Local infrastructure state. Ignoring it does not authorize deleting it.
 .wrangler/
 supabase/.temp/
 supabase/.branches/
-worker-configuration.d.ts
-.dev.vars*
-!.dev.vars.example
-*.tsbuildinfo
-.env*
-!.env.example
+
+# Test output, reports, benchmarks, protected backups and local evidence.
 artifacts/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+
+# Tool caches and logs.
+.vite/
+.cache/
+.npm/
 *.log
+
+# Local source exports; keep source files instead of generated dumps.
 repomix-output.*
-# Local source exports; keep source files instead of committing generated dumps.
 AROMAINFINI.xml
 ECCOMERCE.xml
+
+# Operating-system metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini

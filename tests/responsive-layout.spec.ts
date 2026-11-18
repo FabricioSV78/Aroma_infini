@@ -46,7 +46,12 @@ interface LayoutAudit {
 }
 
 async function auditRoute(page: Page, route: string) {
-  await page.goto(route)
+  await page.goto(route, { waitUntil: 'domcontentloaded' })
+  // A skeleton is also a main/container. Audit the destination, rather than
+  // accidentally measuring its loading shell during cold route imports.
+  await expect(page.locator('main h1:not(.sr-only)')).toBeVisible()
+  await expect(page.locator('.ui-loading-shell')).toHaveCount(0)
+  await page.evaluate(() => document.fonts.ready)
   await page.evaluate(async () => {
     const maximum = document.documentElement.scrollHeight - innerHeight
     const steps = Math.min(6, Math.max(1, Math.ceil(maximum / innerHeight)))

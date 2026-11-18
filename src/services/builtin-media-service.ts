@@ -7,9 +7,10 @@ import {
   type MediaAliasDocument,
 } from './media-alias-registry'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import { registerManagedMedia, registerManagedVideo } from './media-registry'
 import { cachedPublicQuery } from './public-query-cache'
+import { takeInitialPublicMedia } from './public-media-bootstrap'
 
 let loaded = false
 let pending: Promise<MediaAliasDocument> | null = null
@@ -32,6 +33,16 @@ export const builtinMediaService = {
   confirm,
   async load(force = false): Promise<MediaAliasDocument> {
     if (!isRemoteCatalog || (loaded && !force)) return getMediaAliasSnapshot()
+    if (!force) {
+      const initial = takeInitialPublicMedia('aliases')
+      if (initial !== undefined) {
+        try {
+          return confirm(initial)
+        } catch {
+          /* Validate and retry through Supabase. */
+        }
+      }
+    }
     if (pending) {
       if (!force) return pending
       const previous = pending
@@ -40,7 +51,7 @@ export const builtinMediaService = {
     }
     const expected = mediaAliasGeneration()
     const read = async () => {
-      const result = await requireSupabaseClient()
+      const result = await (await requireReadySupabaseClient())
         .rpc('public_media_aliases')
         .abortSignal(AbortSignal.timeout(10000))
       if (result.error)

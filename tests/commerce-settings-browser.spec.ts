@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import type { Page } from '@playwright/test'
 import { DEFAULT_OLFACTORY_FAMILIES } from '../src/domain/olfactory-family'
 import type { ShippingSettings } from '../src/types/shipping'
@@ -89,6 +90,7 @@ const test = authTest.extend<{ settingsNetwork: SettingsFixture }>({
           pages: 1,
           familyCodes: [],
         })
+      else if (['admin_product_list','admin_order_list','admin_customer_list'].includes(name)) await reply(adminListFixture(name,body))
       else if (name === 'admin_catalog_page')
         await reply({
           ...metadata,

@@ -310,3 +310,14 @@ test('arbitrary VITE server credentials cannot be deployed even with a matching 
       (error) => error.message === 'build-environment-or-integrity-mismatch',
     )
   }))
+
+test('a managed-original deployment rejects retained static copies even with valid hashes', () =>
+  fixture('staging', async ({ directory, check }) => {
+    const managedConfig = structuredClone(config)
+    managedConfig.env.staging.vars.MEDIA_BUILTIN_STORAGE = 'r2'
+    assert.equal((await check({ config: managedConfig })).result, 'passed')
+    await mkdir(join(directory, 'images'))
+    await writeFile(join(directory, 'images/ambre-480.webp'), 'old original')
+    await sealWorkerBuild(directory, 'staging')
+    await assert.rejects(check({ config: managedConfig }), /build-environment-or-integrity-mismatch/)
+  }))

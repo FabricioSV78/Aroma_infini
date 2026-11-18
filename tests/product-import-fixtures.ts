@@ -96,6 +96,16 @@ export async function reviewFile(
 /** Read only the isolated browser's persisted demo data, never a remote API. */
 export async function persistedAdminState(page: Page): Promise<AdminState> {
   return page.evaluate(async () => {
+    // goto completes before the lazy local runtime necessarily hydrates. Let
+    // the application create its initial store before reading it;
+    // opening version 1 here first could create an empty database ourselves.
+    const path = '/src/services/admin-service.ts'
+    const { hydrateAdminStore } = (await import(
+      path
+    )) as typeof import('../src/services/admin-service')
+    await hydrateAdminStore()
+    // Observe only committed data: failure/pending-write tests deliberately
+    // inspect the previous snapshot before allowing a later write to finish.
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('aroma-infini-admin', 1)
       request.onsuccess = () => resolve(request.result)

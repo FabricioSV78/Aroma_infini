@@ -5,14 +5,33 @@ import { chromium } from '@playwright/test'
 import { preview } from 'vite'
 import indexablePaths from '../src/seo/indexable-paths.json' with { type: 'json' }
 import { readSeoEnvironment } from './seo-environment.mjs'
+import { imageOnlySnapshot } from './prerender-media.mjs'
+import {
+  publicRouteHints,
+  stripPublicRouteHints,
+  authRouteHint,
+  selectPublicFontPreloads,
+} from './public-route-hints.mjs'
 
 const env = await readSeoEnvironment()
 const shellFile = join('dist', 'index.html')
-const shell = await readFile(shellFile, 'utf8')
-const privateShell = shell.replace(
+const originalShell = await readFile(shellFile, 'utf8')
+const manifest = JSON.parse(
+  await readFile(join('dist', '.vite', 'manifest.json'), 'utf8'),
+)
+const shell = selectPublicFontPreloads(originalShell.replace(
+  '</head>',
+  () => publicRouteHints(manifest, originalShell) + '</head>',
+), '/')
+await writeFile(shellFile, shell)
+// Retain separate markers for shared route dependencies. The Worker selects
+// only this request's group before streaming; no per-request manifest fetch.
+const privateShell = originalShell.replace(
   /(<meta name="robots" content=")[^"]+/,
   '$1noindex,nofollow',
-)
+).replace('</head>', () =>
+  ['/', '/tienda', '/producto'].map(route => publicRouteHints(manifest, originalShell, route)).join('') +
+  authRouteHint(manifest) + '</head>')
 await writeFile(join('dist', '__app_shell.html'), privateShell)
 
 if (env.VITE_ALLOW_INDEXING !== 'true') {
@@ -88,7 +107,9 @@ try {
       const heading = (await page.locator('main h1').first().innerText()).trim()
       if (!heading || /no encontramos|no está en la selección/i.test(heading))
         throw new Error(`La ruta ${path} no tiene contenido publicable.`)
-      snapshots.set(path, await page.content())
+      // A desktop prerender must not initialize a player before the mobile
+      // client can select its image-only resources.
+      snapshots.set(path, await page.evaluate(imageOnlySnapshot))
     } finally {
       await page.close()
     }
@@ -98,7 +119,9 @@ try {
     const filename =
       path === '/' ? shellFile : join('dist', path.slice(1), 'index.html')
     await mkdir(dirname(filename), { recursive: true })
-    await writeFile(filename, html)
+    const currentRoute = selectPublicFontPreloads(stripPublicRouteHints(html, path), path)
+    await writeFile(filename, currentRoute.replace('</head>', () =>
+      publicRouteHints(manifest, currentRoute, path) + '</head>'))
   }
   console.log(`${snapshots.size} páginas públicas prerenderizadas.`)
 } finally {

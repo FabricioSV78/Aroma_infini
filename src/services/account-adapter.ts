@@ -8,7 +8,7 @@ import type { DeliveryLocation } from '../types/commerce'
 import { isDeliveryLocation } from '../domain/delivery-location'
 import { AuthError } from './auth-errors'
 import { mapSupabaseAuthError } from './supabase-auth-errors'
-import { getSupabaseClient, requireSupabaseClient } from './supabase-client'
+import { isSupabaseConfigured, requireSupabaseClient } from './supabase-client'
 import { parseAccountOrder } from './order-response'
 import { isRemoteCatalog } from './catalog-source'
 
@@ -128,7 +128,7 @@ function addressFromDto(value: Json, userId: string): AccountAddress | null {
 /** Real owner-scoped RPCs only; no fallback to the browser's commercial snapshot. */
 export const accountAdapter: AccountRepository = {
   get configured() {
-    return Boolean(getSupabaseClient())
+    return isSupabaseConfigured
   },
   async load(userId) {
     const owner = await verifiedOwner(userId)

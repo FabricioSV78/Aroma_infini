@@ -1,4 +1,5 @@
 import { variantLabel } from '../../domain/product-type'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { RecoveryCodeSettings } from './RecoveryCodeSettings'
 import { authFeatures } from '../../domain/auth-policy'
 import { formatBrandName } from '../../utils/brand-name'
@@ -842,7 +843,7 @@ export function AccountOrderDetailPage() {
                     to={`/producto/${line.productSlug}`}
                     aria-label={`Ver ${line.name}`}
                   >
-                    <img
+                    <LoadingImage
                       src={imageSource(line.image)}
                       srcSet={imageSourceSet(line.image, [480, 960])}
                       sizes="88px"

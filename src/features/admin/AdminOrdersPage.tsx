@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router'
+import { Link, useLocation, useRevalidator, useSearchParams } from 'react-router'
+import { useAdminListData } from './useAdminListData'
+import type { AdminOrderList, AdminOrderSelection } from '../../types/admin-lists'
+import { adminListPage, adminOrderListQuery } from '../../domain/admin-list-query'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
@@ -8,7 +11,6 @@ import {
   getOrderTransitionError,
 } from '../../domain/order-workflow'
 import {
-  adminService,
   hasCompleteOrderDelivery,
   type AdminOrder,
   type AdminOrderStatus,
@@ -17,6 +19,9 @@ import { formatPEN } from '../../services/currency'
 import {
   loadAdminOrders,
   orderAdminService,
+  readAdminOrderSelection,
+  loadAdminOrdersByReferences,
+  readAdminOrderList,
 } from '../../services/order-admin-service'
 import { isRemoteCatalog } from '../../services/catalog-source'
 import type { OrderActionIssue } from '../../types/order-workflow'
@@ -68,27 +73,32 @@ interface OrderActionFeedback {
 interface OrderSelectionState {
   scope: string
   items: Map<string, AdminOrderStatus>
+  records: Map<string, AdminOrderSelection>
 }
 
 export function AdminOrdersPage() {
   const notice = useAdminNotice()
   const persistence = useAdminSave({ catalog: true })
   const state = useAdminStore()
+  const routed = useAdminListData<AdminOrderList>()
+  const [confirmedPage, setConfirmedPage] = useState<{ base: AdminOrderList; page: AdminOrderList } | null>(null)
+  const remote = confirmedPage?.base === routed ? confirmedPage.page : routed
+  const revalidator = useRevalidator()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const selectionScopeParams = new URLSearchParams(params)
   selectionScopeParams.delete('page')
   selectionScopeParams.sort()
-  const selectionScope = selectionScopeParams.toString()
+  const selectionScope = `${remote?.ownerId ?? ''}:${selectionScopeParams.toString()}`
   const [selectionState, setSelectionState] = useState<OrderSelectionState>(
-    () => ({ scope: selectionScope, items: new Map() }),
+    () => ({ scope: selectionScope, items: new Map(), records: new Map() }),
   )
   const selection =
     selectionState.scope === selectionScope
       ? selectionState.items
       : new Map<string, AdminOrderStatus>()
   if (selectionState.scope !== selectionScope) {
-    setSelectionState({ scope: selectionScope, items: new Map() })
+    setSelectionState({ scope: selectionScope, items: new Map(), records: new Map() })
   }
 
   function setSelection(
@@ -97,16 +107,22 @@ export function AdminOrdersPage() {
       | ((
           current: Map<string, AdminOrderStatus>,
         ) => Map<string, AdminOrderStatus>),
+    additional: readonly AdminOrderSelection[] = [],
   ) {
-    setSelectionState((current) => ({
-      scope: selectionScope,
-      items:
-        typeof next === 'function'
-          ? next(current.scope === selectionScope ? current.items : new Map())
-          : next,
-    }))
+    setSelectionState((current) => {
+      const items = typeof next === 'function'
+        ? next(current.scope === selectionScope ? current.items : new Map()) : next
+      const known = new Map([
+        ...(current.scope === selectionScope ? current.records : []),
+        ...(remote?.orders ?? state.orders).map(order => [order.reference, order] as const),
+        ...additional.map(order => [order.reference, order] as const),
+      ])
+      return { scope: selectionScope, items, records: new Map([...known].filter(([reference]) => items.has(reference))) }
+    })
   }
   const [error, setError] = useState('')
+  const pageReadRevision = useRef(0)
+  const busyRef = useRef(false)
   useEffect(() => {
     if (!isRemoteCatalog) return
     let active = true
@@ -124,9 +140,12 @@ export function AdminOrdersPage() {
       if (refreshFrame !== null) return
       refreshFrame = window.requestAnimationFrame(() => {
         refreshFrame = null
-        if (!active || document.visibilityState !== 'visible') return
-        void loadAdminOrders(true).catch(() => {
-          if (active)
+        if (!active || document.visibilityState !== 'visible' || busyRef.current) return
+        const expectedRead = ++pageReadRevision.current
+        void (routed ? readAdminOrderList(adminOrderListQuery(params), adminListPage(params)).then(page => {
+          if (active && expectedRead === pageReadRevision.current) setConfirmedPage({ base: routed, page })
+        }) : loadAdminOrders(true)).catch(() => {
+          if (active && expectedRead === pageReadRevision.current)
             setError(
               'No pudimos actualizar la lista. Conservamos los pedidos confirmados; vuelve a abrir este apartado para intentar de nuevo.',
             )
@@ -141,15 +160,24 @@ export function AdminOrdersPage() {
       window.removeEventListener('focus', refresh)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [])
+  }, [routed, params])
   const [feedback, setFeedback] = useState<OrderActionFeedback | null>(null)
-  const [reviewReferences, setReviewReferences] = useState<string[] | null>(
+  const [localReviewReferences, setLocalReviewReferences] = useState<string[] | null>(
     null,
   )
+  const reviewReferences = remote ? params.get('revisar')?.split(',') ?? null : localReviewReferences
+  function setReviewReferences(references: string[] | null) {
+    if (!remote) { setLocalReviewReferences(references); return }
+    const next = new URLSearchParams(params)
+    next.delete('page')
+    if (references) next.set('revisar', references.join(','))
+    else next.delete('revisar')
+    setParams(next)
+  }
   const persistenceFailed = persistence.persistenceFailed
-  const [busy, setBusy] = useState(false)
+  const [processing, setBusy] = useState(false)
+  const busy = processing || revalidator.state === 'loading'
   useUnsavedChanges(busy || persistenceFailed)
-  const busyRef = useRef(false)
   const [statusAction, setStatusAction] = useState<OrderStatusAction | null>(
     null,
   )
@@ -174,10 +202,10 @@ export function AdminOrdersPage() {
     () => new Map(state.customers.map((customer) => [customer.id, customer])),
     [state.customers],
   )
-  const selectedCustomer = customerById.get(customerFilter)
+  const selectedCustomer = remote?.customer ?? customerById.get(customerFilter)
   const normalizedSearch = orderSearchText(search)
   const orders = useMemo(
-    () =>
+    () => remote?.orders ??
       [...state.orders]
         .filter((order) => {
           if (reviewReferences)
@@ -207,6 +235,7 @@ export function AdminOrdersPage() {
         ),
     [
       state.orders,
+      remote,
       normalizedSearch,
       preparationFilter,
       customerFilter,
@@ -215,7 +244,8 @@ export function AdminOrdersPage() {
       reviewReferences,
     ],
   )
-  const pagination = useAdminPagination(orders, 20)
+  const total = remote?.total ?? orders.length
+  const pagination = useAdminPagination(orders, 20, remote?.total)
   const hasFilters = Boolean(
     search ||
     customerFilter ||
@@ -232,11 +262,15 @@ export function AdminOrdersPage() {
     selection.has(order.reference),
   )
   const allFilteredSelected =
-    orders.length > 0 && orders.every((order) => selection.has(order.reference))
+    total > 0 && selection.size === total
   const returnTo = `${location.pathname}${location.search}`
+  const knownOrders = new Map([
+    ...selectionState.records,
+    ...(remote?.orders ?? state.orders).map(order => [order.reference, order] as const),
+  ])
   const actionOrders =
     statusAction?.references.flatMap((reference) => {
-      const order = state.orders.find((item) => item.reference === reference)
+      const order = knownOrders.get(reference)
       return order ? [order] : []
     }) ?? []
   const eligibleCount = actionOrders.filter(
@@ -256,7 +290,7 @@ export function AdminOrdersPage() {
   }
 
   function updateFilters(next: URLSearchParams) {
-    setReviewReferences(null)
+    if (!remote) setLocalReviewReferences(null)
     setSelection(new Map())
     clearNotices()
     setParams(next)
@@ -286,7 +320,7 @@ export function AdminOrdersPage() {
       references: [...selection.keys()],
       expected: Object.fromEntries(selection),
       expectedVersions: Object.fromEntries(
-        state.orders
+        [...knownOrders.values()]
           .filter((order) => selection.has(order.reference))
           .map((order) => [order.reference, order.version ?? 0]),
       ),
@@ -324,14 +358,13 @@ export function AdminOrdersPage() {
       return
     }
     busyRef.current = true
+    pageReadRevision.current++
     setBusy(true)
     clearNotices()
     try {
       if (statusAction.individual) {
         const reference = statusAction.references[0]
-        const current = adminService
-          .getSnapshot()
-          .orders.find((order) => order.reference === reference)
+        const current = knownOrders.get(reference)
         if (!current || current.status !== statusAction.expected[reference]) {
           setActionError(
             'El estado del pedido ha cambiado. Cierra y revisa su estado actual.',
@@ -345,6 +378,7 @@ export function AdminOrdersPage() {
             deliveryConfirmed,
             expectedVersions: statusAction.expectedVersions,
             operationId: statusAction.operationId,
+            ...(remote ? { listContext: { query: adminOrderListQuery(params), page: adminListPage(params), limit: 20 } } : {}),
           },
         )
         if (result.kind === 'validation') {
@@ -352,6 +386,7 @@ export function AdminOrdersPage() {
           return
         }
         setStatusAction(null)
+        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
         await saveFeedback(
           `Pedido ${reference}: ${adminOrderStatusMeta[targetStatus].label.toLowerCase()}.`,
         )
@@ -365,6 +400,7 @@ export function AdminOrdersPage() {
             deliveryConfirmed,
             expectedVersions: statusAction.expectedVersions,
             operationId: statusAction.operationId,
+            ...(remote ? { listContext: { query: adminOrderListQuery(params), page: adminListPage(params), limit: 20 } } : {}),
           },
         )
         if (result.kind === 'validation') {
@@ -379,6 +415,7 @@ export function AdminOrdersPage() {
         setFeedback(report)
         setSelection(new Map())
         setStatusAction(null)
+        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
         await saveFeedback(
           `${result.updated.length} de ${statusAction.references.length} pedidos actualizados.`,
           result.errors.length || result.skipped.length
@@ -429,6 +466,29 @@ export function AdminOrdersPage() {
       if (value && value !== 'all') next.set(key, value)
     }
     updateFilters(next)
+  }
+
+  async function selectAllFiltered() {
+    if (!remote) { setSelection(new Map(orders.map(order => [order.reference, order.status]))); return }
+    if (busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    try {
+      const rows = await readAdminOrderSelection(adminOrderListQuery(params))
+      setSelection(new Map(rows.map(order => [order.reference, order.status])), rows)
+    } catch (cause) { notice.error(cause, 'orders') }
+    finally { busyRef.current = false; setBusy(false) }
+  }
+
+  async function openExport(references: string[]) {
+    if (busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    try {
+      await loadAdminOrdersByReferences(references)
+      setExportReferences(references)
+    } catch (cause) { notice.error(cause, 'orders') }
+    finally { busyRef.current = false; setBusy(false) }
   }
 
   return (
@@ -496,7 +556,7 @@ export function AdminOrdersPage() {
           ) : null}
         </div>
       ) : null}
-      {state.orders.length ? (
+      {(remote ? Object.values(remote.counts).some(count => count > 0) : state.orders.length > 0) ? (
         <section
           className="admin-order-summary"
           aria-label="Resumen de pedidos"
@@ -517,7 +577,7 @@ export function AdminOrdersPage() {
                   : adminOrderStatusMeta[status].label}
               </AdminBadge>
               <strong>
-                {state.orders.filter((order) => order.status === status).length}
+                {remote?.counts[status] ?? state.orders.filter((order) => order.status === status).length}
               </strong>
             </Link>
           ))}
@@ -576,7 +636,7 @@ export function AdminOrdersPage() {
         </div>
         <div className="admin-filter-result" aria-live="polite">
           <span>
-            {orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'}
+            {total} {total === 1 ? 'pedido' : 'pedidos'}
             {selectedCustomer ? ` de ${selectedCustomer.name}` : ''}
             {reviewReferences ? ' · Solo pedidos no actualizados' : ''}
           </span>
@@ -610,15 +670,9 @@ export function AdminOrdersPage() {
                 className="admin-order-select-all"
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  setSelection(
-                    new Map(
-                      orders.map((order) => [order.reference, order.status]),
-                    ),
-                  )
-                }
+                onClick={() => void selectAllFiltered()}
               >
-                Seleccionar los {orders.length} pedidos filtrados
+                Seleccionar los {total} pedidos filtrados
               </button>
             ) : (
               <span>Todos los pedidos filtrados están seleccionados</span>
@@ -637,7 +691,7 @@ export function AdminOrdersPage() {
               type="button"
               className="button button--secondary"
               disabled={busy}
-              onClick={() => setExportReferences([...selection.keys()])}
+              onClick={() => void openExport([...selection.keys()])}
             >
               Exportar PDF
             </button>

@@ -44,7 +44,12 @@ export async function auditMediaLibraryConcurrency({ client, config, pg }) {
       "select to_regclass('app.media_builtin_aliases') is not null as present",
     )
   ).rows[0].present
-  const aliasPaths = ['/images/ambre-480.webp', '/images/cedre-480.webp']
+  // These category fallbacks have live Home owners. A detached alias alone no
+  // longer retains a retired demonstration product photograph permanently.
+  const aliasPaths = [
+    '/images/discovery-bois-category-480.webp',
+    '/images/discovery-complements-v1-category-480.webp',
+  ]
   const originalAliases = hasAliases
     ? (
         await client.query(

@@ -6,7 +6,8 @@ import {
   type SiteSettingsDocument,
 } from '../domain/site-settings'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
+import { takePublicInitialContext } from './public-initial-context'
 
 // A missing/failed remote read must never invent business contact or policies.
 // Demo text is adopted only after the API explicitly confirms an empty document.
@@ -32,6 +33,21 @@ function confirm(document: SiteSettingsDocument) {
   return snapshot
 }
 export const siteSettingsService = {
+  hydrateInitial() {
+    if (!isRemoteCatalog || loaded) return
+    const value = takePublicInitialContext('settings')
+    if (value === undefined) return
+    try {
+      const source = value as { version?: unknown; data?: unknown } | null
+      confirm(
+        source?.version === 0 && source.data === null
+          ? { version: 0, data: defaultSiteSettings() }
+          : parseSiteSettingsDocument(value),
+      )
+    } catch {
+      /* Keep neutral content until the normal public read succeeds. */
+    }
+  },
   getSnapshot: () => snapshot,
   subscribe(listener: () => void) {
     listeners.add(listener)
@@ -40,10 +56,11 @@ export const siteSettingsService = {
     }
   },
   async load(force = false): Promise<SiteSettingsDocument> {
+    if (!force) this.hydrateInitial()
     if (!isRemoteCatalog || (loaded && !force)) return snapshot
     if (pending) return pending
     pending = (async () => {
-      const { data, error } = await requireSupabaseClient().rpc('site_settings')
+      const { data, error } = await (await requireReadySupabaseClient()).rpc('site_settings')
       if (error)
         throw new Error(
           'No pudimos cargar los datos de la tienda. Vuelve a intentar.',
@@ -63,7 +80,7 @@ export const siteSettingsService = {
   ): Promise<SiteSettingsDocument> {
     if (!isRemoteCatalog)
       return confirm(parseSiteSettingsDocument({ version: version + 1, data }))
-    const result = await requireSupabaseClient().rpc(
+    const result = await (await requireReadySupabaseClient()).rpc(
       'admin_save_site_settings',
       { p_data: JSON.parse(JSON.stringify(data)), p_expected_version: version },
     )

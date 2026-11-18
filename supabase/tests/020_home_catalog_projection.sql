@@ -20,7 +20,7 @@ begin
   end loop;
   return result;
 end $$;
-create function aroma_home_catalog_test.expected_profiles(items jsonb)
+create function aroma_home_catalog_test.full_expected_profiles(items jsonb)
 returns jsonb language sql security invoker set search_path='' as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'brandId',r.value->'product'->'brandId','family',r.value->'product'->'family',
@@ -35,6 +35,14 @@ returns jsonb language sql security invoker set search_path='' as $$
           and (v->>'priceCents')::bigint>0 and (v->>'ml')::integer>0)
   ) order by r.ordinality),'[]'::jsonb)
   from jsonb_array_elements(items) with ordinality r(value,ordinality);
+$$;
+-- Version 40 preserves both consuming projections with first/last occurrences
+-- instead of repeating one identical profile per public product.
+create function aroma_home_catalog_test.expected_profiles(items jsonb)
+returns jsonb language sql security invoker set search_path='' as $$
+  with p as (select profile,ordinal from jsonb_array_elements(aroma_home_catalog_test.full_expected_profiles(items)) with ordinality x(profile,ordinal)),
+  kept as (select min(ordinal) ordinal from p group by profile union select max(ordinal) from p group by profile)
+  select coalesce(jsonb_agg(p.profile order by p.ordinal),'[]'::jsonb) from p join kept using(ordinal);
 $$;
 create function aroma_home_catalog_test.benchmark()
 returns jsonb language plpgsql security invoker set search_path='' as $$
@@ -108,8 +116,8 @@ select aroma_home_catalog_test.ok(api.catalog_home_context()->'profiles'=
   aroma_home_catalog_test.expected_profiles(aroma_home_catalog_test.snapshot()),
   'Home profile values and order equal the complete public snapshot');
 select aroma_home_catalog_test.ok(jsonb_array_length(api.catalog_home_context()->'items')=4
-  and jsonb_array_length(api.catalog_home_context()->'profiles')=1000,
-  'Home retains all vocabulary profiles with only four complete DTOs');
+  and jsonb_array_length(api.catalog_home_context()->'profiles')=12,
+  'Home retains first and last occurrences of all six vocabulary profiles with only four complete DTOs');
 select aroma_home_catalog_test.ok(api.catalog_brand_previews()->'brands'->0->>'previewImage' is null
   and api.catalog_brand_previews()->'brands'->1->>'previewImage'=api.catalog_products(1,0)->'items'->0->'product'->>'image'
   and jsonb_array_length(api.catalog_brand_previews()->'mediaAssets')=1,
@@ -121,7 +129,8 @@ update app.products set active=false where slug='home-fixture-1';
 update app.product_variants set stock=0 where product_id='f3000000-0000-4000-8000-000000000002';
 set constraints all immediate;
 set local role anon;
-select aroma_home_catalog_test.ok(jsonb_array_length(api.catalog_home_context()->'profiles')=998
+select aroma_home_catalog_test.ok((api.catalog_products(1,0)->>'total')::integer=998
+  and jsonb_array_length(api.catalog_home_context()->'profiles')=12
   and api.catalog_home_context()->'items'->0->'product'->>'slug'='home-fixture-3'
   and api.catalog_home_context()->'profiles'=aroma_home_catalog_test.expected_profiles(aroma_home_catalog_test.snapshot()),
   'Unpublished and exhausted products leave both vocabulary and bestsellers');

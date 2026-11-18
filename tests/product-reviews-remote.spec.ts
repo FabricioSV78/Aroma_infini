@@ -237,6 +237,42 @@ async function startForm(page: import('@playwright/test').Page) {
     .getByLabel('Tu opinión', { exact: true })
     .fill('No dura mucho en mi piel. No lo recomiendo.')
 }
+
+test('the closed reviews panel makes no request and keeps its loaded state after reopening', async ({
+  page,
+  reviewsNetwork,
+}) => {
+  void reviewsNetwork
+  let reads = 0
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      request.url().endsWith('/rpc/product_reviews')
+    )
+      reads++
+  })
+  await page.goto('/producto/perfume-opinion')
+  await expect(page.locator('#product-title')).toBeVisible()
+  await page.waitForTimeout(250)
+  expect(reads).toBe(0)
+  const toggle = page.getByRole('button', { name: 'Reseñas', exact: true })
+  await toggle.click()
+  await expect(
+    page.getByRole('heading', { name: 'Aún no hay reseñas publicadas' }),
+  ).toBeVisible()
+  // Development StrictMode may mount effects twice. The production probe
+  // measures actual request counts; this test checks deferred first use and
+  // preserves the mounted instance when the accordion is closed/reopened.
+  const firstOpenReads = reads
+  expect(firstOpenReads).toBeGreaterThan(0)
+  await toggle.click()
+  await expect(page.locator('#product-info-panel-reviews')).toBeHidden()
+  await toggle.click()
+  await expect(
+    page.getByRole('heading', { name: 'Aún no hay reseñas publicadas' }),
+  ).toBeVisible()
+  expect(reads).toBe(firstOpenReads)
+})
 test('guest reads the empty state and is asked to sign in before publishing', async ({
   page,
   reviewsNetwork,

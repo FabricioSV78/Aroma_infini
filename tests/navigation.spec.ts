@@ -1,5 +1,33 @@
-import { expect, test } from './test'
+import { expect, test, type Page } from './test'
 import { footerGroups, navigationGroups } from '../src/content/navigation'
+
+async function readFooterSnapshot(page: Page) {
+  const footer = page.locator('.site-footer')
+  // A zero-count assertion also passes before React mounts the shared layout.
+  // Establish the complete footer first, then check absent social profiles.
+  await expect(footer.locator('.footer-top h2')).toHaveText(
+    footerGroups.map((group) => group.title),
+  )
+  const social = footer.locator('.footer-social')
+  await expect(social.locator('.footer-social-placeholder')).toHaveCount(0)
+  await expect(social.locator('a')).toHaveCount(0)
+
+  // Read the DOM and styles in one browser task, not across separate renders.
+  return footer.evaluate((element) => {
+    const headings = Array.from(
+      element.querySelectorAll<HTMLHeadingElement>('.footer-top h2'),
+    )
+    if (!headings[0]) throw new Error('The footer headings must be mounted.')
+    const style = getComputedStyle(element)
+    return {
+      headings: headings.map((heading) => heading.innerText),
+      text: element.textContent,
+      background: style.backgroundColor,
+      headingSize: getComputedStyle(headings[0]).fontSize,
+      paddingTop: style.paddingTop,
+    }
+  })
+}
 
 test('El footer conserva soporte, seguimiento e información legal', async ({
   page,
@@ -25,13 +53,8 @@ test('El footer muestra las mismas redes y estilos en Home y las demás páginas
 }) => {
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    let expectedFooter: {
-      headings: string[]
-      text: string | null
-      background: string
-      headingSize: string
-      paddingTop: string
-    } | null = null
+    let expectedFooter: Awaited<ReturnType<typeof readFooterSnapshot>> | null =
+      null
 
     for (const path of [
       '/',
@@ -41,29 +64,44 @@ test('El footer muestra las mismas redes y estilos en Home y las demás páginas
       '/contacto',
     ]) {
       await page.goto(path)
-      const footer = page.locator('.site-footer')
-      const social = footer.locator('.footer-social')
       // Unconfigured profiles stay hidden; the admin owns the shared URLs.
-      await expect(social.locator('.footer-social-placeholder')).toHaveCount(0)
-      await expect(social.locator('a')).toHaveCount(0)
-
-      const snapshot = {
-        headings: await footer.locator('.footer-top h2').allInnerTexts(),
-        text: await footer.textContent(),
-        background: await footer.evaluate(
-          (element) => getComputedStyle(element).backgroundColor,
-        ),
-        headingSize: await footer
-          .locator('.footer-top h2')
-          .first()
-          .evaluate((element) => getComputedStyle(element).fontSize),
-        paddingTop: await footer.evaluate(
-          (element) => getComputedStyle(element).paddingTop,
-        ),
-      }
+      const snapshot = await readFooterSnapshot(page)
       if (expectedFooter === null) expectedFooter = snapshot
       else expect(snapshot).toEqual(expectedFooter)
     }
+  }
+})
+
+test('La comparación del footer espera el montaje del layout sin confundir ausencia con contenido vacío', async ({
+  page,
+}) => {
+  let releaseLayout!: () => void
+  let layoutRequested = false
+  const layoutGate = new Promise<void>((resolve) => {
+    releaseLayout = resolve
+  })
+  await page.route(
+    '**/src/components/layout/StoreLayout.tsx*',
+    async (route) => {
+      layoutRequested = true
+      await layoutGate
+      await route.continue()
+    },
+  )
+  try {
+    await page.goto('/contacto', { waitUntil: 'commit' })
+    await expect.poll(() => layoutRequested).toBe(true)
+    const footer = page.locator('.site-footer')
+    await expect(footer).toHaveCount(0)
+    expect(await footer.locator('.footer-top h2').allInnerTexts()).toEqual([])
+
+    const snapshot = readFooterSnapshot(page)
+    releaseLayout()
+    expect((await snapshot).headings).toEqual(
+      footerGroups.map((group) => group.title.toUpperCase()),
+    )
+  } finally {
+    releaseLayout()
   }
 })
 

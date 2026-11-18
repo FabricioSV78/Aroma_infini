@@ -1,4 +1,5 @@
 import { variantLabel } from '../../domain/product-type'
+import { LoadingImage } from '../../components/media/LoadingImage'
 import { Link } from 'react-router'
 import type { ResolvedCart } from '../../services/commerce-service'
 import {
@@ -48,7 +49,7 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
         {cart.lines.map((line) =>
           line.kind === 'ready' ? (
             <li key={line.item.variantId}>
-              <img
+              <LoadingImage
                 src={imageSource(line.product.image)}
                 width={72}
                 height={90}

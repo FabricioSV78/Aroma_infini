@@ -20,6 +20,7 @@ export interface HomeHeroContent {
   order: number
   mediaType: 'image' | 'video'
   video: string | null
+  /** Legacy rendition retained for existing documents; never played on mobile. */
   mobileVideo: string | null
   poster: string | null
   mobilePoster: string | null
@@ -33,6 +34,7 @@ export interface HomeHeroContent {
   cta: string
   alt: string
   desktopImage: string | null
+  /** Also the mobile-only alternative when mediaType is video. */
   mobileImage: string | null
 }
 
@@ -43,8 +45,9 @@ export interface HomeFilmContent {
   cta: string
   video: string | null
   poster: string | null
-  /** Optional rendition of the same clip, prepared for smaller screens. */
+  /** Legacy rendition retained for compatibility; mobile uses an image only. */
   mobileVideo?: string | null
+  /** Independent mobile alternative, with poster as its fallback. */
   mobilePoster?: string | null
 }
 

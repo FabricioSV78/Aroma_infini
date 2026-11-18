@@ -1,3 +1,4 @@
+import { adminListFixture } from './admin-list-fixture'
 import { DEFAULT_OLFACTORY_FAMILIES } from '../src/domain/olfactory-family'
 import type { Page } from '@playwright/test'
 import type { AdminPromotion } from '../src/types/admin'
@@ -60,6 +61,8 @@ const test = authTest.extend<{ workspaceRequests: string[] }>({
           json: { coupon, version: coupon.version },
         })
       }
+      const workspace = adminListFixture(name,route.request().postDataJSON() as Record<string,unknown>)
+      if (workspace) { requests.push(name);return route.fulfill({headers,json:workspace}) }
       const responses: Record<string, unknown> = {
         catalog_settings: metadata,
         commerce_settings: { shipping: null, shippingVersion: 0 },
@@ -151,7 +154,7 @@ test('Promociones en frío carga cupones sin esperar el catálogo y conserva el 
   expect(workspaceRequests).not.toContain('admin_catalog_page')
 })
 
-test('Promociones con enlace directo de ofertas carga solo el catálogo y revalida el acceso al cambiar de pestaña', async ({
+test('Promociones con enlace directo de ofertas carga una página específica y revalida el acceso al cambiar de pestaña', async ({
   page,
   supabaseNetwork,
   workspaceRequests,
@@ -169,8 +172,10 @@ test('Promociones con enlace directo de ofertas carga solo el catálogo y revali
     }),
   ).toBeVisible()
   expect(
-    workspaceRequests.filter((name) => name === 'admin_catalog_page'),
+    workspaceRequests.filter((name) => name === 'admin_offer_list'),
   ).toHaveLength(1)
+  expect(workspaceRequests).toContain('admin_catalog_context')
+  expect(workspaceRequests).not.toContain('admin_catalog_page')
   expect(workspaceRequests).not.toContain('admin_commerce_settings')
 
   supabaseNetwork.adminMembership = false
@@ -225,7 +230,7 @@ test('Promociones carga el catálogo al abrir ofertas y consulta cupones de nuev
     page.getByRole('tab', { name: 'Ofertas de productos', exact: true }),
   ).toHaveAttribute('aria-selected', 'true')
   expect(
-    workspaceRequests.filter((name) => name === 'admin_catalog_page'),
+    workspaceRequests.filter((name) => name === 'admin_offer_list'),
   ).toHaveLength(1)
   expect(
     workspaceRequests.filter((name) => name === 'admin_commerce_settings'),
@@ -236,7 +241,7 @@ test('Promociones carga el catálogo al abrir ofertas y consulta cupones de nuev
     page.getByRole('button', { name: 'Nueva promoción', exact: true }),
   ).toBeVisible()
   expect(
-    workspaceRequests.filter((name) => name === 'admin_catalog_page'),
+    workspaceRequests.filter((name) => name === 'admin_offer_list'),
   ).toHaveLength(1)
   expect(
     workspaceRequests.filter((name) => name === 'admin_commerce_settings'),
@@ -249,8 +254,8 @@ for (const destination of [
     title: 'Tarifas de envío',
     rpc: 'admin_commerce_settings',
   },
-  { path: '/admin/pedidos', title: 'Pedidos', rpc: 'admin_orders' },
-  { path: '/admin/clientes', title: 'Clientes', rpc: 'admin_orders' },
+  { path: '/admin/pedidos', title: 'Pedidos', rpc: 'admin_order_list' },
+  { path: '/admin/clientes', title: 'Clientes', rpc: 'admin_customer_list' },
 ]) {
   test(`carga fría de ${destination.path} evita el catálogo y Productos lo carga al entrar`, async ({
     page,
@@ -281,23 +286,24 @@ for (const destination of [
       .click()
     await expect(page.locator('main h1')).toHaveText('Productos')
     expect(
-      workspaceRequests.filter((name) => name === 'admin_catalog_page'),
+      workspaceRequests.filter((name) => name === 'admin_product_list'),
     ).toHaveLength(1)
     const accessReads = () =>
       supabaseNetwork.requests.filter((request) =>
         ['/auth/v1/user', '/rest/v1/rpc/current_actor'].includes(request.path),
       ).length
-    const verifiedReads = accessReads()
-    // These list views reuse the same complete, owner-bound snapshot. A warm
-    // visit must not introduce a new verification/data waterfall. Editors,
-    // mutations and all missing-cache paths retain their fresh checks.
+    // Each metadata destination must still verify current authorization,
+    // without retrieving any complete product documents.
     for (const title of ['Marcas', 'Familias olfativas', 'Productos']) {
+      const verifiedReads = accessReads()
       await navigation.getByRole('link', { name: title, exact: true }).click()
       await expect(page.locator('main h1')).toHaveText(title)
-      expect(accessReads()).toBe(verifiedReads)
+      expect(accessReads()).toBeGreaterThan(verifiedReads)
       expect(
         workspaceRequests.filter((name) => name === 'admin_catalog_page'),
-      ).toHaveLength(1)
+      ).toHaveLength(0)
     }
+    expect(workspaceRequests.filter(name => name === 'admin_catalog_context')).toHaveLength(2)
+    expect(workspaceRequests.filter(name => name === 'admin_product_list')).toHaveLength(2)
   })
 }

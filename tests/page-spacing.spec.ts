@@ -27,13 +27,13 @@ const breadcrumbRoutes = [
 ]
 
 for (const width of [390, 1440]) {
-  test(`El inicio de las páginas interiores es consistente a ${width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 900 })
+  for (const route of routes) {
+    test(`El inicio de ${route} es consistente a ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
 
-    for (const route of routes) {
-      await page.goto(route)
+      await page.goto(route, { waitUntil: 'domcontentloaded' })
+      await expect(page.locator('.store-page')).toBeVisible()
+      await page.evaluate(() => document.fonts.ready)
       const spacing = await page.locator('.store-page').evaluate((pageRoot) => {
         const header = document.querySelector<HTMLElement>('.site-header')
         const firstSection = pageRoot.firstElementChild as HTMLElement | null
@@ -54,19 +54,21 @@ for (const width of [390, 1440]) {
       })
 
       expect(spacing.actual, route).toBeCloseTo(spacing.token, 0)
-    }
-  })
+    })
+  }
 }
 
 for (const width of [390, 1440]) {
-  test(`Las migajas empiezan a la misma distancia de la cabecera a ${width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.emulateMedia({ reducedMotion: 'reduce' })
+  for (const route of breadcrumbRoutes) {
+    test(`Las migajas de ${route} mantienen la distancia de la cabecera a ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.emulateMedia({ reducedMotion: 'reduce' })
 
-    for (const route of breadcrumbRoutes) {
-      await page.goto(route)
+      await page.goto(route, { waitUntil: 'domcontentloaded' })
+      await expect(
+        page.getByRole('navigation', { name: 'Ruta de navegación' }),
+      ).toBeVisible()
+      await page.evaluate(() => document.fonts.ready)
       const spacing = await page
         .getByRole('navigation', { name: 'Ruta de navegación' })
         .evaluate((breadcrumb) => {
@@ -77,6 +79,6 @@ for (const width of [390, 1440]) {
             : Number.NaN
         })
       expect(spacing, route).toBeCloseTo(24, 0)
-    }
-  })
+    })
+  }
 }

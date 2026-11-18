@@ -6,7 +6,7 @@ export default defineConfig({
   testDir: './tests',
   testMatch: [
     'r2-media-browser.spec.ts',
-    'admin-media-library.spec.ts',
+    'admin-site-images.spec.ts',
     'media-alias.spec.ts',
   ],
   reporter: 'list',

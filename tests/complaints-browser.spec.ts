@@ -1,4 +1,5 @@
-﻿import { mkdir, readFile } from 'node:fs/promises'
+import { adminListFixture } from './admin-list-fixture'
+import { mkdir, readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { PDFDocument } from 'pdf-lib'
 import {
@@ -105,6 +106,9 @@ const test = authTest.extend<{ complaintsNetwork: ComplaintNetwork }>({
           'site_settings',
           'home_document',
           'commerce_settings',
+          'admin_product_list',
+          'admin_order_list',
+          'admin_customer_list',
           'admin_catalog_page',
           'admin_commerce_settings',
           'admin_home_document',
@@ -152,6 +156,7 @@ const test = authTest.extend<{ complaintsNetwork: ComplaintNetwork }>({
         })
       if (name === 'commerce_settings')
         return reply({ shipping: null, shippingVersion: 0 })
+      if (['admin_product_list','admin_order_list','admin_customer_list'].includes(name)) return reply(adminListFixture(name,body))
       if (name === 'admin_catalog_page')
         return reply({
           ...metadata,

@@ -1,3 +1,8 @@
+import {
+  registerAdminRuntime,
+  subscribeAdminState,
+  emitAdminState,
+} from './admin-runtime'
 import type {
   AdminBrand,
   AdminProduct,
@@ -5,7 +10,6 @@ import type {
   AdminCustomer,
   AdminOrderStatus,
   AdminPromotion,
-  AdminShippingZone,
   AdminShippingSettings,
   AdminState,
   AdminSaveResult,
@@ -100,14 +104,13 @@ import {
   getPeruDistrictLabel,
   getPeruProvinceOptions,
   getPeruProvinceLabel,
-  isCoveredDeliveryLocation,
   isValidPeruLocation,
-  getDeliveryArea,
   CALLAO_DEPARTMENT,
   CALLAO_PROVINCE,
   peruDepartments,
 } from '../content/peru'
 import {
+  resolveShippingZone,
   getAreaBaseShipping,
   isShippingDestinationEnabled,
   emptyShippingSettings,
@@ -353,7 +356,6 @@ function createInitialState(): AdminState {
 }
 
 let state = createInitialState()
-const listeners = new Set<() => void>()
 let persistenceQueue: Promise<void> = Promise.resolve()
 let hydrationPromise: Promise<void> | undefined
 
@@ -528,7 +530,7 @@ export function hydrateAdminStore() {
         persist(state)
         await persistenceQueue.catch(() => undefined)
       }
-      listeners.forEach((listener) => listener())
+      emitAdminState()
     } catch {
       // The storefront remains available when browser storage is unavailable.
     }
@@ -656,7 +658,7 @@ export function applyRemoteCommerceSettings(settings: {
   promotions: AdminPromotion[]
 }) {
   state = { ...state, ...settings, revision: state.revision + 1 }
-  listeners.forEach((listener) => listener())
+  emitAdminState()
 }
 
 /** Apply only a canonical, authorized remote response; no browser persistence. */
@@ -681,7 +683,7 @@ export function applyRemoteOrders(
     customers: [...customers.values()],
     revision: state.revision + 1,
   }
-  listeners.forEach((listener) => listener())
+  emitAdminState()
 }
 
 /** Apply only a canonical, authorized remote response; no browser persistence. */
@@ -697,7 +699,7 @@ export function applyRemoteHome(
     homeSettingsVersion: settingsVersion,
     revision: state.revision + 1,
   }
-  listeners.forEach((listener) => listener())
+  emitAdminState()
 }
 
 export function applyRemoteCatalog(
@@ -717,7 +719,7 @@ export function applyRemoteCatalog(
       : {}),
     revision: state.revision + 1,
   }
-  listeners.forEach((listener) => listener())
+  emitAdminState()
 }
 
 function commit(update: (current: AdminState) => AdminState) {
@@ -729,7 +731,7 @@ function commit(update: (current: AdminState) => AdminState) {
   }
   if (state.olfactoryFamilies) replaceOlfactoryFamilies(state.olfactoryFamilies)
   persist(state)
-  listeners.forEach((listener) => listener())
+  emitAdminState()
 }
 
 function validSlug(slug: string) {
@@ -756,66 +758,7 @@ function normalizeKey(value: string) {
     .toLowerCase()
 }
 
-export function resolveShippingZone(
-  shipping: AdminShippingSettings,
-  department: string,
-  province = '',
-  district = '',
-) {
-  const normalizedDepartment = normalizeKey(department)
-  if (
-    !isShippingDestinationEnabled(
-      shipping,
-      normalizedDepartment,
-      province,
-      district,
-    )
-  )
-    return undefined
-  const isCapital = isCoveredDeliveryLocation(
-    normalizedDepartment,
-    province,
-    district,
-  )
-  const override = shipping.zones
-    .filter(
-      (zone) =>
-        zone.active &&
-        normalizeKey(zone.department) === normalizedDepartment &&
-        (!zone.province || zone.province === province) &&
-        (!zone.district || zone.district === district) &&
-        // Una tarifa departamental futura de Lima no reemplaza su tarifa local.
-        (!isCapital || Boolean(zone.province || zone.district)),
-    )
-    .sort(
-      (left, right) =>
-        Number(Boolean(right.district)) - Number(Boolean(left.district)) ||
-        Number(Boolean(right.province)) - Number(Boolean(left.province)),
-    )[0]
-  if (override) return override
-  const area = getDeliveryArea(normalizedDepartment)
-  if (!isCapital)
-    return {
-      id: 'province-base',
-      name: 'Provincias',
-      department: normalizedDepartment,
-      province: null,
-      district: null,
-      courierFeeCents: shipping.nationalCourierFeeCents,
-      motorizadoFeeCents: null,
-      estimate: shipping.nationalEstimate,
-      active: true,
-    } satisfies AdminShippingZone
-  return {
-    id: `${area!.department}-base`,
-    name: area!.label,
-    department: area!.department,
-    province: area!.province,
-    district: null,
-    ...getAreaBaseShipping(shipping, area!.department),
-    active: true,
-  } satisfies AdminShippingZone
-}
+export { resolveShippingZone } from './shipping-rates'
 
 function promotionDiscount(promotion: AdminPromotion, subtotalCents: number) {
   return promotion.type === 'percent'
@@ -943,13 +886,12 @@ export const adminService = {
     return state
   },
   subscribe(listener: () => void) {
-    listeners.add(listener)
-    return () => listeners.delete(listener)
+    return subscribeAdminState(listener)
   },
   reset() {
     state = createInitialState()
     persist(state)
-    listeners.forEach((listener) => listener())
+    emitAdminState()
   },
   flush() {
     return persistenceQueue
@@ -2237,3 +2179,14 @@ export function getShippingZoneForAddress(
 ) {
   return resolveShippingZone(state.shipping, department, province, district)
 }
+
+registerAdminRuntime({
+  adminService,
+  hydrateAdminStore,
+  getStoreBrands,
+  getStoreProductRecords,
+  getPromotionByCode,
+  getShippingSettings,
+  getShippingZoneForAddress,
+  applyRemoteCommerceSettings,
+})

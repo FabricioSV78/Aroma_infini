@@ -1,10 +1,108 @@
-import { useRef, useState, type UIEvent } from 'react'
+import { useEffect, useRef, useState, type UIEvent } from 'react'
+import { Icon } from '../../components/ui/Icon'
 import type { ProductGalleryView } from '../../types/catalog'
 import { imageSource, imageSourceSet } from '../../services/image-source'
+import { PRODUCT_GALLERY_SIZES } from '../../domain/product-gallery'
 
 interface ProductGalleryProps {
   name: string
   views: ProductGalleryView[]
+}
+
+interface GalleryPhotoProps {
+  image: string
+  alt: string
+  priority: 'high' | 'low'
+  thumbnail?: boolean
+}
+
+function GalleryPhoto({
+  image,
+  alt,
+  priority,
+  thumbnail = false,
+}: GalleryPhotoProps) {
+  const ref = useRef<HTMLImageElement>(null)
+  const [state, setState] = useState<'pending' | 'ready' | 'error'>('pending')
+
+  useEffect(() => {
+    const photo = ref.current
+    if (!photo) return
+    let active = true
+    let revision = 0
+    function failed() {
+      revision++
+      if (active) setState('error')
+    }
+    function loaded() {
+      const current = ++revision
+      void photo!.decode().then(
+        () => {
+          if (active && current === revision) setState('ready')
+        },
+        () => {
+          // A responsive candidate can change while a previous decode is
+          // pending. Its own load/error event remains authoritative.
+          if (active && current === revision && !photo!.naturalWidth) failed()
+        },
+      )
+    }
+    photo.addEventListener('load', loaded)
+    photo.addEventListener('error', failed)
+    // A preload or the browser cache can complete before React attaches this
+    // effect. Do not leave an already decoded photograph behind a placeholder.
+    if (photo.complete) {
+      if (photo.naturalWidth) loaded()
+      else failed()
+    }
+    return () => {
+      active = false
+      revision++
+      photo.removeEventListener('load', loaded)
+      photo.removeEventListener('error', failed)
+    }
+  }, [])
+
+  return (
+    <>
+      <span
+        className="product-photo-placeholder"
+        data-image-placeholder=""
+        data-state={state}
+        role={state === 'error' && !thumbnail ? 'img' : undefined}
+        aria-label={
+          state === 'error' && !thumbnail
+            ? `Imagen no disponible: ${alt}`
+            : undefined
+        }
+        aria-hidden={state === 'error' && !thumbnail ? undefined : true}
+      >
+        <Icon name="scent" />
+        {state === 'error' && !thumbnail ? (
+          <span>Imagen no disponible</span>
+        ) : null}
+      </span>
+      <img
+        ref={ref}
+        className="product-gallery-photo"
+        data-state={state}
+        src={imageSource(image)}
+        srcSet={imageSourceSet(image, [480, 960])}
+        // Thumbnail and full view intentionally share the gallery's candidate:
+        // each photo already needs this rendition, so no extra 480 px download
+        // or authoritative manifest request is needed just for its thumbnail.
+        sizes={PRODUCT_GALLERY_SIZES}
+        width={thumbnail ? 480 : 960}
+        height={thumbnail ? 600 : 1200}
+        loading={priority === 'high' && !thumbnail ? 'eager' : 'lazy'}
+        fetchPriority={priority}
+        decoding="async"
+        alt={state === 'error' ? '' : alt}
+        aria-hidden={state === 'error' ? true : undefined}
+        aria-busy={state === 'pending' ? true : undefined}
+      />
+    </>
+  )
 }
 
 export function ProductGallery({ name, views }: ProductGalleryProps) {
@@ -47,13 +145,12 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
               aria-current={activeIndex === index ? 'true' : undefined}
               onClick={() => setActiveIndex(index)}
             >
-              <img
-                src={imageSource(view.image, 480)}
-                width={480}
-                height={600}
+              <GalleryPhoto
+                key={view.image}
+                image={view.image}
                 alt=""
-                loading="lazy"
-                decoding="async"
+                priority="low"
+                thumbnail
               />
               <span aria-hidden="true">
                 {String(index + 1).padStart(2, '0')}
@@ -74,17 +171,10 @@ export function ProductGallery({ name, views }: ProductGalleryProps) {
               }`}
               aria-hidden={activeIndex !== index ? 'true' : undefined}
             >
-              <img
-                src={imageSource(view.image)}
-                srcSet={imageSourceSet(view.image, [480, 960])}
-                // Match the gallery's viewport-height cap and tablet columns;
-                // 52vw overestimated the actual frame and fetched larger files.
-                sizes="(min-width: 1600px) min(560px, 62svh), (min-width: 1024px) min(520px, 56svh), (min-width: 768px) calc(50vw - 36px), calc(100vw - 32px)"
-                width={960}
-                height={1200}
-                loading={index === 0 ? 'eager' : 'lazy'}
-                fetchPriority={index === 0 ? 'high' : 'auto'}
-                decoding="async"
+              <GalleryPhoto
+                key={view.image}
+                image={view.image}
+                priority={index === 0 || index === activeIndex ? 'high' : 'low'}
                 alt={view.alt.trim() || `Vista ${index + 1} de ${name}`}
               />
             </figure>

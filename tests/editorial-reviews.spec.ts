@@ -24,15 +24,15 @@ test('Los ocho perfumes incluyen 50 opiniones coherentes con sus presentaciones'
   }
 })
 
-test('El mismo video utiliza una versión panorámica en escritorio y un encuadre vertical 4:5 en móvil', async ({
+test('el vídeo editorial de escritorio se sustituye por su imagen al pasar a móvil', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   const section = page.locator('.editorial-film')
-  const video = section.locator('video')
   await section.scrollIntoViewIfNeeded()
+  const video = section.locator('video')
   await expect(video).toHaveAttribute(
     'src',
     '/videos/perfume-editorial-wide.mp4',
@@ -40,74 +40,39 @@ test('El mismo video utiliza una versión panorámica en escritorio y un encuadr
   await expect
     .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoWidth))
     .toBe(1920)
-  const desktopDuration = await video.evaluate(
-    (node: HTMLVideoElement) => node.duration,
-  )
-  expect(desktopDuration).toBeLessThan(16)
   await page.setViewportSize({ width: 390, height: 844 })
-  // The responsive rendition replaces the video node. Wait for that profile
-  // and scroll its persistent section instead of the node being replaced.
-  await expect(video).toHaveAttribute(
-    'poster',
+  await section.scrollIntoViewIfNeeded()
+  await expect(video).toHaveCount(0)
+  await expect(section.locator('img')).toHaveAttribute(
+    'src',
     '/videos/perfume-editorial-mobile.webp',
   )
-  await section.scrollIntoViewIfNeeded()
-  await expect(video).toHaveAttribute(
-    'src',
-    '/videos/perfume-editorial-mobile.mp4',
-  )
-  await expect
-    .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoWidth))
-    .toBe(720)
-  await expect
-    .poll(() => video.evaluate((node: HTMLVideoElement) => node.videoHeight))
-    .toBe(900)
-  const mobileDuration = await video.evaluate(
-    (node: HTMLVideoElement) => node.duration,
-  )
-  expect(Math.abs(mobileDuration - desktopDuration)).toBeLessThanOrEqual(0.5)
+  await expect(section.locator('img')).toBeVisible()
 })
 
-test('En móvil solo se descarga el video adaptado y movimiento reducido espera una reproducción voluntaria', async ({
+test('en móvil no se solicita ningún video, con o sin movimiento reducido', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.emulateMedia({ reducedMotion: 'no-preference' })
-  const requestedVideos: string[] = []
-  page.on('request', (request) => {
-    const pathname = new URL(request.url()).pathname
-    if (pathname.startsWith('/videos/') && pathname.endsWith('.mp4'))
-      requestedVideos.push(pathname)
+  const requested: string[] = []
+  page.on('request', (r) => {
+    if (r.url().includes('.mp4') || r.resourceType() === 'media')
+      requested.push(r.url())
   })
-  await page.goto('/')
-  const video = page.locator('.editorial-film video')
-  await expect(video).not.toHaveAttribute('src')
-  await page.locator('.editorial-film').scrollIntoViewIfNeeded()
-  await expect
-    .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
-    .toBeGreaterThanOrEqual(2)
-  expect([...new Set(requestedVideos)]).toEqual([
-    '/videos/perfume-editorial-mobile.mp4',
-  ])
-
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  requestedVideos.length = 0
-  await page.reload()
-  await page.locator('.editorial-film').scrollIntoViewIfNeeded()
-  await page.waitForLoadState('networkidle')
-  await expect(video).not.toHaveAttribute('src')
-  await expect(video).toHaveAttribute(
-    'poster',
-    '/videos/perfume-editorial-mobile.webp',
-  )
-  expect(requestedVideos).toEqual([])
-  await page.getByRole('button', { name: 'Reproducir video editorial' }).click()
-  await expect
-    .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused))
-    .toBe(false)
-  expect([...new Set(requestedVideos)]).toEqual([
-    '/videos/perfume-editorial-mobile.mp4',
-  ])
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    await page.emulateMedia({ reducedMotion })
+    await page.goto('/')
+    await page.locator('.editorial-film').scrollIntoViewIfNeeded()
+    await expect(page.locator('video')).toHaveCount(0)
+    await expect(
+      page.getByRole('button', { name: 'Reproducir video editorial' }),
+    ).toHaveCount(0)
+    await expect(page.locator('.editorial-film img')).toHaveAttribute(
+      'src',
+      '/videos/perfume-editorial-mobile.webp',
+    )
+    expect(requested).toEqual([])
+  }
 })
 
 for (const viewport of [
@@ -129,7 +94,9 @@ for (const viewport of [
     const media = page.locator('.editorial-film-media')
     await section.scrollIntoViewIfNeeded()
 
-    await expect(media.locator('video')).toHaveCSS('object-fit', 'cover')
+    if (viewport.width >= 1024)
+      await expect(media.locator('video')).toHaveCSS('object-fit', 'cover')
+    else await expect(media.locator('video')).toHaveCount(0)
     await expect(media.locator('img')).toHaveCSS('object-fit', 'cover')
     const bounds = await section.boundingBox()
     const copy = await section.locator('.editorial-film-copy').boundingBox()

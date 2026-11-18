@@ -3,6 +3,32 @@
 const entries = new Map<string, { expires: number; value: unknown }>()
 const inFlight = new Map<string, Promise<unknown>>()
 let generation = 0
+const lifetimeMs = 5000
+
+function remember(key: string, value: unknown, expires: number) {
+  if (entries.size >= 40) entries.delete(entries.keys().next().value!)
+  entries.set(key, { value, expires })
+}
+
+/** A validated anonymous document projection joins the existing cache, without
+ * restarting its freshness window or replacing a newer/pending server read. */
+export function seedInitialPublicQuery(
+  key: string,
+  value: unknown,
+  documentAgeMs: number,
+) {
+  if (
+    generation !== 0 ||
+    !Number.isFinite(documentAgeMs) ||
+    documentAgeMs < 0 ||
+    documentAgeMs >= lifetimeMs ||
+    inFlight.has(key) ||
+    (entries.get(key)?.expires ?? 0) > Date.now()
+  )
+    return false
+  remember(key, value, Date.now() + lifetimeMs - documentAgeMs)
+  return true
+}
 
 /** Public projections can coordinate dependencies without retaining old epochs. */
 export function publicQueryCacheGeneration() {
@@ -18,7 +44,7 @@ export function invalidatePublicQueryCache() {
 export async function cachedPublicQuery<T>(
   key: string,
   read: () => Promise<T>,
-  lifetime = 5000,
+  lifetime = lifetimeMs,
 ): Promise<T> {
   const cached = entries.get(key)
   if (cached && cached.expires > Date.now()) return cached.value as T
@@ -27,8 +53,7 @@ export async function cachedPublicQuery<T>(
   const expected = generation
   const operation = read().then((value) => {
     if (expected !== generation) return cachedPublicQuery(key, read, lifetime)
-    if (entries.size >= 40) entries.delete(entries.keys().next().value!)
-    entries.set(key, { value, expires: Date.now() + lifetime })
+    remember(key, value, Date.now() + lifetime)
     return value
   })
   inFlight.set(key, operation)

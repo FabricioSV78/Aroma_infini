@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
 import {
   Link,
   useBlocker,
@@ -15,13 +22,21 @@ import {
   type AdminProduct,
 } from '../../services/admin-service'
 import { saveProductPhotos } from '../../services/product-photos'
-import { ProductDetailPreview } from '../product/ProductPage'
 import { AdminProductPhotos } from './AdminProductPhotos'
 import { AdminPageHeader } from './AdminShared'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { useAdminStore } from './useAdminStore'
 import { useAdminSave } from './useAdminSave'
 import { useAdminNotice } from './AdminNoticeProvider'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { readAdminPhotoQueue } from '../../services/catalog-admin-service'
+import { adminProductListQuery } from '../../domain/admin-list-query'
+
+const ProductDetailPreview = lazy(() =>
+  import('../product/ProductPage').then((module) => ({
+    default: module.ProductDetailPreview,
+  })),
+)
 
 export function AdminProductPhotoPage() {
   const { id } = useParams()
@@ -118,17 +133,31 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
     const continuing =
       submitter instanceof HTMLButtonElement && submitter.value === 'continue'
     setError('')
+    let currentQueue = queue
+    if (continuing && isRemoteCatalog) {
+      busyRef.current = true
+      try {
+        const query = typeof location.state?.photoQueueQuery === 'string' ? location.state.photoQueueQuery : ''
+        currentQueue = await readAdminPhotoQueue(adminProductListQuery(new URLSearchParams(query)))
+      } catch (cause) {
+        notice.error(cause, 'image')
+        return
+      } finally {
+        busyRef.current = false
+      }
+    }
     const result = await persistence.save(
       () => saveProductPhotos(record.product.id, draft.detail, draft.version),
       () => {
         allowNavigation.current = true
-        const currentIndex = queue.indexOf(record.product.id)
+        const currentIndex = currentQueue.indexOf(record.product.id)
         const ordered = [
-          ...queue.slice(currentIndex + 1),
-          ...queue.slice(0, Math.max(0, currentIndex)),
+          ...currentQueue.slice(currentIndex + 1),
+          ...currentQueue.slice(0, Math.max(0, currentIndex)),
         ]
         const next = continuing
           ? ordered.find((id) => {
+              if (isRemoteCatalog) return id !== record.product.id
               const item = adminService
                 .getSnapshot()
                 .products.find((item) => item.product.id === id)
@@ -142,7 +171,7 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
         )
         if (next)
           navigate(`/admin/productos/${next}/fotos`, {
-            state: { returnTo, photoQueue: queue },
+            state: { returnTo, photoQueue: currentQueue, photoQueueQuery: location.state?.photoQueueQuery },
           })
         else navigate(returnTo)
       },
@@ -231,11 +260,13 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
         className="admin-product-preview-dialog"
       >
         {preview ? (
-          <ProductDetailPreview
-            record={draft}
-            products={getStoreProducts()}
-            brands={state.brands}
-          />
+          <Suspense fallback={<p role="status">Preparando vista previa…</p>}>
+            <ProductDetailPreview
+              record={draft}
+              products={getStoreProducts()}
+              brands={state.brands}
+            />
+          </Suspense>
         ) : null}
       </Dialog>
     </div>

@@ -56,7 +56,7 @@ export function resolveHeroDestination(
   {
     products,
     complementsEnabled,
-  }: { products: readonly Product[]; complementsEnabled: boolean },
+  }: { products: readonly Pick<Product, 'id' | 'slug'>[]; complementsEnabled: boolean },
 ): { href: string | null; warning: string | null } {
   if (!isHeroDestination(destination))
     return { href: null, warning: 'Selecciona un destino interno válido.' }

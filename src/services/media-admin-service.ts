@@ -4,7 +4,6 @@ import {
   parseManagedMediaAsset,
   parseManagedVideoAsset,
   parseManagedSvgAsset,
-  validPreparedImageDimensions,
   type ImageMediaPurpose,
   type ManagedMediaAsset,
   type ManagedVideoAsset,
@@ -18,7 +17,7 @@ import { registerManagedMedia, registerManagedVideo } from './media-registry'
 import { UserFacingError } from './admin-messages'
 import type { ExpectedMediaActor } from './media-upload'
 
-export const MEDIA_LIBRARY_SECTIONS = [
+export const MEDIA_SECTIONS = [
   { value: 'home', label: 'Home' },
   { value: 'products', label: 'Productos' },
   { value: 'about', label: 'Nosotros' },
@@ -27,42 +26,26 @@ export const MEDIA_LIBRARY_SECTIONS = [
   { value: 'seo', label: 'Vista al compartir' },
   { value: 'other', label: 'Otros' },
 ] as const
-export type MediaLibrarySection =
-  (typeof MEDIA_LIBRARY_SECTIONS)[number]['value']
-export type MediaLibraryState =
+export type MediaSection =
+  (typeof MEDIA_SECTIONS)[number]['value']
+export type AdminMediaState =
   'used' | 'unused' | 'pending' | 'deleting' | 'deleted' | 'disabled'
-export const mediaStateLabels: Record<MediaLibraryState, string> = {
-  used: 'En uso',
-  unused: 'Sin usar',
-  pending: 'Preparando',
-  deleting: 'Eliminando',
-  deleted: 'Eliminado',
-  disabled: 'Desactivado',
-}
-export type MediaLibraryFilter =
-  'all' | 'used' | 'unused' | 'pending' | 'deleted'
-export type LibraryAsset =
+export type AdminMediaAsset =
   ManagedMediaAsset | ManagedVideoAsset | ManagedSvgAsset
-export interface MediaLibraryItem {
+export interface AdminMediaItem {
   id: string
   name: string
   alt: string
-  section: MediaLibrarySection
+  section: MediaSection
   version: number
   purpose: ImageMediaPurpose | 'film-video' | 'site-vector'
-  state: MediaLibraryState
+  state: AdminMediaState
   createdAt: string
   retireAfter: string | null
   useCount: number
-  asset: LibraryAsset | null
+  asset: AdminMediaAsset | null
 }
-export interface MediaLibraryPage {
-  items: MediaLibraryItem[]
-  total: number
-  page: number
-  pageSize: number
-}
-export interface MediaLibraryDetail extends MediaLibraryItem {
+export interface AdminMediaDetail extends AdminMediaItem {
   usages: { section: string; label: string; key: string }[]
   events: { id: string; type: string; createdAt: string; code: string | null }[]
 }
@@ -92,7 +75,7 @@ authService.subscribe(() => {
 function invalid(): never {
   throw new UserFacingError(
     'media-response',
-    'No pudimos verificar la biblioteca. Vuelve a cargar los archivos.',
+    'No pudimos verificar la imagen. Vuelve a intentarlo.',
   )
 }
 function sessionError(): never {
@@ -123,12 +106,12 @@ function date(value: unknown): string {
   if (!Number.isFinite(Date.parse(result))) invalid()
   return result
 }
-function parseItem(value: unknown): MediaLibraryItem {
+function parseItem(value: unknown): AdminMediaItem {
   const source = object(value)
   if (
     typeof source.id !== 'string' ||
     !uuid.test(source.id) ||
-    !MEDIA_LIBRARY_SECTIONS.some(
+    !MEDIA_SECTIONS.some(
       (section) => section.value === source.section,
     ) ||
     !['used', 'unused', 'pending', 'deleting', 'deleted', 'disabled'].includes(
@@ -155,39 +138,24 @@ function parseItem(value: unknown): MediaLibraryItem {
     id: source.id,
     name: boundedText(source.name, 200),
     alt: boundedText(source.alt, 500),
-    section: source.section as MediaLibrarySection,
+    section: source.section as MediaSection,
     version: integer(source.version, 1),
     purpose: source.purpose,
-    state: source.state as MediaLibraryState,
+    state: source.state as AdminMediaState,
     createdAt: date(source.createdAt),
     retireAfter: source.retireAfter == null ? null : date(source.retireAfter),
     useCount: integer(source.useCount),
     asset,
   }
 }
-function register(item: MediaLibraryItem) {
+function register(item: AdminMediaItem) {
   if (item.asset) {
     if ('variants' in item.asset) registerManagedMedia(item.asset)
     else if (item.asset.mimeType === 'video/mp4')
       registerManagedVideo(item.asset)
   }
 }
-export function parseMediaLibraryPage(value: unknown): MediaLibraryPage {
-  const source = object(value)
-  if (!Array.isArray(source.items) || source.items.length > 100) invalid()
-  const items = source.items.map(parseItem)
-  if (new Set(items.map((item) => item.id)).size !== items.length) invalid()
-  const page = {
-    items,
-    total: integer(source.total),
-    page: integer(source.page, 1),
-    pageSize: integer(source.pageSize, 1),
-  }
-  if (page.pageSize > 100 || page.items.length > page.pageSize) invalid()
-  items.forEach(register)
-  return page
-}
-export function parseMediaLibraryDetail(value: unknown): MediaLibraryDetail {
+export function parseAdminMediaDetail(value: unknown): AdminMediaDetail {
   const source = object(value)
   const item = parseItem(source)
   if (
@@ -217,30 +185,11 @@ export function parseMediaLibraryDetail(value: unknown): MediaLibraryDetail {
   register(item)
   return { ...item, usages, events }
 }
-export function isMediaCompatible(
-  item: MediaLibraryItem,
-  purpose?: ImageMediaPurpose | 'film-video',
-  allowSvg = false,
-) {
-  if (!item.asset || !['used', 'unused'].includes(item.state)) return false
-  if (!purpose) return true
-  if (purpose === 'film-video')
-    return 'mimeType' in item.asset && item.asset.mimeType === 'video/mp4'
-  if ('mimeType' in item.asset && item.asset.mimeType === 'image/svg+xml')
-    return purpose === 'site-image' && allowSvg
-  if (
-    'mimeType' in item.asset ||
-    !validPreparedImageDimensions(item.asset.width, item.asset.height, purpose)
-  )
-    return false
-  if (purpose === 'site-image') return true
-  return true
-}
-export async function mediaLibraryActor(): Promise<ExpectedMediaActor> {
+export async function mediaAdminActor(): Promise<ExpectedMediaActor> {
   if (!isRemoteCatalog)
     throw new UserFacingError(
       'media-config',
-      'La biblioteca está disponible cuando la tienda está conectada a su almacenamiento.',
+      'La gestión de imágenes requiere conectar el almacenamiento.',
     )
   const generation = actorGeneration
   const userId = owner()
@@ -267,7 +216,7 @@ async function rpc<N extends RpcName>(
   name: N,
   args: RpcArgs<N>,
 ): Promise<unknown> {
-  const actor = await mediaLibraryActor()
+  const actor = await mediaAdminActor()
   const response = await requireSupabaseClient()
     .rpc(name, args)
     .setHeader('Authorization', `Bearer ${actor.token}`)
@@ -297,36 +246,15 @@ async function rpc<N extends RpcName>(
   }
   return response.data
 }
-export const mediaLibraryService = {
-  async list({
-    query = '',
-    section = '',
-    state = 'all',
-    page = 1,
-  }: {
-    query?: string
-    section?: MediaLibrarySection | ''
-    state?: MediaLibraryFilter
-    page?: number
-  } = {}) {
-    return parseMediaLibraryPage(
-      await rpc('admin_media_library', {
-        p_query: query,
-        p_section: section || undefined,
-        p_state: state,
-        p_page: page,
-        p_page_size: 20,
-      }),
-    )
-  },
+export const mediaAdminService = {
   async detail(id: string) {
-    return parseMediaLibraryDetail(
+    return parseAdminMediaDetail(
       await rpc('admin_media_detail', { p_asset_id: id }),
     )
   },
   async metadata(
-    item: MediaLibraryItem,
-    fields: Pick<MediaLibraryItem, 'name' | 'alt' | 'section'>,
+    item: AdminMediaItem,
+    fields: Pick<AdminMediaItem, 'name' | 'alt' | 'section'>,
   ) {
     const result = parseItem(
       await rpc('admin_media_metadata', {
@@ -334,16 +262,6 @@ export const mediaLibraryService = {
         p_name: fields.name,
         p_alt: fields.alt,
         p_section: fields.section,
-        p_expected_version: item.version,
-      }),
-    )
-    register(result)
-    return result
-  },
-  async retire(item: MediaLibraryItem) {
-    const result = parseItem(
-      await rpc('admin_media_retire', {
-        p_asset_id: item.id,
         p_expected_version: item.version,
       }),
     )

@@ -15,6 +15,11 @@ import {
 } from '../src/services/asset-source'
 import { imageSource, imageSourceSet } from '../src/services/image-source'
 import {
+  getMediaAliasSnapshot,
+  isBuiltinMediaSource,
+  rememberMediaAliases,
+} from '../src/services/media-alias-registry'
+import {
   getManagedMedia,
   rememberManagedAssets,
   registerManagedMedia,
@@ -157,6 +162,35 @@ test('Las URLs administradas usan el origen Worker y no se redirigen con la migr
     'javascript:alert(1)',
   ])
     expect(mediaApiBaseUrl(address, true)).toBeNull()
+})
+
+test('Un original sin alias usa el Worker configurado y no reaparece desde public local', () => {
+  const previous = getMediaAliasSnapshot()
+  const original = '/images/cedre-480.webp'
+  const worker = 'https://media.invalid'
+  const cdn = 'https://static.invalid'
+  try {
+    rememberMediaAliases({ items: [] })
+    expect(isBuiltinMediaSource(original)).toBe(true)
+    expect(isBuiltinMediaSource('/images/not-in-inventory.webp')).toBe(false)
+    expect(isBuiltinMediaSource(`https://other.invalid${original}`)).toBe(false)
+    expect(assetSource(original, cdn, worker)).toBe(`${worker}${original}`)
+    expect(assetSource(original, undefined, worker)).toBe(`${worker}${original}`)
+    expect(assetSource('/images/not-in-inventory.webp', cdn, worker)).toBe(
+      `${cdn}/images/not-in-inventory.webp`,
+    )
+    expect(assetSource(original, cdn, '')).toBe(`${cdn}${original}`)
+    expect(assetSource(original, undefined, '')).toBe(original)
+    expect(assetSource(original, undefined, 'https://user:secret@media.invalid')).toBe(original)
+
+    const image = asset(71, 480)
+    rememberMediaAliases({ items: [{ path: original, asset: image }] })
+    expect(assetSource(original, cdn, worker)).toBe(`${worker}${image.src}`)
+    rememberMediaAliases({ items: [] })
+    expect(assetSource(original, cdn, worker)).toBe(`${worker}${original}`)
+  } finally {
+    rememberMediaAliases(previous)
+  }
 })
 
 test('srcset contiene sólo candidatos reales y no supone que existe 960 px para un original de 800 px', () => {

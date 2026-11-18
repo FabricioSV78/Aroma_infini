@@ -9,9 +9,12 @@ import './styles/global.css'
 import './styles/service-contact-shipping.css'
 import './styles/font-options.css'
 import { applyFontPreference, getFontPreference } from './lib/font-preference'
-import { hydrateAdminStore } from './services/admin-service'
+import { loadAdminRuntime } from './services/admin-runtime'
+import { isRemoteCatalog } from './services/catalog-source'
 import { authService } from './services/auth-service'
 import { builtinMediaService } from './services/builtin-media-service'
+import { siteMediaService } from './services/site-media-service'
+import { siteSettingsService } from './services/site-settings-service'
 import { PageLoadingState } from './components/ui/PageLoadingState'
 import { getRouter } from './app/router'
 import './styles/ui-states.css'
@@ -21,6 +24,8 @@ const root = document.getElementById('root')
 applyFontPreference(getFontPreference(), false)
 if (!root) throw new Error('No se encontró el elemento raíz de la aplicación.')
 const appRoot = createRoot(root)
+siteMediaService.hydrateInitial()
+siteSettingsService.hydrateInitial()
 appRoot.render(<PageLoadingState pathname={window.location.pathname} />)
 // Public pages need not wait for a private Auth network check. Protected route
 // loaders await the same initialization before granting access.
@@ -29,7 +34,10 @@ const [, router] = await Promise.all([
   // Resolve aliases before rendering images, while route modules and their
   // public queries load concurrently. Local loaders still await hydration.
   builtinMediaService.load().catch(() => {}),
-  hydrateAdminStore().then(getRouter),
+  (isRemoteCatalog
+    ? Promise.resolve()
+    : loadAdminRuntime().then((runtime) => runtime.hydrateAdminStore())
+  ).then(getRouter),
 ])
 appRoot.render(
   <StrictMode>

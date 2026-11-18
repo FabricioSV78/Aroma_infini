@@ -1,3 +1,4 @@
+import { LoadingImage } from '../../components/media/LoadingImage'
 import {
   useEffect,
   useMemo,
@@ -10,7 +11,6 @@ import '../../styles/home-categories.css'
 import { Link } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
 import { categories } from '../../content/home'
-import { editorialFilm } from '../../content/editorial-film'
 import { familyVisuals, finderSteps } from '../../content/fragrance-finder'
 import type {
   HomeAnnouncementContent,
@@ -22,10 +22,14 @@ import { type HomeMedia, type HomeMediaKey } from '../../services/admin-service'
 import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
 import { imageSource } from '../../services/image-source'
 import { assetSource } from '../../services/asset-source'
+import { useDesktopVideo } from '../../components/media/useDesktopVideo'
+import { filmVisualSources } from '../../domain/film-visuals'
 import { formatPEN } from '../../services/currency'
 import { getFinderOptions } from '../../services/fragrance-matching'
 import { storefrontRepository } from '../../services/storefront-repository'
-import type { FinderResult, FinderStep } from '../../types/fragrance-finder'
+import { readRemoteHomeCatalog } from '../../services/public-home-catalog'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import type { FinderOptions, FinderResult, FinderStep } from '../../types/fragrance-finder'
 import type { StoreFeatures } from '../../domain/store-features'
 import { AdminNotice, AdminPageHeader } from './AdminShared'
 import { homeImagePresets, prepareImageFile } from './prepareImageFile'
@@ -38,8 +42,6 @@ import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { InlineStatus } from '../../components/ui/InlineStatus'
 import { useAdminNotice } from './AdminNoticeProvider'
 import { AdminHeroEditor } from './AdminHeroEditor'
-import { AdminMediaPicker } from './AdminMediaPicker'
-
 type HomeTab =
   'hero' | 'announcement' | 'categories' | 'brands' | 'film' | 'finder'
 type FinderView = 'presentation' | 'questions' | 'results'
@@ -162,6 +164,7 @@ function sameHomeContent(left: HomeContent, right: HomeContent) {
 }
 
 export function AdminHomePage() {
+  const desktopVideo = useDesktopVideo()
   const state = useAdminStore()
   const finderSnapshot = useSyncExternalStore(
     storefrontRepository.subscribe,
@@ -174,12 +177,18 @@ export function AdminHomePage() {
     return () => videoPreparationAbort.current?.abort()
   }, [])
   const [tab, setTab] = useState<HomeTab>('hero')
+  const [remoteFinderOptions, setRemoteFinderOptions] = useState<FinderOptions | null>(null)
   useEffect(() => {
     // Only the fragrance editor needs the public eligibility/options snapshot.
     // Opening Hero, categories or video must not download the public catalog.
-    if (tab === 'finder')
-      void storefrontRepository.readSnapshot().catch(() => {})
-  }, [tab])
+    if (tab !== 'finder') return
+    let active = true
+    if (isRemoteCatalog) void readRemoteHomeCatalog().then(catalog => {
+      if (active) setRemoteFinderOptions(catalog.finderOptions)
+    }).catch(error => { if (active) notice.error(error) })
+    else void storefrontRepository.readSnapshot().catch(() => {})
+    return () => { active = false }
+  }, [notice, tab])
   const [previewOpen, setPreviewOpen] = useState(false)
   const [media, setMedia] = useState<HomeMedia>(() => ({ ...state.homeMedia }))
   const [content, setContent] = useState<HomeContent>(() => state.homeContent)
@@ -229,10 +238,12 @@ export function AdminHomePage() {
     (category) => category.id !== 'complementos' || features.complementsEnabled,
   )
   const finderOptions = useMemo(
-    () => getFinderOptions(finderSnapshot),
+    () => isRemoteCatalog
+      ? remoteFinderOptions ?? { families: [], occasions: [], intensities: [], availableCount: 0 }
+      : getFinderOptions(finderSnapshot),
     // Matching helpers also read the validated vocabulary outside the snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [finderSnapshot, state.olfactoryFamilies],
+    [finderSnapshot, remoteFinderOptions, state.olfactoryFamilies],
   )
   const finderStep = content.finder.steps[selectedFinderStep]
   const catalogFinderOptions =
@@ -269,14 +280,12 @@ export function AdminHomePage() {
           '/images/olfactory-cedre.webp')
       : (content.finder.desktopImage ?? '/images/olfactory-cedre.webp'),
   )
-  const filmPreviewVideo =
-    filmPreview === 'mobile'
-      ? (content.film.mobileVideo ?? content.film.video)
-      : content.film.video
-  const filmPreviewPoster =
-    filmPreview === 'mobile' && content.film.mobileVideo
-      ? content.film.mobilePoster
-      : content.film.poster
+  const filmVisuals = filmVisualSources(content.film)
+  const filmMobilePreview = filmPreview === 'mobile' || !desktopVideo
+  const filmPreviewVideo = filmMobilePreview ? null : filmVisuals.video
+  const filmPreviewPoster = filmMobilePreview
+    ? filmVisuals.mobile
+    : filmVisuals.desktop
 
   function updateAnnouncement(patch: Partial<HomeAnnouncementContent>) {
     setContent((current) => ({
@@ -440,26 +449,20 @@ export function AdminHomePage() {
     setPreparingMedia(false)
   }
 
-  async function uploadFilm(file: File, mobile = false) {
+  async function uploadFilm(file: File) {
     if (!beginMediaPreparation()) return
     const cancellation = new AbortController()
     videoPreparationAbort.current = cancellation
     try {
       const prepared = await prepareVideoFile(file, cancellation.signal)
       if (cancellation.signal.aborted) return
-      updateFilm(
-        mobile
-          ? {
-              mobileVideo: prepared.mobileVideo ?? prepared.video,
-              mobilePoster: prepared.mobilePoster ?? prepared.poster,
-            }
-          : {
-              video: prepared.video,
-              poster: prepared.poster,
-              mobileVideo: prepared.mobileVideo ?? null,
-              mobilePoster: prepared.mobilePoster ?? null,
-            },
-      )
+      updateFilm({
+        video: prepared.video,
+        poster: prepared.poster,
+        mobileVideo: prepared.mobileVideo ?? null,
+        mobilePoster:
+          content.film.mobilePoster ?? prepared.mobilePoster ?? null,
+      })
       notice.toast(
         `${prepared.optimization.message} Guarda los cambios para publicarlo.`,
       )
@@ -468,6 +471,24 @@ export function AdminHomePage() {
     } finally {
       if (videoPreparationAbort.current === cancellation)
         videoPreparationAbort.current = null
+      endMediaPreparation()
+    }
+  }
+
+  async function uploadFilmImage(file: File) {
+    if (!beginMediaPreparation()) return
+    try {
+      const image = await prepareImageFile(file, {
+        width: 720,
+        height: 900,
+        maxWidth: 1600,
+        label: '4:5 · mínimo 720 × 900 px',
+      })
+      updateFilm({ mobilePoster: image })
+      notice.toast('Imagen preparada. Guarda los cambios para publicarla.')
+    } catch (error) {
+      notice.error(error, 'image')
+    } finally {
       endMediaPreparation()
     }
   }
@@ -567,15 +588,6 @@ export function AdminHomePage() {
             onChange={(event) => fileChanged(key, event)}
           />
         </label>
-        <AdminMediaPicker
-          purpose="category"
-          label={category.title}
-          disabled={preparingMedia || saving}
-          onSelect={(item) => {
-            if (item.asset && 'variants' in item.asset)
-              setMedia((current) => ({ ...current, [key]: item.asset!.src }))
-          }}
-        />
         {media[key] ? (
           <button
             className="admin-home-reset"
@@ -908,7 +920,7 @@ export function AdminHomePage() {
                         key={category.id}
                       >
                         <div className="admin-home-category-image">
-                          <img
+                          <LoadingImage fallback="inline"
                             src={imageSource(media[key] ?? category.image, 960)}
                             style={{
                               objectPosition: media[key]
@@ -1039,41 +1051,37 @@ export function AdminHomePage() {
                       {content.film.cta || 'Botón'} ↗
                     </span>
                   </div>
-                  <video
-                    controls
-                    muted
-                    playsInline
-                    preload="metadata"
-                    style={
-                      filmPreview === 'mobile'
-                        ? {
-                            aspectRatio: '4 / 5',
-                            objectFit: 'contain',
-                            maxWidth: 320,
-                            maxHeight: '60vh',
-                            justifySelf: 'center',
-                          }
-                        : undefined
-                    }
-                    src={assetSource(
-                      filmPreviewVideo ??
-                        (filmPreview === 'mobile'
-                          ? editorialFilm.mobileSrc
-                          : editorialFilm.src),
-                    )}
-                    poster={
-                      filmPreviewVideo
-                        ? filmPreviewPoster
+                  {filmPreviewVideo ? (
+                    <video
+                      controls
+                      muted
+                      playsInline
+                      preload="metadata"
+                      src={assetSource(filmPreviewVideo)}
+                      poster={
+                        filmPreviewPoster
                           ? assetSource(filmPreviewPoster)
                           : undefined
-                        : assetSource(
-                            filmPreview === 'mobile'
-                              ? editorialFilm.mobilePoster
-                              : editorialFilm.poster,
-                          )
-                    }
-                    aria-label="Vista previa del video editorial"
-                  />
+                      }
+                      aria-label="Vista previa del video editorial"
+                    />
+                  ) : (
+                    <LoadingImage fallback="inline"
+                      src={
+                        filmPreviewPoster
+                          ? assetSource(filmPreviewPoster)
+                          : undefined
+                      }
+                      alt="Vista previa de imagen editorial"
+                      style={{
+                        aspectRatio: '4 / 5',
+                        objectFit: 'contain',
+                        maxWidth: 320,
+                        maxHeight: '60vh',
+                        justifySelf: 'center',
+                      }}
+                    />
+                  )}
                 </div>
               </section>
             </Dialog>
@@ -1144,29 +1152,6 @@ export function AdminHomePage() {
                     }}
                   />
                 </label>
-                <AdminMediaPicker
-                  purpose="film-video"
-                  label="Video editorial"
-                  disabled={preparingMedia || saving}
-                  onSelect={(item) => {
-                    if (item.asset)
-                      updateFilm({
-                        video: item.asset.src,
-                        poster: null,
-                        mobileVideo: null,
-                        mobilePoster: null,
-                      })
-                  }}
-                />
-                <AdminMediaPicker
-                  purpose="film-poster"
-                  label="Portada del video editorial"
-                  disabled={preparingMedia || saving}
-                  onSelect={(item) => {
-                    if (item.asset && 'variants' in item.asset)
-                      updateFilm({ poster: item.asset.src })
-                  }}
-                />
                 {content.film.video && (
                   <button
                     className="admin-home-reset"
@@ -1179,57 +1164,36 @@ export function AdminHomePage() {
               </div>
               <div className="admin-home-image-control">
                 <div>
-                  <strong>Versión para celular (opcional)</strong>
+                  <strong>Imagen alternativa para móvil</strong>
                   <small>
-                    El mismo clip adaptado a móvil. MP4 · 2 a 60 s · original
-                    hasta 20 MB
+                    4:5 · mínimo 720 × 900 px. Si no la eliges, se usa la
+                    portada del video.
                   </small>
                 </div>
                 <label className="admin-home-file-button">
-                  {content.film.mobileVideo
-                    ? 'Cambiar versión'
-                    : 'Subir versión'}
+                  {content.film.mobilePoster
+                    ? 'Cambiar imagen'
+                    : 'Subir imagen'}
                   <input
                     type="file"
-                    accept="video/mp4"
-                    aria-label="Subir video editorial para celular"
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    aria-label="Subir imagen editorial para móvil"
                     onChange={(event) => {
                       const file = event.target.files?.[0]
                       event.target.value = ''
-                      if (file) void uploadFilm(file, true)
+                      if (file) void uploadFilmImage(file)
                     }}
                   />
                 </label>
-                <AdminMediaPicker
-                  purpose="film-video"
-                  label="Video editorial para celular"
-                  disabled={preparingMedia || saving}
-                  onSelect={(item) => {
-                    if (item.asset)
-                      updateFilm({
-                        mobileVideo: item.asset.src,
-                        mobilePoster: null,
-                      })
-                  }}
-                />
-                <AdminMediaPicker
-                  purpose="film-poster"
-                  label="Portada del video editorial para celular"
-                  disabled={preparingMedia || saving}
-                  onSelect={(item) => {
-                    if (item.asset && 'variants' in item.asset)
-                      updateFilm({ mobilePoster: item.asset.src })
-                  }}
-                />
-                {content.film.mobileVideo && (
+                {content.film.mobilePoster && (
                   <button
                     className="admin-home-reset"
                     type="button"
                     onClick={() =>
-                      updateFilm({ mobileVideo: null, mobilePoster: null })
+                      updateFilm({ mobilePoster: null, mobileVideo: null })
                     }
                   >
-                    Usar el video principal
+                    Usar portada del video
                   </button>
                 )}
               </div>
@@ -1312,7 +1276,7 @@ export function AdminHomePage() {
                       <div
                         className={`admin-home-finder-scene admin-home-finder-scene--${finderPreview}`}
                       >
-                        <img src={finderPreviewImage} alt="" />
+                        <LoadingImage fallback="inline" src={finderPreviewImage} alt="" />
                         <div className="admin-home-finder-scene-copy">
                           <span>
                             {content.finder.eyebrow || 'Etiqueta superior'}
@@ -1394,7 +1358,7 @@ export function AdminHomePage() {
                               return (
                                 <span key={option.value}>
                                   {image && selectedFinderStep === 'family' && (
-                                    <img src={assetSource(image)} alt="" />
+                                    <LoadingImage fallback="inline" src={assetSource(image)} alt="" />
                                   )}
                                   <span>
                                     {content.finder.optionLabels[
@@ -1566,15 +1530,6 @@ export function AdminHomePage() {
                           }
                         />
                       </label>
-                      <AdminMediaPicker
-                        purpose="finder-desktop"
-                        label="Imagen de escritorio del recomendador"
-                        disabled={preparingMedia || saving}
-                        onSelect={(item) => {
-                          if (item.asset && 'variants' in item.asset)
-                            updateFinder({ desktopImage: item.asset.src })
-                        }}
-                      />
                       {content.finder.desktopImage && (
                         <button
                           className="admin-home-reset"
@@ -1604,15 +1559,6 @@ export function AdminHomePage() {
                           }
                         />
                       </label>
-                      <AdminMediaPicker
-                        purpose="finder-mobile"
-                        label="Imagen móvil del recomendador"
-                        disabled={preparingMedia || saving}
-                        onSelect={(item) => {
-                          if (item.asset && 'variants' in item.asset)
-                            updateFinder({ mobileImage: item.asset.src })
-                        }}
-                      />
                       {content.finder.mobileImage && (
                         <button
                           className="admin-home-reset"
@@ -1790,7 +1736,7 @@ export function AdminHomePage() {
                                   {selectedFinderStep === 'family' && (
                                     <span className="admin-home-finder-option-thumbnail">
                                       {optionImage ? (
-                                        <img
+                                        <LoadingImage fallback="inline"
                                           src={assetSource(optionImage)}
                                           alt={`Imagen actual de ${option.label}`}
                                           loading="lazy"
@@ -1914,21 +1860,6 @@ export function AdminHomePage() {
                                               }
                                             />
                                           </label>
-                                          <AdminMediaPicker
-                                            purpose="finder-option"
-                                            label={`Opción ${option.label}`}
-                                            disabled={preparingMedia || saving}
-                                            onSelect={(item) => {
-                                              if (
-                                                item.asset &&
-                                                'variants' in item.asset
-                                              )
-                                                updateFinderFamilyVisual(
-                                                  option.value,
-                                                  { image: item.asset.src },
-                                                )
-                                            }}
-                                          />
                                           {configuredVisual?.image && (
                                             <button
                                               className="admin-home-reset"

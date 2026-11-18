@@ -2,6 +2,7 @@ import {
   getCatalogGenders,
   PAGE_SIZE,
   parseCatalogQuery,
+  catalogRequestQuery,
   type CatalogQuery,
 } from '../domain/catalog-query'
 import {
@@ -14,7 +15,7 @@ import {
   parseCatalogProductRecord,
   parseCatalogSettings,
 } from './supabase-storefront'
-import { requireSupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient } from './supabase-client'
 import {
   confirmPublicCatalogRecords,
   readStorefrontMetadata,
@@ -22,7 +23,10 @@ import {
 import {
   cachedPublicQuery,
   publicQueryCacheGeneration,
+  seedInitialPublicQuery,
 } from './public-query-cache'
+import { takeProductBootstrap } from './product-bootstrap'
+import { takePublicInitialContext } from './public-initial-context'
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -50,7 +54,7 @@ export async function readRemoteProductsByIds(
   }
   const key = 'ids:' + JSON.stringify(args)
   const read = async () => {
-    const { data, error } = await requireSupabaseClient().rpc(
+    const { data, error } = await (await requireReadySupabaseClient()).rpc(
       'catalog_products_by_ids',
       args,
     )
@@ -75,18 +79,12 @@ export async function readRemoteProductsByIds(
   }
 }
 
-export async function readRemoteProductContext(slug: string) {
-  const value = await cachedPublicQuery('product:' + slug, async () => {
-    const { data, error } = await requireSupabaseClient().rpc(
-      'catalog_product_context',
-      { p_slug: slug },
-    )
-    if (error) throw new CatalogReadError()
-    return data
-  })
+function parseProductContext(value: unknown) {
   const source = object(value),
     settings = parseCatalogSettings(source)
-  replaceOlfactoryFamilies(settings.olfactoryFamilies)
+  const familyCodes = new Set(
+    settings.olfactoryFamilies.map((family) => family.value),
+  )
   if (
     !Array.isArray(source.brands) ||
     !Array.isArray(source.recommendations) ||
@@ -94,14 +92,27 @@ export async function readRemoteProductContext(slug: string) {
   )
     throw new CatalogReadError()
   const brands = source.brands.map(parseCatalogBrand)
-  if (source.record === null) {
+  const record =
+    source.record === null
+      ? null
+      : parseCatalogProductRecord(source.record, false, familyCodes)
+  const recommendations = source.recommendations.map((item) =>
+    parseCatalogProductRecord(item, false, familyCodes),
+  )
+  return { settings, brands, record, recommendations }
+}
+
+function confirmProductContext({
+  settings,
+  brands,
+  record,
+  recommendations,
+}: ReturnType<typeof parseProductContext>) {
+  replaceOlfactoryFamilies(settings.olfactoryFamilies)
+  if (record === null) {
     confirmPublicCatalogRecords([], { brands, settings })
     return undefined
   }
-  const record = parseCatalogProductRecord(source.record)
-  const recommendations = source.recommendations.map((item) =>
-    parseCatalogProductRecord(item),
-  )
   confirmPublicCatalogRecords([record, ...recommendations], {
     brands,
     settings,
@@ -115,19 +126,60 @@ export async function readRemoteProductContext(slug: string) {
   }
 }
 
+export async function readRemoteProductContext(slug: string) {
+  const bootstrap = takeProductBootstrap(slug)
+  if (bootstrap !== undefined) {
+    try {
+      // Run the same complete validators as a fresh RPC before publishing data.
+      // This initial value never enters the five-second public query cache.
+      const parsed = parseProductContext(bootstrap)
+      if (!parsed.record || parsed.record.product.slug !== slug)
+        throw new CatalogReadError()
+      return confirmProductContext(parsed)
+    } catch {
+      /* Invalid or obsolete HTML falls back to the ordinary fresh read. */
+    }
+  }
+  const value = await cachedPublicQuery('product:' + slug, async () => {
+    const { data, error } = await (await requireReadySupabaseClient()).rpc(
+      'catalog_product_context',
+      { p_slug: slug },
+    )
+    if (error) throw new CatalogReadError()
+    return data
+  })
+  return confirmProductContext(parseProductContext(value))
+}
+
 export async function readRemoteCatalog(
   query: CatalogQuery,
   pageSize = PAGE_SIZE,
 ) {
   const key = 'browse:' + JSON.stringify([query, pageSize])
+  const initial = takePublicInitialContext(
+    'browse',
+    JSON.stringify([query, pageSize]),
+  )
+  if (initial !== undefined) {
+    try {
+      const result = parseRemoteCatalog(initial, pageSize)
+      seedInitialPublicQuery(key, initial, performance.now())
+      return result
+    } catch {
+      /* Retain the ordinary read if the initial projection is invalid. */
+    }
+  }
   const value = await cachedPublicQuery(key, async () => {
-    const { data, error } = await requireSupabaseClient().rpc(
+    const { data, error } = await (await requireReadySupabaseClient()).rpc(
       'catalog_browse',
       { p_query: { ...query }, p_page_size: pageSize },
     )
     if (error) throw new CatalogReadError()
     return data
   })
+  return parseRemoteCatalog(value, pageSize)
+}
+function parseRemoteCatalog(value: unknown, pageSize: number) {
   const source = object(value)
   const settings = parseCatalogSettings(source)
   replaceOlfactoryFamilies(settings.olfactoryFamilies)
@@ -165,39 +217,7 @@ export async function loadRemoteCatalog(
   params: URLSearchParams,
   brandSlug?: string,
 ) {
-  const rawQuery: CatalogQuery = {
-    productTypes: params
-      .getAll('tipo')
-      .filter(
-        (value): value is 'perfume' | 'complemento' =>
-          value === 'perfume' || value === 'complemento',
-      ),
-    brands: brandSlug ? [brandSlug] : params.getAll('marca').slice(0, 100),
-    genders: params
-      .getAll('genero')
-      .filter((value): value is 'hombre' | 'mujer' | 'unisex' =>
-        ['hombre', 'mujer', 'unisex'].includes(value),
-      ),
-    families: params.getAll('familia').slice(0, 32),
-    min: params.get('min') ?? '',
-    max: params.get('max') ?? '',
-    order:
-      params.get('orden') === 'precio-asc'
-        ? 'precio-asc'
-        : params.get('orden') === 'precio-desc'
-          ? 'precio-desc'
-          : 'mas-vendidos',
-    page: Math.max(
-      1,
-      Math.min(100000, parseInt(params.get('pagina') ?? '1', 10) || 1),
-    ),
-    search: (params.get('q') ?? '').trim().slice(0, 100),
-  }
-  // Normalize price syntax and bounds with the same UI parser, while retaining
-  // IDs not loaded yet. SQL confirms their existence; no whole-catalog prefetch.
-  const parsed = parseCatalogQuery(params, [], { complementsEnabled: true })
-  rawQuery.min = parsed.min
-  rawQuery.max = parsed.max
+  const rawQuery = catalogRequestQuery(params, brandSlug)
   const result = await readRemoteCatalog(rawQuery)
   const query = parseCatalogQuery(params, result.brands, result.features)
   const brand = brandSlug

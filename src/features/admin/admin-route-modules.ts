@@ -1,22 +1,28 @@
+async function adminModule<T>(load: () => Promise<T>): Promise<T> {
+  // Preserve the original base-before-page cascade even when React Router
+  // resolves parent and child lazy routes concurrently.
+  await import('../../styles/admin-workspace.css')
+  return load()
+}
+
 /** Code-only imports shared by the router and sidebar intent hints.
  * These functions never run loaders, mount pages or request private records. */
 export const adminRouteModules = {
-  dashboard: () => import('./AdminDashboardPage'),
-  products: () => import('./AdminProductsPage'),
-  productForm: () => import('./AdminProductFormPage'),
-  productPhotos: () => import('./AdminProductPhotoPage'),
-  families: () => import('./AdminOlfactoryFamilies'),
-  notifications: () => import('./AdminNotificationsPage'),
-  brands: () => import('./AdminBrandsPage'),
-  orderDetail: () => import('./AdminOrderDetailPage'),
-  customers: () => import('./AdminCustomersPage'),
-  promotions: () => import('./AdminPromotionsPage'),
-  orders: () => import('./AdminOrdersPage'),
-  shipping: () => import('./AdminShippingPage'),
-  home: () => import('./AdminHomePage'),
-  media: () => import('./AdminMediaLibrary'),
-  settings: () => import('./AdminSiteSettings'),
-  complaints: () => import('./AdminComplaints'),
+  dashboard: () => adminModule(() => import('./AdminDashboardPage')),
+  products: () => adminModule(() => import('./AdminProductsPage')),
+  productForm: () => adminModule(() => import('./AdminProductFormPage')),
+  productPhotos: () => adminModule(() => import('./AdminProductPhotoPage')),
+  families: () => adminModule(() => import('./AdminOlfactoryFamilies')),
+  notifications: () => adminModule(() => import('./AdminNotificationsPage')),
+  brands: () => adminModule(() => import('./AdminBrandsPage')),
+  orderDetail: () => adminModule(() => import('./AdminOrderDetailPage')),
+  customers: () => adminModule(() => import('./AdminCustomersPage')),
+  promotions: () => adminModule(() => import('./AdminPromotionsPage')),
+  orders: () => adminModule(() => import('./AdminOrdersPage')),
+  shipping: () => adminModule(() => import('./AdminShippingPage')),
+  home: () => adminModule(() => import('./AdminHomePage')),
+  settings: () => adminModule(() => import('./AdminSiteSettings')),
+  complaints: () => adminModule(() => import('./AdminComplaints')),
 } as const
 
 const sidebarModules = {
@@ -28,7 +34,6 @@ const sidebarModules = {
   '/admin/clientes': adminRouteModules.customers,
   '/admin/promociones': adminRouteModules.promotions,
   '/admin/home': adminRouteModules.home,
-  '/admin/biblioteca': adminRouteModules.media,
   '/admin/envios': adminRouteModules.shipping,
   '/admin/configuracion': adminRouteModules.settings,
   '/admin/notificaciones': adminRouteModules.notifications,

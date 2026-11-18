@@ -4,8 +4,8 @@ import {
   isValidPeruLocation,
   LIMA_DEPARTMENT,
   LIMA_PROVINCE,
-} from '../content/peru'
-import type { ShippingSettings } from '../types/shipping'
+} from '../content/peru-core'
+import type { ShippingSettings, ShippingZone } from '../types/shipping'
 
 export function emptyShippingSettings(): ShippingSettings {
   return {
@@ -81,4 +81,73 @@ export function getAreaBaseShipping(
       : (fallback?.motorizadoFeeCents ?? null),
     estimate: base?.estimate ?? fallback?.estimate ?? shipping.nationalEstimate,
   }
+}
+
+function normalizeKey(value: string) {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+export function resolveShippingZone(
+  shipping: ShippingSettings,
+  department: string,
+  province = '',
+  district = '',
+) {
+  const normalizedDepartment = normalizeKey(department)
+  if (
+    !isShippingDestinationEnabled(
+      shipping,
+      normalizedDepartment,
+      province,
+      district,
+    )
+  )
+    return undefined
+  const isCapital = isCoveredDeliveryLocation(
+    normalizedDepartment,
+    province,
+    district,
+  )
+  const override = shipping.zones
+    .filter(
+      (zone) =>
+        zone.active &&
+        normalizeKey(zone.department) === normalizedDepartment &&
+        (!zone.province || zone.province === province) &&
+        (!zone.district || zone.district === district) &&
+        // Una tarifa departamental futura de Lima no reemplaza su tarifa local.
+        (!isCapital || Boolean(zone.province || zone.district)),
+    )
+    .sort(
+      (left, right) =>
+        Number(Boolean(right.district)) - Number(Boolean(left.district)) ||
+        Number(Boolean(right.province)) - Number(Boolean(left.province)),
+    )[0]
+  if (override) return override
+  const area = getDeliveryArea(normalizedDepartment)
+  if (!isCapital)
+    return {
+      id: 'province-base',
+      name: 'Provincias',
+      department: normalizedDepartment,
+      province: null,
+      district: null,
+      courierFeeCents: shipping.nationalCourierFeeCents,
+      motorizadoFeeCents: null,
+      estimate: shipping.nationalEstimate,
+      active: true,
+    } satisfies ShippingZone
+  return {
+    id: `${area!.department}-base`,
+    name: area!.label,
+    department: area!.department,
+    province: area!.province,
+    district: null,
+    ...getAreaBaseShipping(shipping, area!.department),
+    active: true,
+  } satisfies ShippingZone
 }

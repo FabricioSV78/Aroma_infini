@@ -1,6 +1,12 @@
-import { adminService } from './admin-service'
+import {
+  adminRuntime,
+  loadAdminRuntime,
+  subscribeAdminState,
+} from './admin-runtime'
 import type { AdminOrder } from '../types/admin'
 import { isRemoteCatalog } from './catalog-source'
+
+if (!isRemoteCatalog) await loadAdminRuntime()
 
 /** Read boundary shared by account and guest order tracking in the demo. */
 export interface OrderStatusReadService {
@@ -11,13 +17,15 @@ export interface OrderStatusReadService {
 const noPublicOrders: readonly AdminOrder[] = []
 
 export const orderStatusService: OrderStatusReadService = {
-  subscribe: adminService.subscribe,
+  subscribe: subscribeAdminState,
   getSnapshot: () =>
-    isRemoteCatalog ? noPublicOrders : adminService.getSnapshot().orders,
+    isRemoteCatalog
+      ? noPublicOrders
+      : adminRuntime().adminService.getSnapshot().orders,
   getByReference: (reference) =>
     isRemoteCatalog
       ? undefined
-      : adminService
-          .getSnapshot()
+      : adminRuntime()
+          .adminService.getSnapshot()
           .orders.find((order) => order.reference === reference),
 }

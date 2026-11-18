@@ -30,7 +30,7 @@ import {
 } from '../../services/checkout-server'
 import { useStorefrontSnapshot } from '../../services/offer-price-clock'
 import { authService } from '../../services/auth-service'
-import { UserFacingError } from '../../services/admin-messages'
+import { UserFacingError } from '../../domain/user-facing-error'
 import { canSimulateCheckout } from '../../services/runtime-environment'
 import { useAuth } from '../auth/useAuth'
 import {
