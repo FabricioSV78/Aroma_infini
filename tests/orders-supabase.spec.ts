@@ -995,7 +995,21 @@ test('Paginación remota: seis mil pedidos conservan selección entre páginas s
   expect(ordersNetwork.history).toHaveLength(40)
   expect(ordersNetwork.calls.filter(c => c.name === 'admin_set_order_statuses_page')).toHaveLength(1)
   await page.setViewportSize({ width: 390, height: 844 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  // Resizing can finish before Chrome has settled the responsive layout.
+  // Observe the real geometry; a persistent overflow still fails this check.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => ({
+          viewportWidth: innerWidth,
+          horizontalOverflow: Math.max(
+            0,
+            document.documentElement.scrollWidth - innerWidth - 1,
+          ),
+        })),
+      { message: 'Pedidos sin desbordamiento en pantalla de 390 px' },
+    )
+    .toEqual({ viewportWidth: 390, horizontalOverflow: 0 })
 })
 
 test('Una selección de más de cien pedidos conserva datos y explica el límite real del comando', async ({ page, supabaseNetwork, ordersNetwork }) => {
