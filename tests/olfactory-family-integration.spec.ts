@@ -17,6 +17,9 @@ test('la familia guardada en el panel se refleja en la tienda y la ficha', async
   await expect(page.locator('.product-card').first()).toContainText(
     'Bois Clair',
   )
+  await page
+    .locator('.catalog-sidebar [data-filter-group="family"] summary')
+    .click()
   await expect(
     page
       .getByRole('complementary', { name: 'Filtros de la tienda' })
@@ -41,10 +44,10 @@ test('una familia sin clasificar no aparece como filtro disponible', async ({
   const sidebar = page.getByRole('complementary', {
     name: 'Filtros de la tienda',
   })
-  await expect(sidebar.locator('[data-filter-group="family"]')).toHaveAttribute(
-    'open',
-    '',
-  )
+  await expect(
+    sidebar.locator('[data-filter-group="family"]'),
+  ).not.toHaveAttribute('open', '')
+  await sidebar.locator('[data-filter-group="family"] summary').click()
   await expect(
     sidebar.getByRole('checkbox', { name: 'Amaderada' }),
   ).toHaveCount(1)
@@ -74,7 +77,8 @@ test('el filtro mantiene una composición usable en cuatro tamaños de pantalla'
       })
       await expect(
         sidebar.locator('[data-filter-group="family"]'),
-      ).toHaveAttribute('open', '')
+      ).not.toHaveAttribute('open', '')
+      await sidebar.locator('[data-filter-group="family"] summary').click()
       await expect(
         sidebar.getByRole('checkbox', { name: 'Floral' }),
       ).toBeVisible()

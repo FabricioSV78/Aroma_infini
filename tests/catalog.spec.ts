@@ -261,11 +261,13 @@ test('El diálogo de filtros mantiene Aplicar filtros visible al abrir en un mó
   await expect(apply).toBeInViewport({ ratio: 1 })
   const opening = await fields.evaluate((element) => ({
     scrollTop: element.scrollTop,
-    scrollable: element.scrollHeight > element.clientHeight,
   }))
   expect(opening.scrollTop).toBe(0)
-  expect(opening.scrollable).toBe(false)
-  await dialog.locator('[data-filter-group="brand"] summary').click()
+  await expect(fields.locator('.catalog-filter-group[open]')).toHaveCount(1)
+  await expect(dialog.locator('[data-filter-group="brand"]')).toHaveAttribute(
+    'open',
+    '',
+  )
   await dialog.locator('[data-filter-group="gender"] summary').click()
   await dialog.locator('[data-filter-group="family"] summary').click()
   await dialog.locator('[data-filter-group="price"] summary').click()

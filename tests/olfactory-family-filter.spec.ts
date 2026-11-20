@@ -102,7 +102,8 @@ test('Escritorio: selección múltiple, chips, orden, recarga y limpieza', async
     name: 'Filtros de la tienda',
   })
   const families = sidebar.locator('[data-filter-group="family"]')
-  await expect(families).toHaveAttribute('open', '')
+  await expect(families).not.toHaveAttribute('open', '')
+  await families.locator('summary').click()
   await expect(sidebar.getByRole('checkbox', { name: 'Gourmand' })).toHaveCount(
     0,
   )
@@ -118,6 +119,8 @@ test('Escritorio: selección múltiple, chips, orden, recarga y limpieza', async
   await page.getByLabel('Ordenar', { exact: true }).selectOption('precio-asc')
   await expect(page.locator('.product-card').first()).toContainText('Pétale Nu')
   await page.reload()
+  await expect(families).not.toHaveAttribute('open', '')
+  await families.locator('summary').click()
   await expect(families).toHaveAttribute('open', '')
   await expect(sidebar.getByRole('checkbox', { name: 'Floral' })).toBeChecked()
   await expect(sidebar.getByRole('checkbox', { name: 'Verde' })).toBeChecked()
@@ -165,7 +168,10 @@ test('Móvil: los filtros olfativos respetan el borrador del panel y el estado v
   await expect(dialog.getByRole('checkbox', { name: 'Gourmand' })).toHaveCount(
     0,
   )
-  await dialog.locator('[data-filter-group="brand"] summary').click()
+  await expect(dialog.locator('[data-filter-group="brand"]')).toHaveAttribute(
+    'open',
+    '',
+  )
   await dialog.getByRole('checkbox', { name: 'Forme' }).check()
   await dialog.getByRole('button', { name: 'Aplicar filtros' }).click()
   await expect(

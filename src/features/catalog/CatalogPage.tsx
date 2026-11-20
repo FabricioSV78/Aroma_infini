@@ -239,6 +239,13 @@ export function CatalogPage() {
   const selectedTypes = draftTypes ?? query.productTypes
   const onlyComplements =
     selectedTypes.length === 1 && selectedTypes[0] === 'complemento'
+  const firstFilter: FilterGroupId = features.complementsEnabled
+    ? 'type'
+    : !brand
+      ? 'brand'
+      : !onlyComplements
+        ? 'gender'
+        : 'price'
   const count =
     (brand ? 0 : query.brands.length) +
     query.productTypes.length +
@@ -247,7 +254,7 @@ export function CatalogPage() {
     Number(Boolean(query.min || query.max))
   const compactSidebar = searchMode && data.total === 1
   function renderFilterForm(surface: 'sidebar' | 'dialog') {
-    const keySuffix = `${surface}-${params.toString()}`
+    const keySuffix = `${surface}-${location.pathname}-${params.toString()}`
     return (
       <form onSubmit={applyFilters} className="catalog-filter-form" noValidate>
         <div className="catalog-filter-fields">
@@ -256,7 +263,7 @@ export function CatalogPage() {
               key={`type-${keySuffix}`}
               id="type"
               title="Tipo de producto"
-              initiallyOpen={surface === 'sidebar'}
+              initiallyOpen={firstFilter === 'type'}
               initialCount={query.productTypes.length}
             >
               <fieldset>
@@ -287,7 +294,7 @@ export function CatalogPage() {
               key={`brand-${keySuffix}`}
               id="brand"
               title="Marca"
-              initiallyOpen={surface === 'sidebar'}
+              initiallyOpen={firstFilter === 'brand'}
               initialCount={query.brands.length}
             >
               <fieldset>
@@ -311,7 +318,7 @@ export function CatalogPage() {
               key={`gender-${keySuffix}`}
               id="gender"
               title="Género"
-              initiallyOpen={false}
+              initiallyOpen={firstFilter === 'gender'}
               initialCount={query.genders.length}
             >
               <fieldset>
@@ -335,7 +342,7 @@ export function CatalogPage() {
               key={`family-${keySuffix}`}
               id="family"
               title="Familia olfativa"
-              initiallyOpen={surface === 'sidebar'}
+              initiallyOpen={false}
               initialCount={query.families.length}
             >
               <fieldset>
@@ -358,7 +365,7 @@ export function CatalogPage() {
             key={`price-${keySuffix}`}
             id="price"
             title="Precio en soles"
-            initiallyOpen={false}
+            initiallyOpen={firstFilter === 'price'}
             initialCount={Number(Boolean(query.min || query.max))}
           >
             <fieldset>

@@ -111,12 +111,19 @@ test('el listado normal pagina 20, 20 y 10 pedidos y conserva la selección entr
     page.getByRole('dialog', { name: 'Exportar PDF', exact: true }),
   ).toContainText('2 pedidos seleccionados')
   await page.keyboard.press('Escape')
-  await pagination
-    .getByRole('button', { name: 'Anterior', exact: true })
-    .click()
-  await pagination
-    .getByRole('button', { name: 'Anterior', exact: true })
-    .click()
+  await expect(
+    page.getByRole('dialog', { name: 'Exportar PDF', exact: true }),
+  ).not.toBeVisible()
+  for (const previousPage of [2, 1]) {
+    await pagination
+      .getByRole('button', { name: 'Anterior', exact: true })
+      .click()
+    // A click starts the SPA navigation; wait for its committed page before
+    // calculating another previous-page destination from the rendered controls.
+    await expect(pagination.locator('[aria-current="page"]')).toHaveText(
+      `Página ${previousPage} de 3`,
+    )
+  }
   await expect(
     page.getByRole('checkbox', { name: first!, exact: true }),
   ).toBeChecked()

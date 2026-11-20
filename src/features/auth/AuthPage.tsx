@@ -14,6 +14,7 @@ import {
   type AuthView,
 } from './AuthScreen'
 import {
+  authEntryReturn,
   authPath,
   safeAuthReturn,
   type AuthAudience,
@@ -47,7 +48,7 @@ function AuthForm({
   const auth = useAuth(audience)
   const authService =
     audience === 'admin' ? adminAuthService : customerAuthService
-  const target = safeAuthReturn(params.get('returnTo'), audience)
+  const target = authEntryReturn(params.get('returnTo'), audience)
   const [values, setValues] = useState<AuthValues>(empty)
   const [errors, setErrors] = useState<AuthScreenProps['fieldErrors']>({})
   const [message, setMessage] = useState<AuthScreenProps['message']>(null)

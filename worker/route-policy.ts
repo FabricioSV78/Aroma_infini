@@ -31,6 +31,7 @@ const appPaths = new Set([
   '/cuenta/pedidos',
   '/cuenta/pagos',
   '/admin',
+  '/admin/resumen',
   '/admin/productos',
   '/admin/productos/nuevo',
   '/admin/marcas',

@@ -106,6 +106,8 @@ function AdminLayoutContent() {
   const sidebarRef = useRef<HTMLElement>(null)
   const [navigationOpen, setNavigationOpen] = useState(false)
   const resetPersistence = useAdminSave()
+  const sectionPath =
+    location.pathname === '/admin/resumen' ? '/admin' : location.pathname
   const currentSection = adminGroups
     .reduce<Array<{ to: string; label: string; end?: boolean }>>(
       (sections, group) => {
@@ -117,8 +119,8 @@ function AdminLayoutContent() {
     .sort((a, b) => b.to.length - a.to.length)
     .find((section) =>
       section.end
-        ? location.pathname === section.to
-        : location.pathname.startsWith(section.to),
+        ? sectionPath === section.to
+        : sectionPath.startsWith(section.to),
     )
 
   useEffect(() => {
@@ -317,7 +319,12 @@ function AdminLayoutContent() {
                 {group.sections.map((section) => (
                   <li key={section.to}>
                     <NavLink
-                      to={section.to}
+                      to={
+                        section.to === '/admin' &&
+                        location.pathname === '/admin/resumen'
+                          ? '/admin/resumen'
+                          : section.to
+                      }
                       end={'end' in section && section.end}
                       className={({ isPending }) =>
                         isPending ? 'is-pending' : undefined

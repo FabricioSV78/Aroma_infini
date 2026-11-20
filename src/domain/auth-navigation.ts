@@ -54,6 +54,20 @@ export function safeAuthReturn(
   }
 }
 
+/** Normal panel sign-ins start at its summary; notification links keep their destination. */
+export function authEntryReturn(
+  value: string | null | undefined,
+  audience: AuthAudience,
+): string {
+  const target = safeAuthReturn(value, audience)
+  if (audience !== 'admin') return target
+  return target === '/admin/resumen' ||
+    target === '/admin/notificaciones' ||
+    /^\/admin\/pedidos\/[A-Za-z0-9-]{1,100}$/.test(target)
+    ? target
+    : '/admin'
+}
+
 export function authPath(
   audience: AuthAudience,
   view: 'login' | 'register' | 'recover',

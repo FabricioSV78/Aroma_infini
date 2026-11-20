@@ -155,12 +155,37 @@ test('click focuses/navigates existing admin window; malicious links remain insi
   expect(worker.shown[0].options.data).toEqual({ url: '/admin/notificaciones' })
   expect(messages).toEqual([{ type: 'ADMIN_NOTIFICATION_RECEIVED' }])
 })
+test('an order notification retains its detail destination in an already open admin window', async () => {
+  const visited: string[] = []
+  let focused = false
+  const worker = runtime([
+    {
+      url: 'https://aroma.example/admin/resumen',
+      navigate: async (url) => {
+        visited.push(url)
+      },
+      focus: async () => {
+        focused = true
+      },
+      postMessage: () => {},
+    },
+  ])
+
+  await worker.click('/admin/pedidos/AI-123')
+
+  expect(visited).toEqual(['https://aroma.example/admin/pedidos/AI-123'])
+  expect(focused).toBe(true)
+  expect(worker.opened).toHaveLength(0)
+})
+
 test('manifest scope/start and platform icons have correct actual dimensions', async () => {
   const manifest = JSON.parse(
     readFileSync('public/admin/manifest.webmanifest', 'utf8'),
   )
+  expect(manifest.id).toBe('/admin/')
   expect(manifest.scope).toBe('/admin/')
-  expect(manifest.start_url).toBe('/admin/notificaciones')
+  expect(manifest.start_url).toBe('/admin/resumen')
+  expect(manifest.start_url.startsWith(manifest.scope)).toBe(true)
   expect(manifest.display).toBe('standalone')
   expect(classifyRoute(manifest.start_url)).toBe('app')
   expect(classifyRoute('/admin/pedidos/AI-123')).toBe('app')

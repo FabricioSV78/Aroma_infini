@@ -356,7 +356,10 @@ test('El filtro móvil permite seleccionar Complementos y descarta los filtros d
   await page.goto('/tienda?genero=unisex&familia=floral')
   await page.getByRole('button', { name: /^Filtros/ }).click()
   const dialog = page.getByRole('dialog', { name: 'Afinar la selección' })
-  await dialog.locator('[data-filter-group="type"] summary').click()
+  await expect(dialog.locator('[data-filter-group="type"]')).toHaveAttribute(
+    'open',
+    '',
+  )
   await dialog
     .getByRole('checkbox', { name: 'Complementos', exact: true })
     .check()

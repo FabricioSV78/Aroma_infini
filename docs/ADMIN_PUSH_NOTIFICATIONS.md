@@ -45,8 +45,10 @@ No se implementó ni se activó la pasarela real en esta entrega.
 
 ## Seguridad y funcionamiento
 
-- PWA limitada a `/admin/`; abre `/admin/notificaciones` para evitar que la
-  normalización de la barra final saque la aplicación del ámbito instalado.
+- PWA limitada a `/admin/`; abre el Resumen en `/admin/resumen`, alias directo
+  de `/admin` que evita que la normalización de la barra final saque la
+  aplicación del ámbito instalado. Los avisos conservan el enlace al pedido
+  o al centro de notificaciones, también después del inicio de sesión y MFA.
   La tienda pública no incluye el manifiesto ni registra este service worker.
 - Service worker pequeño, sin interceptar `fetch`, Cache Storage, tokens,
   pedidos guardados para uso sin conexión ni acceso alternativo al panel.

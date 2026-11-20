@@ -201,8 +201,11 @@ test('los enlaces de categorías, marcas y acordeones conservan un foco de tecla
   const summary = page.locator(
     '.catalog-sidebar [data-filter-group="family"] > summary',
   )
+  await expect(summary.locator('..')).not.toHaveAttribute('open', '')
   await summary.focus()
   await expectVisibleFocus(summary)
+  await page.keyboard.press('Enter')
+  await expect(summary.locator('..')).toHaveAttribute('open', '')
   await page.keyboard.press('Enter')
   await expect(summary.locator('..')).not.toHaveAttribute('open', '')
 })

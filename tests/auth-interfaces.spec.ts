@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { expect, test, type Page } from './test'
-import { safeAuthReturn } from '../src/domain/auth-navigation'
+import { authEntryReturn, safeAuthReturn } from '../src/domain/auth-navigation'
 
 const unavailableMessage =
   'No pudimos conectar con el acceso a tu cuenta. Vuelve a intentarlo más tarde.'
@@ -448,13 +448,13 @@ test.describe('Contratos de identidad y permisos con adaptador aislado', () => {
 
 test.describe('Administrador verificado de prueba', () => {
   test.use({ authMode: 'admin' })
-  test('entra directamente y salir revoca todas las rutas protegidas', async ({
+  test('el acceso normal comienza en Resumen y salir revoca todas las rutas protegidas', async ({
     page,
   }) => {
     await page.goto('/admin/login?returnTo=%2Fadmin%2Fproductos')
-    await expect(page).toHaveURL('/admin/productos')
+    await expect(page).toHaveURL('/admin')
     await expect(
-      page.getByRole('heading', { name: 'Productos', exact: true }),
+      page.getByRole('heading', { name: 'Resumen del negocio', exact: true }),
     ).toBeVisible()
     await page
       .getByRole('button', { name: 'Cerrar sesión', exact: true })
@@ -462,6 +462,38 @@ test.describe('Administrador verificado de prueba', () => {
     await expect(page).toHaveURL(/\/admin\/login/)
     await page.goto('/admin/pedidos')
     await expect(page).toHaveURL(/\/admin\/login/)
+  })
+
+  test('la entrada PWA abre Resumen sin reiniciar la navegación interna', async ({
+    page,
+  }) => {
+    await page.goto('/admin/resumen')
+    await expect(page).toHaveURL('/admin/resumen')
+    await expect(
+      page.getByRole('heading', { name: 'Resumen del negocio', exact: true }),
+    ).toBeVisible()
+    await expect(
+      page.locator('.admin-sidebar').getByRole('link', { name: 'Resumen', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
+
+    for (const name of ['Productos', 'Pedidos']) {
+      await page.locator('.admin-sidebar').getByRole('link', { name, exact: true }).click()
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      await expect(page).toHaveURL(`/admin/${name.toLocaleLowerCase('es')}`)
+    }
+    await page.reload()
+    await expect(page).toHaveURL('/admin/pedidos')
+    await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible()
+  })
+
+  test('el acceso desde una notificación conserva el detalle del pedido', async ({
+    page,
+  }) => {
+    await page.goto('/admin/login?returnTo=%2Fadmin%2Fpedidos%2FAI-210926-01')
+    await expect(page).toHaveURL('/admin/pedidos/AI-210926-01')
+    await expect(
+      page.getByRole('heading', { name: 'Detalle del pedido', exact: true }),
+    ).toBeVisible()
   })
 
   test('un fallo al cerrar el proveedor revoca de todos modos el acceso local', async ({
@@ -697,4 +729,36 @@ test('destinos de retorno evitan orígenes externos, roles cruzados y bucles', (
   )
   expect(safeAuthReturn('/checkout', 'customer')).toBe('/checkout')
   expect(safeAuthReturn('/admin/pedidos', 'customer')).toBe('/cuenta')
+})
+
+test('el acceso administrativo prioriza Resumen y admite solamente los destinos de notificación', () => {
+  for (const target of [
+    null,
+    undefined,
+    '/admin',
+    '/admin/productos',
+    '/admin/pedidos?estado=preparing',
+    '/admin/home',
+    '/admin/pedidos/AI-123?secret=value',
+    '/admin/pedidos/AI-123#details',
+    '/admin/pedidos/AI-123/editar',
+    `/admin/pedidos/${'A'.repeat(101)}`,
+    '/admin/pedidos/%2e%2e/login',
+    'https://evil.invalid/admin/pedidos/AI-123',
+    '//evil.invalid/admin/pedidos/AI-123',
+    '/admin/login',
+  ]) {
+    expect(authEntryReturn(target, 'admin')).toBe('/admin')
+  }
+  for (const target of [
+    '/admin/resumen',
+    '/admin/notificaciones',
+    '/admin/pedidos/AI-123',
+    '/admin/pedidos/00000000-0000-4000-8000-000000000001',
+  ]) {
+    expect(authEntryReturn(target, 'admin')).toBe(target)
+  }
+  expect(authEntryReturn('/checkout', 'customer')).toBe('/checkout')
+  expect(authEntryReturn('/cuenta/pedidos', 'customer')).toBe('/cuenta/pedidos')
+  expect(authEntryReturn('/admin/pedidos/AI-123', 'customer')).toBe('/cuenta')
 })

@@ -319,6 +319,15 @@ export function getRouter() {
           },
         },
         {
+          // A launch URL inside the installed /admin/ scope, without a redirect.
+          path: 'resumen',
+          loader: adminLoader('dashboard'),
+          lazy: async () => {
+            const module = await adminRouteModules.dashboard()
+            return { Component: module.AdminDashboardPage }
+          },
+        },
+        {
           path: 'productos',
           loader: adminLoader('productList'),
           lazy: async () => {

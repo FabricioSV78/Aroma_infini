@@ -4,7 +4,7 @@
   "short_name": "Aroma Admin",
   "description": "Panel administrativo de Aroma Infini",
   "lang": "es-PE",
-  "start_url": "/admin/notificaciones",
+  "start_url": "/admin/resumen",
   "scope": "/admin/",
   "display": "standalone",
   "background_color": "#f4f3ef",

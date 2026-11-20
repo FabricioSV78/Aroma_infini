@@ -312,6 +312,35 @@ test('admin AAL1 necesita TOTP y solo entra al panel tras verificar AAL2', async
   ).toBe(true)
 })
 
+test('un pedido abierto desde una notificación conserva su destino tras contraseña y MFA', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  supabaseNetwork.adminMembership = true
+  await page.goto('/admin/login?returnTo=%2Fadmin%2Fpedidos%2FAI-123')
+  await page.getByLabel('Correo electrónico', { exact: true }).fill(fixtureEmail)
+  await page.getByLabel('Contraseña', { exact: true }).fill(fixturePassword)
+  await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Verificación en dos pasos' }),
+  ).toBeVisible()
+  await expect(page.locator('.admin-sidebar')).toHaveCount(0)
+  await page.getByLabel('Código de verificación', { exact: true }).fill('123456')
+  await page
+    .getByRole('button', { name: 'Verificar y continuar', exact: true })
+    .click()
+
+  await expect(page).toHaveURL('/admin/pedidos/AI-123')
+  await expect(page.locator('.admin-sidebar')).toBeVisible()
+  await expect(page.locator('.auth-mfa')).toHaveCount(0)
+  expect((await authState(page)).mfaRequired).toBe(false)
+  expect(
+    supabaseNetwork.requests.filter((request) =>
+      request.path.endsWith('/factor-test/verify'),
+    ),
+  ).toHaveLength(1)
+})
+
 test('primer acceso administrativo prepara TOTP sin guardar su secreto en el navegador', async ({
   page,
   supabaseNetwork,
