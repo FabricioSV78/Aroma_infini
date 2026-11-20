@@ -504,6 +504,7 @@ export function AdminProductFormPage() {
         ← Volver
       </Link>
       <AdminPageHeader
+        keepDescriptionOnMobile={!editing}
         eyebrow={editing ? 'Editar producto' : 'Nuevo producto'}
         title={editing ? form.product.name : 'Crear producto'}
         description={

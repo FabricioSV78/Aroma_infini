@@ -224,7 +224,7 @@ test('recuerda 60 días con cookie protegida; volver a entrar exige contraseña 
   ).toHaveCount(0)
   const session = await page.evaluate(async () => {
     const source = '/src/services/auth-service.ts'
-    return (await import(source)).authService.getSnapshot().session
+    return (await import(source)).adminAuthService.getSnapshot().session
   })
   expect(session).toMatchObject({
     assurance: 'aal1',
@@ -234,7 +234,7 @@ test('recuerda 60 días con cookie protegida; volver a entrar exige contraseña 
   const resumes = state.resumes
   await page.evaluate(async () => {
     const source = '/src/services/auth-service.ts'
-    await (await import(source)).authService.initialize()
+    await (await import(source)).adminAuthService.initialize()
   })
   expect(state.resumes).toBe(resumes)
   // A refreshed signed-token identity must check the cookie again even when
@@ -244,7 +244,7 @@ test('recuerda 60 días con cookie protegida; volver a entrar exige contraseña 
     const { data } = await (
       await import(source)
     )
-      .requireSupabaseClient()
+      .requireAdminSupabaseClient()
       .auth.getSession()
     return {
       token: data.session!.access_token,
@@ -260,10 +260,10 @@ test('recuerda 60 días con cookie protegida; volver a entrar exige contraseña 
       await (
         await import(source)
       )
-        .requireSupabaseClient()
+        .requireAdminSupabaseClient()
         .auth.setSession({ access_token: access, refresh_token: refresh })
       const auth = '/src/services/auth-service.ts'
-      await (await import(auth)).authService.initialize()
+      await (await import(auth)).adminAuthService.initialize()
     },
     { access: rotated, refresh: stored.refresh },
   )
@@ -361,7 +361,7 @@ test('un primer QR se inscribe una vez y dos administradores conservan sesiones 
     const accountIn = (target: Page) =>
       target.evaluate(async () => {
         const source = '/src/services/auth-service.ts'
-        return (await import(source)).authService.getSnapshot().session?.user.id
+        return (await import(source)).adminAuthService.getSnapshot().session?.user.id
       })
     expect(await accountIn(page)).toBe(customerA)
     expect(await accountIn(otherPage)).toBe(customerB)
@@ -476,7 +476,7 @@ test('una sesión de confianza AAL1 queda limitada por su fecha y un rechazo de 
   await expect(page).toHaveURL(`${origin}/admin`)
   const expiresAt = await page.evaluate(async () => {
     const source = '/src/services/auth-service.ts'
-    return (await import(source)).authService.getSnapshot().session?.expiresAt
+    return (await import(source)).adminAuthService.getSnapshot().session?.expiresAt
   })
   expect(expiresAt).toBe(Date.parse(expiry))
   // Managed Auth can revoke a session independently, including when another

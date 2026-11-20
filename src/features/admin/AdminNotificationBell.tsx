@@ -125,7 +125,7 @@ export function AdminNotificationBell() {
                       aria-hidden="true"
                     />
                     <span>
-                      <strong>Nuevo pedido confirmado</strong>
+                      <strong>{item.kind === 'simulated_order' ? 'Nuevo pedido de prueba' : 'Nuevo pedido confirmado'}</strong>
                       <span>{item.orderReference}</span>
                       <time dateTime={item.createdAt}>
                         {dateFormat.format(new Date(item.createdAt))}

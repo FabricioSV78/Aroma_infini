@@ -1,5 +1,6 @@
 import { variantLabel } from '../../domain/product-type'
-import { Link } from 'react-router'
+import { Link, useRevalidator } from 'react-router'
+import { useEffect, useRef } from 'react'
 import { Icon, type IconName } from '../../components/ui/Icon'
 import { formatPEN } from '../../services/currency'
 import { AdminBadge, AdminPageHeader } from './AdminShared'
@@ -14,6 +15,9 @@ import {
 import { useAdminStore } from './useAdminStore'
 import { useAdminListData } from './useAdminListData'
 import type { AdminDashboardData } from '../../types/admin-lists'
+import { isRemoteCatalog } from '../../services/catalog-source'
+import { isProductionEnvironment } from '../../services/runtime-environment'
+import { ADMIN_ORDERS_CHANGED_EVENT } from '../../domain/order-events'
 
 interface DashboardMetric {
   label: string
@@ -29,7 +33,49 @@ interface DashboardMetric {
 export function AdminDashboardPage() {
   const state = useAdminStore()
   const remote = useAdminListData<AdminDashboardData>()
-  const commercialOrders = remote?.recentOrders ?? getCommercialOrders(state.orders)
+  const revalidator = useRevalidator()
+  const revalidate = useRef(revalidator.revalidate)
+  useEffect(() => {
+    revalidate.current = revalidator.revalidate
+  }, [revalidator.revalidate])
+  useEffect(() => {
+    if (!isRemoteCatalog) return
+    let active = true
+    let frame: number | undefined
+    function cancel() {
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+      frame = undefined
+    }
+    function refresh() {
+      if (document.visibilityState !== 'visible') {
+        cancel()
+        return
+      }
+      if (frame !== undefined) return
+      frame = window.requestAnimationFrame(() => {
+        frame = undefined
+        if (active && document.visibilityState === 'visible')
+          void revalidate.current()
+      })
+    }
+    window.addEventListener('focus', refresh)
+    window.addEventListener(ADMIN_ORDERS_CHANGED_EVENT, refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      active = false
+      cancel()
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener(ADMIN_ORDERS_CHANGED_EVENT, refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+  const includeSimulation = !isProductionEnvironment
+  const operationalOrders =
+    remote?.recentOrders ??
+    (includeSimulation
+      ? state.orders
+      : getCommercialOrders(state.orders)
+    ).filter((order) => !['cancelled', 'expired'].includes(order.status))
   const activeBrandIds = new Set(
     state.brands.filter((brand) => brand.active).map((brand) => brand.id),
   )
@@ -44,15 +90,15 @@ export function AdminDashboardPage() {
     (total, record) => total + getProductInventory(record).totalStock,
     0,
   )
-  const ordersToPrepare = commercialOrders.filter(
+  const ordersToPrepare = operationalOrders.filter(
     (order) =>
-      order.paymentStatus === 'approved' &&
+      (order.paymentStatus === 'approved' || (includeSimulation && order.simulation && order.paymentStatus === 'pending')) &&
       ['received', 'preparing'].includes(order.status),
   )
-  const shipmentsInProgress = commercialOrders.filter(
+  const shipmentsInProgress = operationalOrders.filter(
     (order) => order.status === 'shipped',
   )
-  const recentOrders = [...commercialOrders]
+  const recentOrders = [...operationalOrders]
     .sort(
       (first, second) =>
         new Date(second.placedAt).getTime() -
@@ -65,7 +111,7 @@ export function AdminDashboardPage() {
     {
       label: 'Pedidos por preparar',
       value: remote?.toPrepare ?? ordersToPrepare.length,
-      detail: 'Aprobados y aún no enviados',
+      detail: includeSimulation ? 'Nuevos y en preparación' : 'Aprobados y aún no enviados',
       action: 'Ver pedidos',
       to: '/admin/pedidos?preparacion=atencion',
       icon: 'orders',
@@ -106,13 +152,13 @@ export function AdminDashboardPage() {
   ]
 
   const orderCounts = remote?.counts ?? {
-    received: commercialOrders.filter((order) => order.status === 'received')
+    received: operationalOrders.filter((order) => order.status === 'received')
       .length,
-    preparing: commercialOrders.filter((order) => order.status === 'preparing')
+    preparing: operationalOrders.filter((order) => order.status === 'preparing')
       .length,
-    shipped: commercialOrders.filter((order) => order.status === 'shipped')
+    shipped: operationalOrders.filter((order) => order.status === 'shipped')
       .length,
-    delivered: commercialOrders.filter((order) => order.status === 'delivered')
+    delivered: operationalOrders.filter((order) => order.status === 'delivered')
       .length,
   }
 
@@ -352,7 +398,7 @@ export function AdminDashboardPage() {
           </ul>
         ) : (
           <p className="admin-dashboard-empty">
-            Todavía no hay pedidos comerciales.
+            {includeSimulation ? 'Todavía no hay pedidos.' : 'Todavía no hay pedidos comerciales.'}
           </p>
         )}
       </section>

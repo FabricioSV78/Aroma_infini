@@ -3,6 +3,7 @@ import {
   cachedPublicQuery,
   invalidatePublicQueryCache,
 } from '../src/services/public-query-cache'
+import { createPublicDocumentCache } from '../src/services/public-document-cache'
 
 const realNow = Date.now
 let now = 1000
@@ -158,4 +159,49 @@ test('El límite de cuarenta entradas elimina la más antigua sin vaciar las dem
   expect(calls.get('entry-39')).toBe(1)
   expect(await cachedPublicQuery('entry-0', read('entry-0'))).toBe('entry-0')
   expect(calls.get('entry-0')).toBe(2)
+})
+
+test('Los documentos editoriales vencen a los treinta segundos y no vuelven a confirmar un HIT', async () => {
+  let calls = 0, confirms = 0
+  let snapshot = 0
+  const cache = createPublicDocumentCache('editorial-ttl', async () => ++calls,
+    value => { confirms++; return snapshot = value as number }, () => snapshot)
+  expect(await cache.load()).toBe(1)
+  now += 29999
+  expect(await cache.load()).toBe(1)
+  expect(confirms).toBe(1)
+  now++
+  expect(await Promise.all(Array.from({ length: 10 }, () => cache.load()))).toEqual(Array(10).fill(2))
+  expect(calls).toBe(2)
+  expect(confirms).toBe(2)
+})
+
+test('Una renovación forzada comparte su petición y vence a la anterior sin sobrescribirla', async () => {
+  const old = deferred<number>(), fresh = deferred<number>()
+  let calls = 0, snapshot = 0
+  const cache = createPublicDocumentCache('editorial-force', () => ++calls === 1 ? old.promise : fresh.promise,
+    value => snapshot = value as number, () => snapshot)
+  const previous = cache.load()
+  const renewed = Array.from({ length: 10 }, () => cache.load(true))
+  expect(calls).toBe(2)
+  old.resolve(1)
+  fresh.resolve(2)
+  expect(await previous).toBe(2)
+  expect(await Promise.all(renewed)).toEqual(Array(10).fill(2))
+  expect(snapshot).toBe(2)
+  invalidatePublicQueryCache()
+  expect(await cache.load()).toBe(2)
+  expect(calls).toBe(3)
+})
+
+test('Una respuesta HTTP válida pero un documento inválido no queda cacheado ni borra otros datos', async () => {
+  let calls = 0, snapshot = 0
+  await cachedPublicQuery('unrelated-document', async () => 9)
+  const cache = createPublicDocumentCache('invalid-document', async () => ++calls,
+    value => { if (value === 1) throw new Error('Invalid document'); return snapshot = value as number }, () => snapshot)
+  await expect(cache.load()).rejects.toThrow('Invalid document')
+  expect(snapshot).toBe(0)
+  expect(await cache.load()).toBe(2)
+  expect(calls).toBe(2)
+  expect(await cachedPublicQuery('unrelated-document', async () => 10)).toBe(9)
 })

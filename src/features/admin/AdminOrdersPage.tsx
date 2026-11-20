@@ -8,6 +8,8 @@ import { Icon } from '../../components/ui/Icon'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
 import {
   ORDER_STATUSES,
+  ALL_ORDER_STATUSES,
+  ORDER_ACTION_STATUSES,
   getOrderTransitionError,
 } from '../../domain/order-workflow'
 import {
@@ -40,6 +42,7 @@ import { useUnsavedChanges } from './useUnsavedChanges'
 import { orderSearchText } from './OrderWorkspaceUtils'
 import './admin-operations.css'
 import './admin-order-workspace.css'
+import './admin-orders-mobile.css'
 
 const limaDateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Lima',
@@ -86,6 +89,9 @@ export function AdminOrdersPage() {
   const revalidator = useRevalidator()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
+  const [dateFiltersOpen, setDateFiltersOpen] = useState(
+    () => Boolean(params.get('desde') || params.get('hasta')),
+  )
   const selectionScopeParams = new URLSearchParams(params)
   selectionScopeParams.delete('page')
   selectionScopeParams.sort()
@@ -191,7 +197,7 @@ export function AdminOrdersPage() {
   const search = params.get('q') ?? ''
   const customerFilter = params.get('cliente') ?? ''
   const preparationParameter = params.get('preparacion') ?? ''
-  const preparationFilter = [...ORDER_STATUSES, 'atencion'].includes(
+  const preparationFilter = [...ALL_ORDER_STATUSES, 'atencion'].includes(
     preparationParameter,
   )
     ? preparationParameter
@@ -577,7 +583,7 @@ export function AdminOrdersPage() {
                   : adminOrderStatusMeta[status].label}
               </AdminBadge>
               <strong>
-                {remote?.counts[status] ?? state.orders.filter((order) => order.status === status).length}
+                {(status === 'cancelled' || status === 'expired' ? undefined : remote?.counts[status]) ?? state.orders.filter((order) => order.status === status).length}
               </strong>
             </Link>
           ))}
@@ -602,7 +608,7 @@ export function AdminOrdersPage() {
               placeholder="Código, cliente, correo o destino"
             />
           </label>
-          <label>
+          <label className="admin-order-preparation-field">
             Estado del pedido
             <select
               name="preparacion"
@@ -611,21 +617,34 @@ export function AdminOrdersPage() {
             >
               <option value="all">Todos</option>
               <option value="atencion">Por preparar</option>
-              {ORDER_STATUSES.map((status) => (
+              {ALL_ORDER_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {adminOrderStatusMeta[status].label}
                 </option>
               ))}
             </select>
           </label>
-          <label>
-            Desde
-            <input type="date" name="desde" key={from} defaultValue={from} />
-          </label>
-          <label>
-            Hasta
-            <input type="date" name="hasta" key={until} defaultValue={until} />
-          </label>
+          <button
+            className="admin-order-date-toggle"
+            type="button"
+            aria-controls="admin-order-date-fields"
+            aria-expanded={dateFiltersOpen}
+            disabled={busy}
+            onClick={() => setDateFiltersOpen((open) => !open)}
+          >
+            Filtrar por fecha{from || until ? ' · Activo' : ''}
+            <Icon name="chevron" aria-hidden="true" />
+          </button>
+          <div id="admin-order-date-fields" className={`admin-order-date-fields${dateFiltersOpen ? ' is-open' : ''}`}>
+            <label>
+              Desde
+              <input type="date" name="desde" key={from} defaultValue={from} />
+            </label>
+            <label>
+              Hasta
+              <input type="date" name="hasta" key={until} defaultValue={until} />
+            </label>
+          </div>
           <button
             className="button button--primary"
             type="submit"
@@ -659,7 +678,7 @@ export function AdminOrdersPage() {
           aria-label="Acciones para pedidos seleccionados"
         >
           <div>
-            <strong>
+            <strong aria-live="polite" aria-atomic="true">
               {selectedCount}{' '}
               {selectedCount === 1
                 ? 'pedido seleccionado'
@@ -712,7 +731,7 @@ export function AdminOrdersPage() {
             <caption className="sr-only">Pedidos</caption>
             <thead>
               <tr>
-                <th scope="col">
+                <th scope="col" className="admin-order-page-selection">
                   <label className="admin-order-checkbox-target">
                     <input
                       type="checkbox"
@@ -736,6 +755,10 @@ export function AdminOrdersPage() {
                         })
                       }}
                     />
+                    <span className="admin-order-page-select-text" aria-hidden="true">
+                      Seleccionar esta página
+                      <small>{pagination.items.length} pedidos</small>
+                    </span>
                   </label>
                 </th>
                 <th scope="col">Pedido</th>
@@ -751,8 +774,8 @@ export function AdminOrdersPage() {
                 const orderStatus = adminOrderStatusMeta[order.status]
                 const paymentStatus =
                   adminPaymentStatusMeta[order.paymentStatus]
-                const nextStatus =
-                  ORDER_STATUSES[ORDER_STATUSES.indexOf(order.status) + 1]
+                const currentStep = ORDER_STATUSES.indexOf(order.status)
+                const nextStatus = currentStep < 0 ? undefined : ORDER_STATUSES[currentStep + 1]
                 const customer = customerById.get(order.customerId)
                 const deliveryReady = hasCompleteOrderDelivery(
                   order,
@@ -914,6 +937,7 @@ export function AdminOrdersPage() {
         }
         id="update-orders"
         className="admin-order-action-dialog"
+        closeDisabled={busy}
       >
         <form
           className="admin-order-action-form"
@@ -936,7 +960,7 @@ export function AdminOrdersPage() {
               }}
               disabled={busy}
             >
-              {ORDER_STATUSES.map((status) => (
+              {ORDER_ACTION_STATUSES.map((status) => (
                 <option value={status} key={status}>
                   {adminOrderStatusMeta[status].label}
                 </option>

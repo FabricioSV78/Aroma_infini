@@ -2,6 +2,7 @@ import { authService } from './auth-service'
 import { requireSupabaseClient } from './supabase-client'
 import { UserFacingError } from '../domain/user-facing-error'
 import { isRemoteCatalog } from './catalog-source'
+import { verifySupabaseUser } from './verified-auth-user'
 
 export interface CustomerFavoritesSnapshot {
   ownerId: string | null
@@ -68,7 +69,7 @@ export function parseCustomerFavorites(value: unknown) {
 }
 function owner() {
   const state = authService.getSnapshot()
-  return state.status === 'authenticated' && state.session?.intent === 'account'
+  return state.status === 'authenticated' && state.session?.intent === 'account' && state.session.user.role === 'customer'
     ? state.session.user.id
     : null
 }
@@ -122,7 +123,7 @@ async function actor(): Promise<Actor> {
     )
   const result = { id, generation: started, token: data.session.access_token }
   checkActor(result)
-  const verified = await client.auth.getUser(result.token)
+  const verified = await verifySupabaseUser(result.token)
   checkActor(result)
   if (verified.error || verified.data.user?.id !== id)
     throw new UserFacingError(

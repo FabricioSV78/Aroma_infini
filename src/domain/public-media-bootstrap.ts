@@ -5,9 +5,10 @@ export function publicMediaBootstrapJson(
   project: string,
   document: unknown,
   aliases: unknown,
+  ageMs = 0,
 ) {
   return inertJson(
-    { version: 1, project, document, aliases },
+    { version: 1, project, document, aliases, ageMs },
     PUBLIC_MEDIA_BOOTSTRAP_MAX_BYTES,
   )
 }

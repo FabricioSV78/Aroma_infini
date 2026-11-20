@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
+import { useLocation } from 'react-router'
 import {
   FavoritesContext,
   type FavoritesContextValue,
@@ -46,6 +47,9 @@ function nextFavoriteState(
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const collectionActive =
+    pathname === '/favoritos' || pathname === '/cuenta/favoritos'
   const [state, setState] = useState<FavoriteState>(readInitialState)
   const auth = useAuth()
   const remote = useSyncExternalStore(
@@ -55,7 +59,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const signedOwner =
     isRemoteCatalog &&
     auth.status === 'authenticated' &&
-    auth.session?.intent === 'account'
+    auth.session?.intent === 'account' && auth.session.user.role === 'customer'
       ? auth.session.user.id
       : null
   const ownSnapshot = Boolean(signedOwner && remote.ownerId === signedOwner)
@@ -84,7 +88,9 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     }
   }, [signedOwner])
   useEffect(() => {
-    if (!signedOwner || !customerIds.length) return
+    // Hearts and counts need only the verified ID list. Product records are
+    // needed by the collection, whose loader joins this same bounded read.
+    if (!collectionActive || !signedOwner || !customerIds.length) return
     let active = true
     void loadSelectionProducts('favorites', [...customerIds])
       .then(() => {
@@ -101,7 +107,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [signedOwner, customerIds, hydrationKey, hydrationAttempt])
+  }, [collectionActive, signedOwner, customerIds, hydrationKey, hydrationAttempt])
   const refreshFavorites = useCallback(() => {
     retryHydration((value) => value + 1)
     void customerFavoritesService.load(true).catch(() => {})
@@ -177,7 +183,8 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     const favoriteIds = new Set(
       signedOwner ? customerIds : authChecking ? noIds : state.ids,
     )
-    const catalogError = hydration.key === hydrationKey ? hydration.error : ''
+    const catalogError =
+      collectionActive && hydration.key === hydrationKey ? hydration.error : ''
     return {
       favoriteIds,
       favoriteCount: favoriteIds.size,
@@ -189,7 +196,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
           (!ownSnapshot ||
             remote.status === 'idle' ||
             remote.status === 'loading' ||
-            (customerIds.length > 0 && hydration.key !== hydrationKey)),
+            (collectionActive && customerIds.length > 0 && hydration.key !== hydrationKey)),
         ),
       pendingIds: ownSnapshot ? remote.pendingIds : noPending,
       error: ownSnapshot ? remote.error || catalogError : '',
@@ -209,6 +216,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     auth.status,
     hydration,
     hydrationKey,
+    collectionActive,
     refreshFavorites,
   ])
 

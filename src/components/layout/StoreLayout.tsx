@@ -23,6 +23,19 @@ import { OfferPriceClockContext } from '../../services/offer-price-clock'
 import { getNextProductDiscountChange } from '../../services/product-discounts'
 import { isCustomerAuthModeSwitch } from '../../domain/auth-navigation'
 import { preloadPublicRoute } from '../../app/public-route-modules'
+import { nextVisibleOfferBoundary, subscribeVisibleOfferBoundaries } from '../../domain/visible-offer-boundaries'
+import { subscribePublicQueryInvalidation } from '../../services/public-query-cache'
+import { siteSettingsService } from '../../services/site-settings-service'
+import { siteMediaService } from '../../services/site-media-service'
+import { builtinMediaService } from '../../services/builtin-media-service'
+
+function refreshPublicDocuments() {
+  // Bounded editorial reads, shared across mounted consumers. No route waits
+  // for them and no private/commercial payload enters these document caches.
+  void Promise.allSettled([
+    siteSettingsService.load(), siteMediaService.load(), builtinMediaService.load(),
+  ])
+}
 
 function StoreFrame() {
   const [helpOffset, setHelpOffset] = useState(16)
@@ -66,6 +79,7 @@ function StoreFrame() {
     // A failed background read keeps the confirmed cache empty; route loaders
     // present their existing retry states rather than substituting local data.
     void readStorefrontMetadata().catch(() => {})
+    refreshPublicDocuments()
   }, [location.key])
   useEffect(() => {
     let timer: number | undefined
@@ -75,13 +89,14 @@ function StoreFrame() {
       if (refreshing) return refreshing
       const operation = (async () => {
         if (isRemoteCatalog) {
-          invalidateSupabaseStorefront()
+          invalidateSupabaseStorefront(false)
           try {
             // Catalog, Home, detail and selection loaders already confirm the
             // metadata they read. Reuse it; informational routes still get the
             // standalone projection when revalidation did not supply one.
             await revalidateRef.current()
             await readStorefrontMetadata()
+            refreshPublicDocuments()
           } catch {
             // Route loaders retain ownership of their error/retry screen.
           }
@@ -100,12 +115,14 @@ function StoreFrame() {
       window.clearTimeout(timer)
       if (isRemoteCatalog && document.visibilityState !== 'visible') return
       const now = Date.now()
-      const next = getNextProductDiscountChange(
+      const catalogBoundary = getNextProductDiscountChange(
         storefrontRepository
           .peekSnapshot()
           .products.map(({ product }) => product),
         now,
       )
+      const visibleBoundary = nextVisibleOfferBoundary(now)
+      const next = catalogBoundary === undefined ? visibleBoundary : visibleBoundary === undefined ? catalogBoundary : Math.min(catalogBoundary, visibleBoundary)
       if (next === undefined && !isRemoteCatalog) return
       timer = window.setTimeout(
         () => void refreshOfferSource(),
@@ -122,13 +139,20 @@ function StoreFrame() {
       void refreshOfferSource()
     }
     const unsubscribe = storefrontRepository.subscribe(scheduleNextOfferChange)
+    const unsubscribeVisibleOffers = subscribeVisibleOfferBoundaries(scheduleNextOfferChange)
     document.addEventListener('visibilitychange', refreshWhenVisible)
+    const unsubscribePublications = subscribePublicQueryInvalidation((remote) => {
+      if (remote && document.visibilityState === 'visible')
+        void refreshOfferSource()
+    })
     scheduleNextOfferChange()
     return () => {
       active = false
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
       unsubscribe()
+      unsubscribeVisibleOffers()
+      unsubscribePublications()
     }
   }, [])
   useEffect(() => {

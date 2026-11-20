@@ -35,6 +35,8 @@ export const adminOrderStatusMeta: Record<
   preparing: { label: 'En preparación', tone: 'warning' },
   shipped: { label: 'Enviado', tone: 'info' },
   delivered: { label: 'Entregado', tone: 'success' },
+  cancelled: { label: 'Cancelado', tone: 'neutral' },
+  expired: { label: 'Vencido', tone: 'neutral' },
 }
 
 export const adminPaymentStatusMeta: Record<

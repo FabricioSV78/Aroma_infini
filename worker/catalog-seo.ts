@@ -346,6 +346,7 @@ export function createCatalogSeoHandler(
     request: Request,
     env: SeoEnvironment,
     requestTransport: typeof fetch = transport,
+    onProduct?: (value: unknown) => void,
   ): Promise<Response | null> => {
     if (!['GET', 'HEAD'].includes(request.method)) return null
     const url = new URL(request.url)
@@ -406,6 +407,7 @@ export function createCatalogSeoHandler(
       status,
       initialProduct,
     )
+    if (status === 200 && initialProduct) onProduct?.(initialProduct.value)
     if (env.APP_ENVIRONMENT !== 'staging') return response
     const headers = new Headers(response.headers)
     headers.append(

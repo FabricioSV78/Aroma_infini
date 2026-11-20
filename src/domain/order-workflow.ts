@@ -11,6 +11,21 @@ export const ORDER_STATUSES: readonly OrderStatus[] = [
   'delivered',
 ]
 
+/** Terminal outcomes are not additional fulfilment steps. */
+export const ALL_ORDER_STATUSES: readonly OrderStatus[] = [
+  ...ORDER_STATUSES,
+  'cancelled',
+  'expired',
+]
+export const ORDER_ACTION_STATUSES: readonly OrderStatus[] = [
+  ...ORDER_STATUSES,
+  'cancelled',
+]
+
+export function isTerminalOrderStatus(status: OrderStatus): boolean {
+  return status === 'cancelled' || status === 'expired'
+}
+
 interface OrderWorkflowData {
   simulation?: boolean
   customerName: string
@@ -48,11 +63,24 @@ export function getOrderTransitionError(
   target: OrderStatus,
   legacyPhone?: string,
 ): string | null {
-  const currentIndex = ORDER_STATUSES.indexOf(order.status)
-  const nextIndex = ORDER_STATUSES.indexOf(target)
-  if (currentIndex < 0 || nextIndex < 0)
+  if (
+    !ALL_ORDER_STATUSES.includes(order.status) ||
+    !ALL_ORDER_STATUSES.includes(target)
+  )
     return 'El estado del pedido no es válido.'
   if (order.status === target) return null
+  if (isTerminalOrderStatus(order.status))
+    return 'Un pedido cancelado o vencido no se puede reabrir.'
+  if (target === 'expired')
+    return 'El vencimiento de la reserva lo registra automáticamente el sistema.'
+  if (target === 'cancelled')
+    return order.simulation === true &&
+      order.paymentStatus === 'pending' &&
+      (order.status === 'received' || order.status === 'preparing')
+      ? null
+      : 'Solo se pueden cancelar pedidos pendientes que todavía no se enviaron.'
+  const currentIndex = ORDER_STATUSES.indexOf(order.status)
+  const nextIndex = ORDER_STATUSES.indexOf(target)
   if (order.paymentStatus !== 'approved' && order.simulation !== true)
     return 'El pago debe estar aprobado antes de preparar el pedido.'
   if (Math.abs(currentIndex - nextIndex) !== 1)
@@ -68,6 +96,7 @@ export function isOrderAttention(
 ): boolean {
   return (
     order.status !== 'delivered' &&
+    !isTerminalOrderStatus(order.status) &&
     (order.paymentStatus !== 'approved' ||
       !hasCompleteOrderDelivery(order, legacyPhone))
   )

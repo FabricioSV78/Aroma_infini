@@ -9,6 +9,7 @@ import { requireReadySupabaseClient } from './supabase-client'
 import { mediaApiBaseUrl } from './asset-source'
 import { UserFacingError } from '../domain/user-facing-error'
 import { canSimulateCheckout } from './runtime-environment'
+import { invalidatePublicQueryCache } from './public-query-cache'
 
 export interface ServerCheckoutQuote {
   lines: MockOrder['lines']
@@ -341,7 +342,10 @@ export async function submitSimulatedOrder(
         : 'No pudimos confirmar el pedido. Conservamos los datos para volver a intentar.',
     )
   }
-  return parseSimulatedOrderResponse(value, operation, Boolean(userId))
+  const confirmed = parseSimulatedOrderResponse(value, operation, Boolean(userId))
+  // A confirmed reservation changes availability even without a real charge.
+  invalidatePublicQueryCache(true)
+  return confirmed
 }
 
 /** Check the exact submitted selection before accepting a server confirmation. */

@@ -370,9 +370,7 @@ test.describe('Contratos de identidad y permisos con adaptador aislado', () => {
   }) => {
     await page.goto('/admin/pedidos')
     await expect(page).toHaveURL(/\/admin\/login/)
-    await expect(page.getByRole('alert')).toContainText(
-      'no tiene acceso administrativo',
-    )
+    await expect(page.getByRole('button', { name: 'Iniciar sesión', exact: true })).toBeVisible()
     await expect(page.locator('#admin-content')).toHaveCount(0)
   })
   test('rechaza datos de otro propietario y limpia la cuenta al expirar', async ({

@@ -24,6 +24,35 @@ const vectorPath =
   /^\/media\/(public\/dynamic\/([0-9a-f-]{36})\/[a-f0-9]{64}\/vector\.svg)$/
 const maximumBody = MEDIA_UPLOAD_MAX_BYTES + 65536
 const maximumFile = MEDIA_VARIANT_MAX_BYTES
+const validEntityTag = /^(?:W\/)?"[\x21\x23-\x7e\x80-\xff]*"$/
+
+/** RFC 9110 uses weak comparison for If-None-Match on GET/HEAD. Parse the
+ * complete list: commas inside opaque tags are data, and malformed trailing
+ * input must not turn an unrelated response into a 304. */
+function matchesIfNoneMatch(condition: string | null, etag: string): boolean {
+  if (condition === null) return false
+  if (condition.trim() === '*') return true
+  const representationTag = etag.startsWith('W/') ? etag.slice(2) : etag
+  let offset = 0
+  let matches = false
+  while (offset < condition.length) {
+    while (/^[\t ,]$/.test(condition[offset] ?? '')) offset++
+    if (offset === condition.length) break
+    if (condition.slice(offset, offset + 2) === 'W/') offset += 2
+    const start = offset
+    if (condition[offset++] !== '"') return false
+    while (offset < condition.length && condition[offset] !== '"') {
+      const code = condition.charCodeAt(offset++)
+      if (code !== 0x21 && !(code >= 0x23 && code <= 0x7e) && !(code >= 0x80 && code <= 0xff))
+        return false
+    }
+    if (condition[offset++] !== '"') return false
+    if (condition.slice(start, offset) === representationTag) matches = true
+    while (condition[offset] === ' ' || condition[offset] === '\t') offset++
+    if (offset < condition.length && condition[offset] !== ',') return false
+  }
+  return matches
+}
 class MediaError extends Error {
   constructor(
     readonly status: number,
@@ -1085,7 +1114,8 @@ export function createMediaHandler(dependencies: Dependencies) {
     if (!publicAsset) return answer({ code: 'missing' }, 404)
     // Only immutable image BYTES may be cached, after a new authoritative SQL
     // manifest read on EVERY request. Never cache publication decisions, HTML,
-    // commercial data, errors, uploads, video ranges or conditional responses.
+    // commercial data, errors, uploads or video ranges. Conditional image reads
+    // can reuse these same bytes only after the fresh publication check above.
     const asset = object(publicAsset)
     const variants = Array.isArray(asset.variants) ? asset.variants : []
     const isVector = vectorPath.test(pathname)
@@ -1098,7 +1128,6 @@ export function createMediaHandler(dependencies: Dependencies) {
       context &&
       dependencies.publicImageCache &&
       (imagePath.test(pathname) || isVector) &&
-      !request.headers.has('If-None-Match') &&
       [asset.src, ...variants.map((variant) => object(variant).src)].includes(
         pathname,
       )
@@ -1122,6 +1151,7 @@ export function createMediaHandler(dependencies: Dependencies) {
       cached &&
       (cached.status !== 200 ||
         cached.headers.get('Content-Type') !== expectedType ||
+        !validEntityTag.test(cached.headers.get('ETag') ?? '') ||
         (vector &&
           (cached.headers.get('Content-Length') !== String(vector.byteSize) ||
             cached.headers.get('Content-Security-Policy') !==
@@ -1132,13 +1162,16 @@ export function createMediaHandler(dependencies: Dependencies) {
     }
     // Always verify the current SQL manifest before storage, including HEAD
     // and conditional GET. These timings retain no data or cross-request cache.
-    // HEAD can reuse the verified immutable representation's metadata, but
-    // never stream its body. Conditional requests keep their existing R2 path.
-    if (cached?.body && request.method === 'HEAD')
+    // HEAD and a matching conditional GET reuse verified immutable metadata,
+    // never a body. A MISS retains the original R2 conditional-request path.
+    const notModified = Boolean(cached && matchesIfNoneMatch(
+      request.headers.get('If-None-Match'), cached.headers.get('ETag')!,
+    ))
+    if (cached?.body && (request.method === 'HEAD' || notModified))
       context!.waitUntil(cached.body.cancel().catch(() => {}))
     const response =
-      (cached && request.method === 'HEAD'
-        ? new Response(null, { status: 200, headers: cached.headers })
+      (cached && (request.method === 'HEAD' || notModified)
+        ? new Response(null, { status: notModified ? 304 : 200, headers: cached.headers })
         : cached) ??
       (await (videoPath.test(pathname)
         ? serveVideo(request, env, key, publicAsset)

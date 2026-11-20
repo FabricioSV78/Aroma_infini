@@ -11,13 +11,35 @@ export function RequireAuth({
   audience: AuthAudience
   children: ReactNode
 }) {
-  const auth = useAuth()
+  const auth = useAuth(audience)
   const location = useLocation()
   if (auth.status === 'checking')
     return <InlineStatus busy>Verificando acceso…</InlineStatus>
+  if (auth.status === 'error')
+    return (
+      <section role="alert">
+        <p>{auth.message}</p>
+        <button
+          type="button"
+          className="button button--secondary"
+          onClick={() => {
+            void (audience === 'admin'
+              ? import('../../services/auth-service').then((m) =>
+                  m.adminAuthService.refresh(),
+                )
+              : import('../../services/auth-service').then((m) =>
+                  m.authService.refresh(),
+                ))
+          }}
+        >
+          Volver a intentar
+        </button>
+      </section>
+    )
   if (
     auth.status !== 'authenticated' ||
     auth.session?.intent !== 'account' ||
+    (audience === 'customer' && auth.session.user.role !== 'customer') ||
     (audience === 'admin' &&
       (auth.session.user.role !== 'admin' || auth.session.mfaRequired === true))
   )

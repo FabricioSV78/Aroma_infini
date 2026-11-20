@@ -1,0 +1,173 @@
+/* Shared mobile work surface. Desktop (1200px+) keeps its existing rules.
+   Page-specific editors and the order selection reuse the same DOM and data. */
+.admin-header-actions .admin-store-link-label { color: inherit; }
+.admin-store-link > svg { display: none; }
+
+@media (max-width: 1199px) {
+  .admin-shell {
+    --gutter: 16px;
+    --admin-mobile-header-height: 60px;
+    display: block;
+  }
+  .admin-shell .admin-header {
+    min-height: var(--admin-mobile-header-height);
+    padding: 8px 16px;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  .admin-shell .admin-header > .admin-brand { display: block; font-size: 1.15rem; }
+  .admin-shell .admin-brand small,
+  .admin-shell .admin-header-context { display: none; }
+  .admin-shell .admin-header-actions {
+    flex-basis: auto;
+    gap: 8px;
+  }
+  .admin-shell .admin-menu-toggle { display: inline-flex; }
+  .admin-shell .admin-store-link { justify-content: center; min-width: 44px; }
+  .admin-shell .admin-store-link > svg { display: block; width: 19px; height: 19px; }
+  .admin-shell .admin-store-link-label { display: none; }
+  .admin-shell .admin-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(304px, calc(100vw - 48px));
+    height: 100dvh;
+    min-height: 0;
+    padding: 14px 16px;
+    visibility: hidden;
+    transform: translateX(-100%);
+  }
+  .admin-shell .admin-sidebar.is-open { visibility: visible; transform: translateX(0); }
+  .admin-shell .admin-sidebar-heading { padding: 0; margin-bottom: 16px; }
+  .admin-shell .admin-sidebar-close { display: grid; }
+  .admin-shell .admin-sidebar-backdrop { display: block; }
+  .admin-shell .admin-sidebar nav { gap: 12px; }
+  .admin-shell .admin-sidebar nav a { min-height: 44px; }
+  .admin-shell .admin-page { padding: 20px 24px 40px; }
+  .admin-shell .admin-demo-banner { width: calc(100% - 48px); margin-top: 10px; }
+  .admin-shell .admin-page-heading { margin-bottom: 18px; gap: 12px; }
+  .admin-shell .admin-page-heading h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
+  /* Omit only generic header prose; coverage, SKU help and photo counts stay. */
+  .admin-shell .admin-page-heading > div > .eyebrow:not(.admin-heading-context),
+  .admin-shell .admin-page-heading .admin-heading-description { display: none; }
+  .admin-shell .admin-page-heading p:not(.eyebrow) { font-size: 0.8125rem; }
+  .admin-shell .admin-page-heading > a { min-height: 44px; }
+  .admin-shell .admin-back { min-height: 44px; display: inline-flex; align-items: center; }
+  .admin-shell .admin-main,
+  .admin-shell .admin-page-heading > div,
+  .admin-shell .admin-fields > *,
+  .admin-shell .admin-filter-fields > * { min-width: 0; }
+  .admin-shell :is(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .admin-shell .button { min-height: 44px; }
+  .admin-shell .admin-check { min-height: 44px; }
+  .admin-shell .admin-row-actions { flex-wrap: wrap; gap: 4px 12px; }
+  .admin-shell .admin-row-actions :is(a, button),
+  .admin-shell .admin-inline-actions > button { min-height: 44px; }
+  .admin-shell .admin-filter-bar { gap: 12px; padding: 14px; }
+  .admin-shell .admin-filter-fields { gap: 10px 14px; }
+  .admin-shell .admin-filter-result { gap: 8px; }
+  .admin-shell .admin-pagination { gap: 8px; margin-top: 12px; }
+  .admin-shell .admin-pagination button { min-width: 80px; padding-inline: 10px; }
+  .admin-shell .admin-metric-card { min-height: 118px; padding: 12px; gap: 4px 8px; }
+  .admin-shell .admin-metric-card > strong { margin-top: 3px; font-size: 1.75rem; }
+  .admin-shell .admin-metric-card > small { min-height: 0; }
+  .admin-shell .admin-metric-card > a { min-height: 44px; }
+  .admin-shell .admin-dashboard-grid { gap: 14px; }
+  .admin-shell .admin-dashboard-panel { padding: 16px; }
+  .admin-shell .admin-dashboard-panel > header { gap: 10px; }
+  .admin-shell .admin-dashboard-panel header p { font-size: 0.75rem; }
+  .admin-shell .admin-recent-orders li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'identity action' 'date total' 'state payment';
+    gap: 6px 12px;
+    padding-block: 12px;
+  }
+  .admin-shell .admin-recent-orders li > div { grid-area: identity; min-width: 0; overflow-wrap: anywhere; }
+  .admin-shell .admin-recent-orders li > .admin-order-date { grid-area: date; }
+  .admin-shell .admin-recent-orders li > .admin-order-total { grid-area: total; }
+  .admin-shell .admin-recent-orders li > .admin-order-preparation { grid-area: state; }
+  .admin-shell .admin-recent-orders li > .admin-order-payment { grid-area: payment; justify-self: end; }
+  .admin-shell .admin-recent-orders li > a { grid-area: action; }
+  .admin-shell .admin-dashboard-empty { margin-top: 12px; }
+  .admin-shell .admin-trusted-devices > li { flex-wrap: wrap; gap: 10px; padding-block: 12px; }
+  .admin-shell .admin-trusted-devices > li > div { min-width: 0; overflow-wrap: anywhere; }
+  .admin-shell .admin-shipping-form { gap: 14px; }
+  .admin-shell .admin-shipping-card { padding: 16px; }
+  .admin-shell .admin-shipping-card-heading { gap: 12px; margin-bottom: 14px; }
+  .admin-shell .admin-shipping-area { padding-block: 14px; }
+  .admin-shell .admin-shipping-fields { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.5fr); gap: 12px; }
+  .admin-shell .admin-shipping-common-fields { grid-template-columns: minmax(0, 190px); padding-top: 14px; }
+  .admin-shell .admin-shipping-footer { padding: 10px 12px; gap: 8px 12px; }
+  .admin-shell .admin-shipping-provinces-base .admin-shipping-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-shell .admin-families-toolbar { margin-top: 16px; gap: 12px; }
+  .admin-shell .admin-families-table { min-width: 0; }
+  .admin-shell .admin-families-table .admin-inline-actions { gap: 4px 12px; }
+  .admin-shell .admin-customer-toolbar { gap: 12px; }
+  .admin-shell .admin-customer-result button { min-height: 44px; }
+  .admin-shell .admin-table-wrap :is(th, td) { overflow-wrap: anywhere; }
+  .admin-shell .admin-editor-actions { gap: 8px; }
+  .admin-shell .dialog {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .admin-shell .dialog .dialog-inner { padding: 20px; }
+  .admin-shell .dialog .dialog-heading { margin-bottom: 16px; gap: 12px; }
+  .admin-shell .dialog .dialog-heading h2 { font-size: 1.25rem; overflow-wrap: anywhere; }
+  .admin-shell .dialog .dialog-heading .icon-button { flex: 0 0 44px; }
+  .admin-notice-dialog { max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .admin-notice-dialog .admin-notice-body { padding: 20px; }
+}
+
+@media (max-width: 767px) {
+  .admin-shell .admin-header { padding-inline: 12px; gap: 8px; }
+  .admin-shell .admin-header .admin-header-actions { gap: 4px !important; }
+  .admin-shell .admin-menu-toggle { width: 44px; padding-inline: 0; }
+  .admin-shell .admin-menu-toggle span { display: none; }
+  .admin-shell .admin-page { padding: 18px 16px 28px; }
+  .admin-shell .admin-demo-banner { width: calc(100% - 32px); }
+  .admin-shell .admin-page-heading { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+  .admin-shell .admin-page-heading > a { width: 100%; justify-content: space-between; padding: 10px 14px; }
+  .admin-shell .admin-table-wrap { border: 0; background: transparent; box-shadow: none; }
+  .admin-shell .admin-table tbody tr { padding: 12px; margin-bottom: 10px; }
+  .admin-shell .admin-table :is(th, td) { min-width: 0; gap: 10px; font-size: 0.8125rem; }
+  .admin-shell .admin-table .admin-row-actions { justify-content: flex-start; }
+  .admin-shell .admin-table .admin-cell-label { overflow-wrap: normal; white-space: nowrap; }
+  .admin-shell .admin-customers-page .admin-table tbody { display: grid; gap: 10px; }
+  .admin-shell .admin-customers-page .admin-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+  .admin-shell .admin-customers-page .admin-table :is(th, td) { display: block; padding: 8px 0; text-align: left; }
+  .admin-shell .admin-customers-page .admin-table th:first-child,
+  .admin-shell .admin-customers-page .admin-table td:nth-child(2) { grid-column: 1 / -1; }
+  .admin-shell .admin-customers-page .admin-cell-label { display: block; margin-bottom: 4px; }
+  .admin-shell .admin-families-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .admin-shell .admin-families-table th,
+  .admin-shell .admin-families-table td { padding: 0; border: 0; }
+  .admin-shell .admin-families-table td:last-child { grid-column: 1 / -1; }
+  .admin-shell .admin-families-table td:nth-child(2)::after { content: ' productos'; }
+  .admin-shell .admin-families-table .admin-inline-actions { justify-content: flex-start; flex-wrap: wrap; }
+  .admin-shell .admin-families-toolbar { align-items: stretch; flex-direction: column; }
+  .admin-shell .admin-families-toolbar label { width: 100%; }
+  .admin-shell .admin-families-toolbar > .button { min-height: 44px; }
+  .admin-shell .admin-pagination { align-items: stretch; padding-block: 10px; }
+  .admin-shell .admin-pagination > div { width: 100%; justify-content: space-between; }
+  .admin-shell .admin-metric-grid { gap: 10px; }
+  .admin-shell .admin-dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell .admin-quick-links { margin-bottom: 14px; }
+  .admin-shell .admin-quick-links > div { gap: 10px; }
+  .admin-shell .admin-quick-links a { padding: 10px 12px; min-height: 52px; }
+  .admin-shell .admin-editor-actions { margin-inline: -16px; padding: 10px 16px max(10px, env(safe-area-inset-bottom)); }
+  .admin-shell .admin-shipping-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-shell .admin-shipping-area .admin-shipping-fields > label:last-child { grid-column: 1 / -1; }
+  .admin-shell .admin-shipping-common-fields { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell .admin-shipping-fields input { min-height: 44px; }
+  .admin-shell .admin-shipping-workspace.has-selection { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .admin-shell .admin-shipping-editor { padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--admin-border); }
+  .admin-shell .admin-shipping-editor-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .admin-shell .admin-shipping-editor-fields .admin-shipping-span { grid-column: 1 / -1; }
+  .admin-shell .dialog .dialog-inner { padding: 16px; }
+  .admin-shell .dialog .dialog-heading { gap: 8px; margin-bottom: 12px; }
+  .admin-notice-dialog .admin-notice-body { padding: 18px; }
+  .admin-shell :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='file']) { font-size: 16px; }
+}

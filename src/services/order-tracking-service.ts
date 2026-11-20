@@ -1,5 +1,6 @@
 import type { CheckoutMode, MockOrder } from './checkout-service'
 import type { OrderStatus } from '../types/commerce'
+import { ALL_ORDER_STATUSES } from '../domain/order-workflow'
 import { orderStatusService } from './order-status-service'
 import { isRemoteCatalog } from './catalog-source'
 import { requireReadySupabaseClient } from './supabase-client'
@@ -29,9 +30,7 @@ function isTrackingRecord(value: unknown): value is TrackingRecord {
     REFERENCE_PATTERN.test(record.reference) &&
     typeof record.placedAt === 'string' &&
     !Number.isNaN(Date.parse(record.placedAt)) &&
-    ['received', 'preparing', 'shipped', 'delivered'].includes(
-      record.status ?? '',
-    ) &&
+    ALL_ORDER_STATUSES.includes(record.status as OrderStatus) &&
     (record.mode === 'guest' || record.mode === 'demo-account') &&
     (record.trackingToken == null || TOKEN_PATTERN.test(record.trackingToken))
   )

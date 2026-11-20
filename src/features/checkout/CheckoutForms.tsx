@@ -406,7 +406,7 @@ export function CheckoutDeliveryForm({
             </div>
           </>
         ) : (
-          <div className="checkout-field checkout-field--wide">
+          <div className="checkout-field">
             <label htmlFor="checkout-zone">Zona de entrega</label>
             <select
               id="checkout-zone"
@@ -425,7 +425,7 @@ export function CheckoutDeliveryForm({
             </select>
           </div>
         )}
-        <div className="checkout-field checkout-field--wide">
+        <div className="checkout-field">
           <label htmlFor="checkout-district">Distrito de entrega</label>
           <select
             id="checkout-district"
@@ -449,7 +449,13 @@ export function CheckoutDeliveryForm({
             ))}
           </select>
         </div>
-        <div className="checkout-field checkout-field--wide">
+        <div
+          className={
+            shipping.provinceShippingEnabled
+              ? 'checkout-field checkout-field--wide'
+              : 'checkout-field'
+          }
+        >
           <label htmlFor="checkout-street">Dirección</label>
           <input
             id="checkout-street"
@@ -465,7 +471,13 @@ export function CheckoutDeliveryForm({
             }}
           />
         </div>
-        <div className="checkout-field checkout-field--wide">
+        <div
+          className={
+            shipping.provinceShippingEnabled
+              ? 'checkout-field checkout-field--wide'
+              : 'checkout-field'
+          }
+        >
           <label htmlFor="checkout-reference">
             Referencia <span>(opcional)</span>
           </label>

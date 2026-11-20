@@ -251,8 +251,18 @@ const test = authTest.extend<{ checkoutNetwork: Network }>({
           coupons: [],
           couponVersions: {},
         })
-      } else if (['admin_product_list','admin_order_list','admin_customer_list'].includes(name)) {
-        await reply(adminListFixture(name,body,{orders:state.order?[state.order]:[]}))
+      } else if (
+        [
+          'admin_product_list',
+          'admin_order_list',
+          'admin_customer_list',
+        ].includes(name)
+      ) {
+        await reply(
+          adminListFixture(name, body, {
+            orders: state.order ? [state.order] : [],
+          }),
+        )
       } else if (name === 'admin_orders') {
         expect(request.headers().authorization).toMatch(/^Bearer ey/)
         await reply({
@@ -484,6 +494,327 @@ async function prepare(page: Page, withAccount = false, navigate = true) {
     page.getByRole('button', { name: 'Guardar selección', exact: true }),
   ).toBeEnabled()
 }
+
+async function pauseAfterCartReady(page: Page) {
+  await page.clock.install()
+  await page.goto('/carrito')
+  await expect(
+    page.getByRole('heading', { name: 'Tu carrito', level: 1, exact: true }),
+  ).toBeVisible()
+  await expect(page.locator('.cart-page-lines')).toContainText(line.name)
+  // Keep normal timers during SDK/module loading, then control only the
+  // customer's navigation and subsequent changes to the delivery selection.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+}
+
+test('entrar al checkout cotiza sin espera y al volver muestra carga hasta recibir importes actuales', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  let releaseQuote!: () => void
+  const pendingQuote = new Promise<void>((resolve) => {
+    releaseQuote = resolve
+  })
+  const busy = page
+    .getByRole('status')
+    .filter({ hasText: 'Actualizando importes' })
+  try {
+    await pauseAfterCartReady(page)
+    expect(checkoutNetwork.quotes).toHaveLength(0)
+    await page
+      .getByRole('link', { name: 'Continuar al checkout', exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: 'Tus datos', exact: true }),
+    ).toBeVisible()
+    await expect(busy).toBeVisible()
+    await page.clock.runFor(1)
+    await expect.poll(() => checkoutNetwork.quotes.length).toBe(1)
+    await expect(busy).toBeHidden()
+    await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+    await page
+      .locator('.checkout-summary')
+      .getByRole('link', { name: 'Editar', exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: 'Tu carrito', level: 1, exact: true }),
+    ).toBeVisible()
+
+    checkoutNetwork.price = 15000
+    checkoutNetwork.beforeQuoteResponse = () => pendingQuote
+    await page
+      .getByRole('link', { name: 'Continuar al checkout', exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: 'Tus datos', exact: true }),
+    ).toBeVisible()
+    // A quote from the previous visit must not make this new visit look ready.
+    await expect(busy).toBeVisible()
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana')
+    await page.clock.runFor(1)
+    await expect.poll(() => checkoutNetwork.quotes.length).toBe(2)
+    await expect(busy).toBeVisible()
+    releaseQuote()
+    await expect(busy).toBeHidden()
+    await expect(
+      page.locator('.checkout-line-price .price-display__current'),
+    ).toContainText('150')
+    expect(checkoutNetwork.writes).toHaveLength(0)
+  } finally {
+    releaseQuote()
+  }
+})
+
+test('volver al checkout con Atrás renueva la cotización aunque se restaure la misma entrada del historial', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  let releaseQuote!: () => void
+  const pendingQuote = new Promise<void>((resolve) => {
+    releaseQuote = resolve
+  })
+  const busy = page.locator('.checkout-quote-status')
+  try {
+    await pauseAfterCartReady(page)
+    await page
+      .getByRole('link', { name: 'Continuar al checkout', exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: 'Tus datos', exact: true }),
+    ).toBeVisible()
+    await page.clock.runFor(1)
+    await expect.poll(() => checkoutNetwork.quotes.length).toBe(1)
+    await expect(busy).toBeHidden()
+    const checkoutKey = await page.evaluate(() => history.state.key as string)
+    expect(checkoutKey).toEqual(expect.any(String))
+    await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+    await page
+      .locator('.checkout-summary')
+      .getByRole('link', { name: 'Editar', exact: true })
+      .click()
+    await expect(
+      page.getByRole('heading', { name: 'Tu carrito', level: 1, exact: true }),
+    ).toBeVisible()
+
+    checkoutNetwork.price = 15000
+    checkoutNetwork.beforeQuoteResponse = () => pendingQuote
+    await page.goBack()
+    await expect(page).toHaveURL('/checkout')
+    await expect(
+      page.getByRole('heading', { name: 'Tus datos', exact: true }),
+    ).toBeVisible()
+    expect(await page.evaluate(() => history.state.key as string)).toBe(
+      checkoutKey,
+    )
+    await expect(busy).toBeVisible()
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana')
+    await page.clock.runFor(1)
+    await expect.poll(() => checkoutNetwork.quotes.length).toBe(2)
+    await expect(busy).toBeVisible()
+    releaseQuote()
+    await expect(busy).toBeHidden()
+    await expect(
+      page.locator('.checkout-line-price .price-display__current'),
+    ).toContainText('150')
+    expect(checkoutNetwork.writes).toHaveLength(0)
+  } finally {
+    releaseQuote()
+  }
+})
+
+test('los cambios rápidos de entrega cotizan una sola selección final y conservan los datos', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  await pauseAfterCartReady(page)
+  await page
+    .getByRole('link', { name: 'Continuar al checkout', exact: true })
+    .click()
+  await expect(
+    page.getByRole('heading', { name: 'Tus datos', exact: true }),
+  ).toBeVisible()
+  await page.clock.runFor(1)
+  await expect.poll(() => checkoutNetwork.quotes.length).toBe(1)
+  await expect(page.locator('.checkout-quote-status')).toBeHidden()
+  await page.getByLabel('Nombre', { exact: true }).fill('Ana')
+  await page.getByLabel('Apellido', { exact: true }).fill('Torres')
+  await page
+    .getByLabel('Correo electrónico', { exact: true })
+    .fill('ana@example.invalid')
+  await page.getByLabel('Celular', { exact: true }).fill('912345678')
+  await page.getByRole('button', { name: 'Continuar a entrega' }).click()
+  await expect(
+    page.getByRole('heading', { name: 'A dónde lo enviamos', exact: true }),
+  ).toBeVisible()
+
+  await page.getByLabel('Zona de entrega', { exact: true }).selectOption('lima')
+  await page.clock.runFor(75)
+  await page
+    .getByLabel('Distrito de entrega', { exact: true })
+    .selectOption('150101')
+  await page.clock.runFor(75)
+  expect(checkoutNetwork.quotes).toHaveLength(1)
+  await page
+    .getByLabel('Distrito de entrega', { exact: true })
+    .selectOption('150115')
+  await page
+    .getByLabel('Dirección', { exact: true })
+    .fill('Avenida de prueba 123')
+  await expect(page.locator('.checkout-quote-status')).toBeVisible()
+  await page.clock.runFor(149)
+  expect(checkoutNetwork.quotes).toHaveLength(1)
+  await page.clock.runFor(1)
+  await expect.poll(() => checkoutNetwork.quotes.length).toBe(2)
+  await expect(page.locator('.checkout-quote-status')).toBeHidden()
+  expect(checkoutNetwork.quotes[1]).toMatchObject({
+    p_department: 'lima',
+    p_province: '1501',
+    p_district: '150115',
+    p_delivery_method: 'courier',
+  })
+  await expect(page.locator('.checkout-total dd')).toContainText('130')
+  await expect(
+    page.getByLabel('Distrito de entrega', { exact: true }),
+  ).toHaveValue('150115')
+  await expect(page.getByLabel('Dirección', { exact: true })).toHaveValue(
+    'Avenida de prueba 123',
+  )
+  await page
+    .getByRole('button', { name: 'Volver a datos', exact: true })
+    .click()
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana')
+  await expect(page.getByLabel('Celular', { exact: true })).toHaveValue(
+    '912345678',
+  )
+  expect(checkoutNetwork.writes).toHaveLength(0)
+})
+
+test('Revisión permite volver y usar los pasos anteriores sin perder datos ni crear pedidos', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  await prepare(page)
+  const quoteCount = checkoutNetwork.quotes.length
+  await page
+    .getByRole('button', { name: 'Volver a entrega', exact: true })
+    .click()
+  await expect(page.getByLabel('Dirección', { exact: true })).toHaveValue(
+    'Avenida de prueba 123',
+  )
+  await expect(
+    page.getByLabel('Distrito de entrega', { exact: true }),
+  ).toHaveValue('150101')
+  await page.getByRole('button', { name: 'Revisar selección' }).click()
+  await page
+    .locator('.checkout-progress')
+    .getByRole('button', { name: 'Datos', exact: true })
+    .click()
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Ana')
+  await expect(
+    page.getByLabel('Correo electrónico', { exact: true }),
+  ).toHaveValue('ana@example.invalid')
+  await page.getByRole('button', { name: 'Continuar a entrega' }).click()
+  await page.getByRole('button', { name: 'Revisar selección' }).click()
+  const deliveryStep = page
+    .locator('.checkout-progress')
+    .getByRole('button', { name: 'Entrega', exact: true })
+  await deliveryStep.focus()
+  await page.keyboard.press('Enter')
+  await expect(
+    page.getByRole('heading', { name: 'A dónde lo enviamos', exact: true }),
+  ).toBeFocused()
+  expect(checkoutNetwork.quotes).toHaveLength(quoteCount)
+  expect(checkoutNetwork.writes).toHaveLength(0)
+})
+
+test('la actualización periódica conserva importes visibles y bloquea confirmar hasta recibir la cotización nueva', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  await page.clock.install()
+  await prepare(page)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  checkoutNetwork.beforeQuoteResponse = () => gate
+  checkoutNetwork.price = 15000
+  const previous = await page.locator('.checkout-total dd').innerText()
+  const shippingBefore = await page
+    .locator('.checkout-totals > div')
+    .filter({ has: page.getByText('Envío', { exact: true }) })
+    .locator('dd')
+    .innerText()
+  const count = checkoutNetwork.quotes.length
+  try {
+    await page.clock.runFor(60150)
+    await expect.poll(() => checkoutNetwork.quotes.length).toBe(count + 1)
+    await expect(page.locator('.checkout-summary-refresh')).toBeVisible()
+    await expect(page.locator('.checkout-quote-status')).toBeHidden()
+    await expect(page.locator('.checkout-total dd')).toHaveText(previous)
+    await expect(page.locator('.checkout-totals')).not.toContainText(
+      'Pendiente',
+    )
+    await expect(
+      page
+        .locator('.checkout-totals > div')
+        .filter({ has: page.getByText('Envío', { exact: true }) })
+        .locator('dd'),
+    ).toHaveText(shippingBefore)
+    await expect(
+      page.getByRole('button', { name: 'Guardar selección', exact: true }),
+    ).toBeDisabled()
+    await page
+      .getByRole('button', { name: 'Volver a entrega', exact: true })
+      .click()
+    await expect(page.getByLabel('Dirección', { exact: true })).toHaveValue(
+      'Avenida de prueba 123',
+    )
+    release()
+    await expect(page.locator('.checkout-summary-refresh')).toBeHidden()
+    await expect(page.locator('.checkout-total dd')).toContainText('160')
+    await page.getByRole('button', { name: 'Revisar selección' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Guardar selección', exact: true }),
+    ).toBeEnabled()
+    expect(checkoutNetwork.writes).toHaveLength(0)
+  } finally {
+    release()
+  }
+})
+
+test('un error de actualización conserva el resumen pero exige verificarlo antes de confirmar', async ({
+  page,
+  checkoutNetwork,
+}) => {
+  await page.clock.install()
+  await prepare(page)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
+  const previous = await page.locator('.checkout-total dd').innerText()
+  const count = checkoutNetwork.quotes.length
+  checkoutNetwork.failQuote = true
+  await page.clock.runFor(60150)
+  await expect.poll(() => checkoutNetwork.quotes.length).toBe(count + 1)
+  await expect(page.getByRole('alert')).toContainText(
+    'No pudimos actualizar el resumen',
+  )
+  await expect(page.locator('.checkout-total dd')).toHaveText(previous)
+  await expect(
+    page.getByRole('button', { name: 'Guardar selección', exact: true }),
+  ).toBeDisabled()
+  checkoutNetwork.failQuote = false
+  await page
+    .getByRole('button', { name: 'Actualizar resumen', exact: true })
+    .click()
+  await page.clock.runFor(150)
+  await expect(page.getByRole('alert')).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: 'Guardar selección', exact: true }),
+  ).toBeEnabled()
+  expect(checkoutNetwork.writes).toHaveLength(0)
+})
+
 test('el servidor cotiza, el cupón se valida remotamente y el pedido de prueba queda confirmado sin enviar precios', async ({
   page,
   checkoutNetwork,
@@ -497,6 +828,10 @@ test('el servidor cotiza, el cupón se valida remotamente y el pedido de prueba 
   await expect(page.locator('.checkout-promotion-message')).toContainText(
     'Descuento aplicado',
   )
+  const publicRevision = await page.evaluate(async () => {
+    const path = '/src/services/public-query-cache.ts'
+    return (await import(path)).publicQueryCacheGeneration() as number
+  })
   await page
     .getByRole('button', { name: 'Guardar selección', exact: true })
     .click()
@@ -514,6 +849,10 @@ test('el servidor cotiza, el cupón se valida remotamente y el pedido de prueba 
     JSON.parse(localStorage.getItem('aroma-infini:order-tracking:v1') || '[]'),
   )
   expect(stored[0].reference).toBe('AI-TEST-1234567890ABCDEF')
+  expect(await page.evaluate(async () => {
+    const path = '/src/services/public-query-cache.ts'
+    return (await import(path)).publicQueryCacheGeneration() as number
+  })).toBeGreaterThan(publicRevision)
 })
 test('una respuesta perdida conserva datos y reintenta la misma operación sin duplicar el pedido', async ({
   page,
@@ -1165,7 +1504,7 @@ test('el mismo pedido pasa de checkout de cuenta a administración, PDF y seguim
     page.getByRole('heading', { name: 'En preparación', exact: true }),
   ).toBeVisible()
   await expect(page.locator('main')).toContainText(
-    'no se realizó un cobro ni se reservó inventario',
+    'no se realizó ningún cobro',
   )
   await page
     .getByRole('button', { name: 'Salir de mi cuenta', exact: true })
@@ -1296,4 +1635,57 @@ for (const [width, height] of [
       fullPage: true,
       animations: 'disabled',
     })
+    await page.screenshot({
+      path: `artifacts/checkout-review-stability-2026-11-18/local/revision-${width}.png`,
+      fullPage: true,
+      animations: 'disabled',
+    })
+    await page
+      .getByRole('button', { name: 'Volver a entrega', exact: true })
+      .click()
+    await page
+      .getByRole('checkbox', { name: '¿Otra persona recibirá el pedido?' })
+      .check()
+    await page
+      .getByLabel('Nombre de quien recibe', { exact: true })
+      .fill('Luis Torres')
+    await page
+      .getByLabel('DNI de quien recibe', { exact: true })
+      .fill('12345678')
+    await page.evaluate(() => scrollTo(0, 0))
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) =>
+        document.querySelector(selector)!.getBoundingClientRect()
+      const zone = rect('#checkout-zone'),
+        district = rect('#checkout-district')
+      return {
+        gap:
+          rect('.checkout-heading h1').top -
+          rect('.checkout-breadcrumb').bottom,
+        zoneWidth: zone.width,
+        mainWidth: rect('.checkout-main').width,
+        sameRow: Math.abs(zone.top - district.top) < 1,
+        overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      }
+    })
+    expect(layout.gap).toBeLessThanOrEqual(16)
+    expect(layout.overflow).toBe(false)
+    if (width >= 640) {
+      expect(layout.sameRow).toBe(true)
+      expect(layout.zoneWidth).toBeLessThan(layout.mainWidth * 0.55)
+    }
+    await page.screenshot({
+      path: `artifacts/checkout-review-stability-2026-11-18/local/entrega-${width}.png`,
+      fullPage: true,
+      animations: 'disabled',
+    })
+    await page
+      .getByRole('button', { name: 'Volver a datos', exact: true })
+      .click()
+    await page.screenshot({
+      path: `artifacts/checkout-review-stability-2026-11-18/local/datos-${width}.png`,
+      fullPage: true,
+      animations: 'disabled',
+    })
+    expect(checkoutNetwork.writes).toHaveLength(0)
   })

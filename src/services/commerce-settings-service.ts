@@ -6,9 +6,9 @@ import {
   loadAdminRuntime,
   applyLoadedCommerceSettings,
 } from './admin-runtime'
-import { authService } from './auth-service'
+import { adminAuthService as authService } from './auth-service'
 import { isRemoteCatalog } from './catalog-source'
-import { requireReadySupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient, requireReadyAdminSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import {
   cachedPublicQuery,
@@ -279,7 +279,7 @@ function sessionError(): never {
 }
 async function stillActor(expected: Actor) {
   const state = authService.getSnapshot(),
-    { data, error } = await (await requireReadySupabaseClient()).auth.getSession()
+    { data, error } = await (await requireReadyAdminSupabaseClient()).auth.getSession()
   if (
     error ||
     expected.epoch !== sessionEpoch ||
@@ -303,14 +303,14 @@ async function actor(): Promise<Actor> {
     state.session.intent !== 'account'
   )
     sessionError()
-  const { data, error } = await (await requireReadySupabaseClient()).auth.getSession()
+  const { data, error } = await (await requireReadyAdminSupabaseClient()).auth.getSession()
   if (error || data.session?.user.id !== state.session.user.id) sessionError()
   const expected = {
     userId: state.session.user.id,
     token: data.session!.access_token,
     epoch: startedEpoch,
   }
-  const verified = await verifySupabaseUser(expected.token)
+  const verified = await verifySupabaseUser(expected.token, 'admin')
   if (verified.error || verified.data.user?.id !== expected.userId)
     sessionError()
   await loadAdminRuntime()
@@ -352,7 +352,7 @@ async function rpc<N extends RpcName>(
   expected: Actor,
 ) {
   await stillActor(expected)
-  const response = await (await requireReadySupabaseClient())
+  const response = await (await requireReadyAdminSupabaseClient())
     .rpc(name, args)
     .setHeader('Authorization', `Bearer ${expected.token}`)
   await stillActor(expected)
@@ -382,7 +382,7 @@ export async function loadAdminCommerceSettings(): Promise<void> {
   const reads = await adminSettingsReads()
   const [result] = await Promise.all([
     reads.read('admin_commerce_settings', async current =>
-      (await requireReadySupabaseClient()).rpc('admin_commerce_settings')
+      (await requireReadyAdminSupabaseClient()).rpc('admin_commerce_settings')
         .setHeader('Authorization', `Bearer ${current.token}`),
     ).catch((error: unknown) => {
       if (error instanceof UserFacingError && error.code === 'session') sessionError()
@@ -435,7 +435,7 @@ export const commerceSettingsService = {
       shippingVersion: version,
       promotions: adminRuntime().adminService.getSnapshot().promotions,
     })
-    invalidatePublicQueryCache()
+    invalidatePublicQueryCache(true)
     publicShippingSettings.confirm({
       shipping: publicEnvelope.shipping,
       shippingVersion: version,

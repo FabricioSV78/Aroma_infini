@@ -168,6 +168,22 @@ await check(
     },
   },
 )
+await check('Public finder keeps canonical product inputs and only cover media', 'rpc/catalog_finder_context', {
+  body: {},
+  validate: (data) => {
+    assert.deepEqual(Object.keys(data).sort(), ['brands', 'items', 'mediaAssets', 'olfactoryFamilies', 'total'])
+    assert(Array.isArray(data.items) && data.items.length <= 10000)
+    assert.equal(data.total, data.items.length)
+    const images = new Set(data.items.map(item => item.product.image))
+    for (const item of data.items) {
+      assert.equal(item.product.productType, 'perfume')
+      assert.deepEqual(Object.keys(item.detail).sort(), ['intensity', 'intensityLevel', 'occasion'])
+    }
+    assert(Array.isArray(data.mediaAssets) && data.mediaAssets.length <= data.items.length)
+    for (const asset of data.mediaAssets) assert(images.has(asset.src))
+    assert(!('productVersions' in data) && !('settingsVersion' in data))
+  },
+})
 await check(
   'Public catalog settings contain no administrative fields',
   'rpc/catalog_settings',

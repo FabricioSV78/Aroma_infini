@@ -8,6 +8,8 @@ export default defineConfig({
     'supabase-catalog.spec.ts',
     'admin-workspace-loading.spec.ts',
     'public-initial-browser.spec.ts',
+    'public-home-cache.spec.ts',
+    'public-document-cache-browser.spec.ts',
   ],
   outputDir: 'artifacts/supabase-catalog-test-results',
   fullyParallel: false,

@@ -15,7 +15,7 @@ export interface OrderHistoryEntry {
   changedAt: string
   operator: OrderOperator
   operationId: string
-  source: 'individual' | 'bulk'
+  source: 'individual' | 'bulk' | 'system'
 }
 
 export interface OrderActionIssue {

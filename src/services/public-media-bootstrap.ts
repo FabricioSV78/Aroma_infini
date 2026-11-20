@@ -5,6 +5,11 @@ import {
 import { publicQueryCacheGeneration } from './public-query-cache'
 
 let initial: Record<string, unknown> | null | undefined
+let cacheAgeMs = 0
+
+export function initialPublicMediaAgeMs() {
+  return cacheAgeMs + performance.now()
+}
 /** Two consumers share only verified public image metadata from this document.
  * Each part is consumed once; forced reads and invalidations use normal RPCs. */
 export function takeInitialPublicMedia(kind: 'document' | 'aliases'): unknown {
@@ -34,9 +39,14 @@ export function takeInitialPublicMedia(kind: 'document' | 'aliases'): unknown {
         const envelope = value as Record<string, unknown>
         if (
           envelope.version === 1 &&
-          envelope.project === import.meta.env.VITE_SUPABASE_URL
-        )
+          envelope.project === import.meta.env.VITE_SUPABASE_URL &&
+          (envelope.ageMs === undefined ||
+            (typeof envelope.ageMs === 'number' && Number.isFinite(envelope.ageMs) &&
+              envelope.ageMs >= 0 && envelope.ageMs <= 30000))
+        ) {
+          cacheAgeMs = typeof envelope.ageMs === 'number' ? envelope.ageMs : 0
           initial = envelope
+        }
       }
     } catch {
       /* Both consumers fall back to their existing public RPCs. */

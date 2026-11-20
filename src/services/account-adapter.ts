@@ -11,6 +11,7 @@ import { mapSupabaseAuthError } from './supabase-auth-errors'
 import { isSupabaseConfigured, requireSupabaseClient } from './supabase-client'
 import { parseAccountOrder } from './order-response'
 import { isRemoteCatalog } from './catalog-source'
+import { verifySupabaseUser } from './verified-auth-user'
 
 type AccountClient = ReturnType<typeof requireSupabaseClient>
 type JsonObject = { [key: string]: Json | undefined }
@@ -20,6 +21,50 @@ interface VerifiedOwner {
   userId: string
   email: string
   token: string
+  sessionRevision: number
+}
+
+let sessionRevision = 0
+let readRevision = 0
+let observedClient: AccountClient | undefined
+let observedOwner: string | undefined
+function observeSession(client: AccountClient) {
+  if (observedClient === client) return
+  observedClient = client
+  client.auth.onAuthStateChange((event, session) => {
+    const nextOwner = session?.user.id
+    if (event === 'SIGNED_OUT' || (observedOwner !== undefined && observedOwner !== nextOwner)) {
+      sessionRevision++
+      invalidateReads()
+    }
+    observedOwner = nextOwner
+  })
+}
+function invalidateReads() {
+  readRevision++
+  pendingReads.clear()
+}
+
+function requestAccount(owner: VerifiedOwner) {
+  return Promise.all([
+    owner.client.rpc('get_profile').setHeader('Authorization', `Bearer ${owner.token}`),
+    owner.client.rpc('get_address').setHeader('Authorization', `Bearer ${owner.token}`),
+    isRemoteCatalog
+      ? owner.client.rpc('customer_orders').setHeader('Authorization', `Bearer ${owner.token}`)
+      : Promise.resolve(null),
+  ])
+}
+const pendingReads = new Map<string, ReturnType<typeof requestAccount>>()
+
+function readAccount(owner: VerifiedOwner, revision: number) {
+  const key = JSON.stringify([owner.userId, owner.token, owner.sessionRevision, revision])
+  const existing = pendingReads.get(key)
+  if (existing) return existing
+  const operation = requestAccount(owner).finally(() => {
+    if (pendingReads.get(key) === operation) pendingReads.delete(key)
+  })
+  pendingReads.set(key, operation)
+  return operation
 }
 
 function asObject(value: Json): JsonObject {
@@ -60,6 +105,7 @@ function checkRpcError(error: { code?: string } | null, status: number) {
 
 async function verifiedOwner(userId: string): Promise<VerifiedOwner> {
   const client = requireSupabaseClient()
+  observeSession(client)
   const { data: local, error: sessionError } = await client.auth.getSession()
   if (sessionError) throw mapSupabaseAuthError(sessionError, 'session')
   if (!local.session || local.session.user.id !== userId)
@@ -68,16 +114,19 @@ async function verifiedOwner(userId: string): Promise<VerifiedOwner> {
   // getSession supplies the SDK's request token, not an authorization decision.
   // Supabase Auth verifies it before we trust the identity or canonical email.
   const token = local.session.access_token
-  const { data: verified, error } = await client.auth.getUser(token)
+  const expectedSession = sessionRevision
+  const { data: verified, error } = await verifySupabaseUser(token)
   if (error) throw mapSupabaseAuthError(error, 'session')
   if (!verified.user || verified.user.id !== userId || !verified.user.email)
     throw new AuthError('session')
   await stillOwned(client, userId)
+  if (expectedSession !== sessionRevision) throw new AuthError('session')
   return {
     client,
     token,
     userId,
     email: verified.user.email,
+    sessionRevision: expectedSession,
   }
 }
 
@@ -132,20 +181,13 @@ export const accountAdapter: AccountRepository = {
   },
   async load(userId) {
     const owner = await verifiedOwner(userId)
-    const [profileResult, addressResult, ordersResult] = await Promise.all([
-      owner.client
-        .rpc('get_profile')
-        .setHeader('Authorization', `Bearer ${owner.token}`),
-      owner.client
-        .rpc('get_address')
-        .setHeader('Authorization', `Bearer ${owner.token}`),
-      isRemoteCatalog
-        ? owner.client
-            .rpc('customer_orders')
-            .setHeader('Authorization', `Bearer ${owner.token}`)
-        : Promise.resolve(null),
-    ])
+    const revision = readRevision
+    const [profileResult, addressResult, ordersResult] = await readAccount(owner, revision)
+    // Each consumer verifies remotely again, even when the SQL reads were
+    // shared. Nothing survives logout/relogin (including the same UUID).
     const current = await verifiedOwner(userId)
+    if (owner.sessionRevision !== current.sessionRevision) throw new AuthError('session')
+    if (revision !== readRevision) return accountAdapter.load(userId)
     checkRpcError(profileResult.error, profileResult.status)
     checkRpcError(addressResult.error, addressResult.status)
     if (ordersResult) checkRpcError(ordersResult.error, ordersResult.status)
@@ -167,57 +209,66 @@ export const accountAdapter: AccountRepository = {
     }
   },
   async updateProfile(userId, profile) {
-    const owner = await verifiedOwner(userId)
-    const email = profile.email.trim()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AuthError('email')
-    // Changing the login email is a separate, password-verified server action.
-    // A profile form must never trigger Supabase's email-confirmation flow.
-    if (email.toLowerCase() !== owner.email.toLowerCase())
-      throw new AuthError('email-change')
-    const result = await owner.client
-      .rpc('update_profile', {
-        p_first_name: profile.firstName.trim(),
-        p_last_name: profile.lastName.trim(),
-        p_phone: profile.phone.trim(),
-      })
-      // Pin this request to its verified actor. A sign-out/account switch while
-      // the request is pending cannot redirect an old form's write to user B.
-      .setHeader('Authorization', `Bearer ${owner.token}`)
-    const current = await verifiedOwner(userId)
-    checkRpcError(result.error, result.status)
-    if (result.data === null) throw new AuthError('service')
-    return profileFromDto(result.data, current)
+    invalidateReads()
+    try {
+      const owner = await verifiedOwner(userId)
+      const email = profile.email.trim()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AuthError('email')
+      // Changing the login email is a separate, password-verified server action.
+      // A profile form must never trigger Supabase's email-confirmation flow.
+      if (email.toLowerCase() !== owner.email.toLowerCase())
+        throw new AuthError('email-change')
+      const result = await owner.client
+        .rpc('update_profile', {
+          p_first_name: profile.firstName.trim(),
+          p_last_name: profile.lastName.trim(),
+          p_phone: profile.phone.trim(),
+        })
+        // Pin this request to its verified actor. A sign-out/account switch while
+        // the request is pending cannot redirect an old form's write to user B.
+        .setHeader('Authorization', `Bearer ${owner.token}`)
+      const current = await verifiedOwner(userId)
+      checkRpcError(result.error, result.status)
+      if (result.data === null) throw new AuthError('service')
+      return profileFromDto(result.data, current)
+    } finally { invalidateReads() }
   },
   async saveAddress(userId, address) {
-    const location = deliveryLocation(address.location, 'validation')
-    const owner = await verifiedOwner(userId)
-    const result = await owner.client
-      .rpc('save_address', {
-        p_label: address.label.trim(),
-        p_recipient: address.recipient.trim(),
-        p_department: address.department.trim(),
-        p_province: address.province.trim(),
-        p_district: address.district.trim(),
-        p_street: address.street.trim(),
-        p_reference: address.reference.trim(),
-        // Missing optional RPC arguments default to SQL NULL, including when
-        // removing an existing pin; the generated SDK models these as optional.
-        p_latitude: location?.latitude,
-        p_longitude: location?.longitude,
-      })
-      .setHeader('Authorization', `Bearer ${owner.token}`)
-    await verifiedOwner(userId)
-    checkRpcError(result.error, result.status)
-    const saved = addressFromDto(result.data, userId)
-    if (!saved) throw new AuthError('service')
-    return saved
+    invalidateReads()
+    try {
+      const location = deliveryLocation(address.location, 'validation')
+      const owner = await verifiedOwner(userId)
+      const result = await owner.client
+        .rpc('save_address', {
+          p_label: address.label.trim(),
+          p_recipient: address.recipient.trim(),
+          p_department: address.department.trim(),
+          p_province: address.province.trim(),
+          p_district: address.district.trim(),
+          p_street: address.street.trim(),
+          p_reference: address.reference.trim(),
+          // Missing optional RPC arguments default to SQL NULL, including when
+          // removing an existing pin; the generated SDK models these as optional.
+          p_latitude: location?.latitude,
+          p_longitude: location?.longitude,
+        })
+        .setHeader('Authorization', `Bearer ${owner.token}`)
+      await verifiedOwner(userId)
+      checkRpcError(result.error, result.status)
+      const saved = addressFromDto(result.data, userId)
+      if (!saved) throw new AuthError('service')
+      return saved
+    } finally { invalidateReads() }
   },
   async removeAddress(userId) {
-    const owner = await verifiedOwner(userId)
-    const result = await owner.client
-      .rpc('remove_address')
-      .setHeader('Authorization', `Bearer ${owner.token}`)
-    await verifiedOwner(userId)
-    checkRpcError(result.error, result.status)
+    invalidateReads()
+    try {
+      const owner = await verifiedOwner(userId)
+      const result = await owner.client
+        .rpc('remove_address')
+        .setHeader('Authorization', `Bearer ${owner.token}`)
+      await verifiedOwner(userId)
+      checkRpcError(result.error, result.status)
+    } finally { invalidateReads() }
   },
 }

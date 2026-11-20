@@ -132,7 +132,7 @@ export function AdminNotificationsPage() {
       <AdminPageHeader
         eyebrow="Configuración"
         title="Notificaciones"
-        description="Recibe avisos de pedidos confirmados en este dispositivo."
+        description="Recibe avisos de nuevos pedidos en este dispositivo."
       />
       <section
         className="admin-notification-device"

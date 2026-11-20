@@ -1,4 +1,5 @@
 import { useLayoutEffect, type RefObject } from 'react'
+import { restorePublicInitialMotion } from '../../services/public-initial-motion'
 
 const revealSelector = '[data-reveal], [data-scroll-reveal]'
 
@@ -85,6 +86,7 @@ export function useStoreReveal(
 
       createObserver()
       register(container)
+      restorePublicInitialMotion(container)
 
       const mutations = new MutationObserver((records) => {
         records.forEach((record) => {

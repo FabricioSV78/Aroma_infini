@@ -9,11 +9,10 @@ import {
 import { isRemoteCatalog } from './catalog-source'
 import { requireReadySupabaseClient } from './supabase-client'
 import { registerManagedMedia, registerManagedVideo } from './media-registry'
-import { cachedPublicQuery } from './public-query-cache'
-import { takeInitialPublicMedia } from './public-media-bootstrap'
+import { createPublicDocumentCache } from './public-document-cache'
+import { takeInitialPublicMedia, initialPublicMediaAgeMs } from './public-media-bootstrap'
 
-let loaded = false
-let pending: Promise<MediaAliasDocument> | null = null
+let hydrated = false
 
 function confirm(value: unknown): MediaAliasDocument {
   const document = parseMediaAliasDocument(value)
@@ -23,53 +22,32 @@ function confirm(value: unknown): MediaAliasDocument {
     else if (asset.mimeType === 'video/mp4') registerManagedVideo(asset)
   })
   const confirmed = rememberMediaAliases(document)
-  loaded = true
   return confirmed
 }
+
+const publicDocument = createPublicDocumentCache('builtin-media', async () => {
+  const expected = mediaAliasGeneration()
+  const result = await (await requireReadySupabaseClient())
+    .rpc('public_media_aliases').abortSignal(AbortSignal.timeout(10000))
+  if (result.error) throw new Error('No pudimos cargar los recursos de la tienda.')
+  // An importer may have committed new associations while this read was pending.
+  return expected === mediaAliasGeneration() ? result.data : getMediaAliasSnapshot()
+}, confirm, getMediaAliasSnapshot)
 
 export const builtinMediaService = {
   getSnapshot: getMediaAliasSnapshot,
   subscribe: subscribeMediaAliases,
   confirm,
   async load(force = false): Promise<MediaAliasDocument> {
-    if (!isRemoteCatalog || (loaded && !force)) return getMediaAliasSnapshot()
-    if (!force) {
+    if (!isRemoteCatalog) return getMediaAliasSnapshot()
+    if (!force && !hydrated) {
+      hydrated = true
       const initial = takeInitialPublicMedia('aliases')
       if (initial !== undefined) {
-        try {
-          return confirm(initial)
-        } catch {
-          /* Validate and retry through Supabase. */
-        }
+        try { publicDocument.seed(initial, initialPublicMediaAgeMs()) }
+        catch { /* Retry through the ordinary public contract. */ }
       }
     }
-    if (pending) {
-      if (!force) return pending
-      const previous = pending
-      await previous.catch(() => {})
-      if (pending && pending !== previous) return pending
-    }
-    const expected = mediaAliasGeneration()
-    const read = async () => {
-      const result = await (await requireReadySupabaseClient())
-        .rpc('public_media_aliases')
-        .abortSignal(AbortSignal.timeout(10000))
-      if (result.error)
-        throw new Error('No pudimos cargar los recursos de la tienda.')
-      return result.data
-    }
-    const operation = (async () => {
-      const value = force
-        ? await read()
-        : await cachedPublicQuery('builtin-media', read, 30000)
-      // A committed import may have updated aliases during this public read.
-      return expected === mediaAliasGeneration()
-        ? confirm(value)
-        : getMediaAliasSnapshot()
-    })().finally(() => {
-      if (pending === operation) pending = null
-    })
-    pending = operation
-    return operation
+    return publicDocument.load(force)
   },
 }

@@ -18,8 +18,8 @@ import {
   validPreparedImageDimensions,
 } from '../domain/media'
 import { isPerfume } from '../domain/product-type'
-import { authService } from './auth-service'
-import { requireSupabaseClient } from './supabase-client'
+import { adminAuthService as authService } from './auth-service'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { mediaApiBaseUrl } from './asset-source'
 import { registerManagedMedia } from './media-registry'
 import { UserFacingError } from './admin-messages'

@@ -165,7 +165,8 @@ test('verified SVG bytes reuse cache while every read revalidates the manifest a
     },
     publicImageCache: () => ({
       async match(input) {
-        return entries.get((input as Request).url)?.clone()
+        const cached = entries.get((input as Request).url)
+        return cached && new Response(await cached.clone().arrayBuffer(), cached)
       },
       async put(input, response) {
         entries.set(
@@ -202,11 +203,24 @@ test('verified SVG bytes reuse cache while every read revalidates the manifest a
   }
   expect(manifests).toBe(3)
   expect(fixture.bucket.reads).toHaveLength(0)
+  const etag = first!.headers.get('ETag')!
+  for (const method of ['GET', 'HEAD']) {
+    const response = await handle(new Request(url, {
+      method, headers: { 'If-None-Match': `"another", W/${etag}` },
+    }), fixture.environment, context)
+    expect(response!.status).toBe(304)
+    expect(response!.headers.get('Content-Security-Policy')).toBe("sandbox; default-src 'none'; style-src 'none'")
+    expect(response!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+    expect(await response!.text()).toBe('')
+  }
+  expect(manifests).toBe(5)
+  expect(fixture.bucket.reads).toHaveLength(0)
   fixture.state.privateResponse = true
   expect(
-    (await handle(new Request(url), fixture.environment, context))!.status,
+    (await handle(new Request(url, { headers: { 'If-None-Match': etag } }), fixture.environment, context))!.status,
   ).toBe(404)
-  expect(manifests).toBe(4)
+  expect(manifests).toBe(6)
+  await Promise.all(tasks)
 })
 function request(
   source = minimal,

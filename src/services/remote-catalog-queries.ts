@@ -131,10 +131,12 @@ export async function readRemoteProductContext(slug: string) {
   if (bootstrap !== undefined) {
     try {
       // Run the same complete validators as a fresh RPC before publishing data.
-      // This initial value never enters the five-second public query cache.
+      // Reuse only the remainder of this document's five-second window, just
+      // like Home/browse: a return navigation must not restart its freshness.
       const parsed = parseProductContext(bootstrap)
       if (!parsed.record || parsed.record.product.slug !== slug)
         throw new CatalogReadError()
+      seedInitialPublicQuery('product:' + slug, bootstrap, performance.now())
       return confirmProductContext(parsed)
     } catch {
       /* Invalid or obsolete HTML falls back to the ordinary fresh read. */

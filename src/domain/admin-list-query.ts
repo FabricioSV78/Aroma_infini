@@ -30,7 +30,7 @@ export function adminOrderListQuery(params: URLSearchParams): AdminOrderListQuer
   if (params.get('revisar')) return { references: params.get('revisar')!.split(',') }
   return {
     search: (params.get('q') ?? '').trim().slice(0, 200),
-    status: ['atencion', 'received', 'preparing', 'shipped', 'delivered'].includes(params.get('preparacion') ?? '')
+    status: ['atencion', 'received', 'preparing', 'shipped', 'delivered', 'cancelled', 'expired'].includes(params.get('preparacion') ?? '')
       ? params.get('preparacion')! : 'all',
     customer: (params.get('cliente') ?? '').slice(0, 64),
     from: params.get('desde') ?? '',

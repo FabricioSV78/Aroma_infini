@@ -4,6 +4,42 @@ const entries = new Map<string, { expires: number; value: unknown }>()
 const inFlight = new Map<string, Promise<unknown>>()
 let generation = 0
 const lifetimeMs = 5000
+const invalidationListeners = new Set<(remote: boolean) => void>()
+let channel: BroadcastChannel | undefined
+let channelStarted = false
+
+function listenForPublications() {
+  if (channelStarted || typeof window === 'undefined') return
+  channelStarted = true
+  if (typeof BroadcastChannel === 'undefined') return
+  try {
+    channel = new BroadcastChannel(
+      `aroma-public-publication:${import.meta.env.VITE_SUPABASE_URL ?? 'local'}`,
+    )
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      // A signal only: never receive content, identity, prices or permissions.
+      if (event.data !== 'publication-v1') return
+      clearPublicQueries(true)
+    }
+  } catch {
+    // TTL and focus/navigation revalidation remain available without channels.
+  }
+}
+
+function clearPublicQueries(remote: boolean) {
+  generation++
+  entries.clear()
+  inFlight.clear()
+  invalidationListeners.forEach((listener) => listener(remote))
+}
+
+export function subscribePublicQueryInvalidation(
+  listener: (remote: boolean) => void,
+) {
+  listenForPublications()
+  invalidationListeners.add(listener)
+  return () => { invalidationListeners.delete(listener) }
+}
 
 function remember(key: string, value: unknown, expires: number) {
   if (entries.size >= 40) entries.delete(entries.keys().next().value!)
@@ -16,17 +52,19 @@ export function seedInitialPublicQuery(
   key: string,
   value: unknown,
   documentAgeMs: number,
+  lifetime = lifetimeMs,
 ) {
   if (
     generation !== 0 ||
     !Number.isFinite(documentAgeMs) ||
     documentAgeMs < 0 ||
-    documentAgeMs >= lifetimeMs ||
+    !Number.isFinite(lifetime) || lifetime <= 0 || lifetime > 30000 ||
+    documentAgeMs >= lifetime ||
     inFlight.has(key) ||
     (entries.get(key)?.expires ?? 0) > Date.now()
   )
     return false
-  remember(key, value, Date.now() + lifetimeMs - documentAgeMs)
+  remember(key, value, Date.now() + lifetime - documentAgeMs)
   return true
 }
 
@@ -35,10 +73,20 @@ export function publicQueryCacheGeneration() {
   return generation
 }
 
-export function invalidatePublicQueryCache() {
-  generation++
-  entries.clear()
-  inFlight.clear()
+/** Parsing happens after dependency/version barriers. An invalid successful
+ * HTTP payload must not poison its TTL or evict an unrelated newer response. */
+export function forgetInvalidPublicQuery(key: string, value: unknown) {
+  if (entries.get(key)?.value === value) entries.delete(key)
+}
+
+export function invalidatePublicQueryCache(publish = false) {
+  listenForPublications()
+  clearPublicQueries(false)
+  // Only confirmed writes publish. Refresh clocks never echo.
+  if (publish) {
+    try { channel?.postMessage('publication-v1') }
+    catch { /* TTL revalidation remains available if messaging is disabled. */ }
+  }
 }
 
 export async function cachedPublicQuery<T>(
@@ -46,6 +94,7 @@ export async function cachedPublicQuery<T>(
   read: () => Promise<T>,
   lifetime = lifetimeMs,
 ): Promise<T> {
+  listenForPublications()
   const cached = entries.get(key)
   if (cached && cached.expires > Date.now()) return cached.value as T
   const pending = inFlight.get(key)

@@ -76,6 +76,7 @@ test.beforeAll(async () => {
             !['/rest/v1/rpc/site_media_document','/rest/v1/rpc/public_media_aliases'].includes(url.pathname))
             throw new Error('Unexpected public metadata request');
           counts.set(scenario,(counts.get(scenario)||0)+1);
+          if(scenario==='partial-recovery'&&counts.get(scenario)===1) return Response.json({message:'private-error-marker'},{status:503});
           if(scenario==='upstream-error') return Response.json({message:'private-error-marker'},{status:503});
           if(scenario==='redirect') return new Response(null,{status:302,headers:{Location:'https://outside.invalid/private'}});
           if(url.pathname.endsWith('/site_media_document')){
@@ -196,11 +197,20 @@ test('Solo se guardan DTO públicos validados durante 30 segundos y el producto 
   const second = await request('cached', '/producto/rosa', 10000)
   expect(second.response.headers.get('x-test-calls')).toBe('2')
   expect(second.html).toContain('content="https://old.invalid/old.webp"')
+  const metadata = (html: string) =>
+    JSON.parse(
+      html.match(
+        /<script[^>]*id="aroma-public-media"[^>]*>([^<]*)<\/script>/,
+      )![1],
+    )
+  expect(metadata(first.html).ageMs).toBe(0)
+  expect(metadata(second.html).ageMs).toBe(10000)
   const expired = await request('cached', '/', 30001)
   expect(expired.response.headers.get('x-test-calls')).toBe('4')
+  expect(metadata(expired.html).ageMs).toBe(0)
 })
 
-test('Un error, un redireccionamiento o una proyección inválida conserva el HTML original', async () => {
+test('Una caída conserva el cuerpo original y no publica datos inválidos ni errores privados', async () => {
   for (const scenario of [
     'upstream-error',
     'redirect',
@@ -208,9 +218,33 @@ test('Un error, un redireccionamiento o una proyección inválida conserva el HT
     'wrong-dimensions',
   ]) {
     const { html } = await request(scenario)
-    expect(html, scenario).toBe(shell)
+    expect(html.match(/<body>([\s\S]*?)<\/body>/)?.[1], scenario).toBe(body)
+    expect(schema(html)['@graph'][0].logo).toBe('/brand/logo-on-light.svg')
+    expect(html).not.toContain('data-public-initial-visual')
+    if (scenario === 'upstream-error' || scenario === 'redirect')
+      expect(html).toBe(shell)
     expect(html).not.toContain('private-error-marker')
   }
+})
+
+test('una parte fallida no se cachea y una recuperación completa conserva su edad original', async () => {
+  const first = await request('partial-recovery')
+  const metadata = (html: string) =>
+    JSON.parse(
+      html.match(
+        /<script[^>]*id="aroma-public-media"[^>]*>([^<]*)<\/script>/,
+      )![1],
+    )
+  expect(first.response.headers.get('x-test-calls')).toBe('2')
+  expect(metadata(first.html)).not.toHaveProperty('document')
+  expect(metadata(first.html).aliases.items).toEqual([])
+  const recovered = await request('partial-recovery', '/', 5000)
+  expect(recovered.response.headers.get('x-test-calls')).toBe('4')
+  expect(metadata(recovered.html).document.items).toHaveLength(2)
+  expect(metadata(recovered.html).ageMs).toBe(0)
+  const cached = await request('partial-recovery', '/', 10000)
+  expect(cached.response.headers.get('x-test-calls')).toBe('4')
+  expect(metadata(cached.html).ageMs).toBe(5000)
 })
 
 test('Un JSON-LD de más de 64 KiB se transmite sin retenerlo ni modificarlo', async () => {

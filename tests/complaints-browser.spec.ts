@@ -367,7 +367,7 @@ test('el listado pendiente no devuelve datos después de cerrar sesión', async 
     await expect.poll(() => started).toBe(true)
     await page.evaluate(async () => {
       const source = '/src/services/auth-service.ts'
-      await (await import(source)).authService.signOut()
+      await (await import(source)).adminAuthService.signOut()
     })
     release()
     expect(await loading).toBe(false)

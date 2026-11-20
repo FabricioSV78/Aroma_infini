@@ -457,6 +457,7 @@ export function AdminShippingPage() {
   return (
     <div className="admin-page admin-shipping-page">
       <AdminPageHeader
+        keepDescriptionOnMobile
         eyebrow="Configuración de la tienda"
         title="Tarifas de envío"
         description={

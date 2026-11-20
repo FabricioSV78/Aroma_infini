@@ -97,7 +97,8 @@ test('immutable byte cache still authorizes every GET and denies revoked or unav
     publicImageCache: () => ({
       async match(request) {
         matches++
-        return entries.get(String((request as Request).url))?.clone()
+        const cached = entries.get(String((request as Request).url))
+        return cached && new Response(await cached.clone().arrayBuffer(), cached)
       },
       async put(request, response) {
         expect(new Headers((request as Request).headers).has('Cookie')).toBe(
@@ -176,7 +177,7 @@ test('immutable byte cache still authorizes every GET and denies revoked or unav
   expect(matches).toBe(2)
 })
 
-test('byte-cache errors fall back to R2; conditional GET and production preserve existing paths', async () => {
+test('byte-cache errors fall back to R2, including conditional GET; production preserves its existing path', async () => {
   const fixture = mediaWorkerHarness()
   let cacheReads = 0
   const tasks: Promise<unknown>[] = []
@@ -233,7 +234,115 @@ test('byte-cache errors fall back to R2; conditional GET and production preserve
   expect(production!.status).toBe(200)
   await production!.arrayBuffer()
   expect(production!.headers.has('X-Aroma-Byte-Cache')).toBe(false)
-  expect(cacheReads).toBe(2)
+  expect(cacheReads).toBe(3)
+})
+
+test('cached image validators return 304 for GET/HEAD without R2 and still read each current manifest', async () => {
+  const fixture = mediaWorkerHarness()
+  const entries = new Map<string, Response>()
+  const tasks: Promise<unknown>[] = []
+  const handler = createMediaHandler({
+    fetch: fixture.upstream,
+    decodeWebp: decodeFixture,
+    publicImageCache: () => ({
+      async match(request) {
+        expect((request as Request).headers.has('Authorization')).toBe(false)
+        expect((request as Request).headers.has('If-None-Match')).toBe(false)
+        const cached = entries.get((request as Request).url)
+        return cached && new Response(await cached.clone().arrayBuffer(), cached)
+      },
+      async put(request, response) {
+        expect(response.status).toBe(200)
+        entries.set((request as Request).url, new Response(await response.arrayBuffer(), response))
+      },
+    }),
+  })
+  const context = { waitUntil: (task: Promise<unknown>) => { tasks.push(task) } }
+  const asset = await readAsset(await handler(await uploadRequest(), fixture.environment))
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  const url = `${mediaTestOrigin}${asset.src}`
+  const first = await handler(new Request(url), fixture.environment, context)
+  const bytes = await first!.arrayBuffer()
+  await Promise.all(tasks)
+  const etag = first!.headers.get('ETag')!
+  fixture.bucket.reads.length = 0
+  fixture.bucket.heads.length = 0
+  fixture.calls.length = 0
+  let reads = 0
+  for (const method of ['GET', 'HEAD']) {
+    for (const condition of [etag, `W/${etag}`, `"another,opaque", W/${etag}`, ` , ${etag}, `, '*']) {
+      const response = await handler(new Request(url, {
+        method, headers: { 'If-None-Match': condition, Range: 'bytes=0-99' },
+      }), fixture.environment, context)
+      reads++
+      expect(response!.status, `${method}: ${condition}`).toBe(304)
+      expect(response!.headers.get('ETag')).toBe(etag)
+      expect(response!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+      expect(response!.headers.has('Content-Range')).toBe(false)
+      expect((await response!.arrayBuffer()).byteLength).toBe(0)
+    }
+    for (const condition of ['"different"', `${etag}, invalid`, `W/${etag} garbage`, `*, ${etag}`]) {
+      const response = await handler(new Request(url, {
+        method, headers: { 'If-None-Match': condition },
+      }), fixture.environment, context)
+      reads++
+      expect(response!.status, `${method}: ${condition}`).toBe(200)
+      expect(await response!.arrayBuffer()).toEqual(method === 'GET' ? bytes : new ArrayBuffer(0))
+    }
+  }
+  // CDN compression may weaken an ETag. GET/HEAD still use weak comparison;
+  // this cannot bypass the fresh publication manifest above.
+  for (const [key, cached] of entries) {
+    const headers = new Headers(cached.headers)
+    headers.set('ETag', `W/${etag}`)
+    entries.set(key, new Response(bytes, { headers }))
+  }
+  for (const method of ['GET', 'HEAD']) {
+    const response = await handler(new Request(url, { method, headers: { 'If-None-Match': etag } }), fixture.environment, context)
+    reads++
+    expect(response!.status).toBe(304)
+    expect(response!.headers.get('X-Aroma-Byte-Cache')).toBe('HIT')
+    expect(await response!.text()).toBe('')
+  }
+  expect(fixture.bucket.reads).toHaveLength(0)
+  expect(fixture.bucket.heads).toHaveLength(0)
+  expect(fixture.calls.filter(call => call.name === 'media_public_asset')).toHaveLength(reads)
+  fixture.state.privateResponse = true
+  expect((await handler(new Request(url, { headers: { 'If-None-Match': etag } }), fixture.environment, context))!.status).toBe(404)
+  fixture.state.privateResponse = false
+  fixture.state.publicUnavailable = true
+  expect((await handler(new Request(url, { headers: { 'If-None-Match': etag } }), fixture.environment, context))!.status).toBe(503)
+  await Promise.all(tasks)
+})
+
+test('invalid cached validators fall back to verified R2 and cannot manufacture a 304', async () => {
+  const fixture = setup()
+  const asset = await readAsset(await fixture.handle(await uploadRequest()))
+  fixture.environment.APP_ENVIRONMENT = 'staging'
+  const url = `${mediaTestOrigin}${asset.src}`
+  for (const etag of [null, 'unquoted', 'W/unquoted']) {
+    const headers = new Headers({ 'Content-Type': 'image/webp' })
+    if (etag !== null) headers.set('ETag', etag)
+    const tasks: Promise<unknown>[] = []
+    const handler = createMediaHandler({
+      fetch: fixture.upstream,
+      decodeWebp: decodeFixture,
+      publicImageCache: () => ({
+        async match() { return new Response('untrusted cached bytes', { headers }) },
+        async put() {},
+      }),
+    })
+    const previous = fixture.bucket.reads.length
+    const response = await handler(new Request(url, {
+      headers: { 'If-None-Match': '"different"' },
+    }), fixture.environment, { waitUntil: task => { tasks.push(task) } })
+    expect(response!.status).toBe(200)
+    expect(response!.headers.get('X-Aroma-Byte-Cache')).toBe('MISS')
+    expect(response!.headers.get('ETag')).not.toBe(etag)
+    expect(fixture.bucket.reads).toHaveLength(previous + 1)
+    expect(await response!.arrayBuffer()).toEqual(await webpFixture(1600))
+    await Promise.all(tasks)
+  }
 })
 
 test('a cached HEAD rechecks publication and returns metadata without another R2 read or body', async () => {
@@ -245,7 +354,8 @@ test('a cached HEAD rechecks publication and returns metadata without another R2
     decodeWebp: decodeFixture,
     publicImageCache: () => ({
       async match(request) {
-        return entries.get((request as Request).url)?.clone()
+        const cached = entries.get((request as Request).url)
+        return cached && new Response(await cached.clone().arrayBuffer(), cached)
       },
       async put(request, response) {
         entries.set(

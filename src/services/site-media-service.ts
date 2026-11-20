@@ -7,19 +7,18 @@ import {
   type SiteMediaSlot,
 } from '../domain/site-media-slots'
 import { isRemoteCatalog } from './catalog-source'
-import { requireReadySupabaseClient } from './supabase-client'
+import { requireReadySupabaseClient, requireReadyAdminSupabaseClient } from './supabase-client'
 import { registerManagedMedia } from './media-registry'
 import { assetSource, assetSourceSet } from './asset-source'
 import {
-  cachedPublicQuery,
   invalidatePublicQueryCache,
 } from './public-query-cache'
 import { UserFacingError } from '../domain/user-facing-error'
-import { takeInitialPublicMedia } from './public-media-bootstrap'
+import { takeInitialPublicMedia, initialPublicMediaAgeMs } from './public-media-bootstrap'
+import { createPublicDocumentCache } from './public-document-cache'
 
 let snapshot: SiteMediaDocument = { items: [] }
-let loaded = false
-let pending: Promise<SiteMediaDocument> | null = null
+let hydrated = false
 const listeners = new Set<() => void>()
 
 function adminError(error: { code?: string } | null, status: number): void {
@@ -69,18 +68,24 @@ function confirm(value: unknown): SiteMediaDocument {
     else items[index] = item
   }
   snapshot = { items }
-  loaded = true
   listeners.forEach((listener) => listener())
   return snapshot
 }
 
+const publicDocument = createPublicDocumentCache('site-media', async () => {
+  const result = await (await requireReadySupabaseClient()).rpc('site_media_document')
+  if (result.error) throw new UserFacingError('site-media-network', 'No pudimos cargar las imágenes de la tienda.')
+  return result.data
+}, confirm, () => snapshot)
+
 export const siteMediaService = {
   hydrateInitial() {
-    if (!isRemoteCatalog || loaded) return
+    if (!isRemoteCatalog || hydrated) return
+    hydrated = true
     const initial = takeInitialPublicMedia('document')
     if (initial !== undefined) {
       try {
-        confirm(initial)
+        publicDocument.seed(initial, initialPublicMediaAgeMs())
       } catch {
         /* Normal load retains its retry/error path. */
       }
@@ -95,32 +100,14 @@ export const siteMediaService = {
   },
   confirm,
   async load(force = false): Promise<SiteMediaDocument> {
-    if (!isRemoteCatalog || (loaded && !force)) return snapshot
-    if (pending) return pending
-    const read = async () => {
-      const result = await (await requireReadySupabaseClient()).rpc('site_media_document')
-      if (result.error)
-        throw new UserFacingError(
-          'site-media-network',
-          'No pudimos cargar las imágenes de la tienda.',
-        )
-      return result.data
-    }
-    pending = (async () =>
-      confirm(
-        force
-          ? await read()
-          : await cachedPublicQuery('site-media', read, 30000),
-      ))().finally(() => {
-      pending = null
-    })
-    return pending
+    if (!isRemoteCatalog) return snapshot
+    return publicDocument.load(force)
   },
   async loadAdmin(): Promise<SiteMediaDocument> {
     if (!isRemoteCatalog) return snapshot
     const { mediaAdminActor } = await import('./media-admin-service')
     const actor = await mediaAdminActor()
-    const result = await (await requireReadySupabaseClient())
+    const result = await (await requireReadyAdminSupabaseClient())
       .rpc('admin_site_media_document')
       .setHeader('Authorization', `Bearer ${actor.token}`)
     await actor.assertCurrent?.()
@@ -140,7 +127,7 @@ export const siteMediaService = {
       )
     const { mediaAdminActor } = await import('./media-admin-service')
     const actor = await mediaAdminActor()
-    const result = await (await requireReadySupabaseClient())
+    const result = await (await requireReadyAdminSupabaseClient())
       .rpc('admin_save_site_media', {
         p_slot: slot,
         // NULL restores the fallback; generated RPC types omit nullability.
@@ -152,7 +139,7 @@ export const siteMediaService = {
     await actor.assertCurrent?.()
     adminError(result.error, result.status)
     const confirmed = confirm(result.data)
-    invalidatePublicQueryCache()
+    invalidatePublicQueryCache(true)
     return confirmed
   },
 }

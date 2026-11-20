@@ -5,7 +5,7 @@ import {
   getPeruDistrictLabel,
   getPeruProvinceLabel,
 } from '../content/peru'
-import { ORDER_STATUSES } from './order-workflow'
+import { ALL_ORDER_STATUSES } from './order-workflow'
 
 export type OrderDocumentType = 'shipping' | 'summary'
 
@@ -92,7 +92,7 @@ function summaryProblems(order: AdminOrder) {
   if (!Number.isFinite(Date.parse(order.placedAt)))
     return 'Revisa la fecha del pedido.'
   if (
-    !ORDER_STATUSES.includes(order.status) ||
+    !ALL_ORDER_STATUSES.includes(order.status) ||
     !['pending', 'approved', 'rejected', 'refunded'].includes(
       order.paymentStatus,
     )

@@ -17,8 +17,8 @@ import {
   applyRemoteHome,
 } from './admin-service'
 import { isRemoteCatalog } from './catalog-source'
-import { authService } from './auth-service'
-import { requireSupabaseClient } from './supabase-client'
+import { adminAuthService as authService } from './auth-service'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import { readAdminPageBatches } from './admin-page-batches'
 import {
@@ -159,8 +159,15 @@ export async function readAdminCatalogChoices(query: AdminCatalogChoiceQuery = {
     items: data.items.map(parseChoice), selected: data.selected.map(parseChoice), total: count(data.total) }
 }
 
-export async function readAdminOfferList(page: number, limit: number): Promise<AdminOfferList> {
+export async function readAdminOfferList(page: number, limit: number, vocabularyReady?: Promise<void>): Promise<AdminOfferList> {
   const { data: value, current } = await readRpc('admin_offer_list', { p_page: page, p_limit: limit })
+  // Keep the protected read concurrent with metadata, but never validate a
+  // product's dynamic family codes against a dictionary still in flight.
+  // This gate belongs to each caller, outside the shared unfinished RPC.
+  if (vocabularyReady) {
+    await vocabularyReady
+    await stillActor(current)
+  }
   const data = object(value)
   if (!Array.isArray(data.products) || data.products.length > limit || !Array.isArray(data.brands) ||
       typeof data.revision !== 'string' || !/^[a-f0-9]{32}$/.test(data.revision))
@@ -377,7 +384,7 @@ async function actor(): Promise<Actor> {
   if (error || !current.session || current.session.user.id !== userId)
     sessionError()
   const token = current.session.access_token
-  const verified = await verifySupabaseUser(token)
+  const verified = await verifySupabaseUser(token, 'admin')
   if (verified.error || verified.data.user?.id !== userId) sessionError()
   const expected = { userId, token, epoch: startedEpoch, accessRevision }
   await stillActor(expected)

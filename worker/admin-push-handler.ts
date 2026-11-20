@@ -23,7 +23,7 @@ interface Subscription {
 }
 interface PushPayload {
   id: string
-  kind: 'new_order' | 'test'
+  kind: 'new_order' | 'simulated_order' | 'test'
   title: string
   body: string
   url: string
@@ -43,7 +43,7 @@ interface Delivery {
   deliveryId: string
   leaseId: string
   eventId: string
-  kind: 'new_order' | 'test'
+  kind: 'new_order' | 'simulated_order' | 'test'
   orderReference: string | null
   subscription: Subscription
 }
@@ -417,7 +417,7 @@ function notifications(value: unknown) {
     if (
       typeof item.id !== 'string' ||
       !uuid.test(item.id) ||
-      item.kind !== 'new_order' ||
+      !['new_order', 'simulated_order'].includes(String(item.kind)) ||
       typeof item.orderReference !== 'string' ||
       !reference.test(item.orderReference) ||
       typeof item.createdAt !== 'string' ||
@@ -431,7 +431,7 @@ function notifications(value: unknown) {
       )
     return {
       id: item.id,
-      kind: 'new_order',
+      kind: item.kind as 'new_order' | 'simulated_order',
       orderReference: item.orderReference,
       createdAt: item.createdAt,
       read: item.read,
@@ -750,8 +750,8 @@ async function parseDelivery(value: unknown): Promise<Delivery> {
     !uuid.test(raw.leaseId) ||
     typeof raw.eventId !== 'string' ||
     !uuid.test(raw.eventId) ||
-    !['test', 'new_order'].includes(String(raw.kind)) ||
-    (raw.kind === 'new_order' &&
+    !['test', 'new_order', 'simulated_order'].includes(String(raw.kind)) ||
+    (raw.kind !== 'test' &&
       (typeof raw.orderReference !== 'string' ||
         !reference.test(raw.orderReference))) ||
     (raw.kind === 'test' && raw.orderReference !== null)
@@ -774,20 +774,26 @@ export async function dispatchAdminPush(
   env: AdminPushEnvironment,
   dependencies: Dependencies = {},
   targetDeliveryId?: string,
+  targetOrderId?: string,
 ) {
   environment(env)
   if (!configured(env)) return { claimed: 0, accepted: 0 }
   if (targetDeliveryId && !uuid.test(targetDeliveryId))
     throw new Error('Invalid test delivery identifier')
+  if (
+    targetOrderId &&
+    (!uuid.test(targetOrderId) || targetDeliveryId || environment(env) !== 'staging')
+  )
+    throw new Error('Invalid order delivery scope')
   const transport = dependencies.fetch ?? ((input, init) => fetch(input, init))
   const send: Sender =
     dependencies.send ??
     ((item, keys, payload) => sendWebPush(item, keys, payload, transport))
   const result = object(
-    await rpc(env, transport, 'claim_admin_push', {
+    await rpc(env, transport, targetOrderId ? 'claim_admin_order_push' : 'claim_admin_push', {
       p_environment: environment(env),
       p_limit: targetDeliveryId ? 1 : 10,
-      p_delivery_id: targetDeliveryId ?? null,
+      ...(targetOrderId ? { p_order_id: targetOrderId } : { p_delivery_id: targetDeliveryId ?? null }),
     }),
   )
   if (
@@ -826,13 +832,15 @@ export async function dispatchAdminPush(
         errorCode = 'not-eligible'
       } else {
         const test = claim.kind === 'test'
+        const simulated = claim.kind === 'simulated_order'
+        if (simulated && environment(env) !== 'staging') throw new Error('Invalid simulated delivery environment')
         const payload: PushPayload = {
           id: claim.eventId,
           kind: claim.kind,
-          title: test ? 'Prueba de notificaciones' : 'Nuevo pedido',
+          title: test ? 'Prueba de notificaciones' : simulated ? 'Pedido de prueba' : 'Nuevo pedido',
           body: test
             ? 'Esta es una prueba de Aroma Infini Admin.'
-            : 'Hay un pedido confirmado listo para revisar.',
+            : `${simulated ? 'Pedido de prueba' : 'Pedido'} ${claim.orderReference} recibido. Toca para revisar.`,
           url: test
             ? '/admin/notificaciones'
             : `/admin/pedidos/${encodeURIComponent(claim.orderReference!)}`,
@@ -904,4 +912,16 @@ export async function dispatchAdminPush(
       )
   }
   return { claimed: result.deliveries.length, accepted }
+}
+
+/** Post-commit staging acceleration. The durable event is written atomically by
+ * SQL, never by this helper. Failure leaves its lease/outbox for the cron tick. */
+export async function dispatchAdminOrderPush(
+  env: AdminPushEnvironment,
+  orderId: string,
+  dependencies: Dependencies = {},
+) {
+  if (env.APP_ENVIRONMENT !== 'staging' || env.PUSH_ENVIRONMENT !== 'staging')
+    return { claimed: 0, accepted: 0 }
+  return dispatchAdminPush(env, dependencies, undefined, orderId)
 }

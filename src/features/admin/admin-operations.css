@@ -203,6 +203,11 @@
   overflow-wrap: anywhere;
 }
 
+.admin-order-line-amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .admin-shipping-summary-panel {
   margin-top: 20px;
   border-top: 1px solid var(--admin-border);

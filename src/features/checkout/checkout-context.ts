@@ -20,6 +20,7 @@ export interface CheckoutContextValue {
   completeOrder: (cart: ResolvedCart) => Promise<MockOrder | null>
   serverQuote: ServerCheckoutQuote | null
   quoteLoading: boolean
+  quoteRefreshing: boolean
   quoteError: string
   pendingConfirmation: boolean
   refreshQuote: () => void

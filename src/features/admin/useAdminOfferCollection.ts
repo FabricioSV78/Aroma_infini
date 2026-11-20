@@ -22,6 +22,16 @@ export function useAdminOfferCollection() {
     pages: AdminOfferList[]
   }>({ initial, pages: [] })
   const pages = useMemo(() => additional.initial === initial ? additional.pages : [], [additional, initial])
+  // Preserve collection identity while the editor changes its own draft. The
+  // offer maps/sort and scheduled discount clock depend on these arrays.
+  const products = useMemo(
+    () => initial ? [...initial.products, ...pages.flatMap(page => page.products)] : [],
+    [initial, pages],
+  )
+  const brands = useMemo(
+    () => initial ? [...initial.brands, ...pages.flatMap(page => page.brands)] : [],
+    [initial, pages],
+  )
   const loaded = (initial?.products.length ?? 0) +
     pages.reduce((count, page) => count + page.products.length, 0)
   const canLoadMore = Boolean(isRemoteCatalog && initial && loaded < initial.total)
@@ -93,8 +103,8 @@ export function useAdminOfferCollection() {
 
   return {
     initial,
-    products: initial ? [...initial.products, ...pages.flatMap(page => page.products)] : [],
-    brands: initial ? [...initial.brands, ...pages.flatMap(page => page.brands)] : [],
+    products,
+    brands,
     total: initial?.total ?? 0,
     availableCount: initial?.availableCount ?? 0,
     sentinel,

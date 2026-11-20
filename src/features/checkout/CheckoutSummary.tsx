@@ -11,6 +11,7 @@ import { imageSource } from '../../services/image-source'
 import { PriceDisplay } from '../../components/ui/PriceDisplay'
 import { isRemoteCatalog } from '../../services/catalog-source'
 import { useCheckout } from './checkout-context'
+import { Spinner } from '../../components/ui/Spinner'
 
 interface CheckoutSummaryProps {
   cart: ResolvedCart
@@ -18,7 +19,7 @@ interface CheckoutSummaryProps {
 }
 
 export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
-  const { serverQuote, pendingConfirmation } = useCheckout()
+  const { serverQuote, pendingConfirmation, quoteRefreshing } = useCheckout()
   const amount = isRemoteCatalog
     ? (serverQuote ?? {
         subtotalCents: cart.subtotalCents,
@@ -31,6 +32,7 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
     <aside
       className="checkout-summary"
       aria-labelledby="checkout-summary-title"
+      aria-busy={quoteRefreshing || undefined}
     >
       <div className="checkout-summary-heading">
         <h2 id="checkout-summary-title">Tu selección</h2>
@@ -109,7 +111,15 @@ export function CheckoutSummary({ cart, draft }: CheckoutSummaryProps) {
           </dd>
         </div>
         <div className="checkout-total">
-          <dt>Total</dt>
+          <dt>
+            Total
+            {quoteRefreshing ? (
+              <span className="checkout-summary-refresh" role="status">
+                <Spinner />
+                <span className="sr-only">Verificando importes</span>
+              </span>
+            ) : null}
+          </dt>
           <dd>
             {amount.totalCents === null
               ? 'Pendiente'

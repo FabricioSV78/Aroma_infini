@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { Icon } from '../../components/ui/Icon'
 import { InstitutionalBreadcrumb } from '../institutional/InstitutionalBreadcrumb'
 import { isRemoteCatalog } from '../../services/catalog-source'
+import { isTerminalOrderStatus } from '../../domain/order-workflow'
 import {
   loadTrackingRecord,
   type TrackingRecord,
@@ -35,17 +36,21 @@ function OrderStatus({ record }: { record: TrackingRecord }) {
         </div>
         <span>{dateFormatter.format(new Date(record.placedAt))}</span>
       </div>
-      <ol className="tracking-steps" aria-label="Estado del pedido">
-        {accountStatusOrder.map((status, index) => (
-          <li
-            key={status}
-            aria-current={index === currentIndex ? 'step' : undefined}
-            data-complete={index < currentIndex ? 'true' : undefined}
-          >
-            {accountStatusLabels[status]}
-          </li>
-        ))}
-      </ol>
+      {!isTerminalOrderStatus(record.status) ? (
+        <ol className="tracking-steps" aria-label="Estado del pedido">
+          {accountStatusOrder.map((status, index) => (
+            <li
+              key={status}
+              aria-current={index === currentIndex ? 'step' : undefined}
+              data-complete={index < currentIndex ? 'true' : undefined}
+            >
+              {accountStatusLabels[status]}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="tracking-note">La reserva de este pedido está cerrada.</p>
+      )}
       <p className="tracking-note">
         {record.simulation
           ? 'Pedido de prueba: no representa un cobro ni una entrega real.'

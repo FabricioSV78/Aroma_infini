@@ -2,7 +2,7 @@ import type { AdminOrder, AdminOrderStatus } from '../types/admin'
 import type { AccountOrder } from '../types/account'
 import type { OrderHistoryEntry } from '../types/order-workflow'
 import type { AdminOrderSelection } from '../types/admin-lists'
-import { ORDER_STATUSES } from '../domain/order-workflow'
+import { ALL_ORDER_STATUSES } from '../domain/order-workflow'
 import { UserFacingError } from '../domain/user-facing-error'
 
 /** Validates private order responses without initializing administrative state. */
@@ -42,7 +42,7 @@ export function orderResponseUuid(value: unknown): string {
   return result
 }
 function status(value: unknown): AdminOrderStatus {
-  if (!ORDER_STATUSES.includes(value as AdminOrderStatus))
+  if (!ALL_ORDER_STATUSES.includes(value as AdminOrderStatus))
     invalidOrderResponse()
   return value as AdminOrderStatus
 }
@@ -176,9 +176,13 @@ export function parseAdminOrder(value: unknown): AdminOrder {
 export function parseOrderHistory(value: unknown): OrderHistoryEntry {
   const source = orderResponseObject(value),
     operator = orderResponseObject(source.operator)
+  const system = source.source === 'system'
   if (
-    operator.verified !== true ||
-    !['individual', 'bulk'].includes(String(source.source))
+    (system
+      ? operator.verified !== false || operator.id !== null ||
+        operator.name !== 'Sistema' || source.toStatus !== 'expired' ||
+        !['received', 'preparing'].includes(String(source.fromStatus))
+      : operator.verified !== true || !['individual', 'bulk'].includes(String(source.source)))
   )
     invalidOrderResponse()
   return {
@@ -192,7 +196,7 @@ export function parseOrderHistory(value: unknown): OrderHistoryEntry {
     operator: {
       name: orderResponseText(operator.name, 254),
       id: operator.id === null ? null : orderResponseUuid(operator.id),
-      verified: true,
+      verified: !system,
     },
   }
 }

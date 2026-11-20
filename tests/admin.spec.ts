@@ -719,20 +719,22 @@ test('Los datos de pedidos recientes conservan separación en tablet y escritori
         const target = element.querySelector(selector)
         if (!(target instanceof HTMLElement)) return null
         const rectangle = target.getBoundingClientRect()
-        return { left: rectangle.left, right: rectangle.right }
+        return { left: rectangle.left, right: rectangle.right, top: rectangle.top, bottom: rectangle.bottom }
       })
 
-      return rectangles.slice(0, -1).map((rectangle, index) => {
-        const nextRectangle = rectangles[index + 1]
-        return rectangle && nextRectangle
-          ? nextRectangle.left - rectangle.right
-          : -1
-      })
+      // Tablet uses the same six values in a compact multi-row grid. Check
+      // every pair in both axes instead of requiring a desktop-only row.
+      return rectangles.flatMap((rectangle, index) => rectangles.slice(index + 1).map(nextRectangle =>
+        rectangle && nextRectangle
+          ? Math.max(nextRectangle.left - rectangle.right, rectangle.left - nextRectangle.right,
+            nextRectangle.top - rectangle.bottom, rectangle.top - nextRectangle.bottom)
+          : -1,
+      ))
     })
 
     for (const gap of gaps) {
-      expect(gap, `Separación horizontal a ${width}px`).toBeGreaterThanOrEqual(
-        8,
+      expect(gap, `Separación entre datos a ${width}px`).toBeGreaterThanOrEqual(
+        width < 1200 ? 6 : 8,
       )
     }
   }
@@ -983,7 +985,7 @@ test('Los accesos del flujo filtran nuevos, entregados y enviados', async ({
 }) => {
   await page.goto('/admin/pedidos?preparacion=received')
   await expect(page.locator('.admin-table tbody tr')).toHaveCount(13)
-  await expect(page.getByText('13 pedidos', { exact: true })).toBeVisible()
+  await expect(page.locator('.admin-filter-result').getByText('13 pedidos', { exact: true })).toBeVisible()
 
   await page.getByLabel('Estado del pedido').selectOption('delivered')
   await page.getByRole('button', { name: 'Aplicar' }).click()

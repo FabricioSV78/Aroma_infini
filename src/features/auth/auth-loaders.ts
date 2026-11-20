@@ -1,16 +1,20 @@
 import { redirect, type LoaderFunctionArgs } from 'react-router'
-import { authService } from '../../services/auth-service'
+import { authService, adminAuthService } from '../../services/auth-service'
 import { authPath, type AuthAudience } from '../../domain/auth-navigation'
 
 export function requireAuthLoader(audience: AuthAudience) {
   return async ({ request }: LoaderFunctionArgs) => {
-    await authService.initialize()
-    const state = authService.getSnapshot()
+    const service = audience === 'admin' ? adminAuthService : authService
+    await service.initialize()
+    const state = service.getSnapshot()
+    if (state.status === 'error' && audience === 'customer')
+      throw new Error(state.message)
     if (
       state.status === 'authenticated' &&
       state.session?.intent === 'account' &&
-      (audience === 'customer' ||
-        (state.session.user.role === 'admin' &&
+      ((audience === 'customer' && state.session.user.role === 'customer') ||
+        (audience === 'admin' &&
+          state.session.user.role === 'admin' &&
           state.session.mfaRequired !== true))
     )
       return null
@@ -27,7 +31,7 @@ export function requireAuthLoader(audience: AuthAudience) {
 export function adminDataLoader(load: () => Promise<void>) {
   const authorize = requireAuthLoader('admin')
   return async (args: LoaderFunctionArgs) => {
-    const state = authService.getSnapshot()
+    const state = adminAuthService.getSnapshot()
     const verifiedAdmin =
       state.status === 'authenticated' &&
       state.session?.intent === 'account' &&

@@ -1,4 +1,5 @@
 import { useNavigation } from 'react-router'
+import { Spinner } from './Spinner'
 
 /** Keeps the current screen usable while the router fetches the next one. */
 export function NavigationStatus() {
@@ -13,7 +14,10 @@ export function NavigationStatus() {
       {busy ? (
         <>
           <span className="ui-navigation-progress" aria-hidden="true" />
-          <span className="sr-only">Cargando la página…</span>
+          <span className="ui-navigation-feedback">
+            <Spinner />
+            <span>Cargando la página…</span>
+          </span>
         </>
       ) : null}
     </div>

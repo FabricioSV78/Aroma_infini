@@ -69,6 +69,7 @@ export function CheckoutPage() {
     completeOrder,
     serverQuote,
     quoteLoading,
+    quoteRefreshing,
     quoteError,
     refreshQuote,
     pendingConfirmation,
@@ -205,7 +206,10 @@ export function CheckoutPage() {
       paymentInFlight.current ||
       finalized.current ||
       (!pendingConfirmation &&
-        (cart.needsAttention || amount.totalCents === null))
+        (cart.needsAttention ||
+          quoteLoading ||
+          quoteError ||
+          amount.totalCents === null))
     )
       return
     const request = ++paymentRequest.current
@@ -304,7 +308,7 @@ export function CheckoutPage() {
       <header className="checkout-heading" data-scroll-reveal="copy">
         <h1>Finaliza tu selección</h1>
         <p>Revisa tus datos y la entrega antes de continuar.</p>
-        {isRemoteCatalog && quoteLoading ? (
+        {isRemoteCatalog && quoteLoading && !quoteRefreshing ? (
           <InlineStatus className="checkout-quote-status" busy>
             Actualizando importes…
           </InlineStatus>
@@ -329,8 +333,25 @@ export function CheckoutPage() {
             key={item.id}
             aria-current={step === item.id ? 'step' : undefined}
           >
-            <span aria-hidden="true">0{index + 1}</span>
-            {item.label}
+            {index < steps.findIndex((item) => item.id === step) ? (
+              <button
+                type="button"
+                disabled={
+                  paymentStatus === 'processing' ||
+                  promotionBusy ||
+                  pendingConfirmation
+                }
+                onClick={() => goToStep(item.id)}
+              >
+                <span aria-hidden="true">0{index + 1}</span>
+                {item.label}
+              </button>
+            ) : (
+              <>
+                <span aria-hidden="true">0{index + 1}</span>
+                {item.label}
+              </>
+            )}
           </li>
         ))}
       </ol>
@@ -556,11 +577,27 @@ export function CheckoutPage() {
                   </strong>
                 </div>
                 <button
+                  className="text-link checkout-review-back"
+                  type="button"
+                  disabled={
+                    paymentStatus === 'processing' ||
+                    promotionBusy ||
+                    pendingConfirmation
+                  }
+                  onClick={() => goToStep('entrega')}
+                >
+                  Volver a entrega
+                </button>
+                <button
                   className="button button--primary"
                   type="button"
                   disabled={
                     paymentStatus === 'processing' ||
-                    (!pendingConfirmation && amount.totalCents === null)
+                    promotionBusy ||
+                    (!pendingConfirmation &&
+                      (quoteLoading ||
+                        Boolean(quoteError) ||
+                        amount.totalCents === null))
                   }
                   onClick={() => void runPayment()}
                   aria-busy={paymentStatus === 'processing'}

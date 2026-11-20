@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import {
   expect,
@@ -7,6 +7,8 @@ import {
   type SupabaseAuthNetwork,
 } from './supabase-auth-fixture'
 import type { AdminNotification } from '../src/services/admin-notifications'
+
+const serviceWorkerSource = await readFile('public/admin/sw.js', 'utf8')
 
 const publicKey = Buffer.from([
   4,
@@ -311,7 +313,7 @@ test('cerrar sesión mientras carga el dispositivo impide devolver su estado', a
     await expect.poll(() => started).toBe(true)
     await page.evaluate(async () => {
       const source = '/src/services/auth-service.ts'
-      await (await import(source)).authService.signOut()
+      await (await import(source)).adminAuthService.signOut()
     })
     release()
     expect(await loading).toBe(false)
@@ -490,6 +492,107 @@ test('la campana usa datos reales del contrato, marca leídas y restaura foco si
       exact: true,
     }),
   ).toBeFocused()
+})
+
+test('los pedidos operativos se identifican como pruebas y la recepción push invalida pedidos sin publicar datos', async ({ page, supabaseNetwork, pushNetwork }) => {
+  pushNetwork.items[0].kind = 'simulated_order'
+  await administrator(page, supabaseNetwork)
+  await page.getByRole('button', { name: 'Notificaciones: 1 sin leer', exact: true }).click()
+  await expect(page.getByRole('dialog').getByRole('link', { name: /Nuevo pedido de prueba/ })).toHaveAttribute('href', '/admin/pedidos/AI-TEST-0001')
+  const result = await page.evaluate(async () => {
+    let events = 0
+    let hasPayload = false
+    window.addEventListener('aroma-infini:orders-changed', (event) => { events++; hasPayload ||= 'detail' in event })
+    navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'ADMIN_NOTIFICATION_RECEIVED' } }))
+    await Promise.resolve()
+    return { events, hasPayload }
+  })
+  expect(result).toEqual({ events: 1, hasPayload: false })
+})
+
+test('IndexedDB real del navegador evita duplicados tras reiniciar el worker y conserva únicamente IDs acotados', async ({ page, supabaseNetwork, pushNetwork }) => {
+  void pushNetwork
+  await administrator(page, supabaseNetwork)
+  const result = await page.evaluate(async (source) => {
+    const shown: Array<{ title: string; options: Record<string, unknown> }> = []
+    type PushEvent = { data: { json: () => unknown }; waitUntil: (work: Promise<unknown>) => void }
+    function instance(storage: IDBFactory | null = indexedDB, rejectFirst = false) {
+      let push!: (event: PushEvent) => void
+      let attempts = 0
+      const scope = {
+        indexedDB: storage, location: { origin: location.origin },
+        addEventListener(name: string, handler: typeof push) { if (name === 'push') push = handler },
+        skipWaiting: async () => {},
+        registration: { async showNotification(title: string, options: Record<string, unknown>) {
+          attempts++
+          if (rejectFirst && attempts === 1) throw new Error('Controlled display failure')
+          shown.push({ title, options })
+        } },
+        clients: { claim: async () => {}, matchAll: async () => [] },
+      }
+      new Function('self', source)(scope)
+      return { async push(id: string) {
+        let work: Promise<unknown> = Promise.resolve()
+        push({ data: { json: () => ({ id, kind: 'simulated_order', url: '/admin/pedidos/AI-FIXTURE-123' }) }, waitUntil: value => { work = value } })
+        await work
+      } }
+    }
+    const worker = instance()
+    await Promise.all([worker.push('persistent-event'), worker.push('persistent-event')])
+    await instance().push('persistent-event')
+    const shownAfterRestart = shown.length
+    const read = () => new Promise<Array<{ id: string; shownAt: number }>>((resolve, reject) => {
+      const request = indexedDB.open('aroma-admin-push-events-v1', 1)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const database = request.result, transaction = database.transaction('shown', 'readonly')
+        const values = transaction.objectStore('shown').getAll()
+        transaction.oncomplete = () => { database.close(); resolve(values.result) }
+        transaction.onerror = () => { database.close(); reject(transaction.error) }
+      }
+    })
+    const first = await read()
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('aroma-admin-push-events-v1', 1)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const database = request.result, transaction = database.transaction('shown', 'readwrite')
+        const store = transaction.objectStore('shown')
+        store.put({ id: 'expired-event', shownAt: Date.now() - 25 * 60 * 60 * 1000 })
+        for (let i = 0; i < 512; i++) store.put({ id: `retained-${i}`, shownAt: Date.now() - 1000 })
+        transaction.oncomplete = () => { database.close(); resolve() }
+        transaction.onerror = () => { database.close(); reject(transaction.error) }
+      }
+    })
+    await instance().push('bounded-new-event')
+    const bounded = await read()
+    const failed = instance(indexedDB, true)
+    let rejected = false
+    try { await failed.push('retry-after-display-failure') } catch { rejected = true }
+    const recordedBeforeRetry = (await read()).some(row => row.id === 'retry-after-display-failure')
+    await failed.push('retry-after-display-failure')
+    const recordedAfterRetry = (await read()).some(row => row.id === 'retry-after-display-failure')
+    const fallback = instance(null)
+    await fallback.push('storage-unavailable')
+    return { shownAfterRestart, first, boundedCount: bounded.length,
+      containsExpired: bounded.some(row => row.id === 'expired-event'),
+      containsNew: bounded.some(row => row.id === 'bounded-new-event'),
+      fields: [...new Set(bounded.flatMap(row => Object.keys(row)))].sort(),
+      rejected, recordedBeforeRetry, recordedAfterRetry,
+      fallbackShown: shown.at(-1)?.options.tag === 'aroma-admin-storage-unavailable',
+      referenceShown: String(shown[0].options.body).includes('AI-FIXTURE-123') }
+  }, serviceWorkerSource)
+  expect(result.shownAfterRestart).toBe(1)
+  expect(result.first).toHaveLength(1)
+  expect(result.fields).toEqual(['id', 'shownAt'])
+  expect(result.boundedCount).toBeLessThanOrEqual(512)
+  expect(result.containsExpired).toBe(false)
+  expect(result.containsNew).toBe(true)
+  expect(result.rejected).toBe(true)
+  expect(result.recordedBeforeRetry).toBe(false)
+  expect(result.recordedAfterRetry).toBe(true)
+  expect(result.fallbackShown).toBe(true)
+  expect(result.referenceShown).toBe(true)
 })
 
 test('la clave pública rotada permite reactivar sin acumular suscripciones', async ({

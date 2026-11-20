@@ -10,7 +10,7 @@ import { UserFacingError } from '../../services/admin-messages'
 export function useAdminListData<T extends { ownerId: string; accessRevision: number }>(): T | null {
   // These private loaders return JSON-only DTOs already validated by services.
   const data = useLoaderData() as T | null
-  const auth = useAuth()
+  const auth = useAuth('admin')
   const revision = useSyncExternalStore(adminListAccess.subscribe, adminListAccess.getSnapshot)
   if (isRemoteCatalog && data && data.accessRevision !== revision)
     throw new UserFacingError('session', 'Tu acceso administrativo cambió. Vuelve a iniciar sesión antes de continuar.')

@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useEffect } from 'react'
 import { LoadingImage } from '../../components/media/LoadingImage'
 import { Icon } from '../../components/ui/Icon'
 import { getVariantPrice } from '../../services/product-discounts'
@@ -8,6 +9,7 @@ import { PriceDisplay } from '../../components/ui/PriceDisplay'
 import { OfferBadge } from '../../components/ui/OfferBadge'
 import type { FinderResult } from '../../types/fragrance-finder'
 import type { HomeFinderContent } from '../../types/home'
+import { registerVisibleOfferBoundaries } from '../../domain/visible-offer-boundaries'
 
 export function FragranceResults({
   result,
@@ -19,6 +21,9 @@ export function FragranceResults({
   content: HomeFinderContent
 }) {
   useOfferPriceRevision()
+  useEffect(() => registerVisibleOfferBoundaries(
+    result.matches.map(({ product }) => product.discount),
+  ), [result])
   return (
     <>
       {result.kind !== 'matches' && (

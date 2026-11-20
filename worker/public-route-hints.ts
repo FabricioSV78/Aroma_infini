@@ -44,7 +44,7 @@ export function filterPublicRouteHints(
     })
     .on('head link[rel="preload"][as="font"]', {
       element(element) {
-        if (element.getAttribute('href') !== '/fonts/lato-latin-300-normal.woff2') return
+        if (!/^\/(?:fonts\/lato-latin-300-normal|assets\/lato-latin-300-normal-[A-Za-z0-9_-]+)\.woff2$/.test(element.getAttribute('href') ?? '')) return
         if (group) {
           element.setAttribute('media', DESKTOP_LAYOUT_QUERY)
           element.setAttribute('data-public-font', 'light')

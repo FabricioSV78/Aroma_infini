@@ -18,6 +18,8 @@ export const accountStatusLabels: Record<AccountOrderStatus, string> = {
   preparing: 'En preparación',
   shipped: 'En camino',
   delivered: 'Entregado',
+  cancelled: 'Cancelado',
+  expired: 'Vencido',
 }
 
 export const accountStatusOrder: AccountOrderStatus[] = [

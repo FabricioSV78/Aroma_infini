@@ -5,9 +5,10 @@ import {
 } from '../domain/product-bootstrap'
 import { publicQueryCacheGeneration } from './public-query-cache'
 
-/** Only the first navigation may consume its fresh, no-store anonymous DTO.
- * Removing it makes retries, visibility refreshes and later routes use Supabase.
- * No product/stock/price data is saved to storage or a cross-request cache. */
+/** Only the first navigation may adopt its fresh, no-store anonymous DTO.
+ * Its validated value can reuse only the original five-second query window;
+ * invalidation or expiry still makes later reads use Supabase. No product,
+ * stock or price data is saved to storage or a cross-request cache. */
 export function takeProductBootstrap(slug: string): unknown {
   if (typeof document === 'undefined') return undefined
   const element = document.getElementById(PRODUCT_BOOTSTRAP_ID)

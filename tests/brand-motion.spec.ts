@@ -150,6 +150,57 @@ test('Movimiento reducido deja todas las marcas estáticas y accesibles', async 
   ).toBe('none')
 })
 
+test('El carrusel no mantiene frames de animación fuera de pantalla, en pausa o con movimiento reducido', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = window.requestAnimationFrame.bind(window)
+    Reflect.set(window, '__brandRailFrames', 0)
+    window.requestAnimationFrame = (callback) => original((time) => {
+      if (callback.name === 'animate')
+        Reflect.set(window, '__brandRailFrames', Number(Reflect.get(window, '__brandRailFrames')) + 1)
+      callback(time)
+    })
+  })
+  await page.reload()
+  // Reload discards beforeEach's test-only scroll rule. Keep the hover probe
+  // stationary rather than measuring while native smooth scroll moves the rail
+  // out from under the pointer. The production animation remains unchanged.
+  await page.addStyleTag({
+    content: 'html { scroll-behavior: auto !important; }',
+  })
+  await page.evaluate(() => document.fonts.ready)
+  const gallery = page.locator('#marcas')
+  const rail = gallery.locator('.brand-signatures-viewport')
+  const frameCount = () => page.evaluate(() => Number(Reflect.get(window, '__brandRailFrames')))
+  const idleFrames = async () => {
+    const before = await frameCount()
+    await page.waitForTimeout(250)
+    return (await frameCount()) - before
+  }
+  expect((await rail.boundingBox())!.y).toBeGreaterThan(
+    await page.evaluate(() => innerHeight),
+  )
+  expect(await idleFrames()).toBe(0)
+  await gallery.scrollIntoViewIfNeeded()
+  await page.mouse.move(0, 0)
+  await expect.poll(frameCount).toBeGreaterThan(2)
+  await rail.hover()
+  expect(await idleFrames()).toBe(0)
+  const toggle = gallery.getByRole('button', { name: 'Pausar movimiento' })
+  await toggle.focus()
+  await page.keyboard.press('Space')
+  await page.mouse.move(0, 0)
+  await page.keyboard.press('Tab')
+  expect(await idleFrames()).toBe(0)
+  await gallery.getByRole('button', { name: 'Reanudar movimiento' }).focus()
+  await page.keyboard.press('Space')
+  await page.keyboard.press('Shift+Tab')
+  const resumeFrames = await frameCount()
+  await expect.poll(frameCount).toBeGreaterThan(resumeFrames + 2)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(gallery.getByRole('button', { name: /movimiento/ })).toHaveCount(0)
+  expect(await idleFrames()).toBe(0)
+})
+
 test('El deslizamiento táctil permite explorar sin impedir el scroll vertical ni los enlaces', async ({
   browser,
 }) => {

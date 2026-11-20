@@ -18,7 +18,10 @@ import {
   safeAuthReturn,
   type AuthAudience,
 } from '../../domain/auth-navigation'
-import { authService } from '../../services/auth-service'
+import {
+  authService as customerAuthService,
+  adminAuthService,
+} from '../../services/auth-service'
 import { AuthError, authErrorMessage } from '../../services/auth-errors'
 import { SeoManager } from '../../seo/SeoManager'
 import { useAuth } from './useAuth'
@@ -41,7 +44,9 @@ function AuthForm({
 }) {
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const auth = useAuth()
+  const auth = useAuth(audience)
+  const authService =
+    audience === 'admin' ? adminAuthService : customerAuthService
   const target = safeAuthReturn(params.get('returnTo'), audience)
   const [values, setValues] = useState<AuthValues>(empty)
   const [errors, setErrors] = useState<AuthScreenProps['fieldErrors']>({})
@@ -135,7 +140,11 @@ function AuthForm({
             error.code === 'unavailable' &&
             audience === 'admin'
               ? 'No se puede iniciar sesión en este momento. Vuelve a intentarlo más tarde.'
-              : authErrorMessage(error),
+              : error instanceof AuthError &&
+                  error.code === 'permission' &&
+                  audience === 'customer'
+                ? 'Inicia sesión con una cuenta de cliente. El acceso administrativo se utiliza desde el panel.'
+                : authErrorMessage(error),
         })
     } finally {
       busy.current = false
@@ -145,8 +154,10 @@ function AuthForm({
   const hasAccess =
     auth.status === 'authenticated' &&
     auth.session?.intent === 'account' &&
-    (audience === 'customer' ||
-      (auth.session.user.role === 'admin' && auth.session.mfaRequired !== true))
+    ((audience === 'customer' && auth.session.user.role === 'customer') ||
+      (audience === 'admin' &&
+        auth.session.user.role === 'admin' &&
+        auth.session.mfaRequired !== true))
   if (hasAccess) return <Navigate to={target} replace />
   const contextualMessage: AuthScreenProps['message'] =
     auth.status === 'expired'

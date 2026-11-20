@@ -27,6 +27,7 @@ export function useBrandRail(
     let resumeAt = 0
     let lastTime = 0
     let frame = 0
+    let wakeTimer: number | undefined
     let suppressClick = false
     let drag: {
       id: number
@@ -43,23 +44,41 @@ export function useBrandRail(
       written = viewport.scrollLeft
     }
 
-    function animate(time: number) {
-      const elapsed = lastTime ? Math.min(time - lastTime, 48) : 0
-      lastTime = time
-      if (
+    function canAnimate() {
+      return (
         !motion.matches &&
         visible &&
         !document.hidden &&
         !paused &&
         !hovered &&
         !focused &&
-        !drag &&
-        time >= resumeAt
-      ) {
-        // A short acceleration after manual interaction avoids an abrupt restart.
-        const ramp = resumeAt ? Math.min((time - resumeAt) / 650, 1) : 1
-        write(position + (AUTOPLAY_PIXELS_PER_SECOND * elapsed * ramp) / 1000)
-      }
+        !drag
+      )
+    }
+
+    function scheduleAnimation() {
+      cancelAnimationFrame(frame)
+      frame = 0
+      window.clearTimeout(wakeTimer)
+      wakeTimer = undefined
+      lastTime = 0
+      if (!canAnimate()) return
+      const delay = resumeAt - performance.now()
+      // Waiting for the existing interaction pause needs one timer, not a
+      // recurring frame callback. Inactive/offscreen rails schedule no work.
+      if (delay > 0) {
+        wakeTimer = window.setTimeout(scheduleAnimation, delay)
+      } else frame = requestAnimationFrame(animate)
+    }
+
+    function animate(time: number) {
+      frame = 0
+      if (!canAnimate()) return
+      const elapsed = lastTime ? Math.min(time - lastTime, 48) : 0
+      lastTime = time
+      // Preserve the same speed and acceleration after manual interaction.
+      const ramp = resumeAt ? Math.min((time - resumeAt) / 650, 1) : 1
+      write(position + (AUTOPLAY_PIXELS_PER_SECOND * elapsed * ramp) / 1000)
       frame = requestAnimationFrame(animate)
     }
 
@@ -73,6 +92,7 @@ export function useBrandRail(
         previousX: event.clientX,
         moved: false,
       }
+      scheduleAnimation()
     }
 
     function pointerMove(event: PointerEvent) {
@@ -82,6 +102,7 @@ export function useBrandRail(
         const dy = Math.abs(event.clientY - drag.y)
         if (dy > dx && dy > 6) {
           drag = null
+          scheduleAnimation()
           return
         }
         if (dx < 6) return
@@ -102,6 +123,7 @@ export function useBrandRail(
       delete viewport!.dataset.dragging
       if (viewport!.hasPointerCapture(event.pointerId))
         viewport!.releasePointerCapture(event.pointerId)
+      scheduleAnimation()
     }
 
     function click(event: MouseEvent) {
@@ -132,6 +154,7 @@ export function useBrandRail(
                 : 1),
       )
       resumeAt = performance.now() + 1400
+      scheduleAnimation()
     }
 
     function focusIn(event: FocusEvent) {
@@ -148,6 +171,7 @@ export function useBrandRail(
       })
       position = viewport!.scrollLeft
       written = position
+      scheduleAnimation()
     }
 
     function focusOut(event: FocusEvent) {
@@ -159,14 +183,19 @@ export function useBrandRail(
       focused = false
       position = viewport!.scrollLeft
       resumeAt = performance.now() + 1400
+      scheduleAnimation()
     }
 
     function pointerEnter(event: PointerEvent) {
-      if (event.pointerType === 'mouse') hovered = true
+      if (event.pointerType === 'mouse') {
+        hovered = true
+        scheduleAnimation()
+      }
     }
     function pointerLeave(event: PointerEvent) {
       if (event.pointerType === 'mouse') hovered = false
       if (drag && !drag.moved) drag = null
+      scheduleAnimation()
     }
     function scroll() {
       // Adopt browser/keyboard scrolling, but retain fractional autoplay progress.
@@ -185,6 +214,7 @@ export function useBrandRail(
         delete viewport!.dataset.dragging
         viewport!.scrollLeft = position = written = 0
       }
+      scheduleAnimation()
     }
 
     const resize = new ResizeObserver(() => {
@@ -195,6 +225,7 @@ export function useBrandRail(
     })
     const intersection = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting
+      scheduleAnimation()
     })
     resize.observe(group)
     intersection.observe(viewport)
@@ -211,9 +242,11 @@ export function useBrandRail(
     viewport.addEventListener('scroll', scroll, { passive: true })
     viewport.addEventListener('dragstart', preventNativeDrag)
     motion.addEventListener('change', motionChange)
-    frame = requestAnimationFrame(animate)
+    document.addEventListener('visibilitychange', scheduleAnimation)
+    scheduleAnimation()
     return () => {
       cancelAnimationFrame(frame)
+      window.clearTimeout(wakeTimer)
       resize.disconnect()
       intersection.disconnect()
       viewport.removeEventListener('pointerdown', pointerDown)
@@ -229,6 +262,7 @@ export function useBrandRail(
       viewport.removeEventListener('scroll', scroll)
       viewport.removeEventListener('dragstart', preventNativeDrag)
       motion.removeEventListener('change', motionChange)
+      document.removeEventListener('visibilitychange', scheduleAnimation)
     }
   }, [looping, paused, brandCount])
 

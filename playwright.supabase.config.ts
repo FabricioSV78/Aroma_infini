@@ -28,6 +28,7 @@ export default defineConfig({
         'admin-trusted-devices.spec.ts',
         'account-email-change.spec.ts',
         'offline-account-recovery-ui.spec.ts',
+        'customer-admin-isolation.spec.ts',
       ],
       use: { baseURL: 'http://127.0.0.1:5175' },
     },

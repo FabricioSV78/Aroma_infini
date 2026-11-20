@@ -48,7 +48,8 @@ export const adminLoaders = {
     ? adminDataLoader(loadAdminCatalogContext)(args) : catalog(args),
   offers: (args: LoaderFunctionArgs) => isRemoteCatalog
     ? queryLoader(async () => {
-      const [, offers] = await Promise.all([loadAdminCatalogContext(), readAdminOfferList(1, 12)])
+      const vocabularyReady = loadAdminCatalogContext()
+      const [, offers] = await Promise.all([vocabularyReady, readAdminOfferList(1, 12, vocabularyReady)])
       return offers
     })(args) : catalog(args),
   home: adminDataLoader(loadAdminHome),

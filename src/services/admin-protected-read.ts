@@ -1,7 +1,7 @@
 import { adminListAccess } from './admin-list-access'
-import { authService } from './auth-service'
+import { adminAuthService as authService } from './auth-service'
 import { UserFacingError } from '../domain/user-facing-error'
-import { requireSupabaseClient } from './supabase-client'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 
 export interface AdminReadActor {
@@ -89,7 +89,7 @@ export function createAdminProtectedReads() {
     const operation = (async () => {
       // SQL still authenticates/authorizes its captured credential itself. The
       // caller must only fetch here; parse/publish shared state after read().
-      const verification = verifySupabaseUser(actor.token)
+      const verification = verifySupabaseUser(actor.token, 'admin')
       const response = Promise.resolve().then(() => load(actor))
       const [identity, result] = await Promise.allSettled([verification, response])
       await assertCurrent()

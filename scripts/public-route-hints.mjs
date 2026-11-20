@@ -18,7 +18,7 @@ function routeGroup(route) {
 export function selectPublicFontPreloads(html, route) {
   const critical = routeGroup(route) !== undefined
   return html.replace(
-    /<link\b(?=[^>]*\brel="preload")(?=[^>]*\bas="font")(?=[^>]*\bhref="\/fonts\/lato-latin-300-normal\.woff2")[^>]*>/g,
+    /<link\b(?=[^>]*\brel="preload")(?=[^>]*\bas="font")(?=[^>]*\bhref="\/(?:fonts\/lato-latin-300-normal|assets\/lato-latin-300-normal-[A-Za-z0-9_-]+)\.woff2")[^>]*>/g,
     (link) => {
       if (critical) {
         if (link.includes('data-public-font="light"')) return link

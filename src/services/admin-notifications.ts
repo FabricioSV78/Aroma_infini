@@ -1,13 +1,14 @@
-import { authService } from './auth-service'
-import { requireSupabaseClient } from './supabase-client'
+import { adminAuthService as authService } from './auth-service'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { mediaApiBaseUrl } from './asset-source'
 import { runtimeEnvironment } from './runtime-environment'
 import { getAdminPushRegistration } from './admin-pwa'
 import { UserFacingError } from './admin-messages'
+import { notifyAdminOrdersChanged } from '../domain/order-events'
 
 export interface AdminNotification {
   id: string
-  kind: 'new_order'
+  kind: 'new_order' | 'simulated_order'
   orderReference: string
   createdAt: string
   read: boolean
@@ -220,7 +221,7 @@ function parseCenter(
     if (
       !record(item) ||
       typeof item.id !== 'string' ||
-      item.kind !== 'new_order' ||
+      !['new_order', 'simulated_order'].includes(String(item.kind)) ||
       typeof item.orderReference !== 'string' ||
       !item.orderReference ||
       item.orderReference.length > 120 ||
@@ -234,7 +235,7 @@ function parseCenter(
       )
     return {
       id: item.id,
-      kind: item.kind,
+      kind: item.kind as AdminNotification['kind'],
       orderReference: item.orderReference,
       createdAt: item.createdAt,
       read: item.read,
@@ -289,8 +290,10 @@ export const adminNotifications = {
         if (
           record(event.data) &&
           event.data.type === 'ADMIN_NOTIFICATION_RECEIVED'
-        )
+        ) {
+          if (currentOwner()) notifyAdminOrdersChanged()
           void refresh(true)
+        }
       }
       window.addEventListener('focus', onFocus)
       document.addEventListener('visibilitychange', onFocus)

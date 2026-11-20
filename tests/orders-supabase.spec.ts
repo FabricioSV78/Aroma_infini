@@ -571,6 +571,10 @@ test('El detalle cambia un estado y guarda su administrador real en el historial
   const selected = ordersNetwork.orders[0]
   await admin(page, supabaseNetwork)
   await page.goto(`/admin/pedidos/${selected.reference}`)
+  const publicRevision = await page.evaluate(async () => {
+    const path = '/src/services/public-query-cache.ts'
+    return (await import(path)).publicQueryCacheGeneration() as number
+  })
   await page.getByRole('radio', { name: 'En preparación', exact: true }).check()
   await page
     .getByRole('button', { name: 'Guardar estado', exact: true })
@@ -579,9 +583,116 @@ test('El detalle cambia un estado y guarda su administrador real en el historial
     page.getByRole('region', { name: 'Historial del pedido' }),
   ).toContainText('Ana Torres')
   expect(ordersNetwork.orders[0].status).toBe('preparing')
+  expect(await page.evaluate(async () => {
+    const path = '/src/services/public-query-cache.ts'
+    return (await import(path)).publicQueryCacheGeneration() as number
+  })).toBeGreaterThan(publicRevision)
   await expect(page.locator('main')).toContainText(
-    'no representa un cobro real',
+    'Modo prueba: sin cobro real.',
   )
+})
+
+test('El dashboard operativo incluye los pedidos de prueba pendientes y actualiza los contadores después de una escritura confirmada', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  ordersNetwork.orders = ordersNetwork.orders.slice(0, 4)
+  await admin(page, supabaseNetwork)
+  await expect(
+    page.locator('.admin-order-overview').getByRole('link', {
+      name: 'Ver 4 pedidos nuevos',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.locator('.admin-order-overview').getByRole('link', {
+      name: 'Ver 0 pedidos en preparación',
+      exact: true,
+    }),
+  ).toBeVisible()
+  const initialDashboardReads = ordersNetwork.calls.filter(
+    (call) =>
+      call.name === 'admin_order_list' && call.body.p_mode === 'dashboard',
+  )
+  expect(initialDashboardReads).toHaveLength(1)
+  expect(initialDashboardReads[0].body.p_query).toEqual({
+    includeSimulation: true,
+  })
+  const reference = ordersNetwork.orders[0].reference
+  const result = await page.evaluate(async (reference) => {
+    const source = '/src/services/order-admin-service.ts'
+    const { orderAdminService } = (await import(
+      source
+    )) as typeof import('../src/services/order-admin-service')
+    return orderAdminService.setOrderStatus(reference, 'preparing', {
+      expectedVersions: { [reference]: 1 },
+    })
+  }, reference)
+  expect(result.kind).toBe('saved')
+  await expect(
+    page.locator('.admin-order-overview').getByRole('link', {
+      name: 'Ver 1 pedidos en preparación',
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.locator('.admin-order-overview').getByRole('link', {
+      name: 'Ver 3 pedidos nuevos',
+      exact: true,
+    }),
+  ).toBeVisible()
+  expect(
+    ordersNetwork.calls.filter(
+      (call) =>
+        call.name === 'admin_order_list' && call.body.p_mode === 'dashboard',
+    ),
+  ).toHaveLength(2)
+  expect(
+    ordersNetwork.calls.filter((call) => call.name === 'admin_orders'),
+  ).toHaveLength(0)
+  expect(ordersNetwork.orders[0].paymentStatus).toBe('pending')
+  expect(ordersNetwork.history).toHaveLength(1)
+  await expect(
+    page
+      .locator('.admin-metric-card')
+      .filter({ hasText: 'Pedidos por preparar' })
+      .locator('strong'),
+  ).toHaveText('4')
+})
+
+test('Volver de un pedido en preparación al resumen recupera la agregación actual sin recargar el documento', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  ordersNetwork.orders = ordersNetwork.orders.slice(0, 3)
+  await admin(page, supabaseNetwork)
+  const reference = ordersNetwork.orders[0].reference
+  await page
+    .locator('.admin-recent-orders')
+    .getByRole('link', { name: `Ver pedido ${reference}`, exact: true })
+    .click()
+  await page.getByRole('radio', { name: 'En preparación', exact: true }).check()
+  await page
+    .getByRole('button', { name: 'Guardar estado', exact: true })
+    .click()
+  await expect(
+    page.getByRole('region', { name: 'Historial del pedido' }),
+  ).toContainText('En preparación')
+  await page.getByRole('link', { name: 'Resumen', exact: true }).click()
+  await expect(page).toHaveURL('/admin')
+  await expect(
+    page
+      .locator('.admin-order-overview')
+      .getByRole('link', { name: 'Ver 1 pedidos en preparación', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .locator('.admin-order-overview')
+      .getByRole('link', { name: 'Ver 2 pedidos nuevos', exact: true }),
+  ).toBeVisible()
+  expect(ordersNetwork.orders[0].paymentStatus).toBe('pending')
 })
 
 test('Un guardado confirmado no depende de otra lectura y no duplica el historial', async ({
@@ -765,16 +876,9 @@ for (const [width, height] of [
     const desktopSelection = page.locator(
       '.admin-work-order-table thead input[type="checkbox"]',
     )
-    if (width < 1200) {
-      await expect(desktopSelection).toBeHidden()
-      const skippedHiddenControl = await desktopSelection.evaluate(
-        (element) => {
-          ;(element as HTMLInputElement).focus()
-          return document.activeElement !== element
-        },
-      )
-      expect(skippedHiddenControl).toBe(true)
-    } else await expect(desktopSelection).toBeVisible()
+    await expect(desktopSelection).toBeVisible()
+    await desktopSelection.focus()
+    await expect(desktopSelection).toBeFocused()
     await page
       .getByRole('checkbox', { name: /^Seleccionar pedido AI-/ })
       .first()
@@ -886,6 +990,61 @@ test('El regreso a la pestaña agrupa foco y visibilidad en una lectura y conser
   })
   await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(0)
   expect(readCount()).toBe(initialReads + 4)
+})
+
+test('El resumen revalida al recibir un pedido y al recuperar foco sin duplicar consultas ni conservar acceso revocado', async ({
+  page,
+  supabaseNetwork,
+  ordersNetwork,
+}) => {
+  ordersNetwork.orders = ordersNetwork.orders.slice(0, 2)
+  await admin(page, supabaseNetwork)
+  await expect(
+    page
+      .locator('.admin-order-overview')
+      .getByRole('link', { name: 'Ver 2 pedidos nuevos', exact: true }),
+  ).toBeVisible()
+  const count = () =>
+    ordersNetwork.calls.filter(
+      (call) =>
+        call.name === 'admin_order_list' && call.body.p_mode === 'dashboard',
+    ).length
+  const before = count()
+  await holdOrderRefreshFrames(page)
+  try {
+    ordersNetwork.orders[0].status = 'preparing'
+    ordersNetwork.orders[0].version = 2
+    await page.evaluate(async () => {
+      const source = '/src/domain/order-events.ts'
+      const { notifyAdminOrdersChanged } = (await import(
+        source
+      )) as typeof import('../src/domain/order-events')
+      notifyAdminOrdersChanged()
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      ;(window as OrderRefreshWindow).orderRefreshFrames.flush()
+    })
+    await expect(
+      page
+        .locator('.admin-order-overview')
+        .getByRole('link', {
+          name: 'Ver 1 pedidos en preparación',
+          exact: true,
+        }),
+    ).toBeVisible()
+    expect(count()).toBe(before + 1)
+    ordersNetwork.denied = true
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'))
+      ;(window as OrderRefreshWindow).orderRefreshFrames.flush()
+    })
+    await expect(page.locator('.admin-order-overview')).toHaveCount(0)
+    expect(count()).toBe(before + 2)
+  } finally {
+    await page.evaluate(() => {
+      ;(window as OrderRefreshWindow).orderRefreshFrames.restore()
+    })
+  }
 })
 
 test('Una lectura de foco anterior no reemplaza la página confirmada por la escritura atómica', async ({ page, supabaseNetwork, ordersNetwork }) => {
@@ -1011,6 +1170,82 @@ test('Paginación remota: seis mil pedidos conservan selección entre páginas s
     )
     .toEqual({ viewportWidth: 390, horizontalOverflow: 0 })
 })
+
+for (const width of [360, 390, 430, 768, 1024]) {
+  test(`Pedidos móviles ${width}: selección de página, paginación remota y todos los filtrados comparten una sola operación confirmada`, async ({
+    page,
+    supabaseNetwork,
+    ordersNetwork,
+  }) => {
+    await page.setViewportSize({ width, height: width >= 768 ? 1024 : 844 })
+    ordersNetwork.orders = Array.from({ length: 65 }, (_, index) => makeOrder(index + 1))
+    await admin(page, supabaseNetwork)
+    await page.goto('/admin/pedidos')
+    const selected = page.locator('.admin-order-selection-bar')
+    const pageSelection = page.getByRole('checkbox', { name: 'Seleccionar pedidos de esta página', exact: true })
+    await expect(pageSelection).toHaveCount(1)
+    await expect(pageSelection).toBeVisible()
+    const target = page.locator('.admin-order-page-selection .admin-order-checkbox-target')
+    await expect(target).toContainText('Seleccionar esta página')
+    const targetBox = await target.boundingBox()
+    expect(targetBox!.height).toBeGreaterThanOrEqual(44)
+    expect(targetBox!.width).toBeGreaterThanOrEqual(44)
+    await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+    const firstRow = page.locator('.admin-order-workspace tbody tr').first()
+    const dates = page.getByRole('button', { name: 'Filtrar por fecha', exact: true })
+    if (width < 768) {
+      await expect(page.getByLabel('Desde', { exact: true })).not.toBeVisible()
+      await dates.click()
+      await expect(dates).toHaveAttribute('aria-expanded', 'true')
+      await page.getByLabel('Desde', { exact: true }).fill('2026-10-01')
+      await dates.click()
+      await expect(page.getByLabel('Desde', { exact: true })).toHaveValue('2026-10-01')
+      await dates.click()
+      await expect(page.getByLabel('Desde', { exact: true })).toBeVisible()
+      await page.getByLabel('Desde', { exact: true }).fill('')
+      await dates.click()
+    } else {
+      await expect(dates).not.toBeVisible()
+      await expect(page.getByLabel('Desde', { exact: true })).toBeVisible()
+    }
+    await firstRow.getByRole('checkbox').check()
+    await expect(pageSelection).toHaveJSProperty('indeterminate', true)
+    await pageSelection.check()
+    await expect(selected).toContainText('20 pedidos seleccionados')
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: 'Paginación de pedidos' })).toContainText('Página 2 de 4')
+    await expect(selected).toContainText('20 pedidos seleccionados')
+    await expect(pageSelection).not.toBeChecked()
+    await pageSelection.check()
+    await expect(selected).toContainText('40 pedidos seleccionados')
+    await page.getByRole('button', { name: 'Anterior', exact: true }).click()
+    await expect(pageSelection).toBeChecked()
+    await pageSelection.uncheck()
+    await expect(selected).toContainText('20 pedidos seleccionados')
+    await pageSelection.check()
+    await selected.getByRole('button', { name: 'Seleccionar los 65 pedidos filtrados', exact: true }).click()
+    await expect(selected).toContainText('65 pedidos seleccionados')
+    expect(ordersNetwork.calls.filter(call => call.name === 'admin_order_list' && call.body.p_mode === 'selection')).toHaveLength(1)
+    expect(ordersNetwork.calls.filter(call => call.name === 'admin_orders')).toHaveLength(0)
+    await selected.getByRole('button', { name: 'Cambiar estado', exact: true }).click()
+    const confirmation = page.getByRole('dialog', { name: 'Actualizar 65 pedidos', exact: true })
+    await expect(confirmation).toBeVisible()
+    await expect(confirmation.getByRole('button', { name: 'Confirmar actualización', exact: true })).toBeInViewport()
+    expect(ordersNetwork.calls.filter(call => call.name === 'admin_set_order_statuses_page')).toHaveLength(0)
+    await confirmation.getByRole('button', { name: 'Confirmar actualización', exact: true }).click()
+    await expect(page.locator('.admin-order-bulk-report')).toContainText('65 actualizados')
+    expect(ordersNetwork.calls.filter(call => call.name === 'admin_set_order_statuses_page')).toHaveLength(1)
+    expect(ordersNetwork.history).toHaveLength(65)
+    expect(new Set(ordersNetwork.history.map(entry => entry.reference)).size).toBe(65)
+    await expect(selected).toHaveCount(0)
+    await page.getByRole('combobox', { name: 'Estado del pedido', exact: true }).selectOption('preparing')
+    await page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: 'Paginación de pedidos' })).toContainText('Página 1 de 4')
+    await expect(page.locator('.admin-order-workspace tbody tr')).toHaveCount(20)
+    await expect(selected).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  })
+}
 
 test('Una selección de más de cien pedidos conserva datos y explica el límite real del comando', async ({ page, supabaseNetwork, ordersNetwork }) => {
   ordersNetwork.orders = Array.from({ length: 101 }, (_, index) => makeOrder(index + 1))
@@ -1164,7 +1399,7 @@ for (const revoke of ['logout', 'permissions', 'mfa'] as const)
       })
       await page.evaluate(async revoke => {
         const source = '/src/services/auth-service.ts'
-        const { authService } = await import(source) as typeof import('../src/services/auth-service')
+        const { adminAuthService: authService } = await import(source) as typeof import('../src/services/auth-service')
         if (revoke === 'logout') await authService.signOut()
         else await authService.refresh()
       }, revoke)
@@ -1204,8 +1439,8 @@ test('Lecturas protegidas: renovar el token del mismo administrador descarta la 
     await page.evaluate(async () => {
       const sdkPath = '/src/services/supabase-client.ts'
       const authPath = '/src/services/auth-service.ts'
-      const { requireSupabaseClient } = await import(sdkPath) as typeof import('../src/services/supabase-client')
-      const { authService } = await import(authPath) as typeof import('../src/services/auth-service')
+      const { requireAdminSupabaseClient: requireSupabaseClient } = await import(sdkPath) as typeof import('../src/services/supabase-client')
+      const { adminAuthService: authService } = await import(authPath) as typeof import('../src/services/auth-service')
       const client = requireSupabaseClient()
       const session = (await client.auth.getSession()).data.session!
       const parts = session.access_token.split('.')
@@ -1221,7 +1456,7 @@ test('Lecturas protegidas: renovar el token del mismo administrador descarta la 
       const accessPath = '/src/services/admin-list-access.ts'
       const authPath = '/src/services/auth-service.ts'
       const { adminListAccess } = await import(accessPath) as typeof import('../src/services/admin-list-access')
-      const { authService } = await import(authPath) as typeof import('../src/services/auth-service')
+      const { adminAuthService: authService } = await import(authPath) as typeof import('../src/services/auth-service')
       return { revision: adminListAccess.getSnapshot(), role: authService.getSnapshot().session?.user.role, status: authService.getSnapshot().status }
     })
     expect(after).toEqual({ revision: before, role: 'admin', status: 'authenticated' })

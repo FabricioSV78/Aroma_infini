@@ -1,4 +1,5 @@
 import { adminListFixture } from './admin-list-fixture'
+import { finderCatalogFixture } from './finder-catalog-fixture'
 import {
   catalogRefreshCount,
   installCatalogRefreshCounter,
@@ -41,7 +42,7 @@ import {
   customerB,
   expect,
   fixtureProject,
-  fixtureStorageKey,
+  fixtureAdminStorageKey,
   signIn,
   test as authTest,
   type SupabaseAuthNetwork,
@@ -233,6 +234,8 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
         await reply(state.home)
       } else if (name === 'catalog_home_context') {
         await reply(publicHomeCatalogFixture(metadata, publicProducts))
+      } else if (name === 'catalog_finder_context') {
+        await reply(finderCatalogFixture(metadata.brands, state.olfactoryFamilies, publicProducts))
       } else if (name === 'catalog_brand_previews') {
         await reply(publicBrandPreviewsFixture(metadata.brands, publicProducts))
       } else if (name === 'catalog_browse') {
@@ -760,7 +763,7 @@ for (const leave of [false, true]) {
       if (leave) {
         await page.evaluate(async () => {
           const path = '/src/services/auth-service.ts'
-          const { authService } = (await import(
+          const { adminAuthService: authService } = (await import(
             path
           )) as typeof import('../src/services/auth-service')
           await authService.signOut()
@@ -1103,6 +1106,8 @@ for (const scenario of [
   'wrong-project',
   'invalid-aliases',
   'invalid-document',
+  'missing-aliases',
+  'missing-document',
 ] as const) {
   test(`Los metadatos iniciales de medios conservan validación y lecturas forzadas: ${scenario}`, async ({
     page,
@@ -1121,10 +1126,10 @@ for (const scenario of [
       scenario === 'wrong-project'
         ? 'https://wrongproject.supabase.co'
         : origin,
-      scenario === 'invalid-document'
+      scenario === 'missing-document' ? undefined : scenario === 'invalid-document'
         ? { items: [{ invalid: true }] }
         : { items: [] },
-      scenario === 'invalid-aliases'
+      scenario === 'missing-aliases' ? undefined : scenario === 'invalid-aliases'
         ? { items: [{ path: '/unknown.webp', asset: {} }] }
         : { items: [] },
     )!
@@ -1350,6 +1355,69 @@ for (const scenario of [
   })
 }
 
+for (const scenario of ['original-expiration', 'invalidated', 'wrong-record-slug'] as const) {
+  test(`Volver a una ficha reutiliza su DTO inicial solo dentro de la frescura original: ${scenario}`, async ({
+    page,
+    catalogNetwork,
+  }) => {
+    const initial = {
+      brands: catalogNetwork.brands.filter((brand) => brand.active),
+      features: { complementsEnabled: false },
+      featuredBrandId: remoteBrandId,
+      olfactoryFamilies: catalogNetwork.olfactoryFamilies,
+      homeAnnouncement: null,
+      homeVersion: 0,
+      record: structuredClone(catalogNetwork.products[0]),
+      recommendations: [],
+    }
+    if (scenario === 'wrong-record-slug') initial.record.product.slug = 'otra-ficha'
+    await page.goto('/contacto')
+    await expect(page.locator('main h1')).toHaveText('Contacto')
+    catalogNetwork.products[0].product.name = 'Nombre vigente del servidor'
+    catalogNetwork.calls.length = 0
+    const names = await page.evaluate(async ({ initial, scenario, origin }) => {
+      const queryPath = '/src/services/remote-catalog-queries.ts'
+      const cachePath = '/src/services/public-query-cache.ts'
+      const { readRemoteProductContext } = (await import(queryPath)) as typeof import('../src/services/remote-catalog-queries')
+      const { invalidatePublicQueryCache } = (await import(cachePath)) as typeof import('../src/services/public-query-cache')
+      history.replaceState({}, '', '/producto/fleur-de-test')
+      const script = document.createElement('script')
+      script.id = 'aroma-public-product'
+      script.type = 'application/json'
+      script.textContent = JSON.stringify({ version: 1, project: origin, slug: 'fleur-de-test', value: initial })
+      document.head.append(script)
+      const dateNow = Date.now
+      let now = dateNow()
+      Date.now = () => now
+      Object.defineProperty(performance, 'now', { configurable: true, value: () => 4500 })
+      try {
+        const names = [(await readRemoteProductContext('fleur-de-test'))?.product.name]
+        names.push((await readRemoteProductContext('fleur-de-test'))?.product.name)
+        if (scenario === 'original-expiration') {
+          now += 499
+          names.push((await readRemoteProductContext('fleur-de-test'))?.product.name)
+          now++
+          names.push((await readRemoteProductContext('fleur-de-test'))?.product.name)
+        } else if (scenario === 'invalidated') {
+          invalidatePublicQueryCache()
+          names.push((await readRemoteProductContext('fleur-de-test'))?.product.name)
+        }
+        return { names, scriptRemoved: !script.isConnected }
+      } finally {
+        Date.now = dateNow
+        Reflect.deleteProperty(performance, 'now')
+      }
+    }, { initial, scenario, origin })
+    expect(names.scriptRemoved).toBe(true)
+    expect(names.names).toEqual(scenario === 'original-expiration'
+      ? ['Fleur de Test', 'Fleur de Test', 'Fleur de Test', 'Nombre vigente del servidor']
+      : scenario === 'invalidated'
+        ? ['Fleur de Test', 'Fleur de Test', 'Nombre vigente del servidor']
+        : ['Nombre vigente del servidor', 'Nombre vigente del servidor'])
+    expect(catalogNetwork.calls.filter(({ name }) => name === 'catalog_product_context')).toHaveLength(1)
+  })
+}
+
 test('Actualizar una ficha reutiliza su metadata y agrupa avisos de visibilidad simultáneos', async ({
   page,
   catalogNetwork,
@@ -1518,9 +1586,15 @@ test('el detalle presenta los datos remotos y el cuestionario recomienda ese per
     'Una composición floral para acompañarte cada día.',
   )
   await page.goto('/')
+  const preparedFinder = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/src/services/remote-fragrance-finder.ts' &&
+    response.status() === 200,
+  )
   await page
     .getByRole('button', { name: 'Encontrar mi perfume', exact: true })
     .click()
+  await preparedFinder
+  expect(catalogNetwork.calls.some(call => call.name === 'catalog_finder_context')).toBe(false)
   const dialog = page.getByRole('dialog', {
     name: 'Encuentra tu perfume ideal',
   })
@@ -1540,6 +1614,8 @@ test('el detalle presenta los datos remotos y el cuestionario recomienda ese per
     dialog.getByRole('heading', { name: 'Fleur de Test', exact: true }),
   ).toBeVisible()
   await expect(dialog).not.toContainText('Bois Clair')
+  expect(catalogNetwork.calls.filter(call => call.name === 'catalog_finder_context')).toHaveLength(1)
+  expect(catalogNetwork.calls.some(call => call.name === 'catalog_products')).toBe(false)
 })
 
 test('un catálogo remoto vacío permanece vacío y no registra productos automáticamente', async ({
@@ -2405,7 +2481,7 @@ test('un cambio de propietario durante el guardado no confirma datos privados en
     const raw = localStorage.getItem(key)
     if (!raw) throw new Error('Expected isolated SDK session')
     return JSON.parse(raw) as { access_token: string; user: { id: string } }
-  }, fixtureStorageKey)
+  }, fixtureAdminStorageKey)
   const [tokenHeader, tokenBody, signature] =
     replacement.access_token.split('.')
   const claims = JSON.parse(
@@ -2415,7 +2491,7 @@ test('un cambio de propietario durante el guardado no confirma datos privados en
   replacement.user.id = customerB
   await page.evaluate(
     ({ key, session }) => localStorage.setItem(key, JSON.stringify(session)),
-    { key: fixtureStorageKey, session: replacement },
+    { key: fixtureAdminStorageKey, session: replacement },
   )
   release()
   await expect(save).toBeEnabled()
@@ -2505,7 +2581,7 @@ test('cerrar sesión y volver con el mismo administrador descarta el guardado pe
     .toBe(1)
   await page.evaluate(async () => {
     const source = '/src/services/auth-service.ts'
-    const { authService } = (await import(
+    const { adminAuthService: authService } = (await import(
       source
     )) as typeof import('../src/services/auth-service')
     await authService.signOut()
@@ -3100,4 +3176,126 @@ test('Crear oferta usa identidades y recupera únicamente la ficha seleccionada 
   await page.getByRole('button',{name:'Guardar oferta',exact:true}).click()
   await expect(page.locator('.admin-offers-list')).toContainText('Producto 0999')
   expect(catalogNetwork.calls.some(call=>call.name==='admin_catalog_page')).toBe(false)
+})
+
+test('Ofertas conserva su página canónica y el contexto necesario de familias', async ({page,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.products[0].product.discount = {
+    type: 'percent', value: 10, active: true, startsAt: '', endsAt: '',
+  }
+  await signInAdmin(page, supabaseNetwork)
+  catalogNetwork.calls.length = 0
+  await page.goto('/admin/promociones?vista=ofertas')
+  await expect(page.locator('.admin-offers-list')).toContainText('Maison de Test')
+  await expect(page.locator('.admin-offers-list')).toContainText('Fleur de Test')
+  await expect(page.locator('.admin-offers-toolbar')).toContainText('1 producto con oferta')
+  await expect(page.locator('.admin-offers-list-prices')).toContainText('S/ 378')
+  expect(catalogNetwork.calls.filter(call => call.name === 'admin_offer_list')).toHaveLength(1)
+  expect(catalogNetwork.calls.filter(call => call.name === 'admin_catalog_context')).toHaveLength(1)
+  expect(catalogNetwork.calls.some(call => call.name === 'admin_catalog_page')).toBe(false)
+})
+
+test('Ofertas en frío solapa solicitudes y espera familias nuevas antes de validar las fichas', async ({page,context,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.olfactoryFamilies = [{
+    value: 'acuatico', label: 'Acuático', aromaLabel: 'Acuático', active: true,
+    aliases: [], version: 1,
+  }]
+  const product = catalogNetwork.products[0].product
+  product.olfactoryFamilies = ['acuatico']
+  product.olfactoryFamily = 'acuatico'
+  product.family = 'Acuático · fresco'
+  product.discount = {type: 'percent', value: 10, active: true, startsAt: '', endsAt: ''}
+  await signInAdmin(page, supabaseNetwork)
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await context.route(`${origin}/rest/v1/rpc/admin_catalog_context`, async route => {
+    if (route.request().method() === 'OPTIONS') return route.fallback()
+    await held
+    await route.fallback()
+  })
+  // A new document has only the default vocabulary until the held metadata
+  // response is applied. The offer HTTP response is allowed to finish first.
+  const response = page.waitForResponse(result => result.url() === `${origin}/rest/v1/rpc/admin_offer_list` && result.request().method() === 'POST')
+  try {
+    await page.goto('/admin/promociones?vista=ofertas')
+    await (await response).finished()
+    await settleCatalogRefreshRender(page)
+    await expect(page.locator('.admin-offers-list')).not.toBeVisible()
+    release()
+    await expect(page.locator('.admin-offers-list')).toContainText('Fleur de Test')
+    await expect(page.locator('.admin-offers-list')).toContainText('Maison de Test')
+    await expect(page.locator('.admin-offers-list-prices')).toContainText('S/ 378')
+    await expect(page.locator('#route-error-title')).toHaveCount(0)
+  } finally {
+    release()
+  }
+})
+
+test('Editar el descuento conserva el reloj programado y las colecciones sin nuevas consultas', async ({page,supabaseNetwork,catalogNetwork}) => {
+  catalogNetwork.products[0].product.discount = {
+    type: 'percent', value: 10, active: true, startsAt: '',
+    endsAt: new Date(Date.now() + 3_600_000).toISOString(),
+  }
+  await signInAdmin(page, supabaseNetwork)
+  await page.goto('/admin/promociones?vista=ofertas')
+  await page.getByRole('button', { name: 'Editar oferta', exact: true }).click()
+  const amount = page.getByRole('spinbutton', { name: 'Descuento (%)', exact: true })
+  await expect(amount).toHaveValue('10')
+  await settleCatalogRefreshRender(page)
+  const calls = catalogNetwork.calls.length
+  await page.evaluate(() => {
+    const original: Window['setTimeout'] = window.setTimeout.bind(window)
+    Reflect.set(window, '__offerScheduledDiscounts', 0)
+    Reflect.set(window, 'setTimeout', (handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (timeout !== undefined && timeout > 3_500_000 && timeout <= 3_600_001)
+        Reflect.set(window, '__offerScheduledDiscounts', Number(Reflect.get(window, '__offerScheduledDiscounts')) + 1)
+      return original(handler, timeout, ...args)
+    })
+  })
+  for (const value of ['11', '12', '13', '14', '15']) {
+    await amount.fill(value)
+    await settleCatalogRefreshRender(page)
+  }
+  await expect(amount).toHaveValue('15')
+  expect(await page.evaluate(() => Reflect.get(window, '__offerScheduledDiscounts'))).toBe(0)
+  expect(catalogNetwork.calls.length).toBe(calls)
+  await page.getByRole('button', { name: 'Ver precios finales por presentación', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Precios por presentación' })).toContainText('S/ 357')
+})
+
+test('El selector de ofertas rechaza identidades repetidas entre páginas sin publicar opciones parciales', async ({page,context,supabaseNetwork,catalogNetwork}) => {
+  const servedPages: number[] = []
+  catalogNetwork.products = Array.from({length: 101}, (_, index) => {
+    const record = makeProduct()
+    record.product.id = `30000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+    record.product.name = `Producto ${String(index).padStart(4, '0')}`
+    record.product.slug = `producto-${index}`
+    return record
+  })
+  await signInAdmin(page, supabaseNetwork)
+  await page.goto('/admin/promociones?vista=ofertas')
+  await context.route(`${origin}/rest/v1/rpc/admin_catalog_choices`, async route => {
+    if (route.request().method() === 'OPTIONS') return route.fallback()
+    const body = route.request().postDataJSON() as Record<string, unknown>
+    servedPages.push(Number(body.p_page))
+    const response = adminListFixture('admin_catalog_choices', body, {
+      products: catalogNetwork.products, brands: catalogNetwork.brands,
+    }) as { items: unknown[] }
+    if (body.p_page === 2) {
+      const first = adminListFixture('admin_catalog_choices', {...body, p_page: 1}, {
+        products: catalogNetwork.products, brands: catalogNetwork.brands,
+      }) as { items: unknown[] }
+      response.items = [first.items[0]]
+    }
+    await route.fulfill({headers, json: response})
+  })
+  await page.getByRole('button', {name: 'Crear oferta de producto', exact: true}).click()
+  // Plain internal Errors are deliberately sanitized by AdminNoticeProvider.
+  // Assert its existing safe message and both received pages, then verify that
+  // none of the partial/duplicate options can be selected or saved.
+  await expect(page.getByRole('alertdialog')).toContainText('Conserva tus cambios y vuelve a intentarlo.')
+  expect(servedPages).toEqual([1, 2])
+  await page.getByRole('button', {name: 'Entendido', exact: true}).click()
+  await expect(page.getByRole('combobox', {name: 'Producto', exact: true}).locator('option')).toHaveCount(1)
+  await expect(page.getByRole('button', {name: 'Guardar oferta', exact: true})).toBeDisabled()
+  expect(catalogNetwork.calls.some(call => call.name === 'admin_products_by_ids')).toBe(false)
 })

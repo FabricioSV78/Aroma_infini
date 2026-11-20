@@ -85,7 +85,11 @@ export function adminListFixture(
     }
   }
   if (name === 'admin_order_list') {
-    const orders = mode==='dashboard' ? getCommercialOrders(allOrders) : allOrders
+    const includeSimulation = mode==='dashboard' && query.includeSimulation === true
+    const orders = mode==='dashboard'
+      ? (includeSimulation ? allOrders : getCommercialOrders(allOrders))
+        .filter(order => !['cancelled', 'expired'].includes(order.status))
+      : allOrders
     const day=(value:string)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value))
     const refs = Array.isArray(query.references) ? query.references : null
     const matched=orders.filter(o=>(!refs||refs.includes(o.reference))&&
@@ -95,8 +99,8 @@ export function adminListFixture(
       .sort((a,b)=>Date.parse(b.placedAt)-Date.parse(a.placedAt)||a.reference.localeCompare(b.reference))
     if(mode==='selection')return{total:matched.length,selection:matched.map(({reference,version,status,paymentStatus,simulation,customerId,customerName,customerEmail,contactPhone,address})=>({reference,version:version??1,status,paymentStatus,simulation:simulation??false,customerId,customerName,customerEmail,contactPhone:contactPhone??'',address}))}
     return{total:matched.length,orders:paginate(matched,Number(body.p_page??1),Number(body.p_limit??20)).items,orderHistory:mode==='details'?(source.history??[]).filter(h=>matched.some(o=>o.reference===h.reference)):[],customer:null,
-      toPrepare:orders.filter(o=>o.paymentStatus==='approved'&&['received','preparing'].includes(o.status)).length,
-      counts:Object.fromEntries(['received','preparing','shipped','delivered'].map(s=>[s,orders.filter(o=>o.status===s).length]))}
+      toPrepare:matched.filter(o=>(o.paymentStatus==='approved'||(includeSimulation&&o.simulation&&o.paymentStatus==='pending'))&&['received','preparing'].includes(o.status)).length,
+      counts:Object.fromEntries(['received','preparing','shipped','delivered'].map(s=>[s,matched.filter(o=>o.status===s).length]))}
   }
   if(name==='admin_customer_list'){
     const sorted=[...allOrders].sort((a,b)=>Date.parse(b.placedAt)-Date.parse(a.placedAt)),all=new Map<string,AdminOrder>(),commercial=new Map<string,AdminOrder[]>();for(const order of sorted){if(!all.has(order.customerId))all.set(order.customerId,order);if(!order.simulation)commercial.set(order.customerId,[...(commercial.get(order.customerId)??[]),order])}

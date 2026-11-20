@@ -70,6 +70,48 @@ async function controlCatalog(
   )
 }
 
+for (const width of [390, 1440]) {
+  for (const destination of ['catalog', 'product'] as const) {
+    test(`la navegación pública muestra una carga visible sin bloquear el contenido: ${destination} en ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await controlCatalog(page, destination === 'catalog' ? 'getCatalog' : 'getProduct')
+      await page.goto(destination === 'catalog' ? '/' : '/tienda')
+      const previousPage = page.locator(destination === 'catalog' ? '.home' : '.catalog-page')
+      await expect(previousPage).toBeVisible()
+      const timeOrigin = await page.evaluate(() => performance.timeOrigin)
+      const link = destination === 'catalog'
+        ? page.locator('.site-footer a[href="/tienda"]')
+        : page.locator('.product-card a.product-image-link[href="/producto/bois-clair"]').first()
+      try {
+        await link.click()
+        const feedback = page.locator('.ui-navigation-status[role="status"] .ui-navigation-feedback')
+        await expect(feedback).toBeVisible()
+        await expect(feedback).toContainText('Cargando la página')
+        await expect(previousPage).toBeVisible()
+        await expect(link).toBeFocused()
+        expect(await feedback.evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight
+        })).toBe(true)
+        await page.waitForFunction(() => typeof (window as unknown as {
+          __loadingRead: { release?: () => void }
+        }).__loadingRead.release === 'function')
+      } finally {
+        await page.evaluate(() => {
+          const control = (window as unknown as {
+            __loadingRead: { hold: boolean; release?: () => void }
+          }).__loadingRead
+          control.hold = false
+          control.release?.()
+        })
+      }
+      await expect(page.locator(destination === 'catalog' ? '.catalog-page' : '.product-page')).toBeVisible()
+      await expect(page.locator('.ui-navigation-feedback')).toHaveCount(0)
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(timeOrigin)
+    })
+  }
+}
+
 test('la carga inicial del catálogo reserva contenido y termina al resolver la consulta', async ({
   page,
 }) => {

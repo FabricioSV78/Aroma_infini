@@ -60,7 +60,7 @@ function reportTrimmedValidity(form: HTMLFormElement) {
 export function AccountOverviewPage() {
   const auth = useAuth()
   const { profile, address, orders, ordersAvailable } = useAccount()
-  const { favoriteCount, persistence: favoritesPersistence } = useFavorites()
+  const { favoriteCount, persistence: favoritesPersistence, loading: favoritesLoading, error: favoritesError, refreshFavorites } = useFavorites()
   const latestOrder = orders[0]
   return (
     <section className="account-section" aria-labelledby="account-title">
@@ -103,13 +103,14 @@ export function AccountOverviewPage() {
           </Link>
         </section>
         <section aria-labelledby="overview-favorites-title">
-          <span>{String(favoriteCount).padStart(2, '0')}</span>
+          <span aria-busy={favoritesLoading && !favoritesError}>{favoritesError ? '—' : favoritesLoading ? '…' : String(favoriteCount).padStart(2, '0')}</span>
           <h2 id="overview-favorites-title">Favoritos</h2>
           <p>
-            {favoritesPersistence === 'account'
+            {favoritesError ? 'No pudimos cargar tus favoritos.' : favoritesLoading ? 'Cargando favoritos…' : favoritesPersistence === 'account'
               ? 'Productos guardados en tu cuenta.'
               : 'Aromas guardados en este navegador.'}
           </p>
+          {favoritesError && <button type="button" className="text-link" onClick={refreshFavorites}>Volver a intentar</button>}
           <Link className="text-link" to="/cuenta/favoritos">
             Ver favoritos <Icon name="arrow" />
           </Link>
@@ -828,7 +829,7 @@ export function AccountOrderDetailPage() {
       <AccountOrderTimeline status={order.status} />
       {order.simulation ? (
         <p className="account-field-hint">
-          Pedido de prueba: no se realizó un cobro ni se reservó inventario.
+          Pedido de prueba: no se realizó ningún cobro.
         </p>
       ) : null}
       <div className="account-order-detail-grid" data-scroll-reveal="stagger">

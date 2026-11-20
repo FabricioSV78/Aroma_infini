@@ -1,7 +1,8 @@
 /** Shared order and customer fields used by checkout, account and admin. */
 export type DeliveryMethod = 'courier' | 'motorizado'
 
-export type OrderStatus = 'received' | 'preparing' | 'shipped' | 'delivered'
+export type OrderFulfilmentStatus = 'received' | 'preparing' | 'shipped' | 'delivered'
+export type OrderStatus = OrderFulfilmentStatus | 'cancelled' | 'expired'
 
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded'
 

@@ -17,6 +17,7 @@ function fixture(
     status?: number
     code?: string
     rate?: boolean
+    admin?: boolean
   } = {},
 ) {
   const calls: Array<{ url: string; body: unknown; headers: Headers }> = []
@@ -34,6 +35,8 @@ function fixture(
           : { id: '70000000-0000-4000-8000-000000000001' },
         { status: options.verified === false ? 401 : 200 },
       )
+    if (url.endsWith('/rpc/current_actor'))
+      return Response.json({ user_id: '70000000-0000-4000-8000-000000000001', role: options.admin ? 'admin' : 'customer', aal: 'aal1', requires_mfa: false })
     return options.code
       ? Response.json(
           { code: options.code, message: 'PRIVATE PROVIDER DETAILS' },
@@ -41,6 +44,7 @@ function fixture(
         )
       : Response.json({
           order: {
+            id: '90000000-0000-4000-8000-000000000001',
             simulation: true,
             paymentStatus: 'pending',
             reference: 'AI-TEST-1234567890123456',
@@ -99,6 +103,8 @@ test('checkout Auth and privileged RPC never follow upstream redirects', async (
     policies.push(init?.redirect)
     if (String(input).endsWith('/auth/v1/user'))
       return Response.json({ id: '70000000-0000-4000-8000-000000000001' })
+    if (String(input).endsWith('/rpc/current_actor'))
+      return Response.json({ user_id: '70000000-0000-4000-8000-000000000001', role: 'customer' })
     return Response.json({
       order: { simulation: true, paymentStatus: 'pending' },
     })
@@ -108,7 +114,7 @@ test('checkout Auth and privileged RPC never follow upstream redirects', async (
     f.env,
   )
   expect(response?.status).toBe(200)
-  expect(policies).toEqual(['manual', 'manual'])
+  expect(policies).toEqual(['manual', 'manual', 'manual'])
 })
 test('Production and copied staging flags on another host never call Auth or SQL', async () => {
   for (const environment of ['production', undefined]) {
@@ -147,13 +153,14 @@ test('authenticated ownership comes from Auth verification, never the submitted 
     f.env,
   )
   expect(response?.status).toBe(200)
-  expect(f.calls).toHaveLength(2)
-  expect(f.calls[1].body).toHaveProperty(
+  expect(f.calls).toHaveLength(3)
+  expect(f.calls[2].body).toHaveProperty(
     'p_user_id',
     '70000000-0000-4000-8000-000000000001',
   )
   expect(f.calls[0].headers.get('apikey')).toBe('public-key')
-  expect(f.calls[1].headers.get('apikey')).toBe('server-secret-never-public')
+  expect(f.calls[1].headers.get('apikey')).toBe('public-key')
+  expect(f.calls[2].headers.get('apikey')).toBe('server-secret-never-public')
 })
 test('invalid JWT, forbidden origin and disabled simulation perform no order write', async () => {
   const auth = fixture({ verified: false })
@@ -186,6 +193,13 @@ test('invalid JWT, forbidden origin and disabled simulation perform no order wri
     )?.status,
   ).toBe(503)
   expect(disabled.calls).toHaveLength(0)
+})
+
+test('a verified administrative bearer cannot create a customer checkout even before MFA', async () => {
+  const f = fixture({ admin: true })
+  const response = await f.handler(f.request(body, { Authorization: `Bearer ${'x'.repeat(30)}` }), f.env)
+  expect(response?.status).toBe(403)
+  expect(f.calls.map(c => c.url.split('/').at(-1))).toEqual(['user', 'current_actor'])
 })
 test('rate limit, spoofed owner and oversized streamed body fail before any SQL request', async () => {
   const rate = fixture({ rate: false })
@@ -376,4 +390,16 @@ test('preflight permits only declared origins and the checkout route has a bound
   expect(
     await f.handler(new Request('https://store.example.invalid/tienda'), f.env),
   ).toBeNull()
+})
+
+test('only confirmed orders schedule post-commit work and scheduling cannot undo a committed order', async () => {
+  const f = fixture()
+  const committed: string[] = []
+  const response = await f.handler(f.request(), f.env, (id) => { committed.push(id) })
+  expect(response?.status).toBe(200)
+  expect(committed).toEqual(['90000000-0000-4000-8000-000000000001'])
+  const failed = fixture({ code: 'PT409', status: 409 })
+  expect((await failed.handler(failed.request(), failed.env, (id) => { committed.push(id) }))?.status).toBe(409)
+  expect(committed).toHaveLength(1)
+  expect((await f.handler(f.request(), f.env, () => { throw new Error('Scheduling unavailable') }))?.status).toBe(200)
 })

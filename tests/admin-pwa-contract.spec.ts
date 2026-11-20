@@ -100,6 +100,9 @@ test('safe generic lockscreen payload, stable deduplication tag, explicit tests 
   expect(worker.shown[0].title).toBe('Aroma Infini — Nuevo pedido')
   expect(JSON.stringify(worker.shown)).not.toContain('Secret address')
   expect(worker.shown[0].options.tag).toBe(worker.shown[1].options.tag)
+  expect(worker.shown[0].options.body).toContain('AI-123')
+  expect(worker.shown[0].options.vibrate).toEqual([200, 100, 200])
+  expect(worker.shown[0].options.silent).toBe(false)
   await worker.push({
     kind: 'test',
     id: 'test-123',
@@ -110,6 +113,21 @@ test('safe generic lockscreen payload, stable deduplication tag, explicit tests 
   expect(worker.shown.at(-1)?.title).toBe('Aroma Infini Admin')
   await worker.click('/admin/pedidos/AI-123')
   expect(worker.opened).toEqual(['https://aroma.example/admin/pedidos/AI-123'])
+})
+test('staging operational orders are explicitly identified and cannot inject a title, body or foreign destination', async () => {
+  const worker = runtime()
+  await worker.push({
+    kind: 'simulated_order', id: 'operation-123',
+    title: 'PRIVATE CUSTOMER', body: 'PRIVATE ADDRESS',
+    url: '/admin/pedidos/AI-STAGING-123',
+  })
+  expect(worker.shown[0].title).toBe('Aroma Infini — Pedido de prueba')
+  expect(worker.shown[0].options.body).toBe('Pedido de prueba AI-STAGING-123 recibido. Toca para revisar.')
+  expect(worker.shown[0].options.data).toEqual({ url: '/admin/pedidos/AI-STAGING-123' })
+  expect(JSON.stringify(worker.shown)).not.toContain('PRIVATE')
+  await worker.push({ kind: 'new_order', id: 'bad-url', url: '/admin/pedidos/../../logout?secret=PRIVATE' })
+  expect(JSON.stringify(worker.shown)).not.toContain('secret=')
+  expect(worker.shown[1].options.data).toEqual({ url: '/admin/notificaciones' })
 })
 test('click focuses/navigates existing admin window; malicious links remain inside protected admin', async () => {
   const visited: string[] = []

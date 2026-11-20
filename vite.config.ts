@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { createBuildTarget } from './scripts/build-identity.ts'
 import { privilegedPublicValue } from './scripts/public-environment.mjs'
 import { viteTestCache } from './scripts/vite-test-cache.mjs'
+import { versionedPublicFonts } from './scripts/versioned-public-fonts.ts'
 import {
   initialSharedModule,
   verifyPublicStartup,
@@ -45,6 +46,9 @@ export default defineConfig(({ mode }) => {
       viteTestCache(),
       react(),
       tailwindcss(),
+      // Run after Tailwind resolves nested @imports, before Vite fingerprints
+      // CSS URLs, so preload and stylesheet always share the same font asset.
+      versionedPublicFonts(),
       {
         name: 'seo-index-defaults',
         transformIndexHtml(html) {

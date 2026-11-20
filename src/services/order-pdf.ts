@@ -42,6 +42,8 @@ const statusLabels: Record<AdminOrder['status'], string> = {
   preparing: 'En preparación',
   shipped: 'Enviado',
   delivered: 'Entregado',
+  cancelled: 'Cancelado',
+  expired: 'Vencido',
 }
 interface DocumentFonts {
   regular: PDFFont

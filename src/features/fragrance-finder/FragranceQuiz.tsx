@@ -24,6 +24,7 @@ import type {
 import { FragranceResults } from './FragranceResults'
 import { imageSourceSet } from '../../services/image-source'
 import { assetSource } from '../../services/asset-source'
+import { useOfferPriceRevision } from '../../services/offer-price-clock'
 
 function stepIsAnswered(answers: FinderAnswers, step: FinderStep) {
   return step === 'budget'
@@ -55,6 +56,9 @@ export function FragranceQuiz({
   const mounted = useRef(false)
   const heading = useRef<HTMLHeadingElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  const priceRevision = useOfferPriceRevision()
+  const checkedPriceRevision = useRef(priceRevision)
+  const backgroundResult = useRef<FinderResult | null>(null)
   const current = finderSteps[step]
   const currentContent = content.steps[current.id]
   const selectedCount =
@@ -105,10 +109,34 @@ export function FragranceQuiz({
 
   useEffect(() => {
     if (!busy) {
+      // A price refresh uses the existing clock, without moving the reader's
+      // focus or scrolling an already visible result back to its heading.
+      if (!error && result !== null && backgroundResult.current === result)
+        return
       heading.current?.focus({ preventScroll: true })
       body.current?.closest('dialog')?.scrollTo({ top: 0, behavior: 'instant' })
     }
   }, [step, result, busy, error])
+
+  useEffect(() => {
+    if (checkedPriceRevision.current === priceRevision) return
+    checkedPriceRevision.current = priceRevision
+    if (!result || busy || error) return
+    const id = ++request.current
+    let cancelled = false
+    // Server-quoted prices in an immutable result cannot be recalculated just
+    // by repainting. Rejoin the existing offer refresh with a fresh read; never
+    // retain an expired quote or replace errors with an empty recommendation.
+    void service.recommend(answers).then((data) => {
+      if (cancelled || !mounted.current || request.current !== id) return
+      backgroundResult.current = data
+      setResult(data)
+    }).catch(() => {
+      if (!cancelled && mounted.current && request.current === id)
+        setError(true)
+    })
+    return () => { cancelled = true }
+  }, [priceRevision, result, busy, error, service, answers])
 
   function restart() {
     request.current++

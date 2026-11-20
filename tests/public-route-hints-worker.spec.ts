@@ -10,7 +10,7 @@ test.beforeAll(async () => {
       contents: `
  import{filterPublicRouteHints}from'./worker/public-route-hints';
  const html='<html><head><link rel="modulepreload" href="/assets/home.js" data-public-route="/"><link rel="stylesheet" href="/assets/home.css" data-public-route="/"><link rel="modulepreload" href="/assets/catalog.js" data-public-route="/tienda"><link rel="modulepreload" href="/assets/product.js" data-public-route="/producto"><link rel="stylesheet" href="/assets/common.css"><link rel="modulepreload" href="/assets/sdk.js" data-auth-route><link rel="preload" as="font" href="/fonts/lato-latin-300-normal.woff2"><link rel="preload" as="font" href="/fonts/lato-latin-400-normal.woff2"></head><body><main>Intacto</main></body></html>';
- export default{fetch(request){const text=new URL(request.url).searchParams.has('text');return filterPublicRouteHints(new Response(html,{headers:{'Content-Type':text?'text/plain':'text/html','Content-Length':String(html.length),ETag:'old'}}),request)}}
+ export default{fetch(request){const text=new URL(request.url).searchParams.has('text');const selected=new URL(request.url).searchParams.has('hashed')?html.replaceAll('/fonts/lato-latin-300-normal.woff2','/assets/lato-latin-300-normal-hashFixture.woff2'):html;return filterPublicRouteHints(new Response(selected,{headers:{'Content-Type':text?'text/plain':'text/html','Content-Length':String(html.length),ETag:'old'}}),request)}}
  `,
     },
     bundle: true,
@@ -47,6 +47,17 @@ test('solo Home conserva los hints de su grafo', async () => {
   expect(html).not.toContain('/assets/catalog.js')
   expect(html).not.toContain('/assets/product.js')
   expect(html).not.toContain('/assets/sdk.js')
+})
+
+test('la fuente versionada conserva exactamente la selección responsive de su preload', async () => {
+  for (const path of ['/', '/tienda', '/producto/uno']) {
+    const html = await (await runtime.dispatchFetch('https://fixture.invalid' + path + '?hashed')).text()
+    expect(html).toContain('href="/assets/lato-latin-300-normal-hashFixture.woff2" media="(min-width: 1024px)" data-public-font="light"')
+    expect(html).not.toContain('href="/fonts/lato-latin-300-normal.woff2"')
+  }
+  const html = await (await runtime.dispatchFetch('https://fixture.invalid/contacto?hashed')).text()
+  expect(html).toContain('href="/assets/lato-latin-300-normal-hashFixture.woff2">')
+  expect(html).not.toContain('data-public-font')
 })
 test('Tienda, fichas, cuentas y panel no descargan código del Home por su HTML', async () => {
   for (const path of [

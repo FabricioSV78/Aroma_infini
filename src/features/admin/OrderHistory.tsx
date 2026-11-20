@@ -34,7 +34,9 @@ export function OrderHistory({ reference }: { reference: string }) {
                 </time>
               </div>
               <p>
-                {entry.source === 'bulk'
+                {entry.source === 'system'
+                  ? 'Vencimiento automático · Sistema'
+                  : entry.source === 'bulk'
                   ? 'Acción masiva'
                   : 'Cambio individual'}
                 {entry.operator.verified ? ` · ${entry.operator.name}` : ''}

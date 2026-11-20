@@ -84,24 +84,36 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0)
   const [quoteState, setQuoteState] = useState<{
     key: string
+    visit: ReturnType<typeof useLocation> | null
     quote: ServerCheckoutQuote | null
     error: string
-  }>({ key: '', quote: null, error: '' })
+    request: object | null
+  }>({ key: '', visit: null, quote: null, error: '', request: null })
   const queryKey = JSON.stringify(checkoutQuery(items, draft))
-  const catalogKey = JSON.stringify(
-    snapshot.products
-      .filter((record) =>
-        record.product.variants.some((variant) =>
-          items.some((item) => item.variantId === variant.id),
-        ),
-      )
-      .map(({ product }) => ({
-        id: product.id,
-        variants: product.variants,
-        discount: product.discount,
-      })),
+  const catalogKey = useMemo(() => {
+    if (!items.length) return '[]'
+    const variantIds = new Set(items.map((item) => item.variantId))
+    return JSON.stringify(
+      snapshot.products
+        .filter((record) =>
+          record.product.variants.some((variant) => variantIds.has(variant.id)),
+        )
+        .map(({ product }) => ({
+          id: product.id,
+          variants: product.variants,
+          discount: product.discount,
+        })),
+    )
+  }, [snapshot.products, items])
+  const shippingKey = useMemo(
+    () => JSON.stringify(snapshot.shipping),
+    [snapshot.shipping],
   )
-  const quoteKey = queryKey + catalogKey + JSON.stringify(snapshot.shipping)
+  const quoteKey = queryKey + catalogKey + shippingKey + (ownerId ?? '')
+  const quoteRequest = useMemo(
+    () => ({ key: quoteKey, visit: location, revision }),
+    [quoteKey, location, revision],
+  )
   const currentDraft = useRef(draft)
   const currentItems = useRef(items)
   useEffect(() => {
@@ -192,60 +204,110 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     isRemoteCatalog &&
     location.pathname === '/checkout' &&
     items.length > 0
+  const quoteStarted = useRef(false)
+  const quoteRequestActive = useRef(false)
+  const lastQuoteStartedAt = useRef(0)
   useEffect(() => {
-    if (!remoteActive || pendingConfirmation) return
+    if (!remoteActive) {
+      quoteStarted.current = false
+      return
+    }
+    if (pendingConfirmation) return
     const controller = new AbortController(),
       request = ++requestNumber.current
-    const timer = window.setTimeout(() => {
-      void requestCheckoutQuote(
-        currentItems.current,
-        currentDraft.current,
-        undefined,
-        controller.signal,
-      )
-        .then((quote) => {
-          if (!controller.signal.aborted && request === requestNumber.current)
-            setQuoteState({ key: quoteKey, quote, error: '' })
-        })
-        .catch((error) => {
-          if (!controller.signal.aborted && request === requestNumber.current)
-            setQuoteState({
-              key: quoteKey,
-              quote: null,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'No pudimos actualizar el resumen.',
-            })
-        })
-    }, 150)
+    quoteRequestActive.current = true
+    // Start the first quote on entry without a typing debounce. Mark it only
+    // when the request starts, so StrictMode cleanup can cancel its timer.
+    // Later edits still coalesce and retain the same cancellation/identity checks.
+    const timer = window.setTimeout(
+      () => {
+        quoteStarted.current = true
+        lastQuoteStartedAt.current = Date.now()
+        void requestCheckoutQuote(
+          currentItems.current,
+          currentDraft.current,
+          undefined,
+          controller.signal,
+        )
+          .then((quote) => {
+            if (!controller.signal.aborted && request === requestNumber.current)
+              setQuoteState({
+                key: quoteKey,
+                visit: location,
+                quote,
+                error: '',
+                request: quoteRequest,
+              })
+          })
+          .catch((error) => {
+            if (!controller.signal.aborted && request === requestNumber.current)
+              setQuoteState((previous) => ({
+                key: quoteKey,
+                visit: location,
+                // Keep only the last verified quote for these exact inputs and
+                // visit. It remains display-only until revalidation succeeds.
+                quote:
+                  previous.key === quoteKey && previous.visit === location
+                    ? previous.quote
+                    : null,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'No pudimos actualizar el resumen.',
+                request: quoteRequest,
+              }))
+          })
+          .finally(() => {
+            if (request === requestNumber.current)
+              quoteRequestActive.current = false
+          })
+      },
+      quoteStarted.current ? 150 : 0,
+    )
     return () => {
       window.clearTimeout(timer)
       controller.abort()
+      quoteRequestActive.current = false
     }
-  }, [remoteActive, quoteKey, revision, pendingConfirmation])
+  }, [remoteActive, quoteKey, quoteRequest, pendingConfirmation, location])
+  // A quote from an earlier visit must not make a new checkout look verified
+  // before its fresh server read finishes, even when the cart is unchanged.
+  // The location object also distinguishes POP visits to the same history key.
+  const currentQuote =
+    quoteState.key === quoteKey && quoteState.visit === location
   const serverQuote = pendingConfirmation
     ? pendingQuote
-    : remoteActive && quoteState.key === quoteKey
+    : remoteActive && currentQuote
       ? quoteState.quote
       : null
   const quoteError =
-    remoteActive && quoteState.key === quoteKey ? quoteState.error : ''
-  const quoteLoading = remoteActive && !serverQuote && !quoteError
+    remoteActive && currentQuote && quoteState.request === quoteRequest
+      ? quoteState.error
+      : ''
+  const quoteLoading =
+    remoteActive &&
+    !pendingConfirmation &&
+    (!currentQuote || quoteState.request !== quoteRequest)
+  const quoteRefreshing = quoteLoading && serverQuote !== null
   const refreshQuote = useCallback(() => {
-    setQuoteState({ key: '', quote: null, error: '' })
+    // A same-query refresh must not erase prices or delivery while in flight.
+    // The revision still prevents submission of the previous quote.
     setRevision((value) => value + 1)
   }, [])
   useEffect(() => {
     if (!remoteActive || pendingConfirmation) return
     const update = () => {
-      if (document.visibilityState === 'visible') refreshQuote()
+      if (document.visibilityState === 'visible' && !quoteRequestActive.current)
+        refreshQuote()
+    }
+    const onVisible = () => {
+      if (Date.now() - lastQuoteStartedAt.current >= 60000) update()
     }
     const timer = window.setInterval(update, 60000)
-    document.addEventListener('visibilitychange', update)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', update)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [remoteActive, refreshQuote, pendingConfirmation])
 
@@ -260,7 +322,10 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
         if (
           inFlight.current ||
           (!pendingConfirmation &&
-            (!serverQuote || quoteLoading || serverQuote.totalCents === null))
+            (!serverQuote ||
+              quoteLoading ||
+              quoteError ||
+              serverQuote.totalCents === null))
         )
           return null
         inFlight.current = true
@@ -369,6 +434,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       items,
       serverQuote,
       quoteLoading,
+      quoteError,
       refreshQuote,
       pendingConfirmation,
     ],
@@ -383,6 +449,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       completeOrder,
       serverQuote,
       quoteLoading,
+      quoteRefreshing,
       quoteError,
       pendingConfirmation,
       refreshQuote,
@@ -393,6 +460,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       order,
       serverQuote,
       quoteLoading,
+      quoteRefreshing,
       quoteError,
       pendingConfirmation,
       refreshQuote,

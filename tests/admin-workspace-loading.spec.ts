@@ -184,7 +184,7 @@ test('Promociones con enlace directo de ofertas carga una página específica y 
   await expect(page.locator('.admin-promotions-codes')).toHaveCount(0)
 })
 
-test('Promociones carga el catálogo al abrir ofertas y consulta cupones de nuevo sin perder la protección del borrador', async ({
+test('Promociones carga la página de ofertas y consulta cupones de nuevo sin perder la protección del borrador', async ({
   page,
   supabaseNetwork,
   workspaceRequests,

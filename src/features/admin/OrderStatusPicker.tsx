@@ -3,6 +3,7 @@ import { Icon, type IconName } from '../../components/ui/Icon'
 import {
   ORDER_STATUSES,
   getOrderTransitionError,
+  isTerminalOrderStatus,
 } from '../../domain/order-workflow'
 import type { AdminOrder, AdminOrderStatus } from '../../services/admin-service'
 import { adminOrderStatusMeta } from './admin-utils'
@@ -13,6 +14,8 @@ const stepIcons: Record<AdminOrderStatus, IconName> = {
   preparing: 'package',
   shipped: 'truck',
   delivered: 'check',
+  cancelled: 'close',
+  expired: 'clock',
 }
 
 interface OrderStatusPickerProps {
@@ -34,6 +37,16 @@ export function OrderStatusPicker({
   const currentIndex = ORDER_STATUSES.indexOf(order.status)
   const changed = value !== order.status
   const paymentBlocked = order.paymentStatus !== 'approved' && !order.simulation
+  if (isTerminalOrderStatus(order.status))
+    return (
+      <p className="admin-order-state-help" role="status">
+        <Icon name={stepIcons[order.status]} />
+        <span>
+          {adminOrderStatusMeta[order.status].label}. La reserva de stock está
+          cerrada.
+        </span>
+      </p>
+    )
   return (
     <>
       <fieldset className="admin-order-state-picker" disabled={disabled}>
@@ -105,6 +118,16 @@ export function OrderStatusPicker({
           })}
         </div>
       </fieldset>
+      {!getOrderTransitionError(order, 'cancelled', legacyPhone) ? (
+        <button
+          className="admin-order-cancel-action"
+          type="button"
+          disabled={disabled || value === 'cancelled'}
+          onClick={() => onChange('cancelled')}
+        >
+          Cancelar pedido
+        </button>
+      ) : null}
       {paymentBlocked ? (
         <p className="admin-order-state-help">
           <Icon name="card" />

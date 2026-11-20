@@ -3,6 +3,7 @@ import {
   allowedPushEndpoint,
   createAdminPushHandler,
   dispatchAdminPush,
+  dispatchAdminOrderPush,
 } from '../worker/admin-push-handler'
 
 const origin = 'https://admin.fixture.workers.dev'
@@ -123,7 +124,7 @@ function fixture(
       })
     if (name === 'admin_read_notifications')
       return Response.json({ updated: 1, unreadCount: 0 })
-    if (name === 'claim_admin_push')
+    if (name === 'claim_admin_push' || name === 'claim_admin_order_push')
       return Response.json({
         deliveries: options.claims ?? [
           claim({ kind: 'test', orderReference: null, eventId: deliveryId }),
@@ -728,6 +729,24 @@ test('revoked administrator or disabled subscription is rechecked immediately be
     p_result: 'failed',
     p_error_code: 'not-eligible',
   })
+})
+test('post-commit staging dispatch scopes claims to one committed order and uses explicit simulation copy', async () => {
+  const f = fixture({ claims: [claim({ kind: 'simulated_order' })] })
+  const orderId = '60000000-0000-4000-8000-000000000001'
+  expect(await dispatchAdminOrderPush(f.env, orderId, f.dependencies)).toEqual({ claimed: 1, accepted: 1 })
+  expect(f.calls.find(c => c.url.endsWith('/claim_admin_order_push'))?.body).toEqual({
+    p_environment: 'staging', p_limit: 10, p_order_id: orderId,
+  })
+  expect(f.sends[0].payload).toMatchObject({
+    kind: 'simulated_order', title: 'Pedido de prueba',
+    body: 'Pedido de prueba AI-2026-000001 recibido. Toca para revisar.',
+    url: '/admin/pedidos/AI-2026-000001', tag: `ai-admin-${eventId}`,
+  })
+  expect(JSON.stringify(f.sends[0].payload)).not.toContain('confirmado')
+  const before = f.calls.length
+  expect(await dispatchAdminOrderPush({ ...f.env, APP_ENVIRONMENT: 'production', PUSH_ENVIRONMENT: 'production' }, orderId, f.dependencies)).toEqual({ claimed: 0, accepted: 0 })
+  expect(f.calls).toHaveLength(before)
+  await expect(dispatchAdminOrderPush(f.env, 'invalid', f.dependencies)).rejects.toThrow('Invalid order delivery scope')
 })
 test('unsafe stored endpoint cannot cause any external send', async () => {
   const f = fixture({

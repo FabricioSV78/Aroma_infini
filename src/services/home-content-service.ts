@@ -8,7 +8,11 @@ import {
   registerManagedVideo,
 } from './media-registry'
 import { requireReadySupabaseClient } from './supabase-client'
-import { cachedPublicQuery } from './public-query-cache'
+import {
+  cachedPublicQuery,
+  publicQueryCacheGeneration,
+  seedInitialPublicQuery,
+} from './public-query-cache'
 import type { ExpectedMediaActor } from './media-upload'
 import { UserFacingError } from '../domain/user-facing-error'
 import { takeInitialHome } from './home-bootstrap'
@@ -28,6 +32,10 @@ const listeners = new Set<() => void>()
 let confirmed = defaultDocument()
 let expectedPublicVersion = 0
 let announcement = confirmed.content.announcement
+// A read may discover a newer version itself. That must not change its cache
+// key and turn the very next navigation into another identical request.
+let publicReadRevision = 0
+const publicHomeLifetimeMs = 30000
 
 export function parseHomeDocument(
   value: unknown,
@@ -153,18 +161,28 @@ export async function readPublicHome(
     return data
   }
   const initial = takeInitialHome()
+  const initialGeneration = publicQueryCacheGeneration()
   // Metadata or a successful save can advance while a previous read is still
   // in flight. Re-read once without cache instead of publishing older copy.
   for (let attempt = 0; attempt < 2; attempt++) {
+    const readRevision = publicReadRevision
+    const key = `home-document:${readRevision}`
+    let fromInitial = attempt === 0 && initial !== undefined
     // Fetch independent public projections together, but keep catalog context
     // as a validation/publication barrier (including the version-zero default).
-    const [raw, brandId] = await Promise.all([
-      attempt === 0
-        ? (initial ??
-          cachedPublicQuery(`home:${expectedPublicVersion}`, read, 30000))
-        : read(),
+    const [received, brandId] = await Promise.all([
+      fromInitial
+        ? initial
+        : cachedPublicQuery(key, read, publicHomeLifetimeMs),
       featuredBrandId,
     ])
+    let raw = received
+    // A write can supersede a document while the independent catalog context
+    // is pending. Do not publish its previous epoch or seed it after the write.
+    if (fromInitial && initialGeneration !== publicQueryCacheGeneration()) {
+      fromInitial = false
+      raw = await cachedPublicQuery(key, read, publicHomeLifetimeMs)
+    }
     let result: HomeDocument
     try {
       result = parseHomeDocument(raw, brandId, { publicDocument: true })
@@ -173,11 +191,26 @@ export async function readPublicHome(
         throw error
       // A malformed HTML DTO uses the ordinary network contract, retaining
       // the version/publication barrier and normal actionable errors.
-      result = parseHomeDocument(await read(), brandId, {
+      fromInitial = false
+      raw = await cachedPublicQuery(key, read, publicHomeLifetimeMs)
+      result = parseHomeDocument(raw, brandId, {
         publicDocument: true,
       })
     }
-    if (publicHomeContent.confirm(result)) return result
+    if (publicHomeContent.confirm(result)) {
+      if (fromInitial)
+        seedInitialPublicQuery(
+          key,
+          raw,
+          performance.now(),
+          publicHomeLifetimeMs,
+        )
+      return result
+    }
+    // Metadata/publication won the version race. Rotate only once for all
+    // readers of this old key; their fresh retry shares the existing pending
+    // request and retains its ordinary TTL instead of bypassing the cache.
+    if (publicReadRevision === readRevision) publicReadRevision++
   }
   throw new UserFacingError(
     'home-network',

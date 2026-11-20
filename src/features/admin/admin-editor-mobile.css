@@ -1,0 +1,434 @@
+/* Editor-only adaptations. The desktop work surfaces remain unchanged.
+   The shell scope deliberately outranks styles loaded later by lazy routes. */
+@media (max-width: 1199px) {
+  .admin-shell .admin-editor-page .admin-editor-section-nav,
+  .admin-shell .admin-home-editor .admin-home-tabs,
+  .admin-shell .admin-home-editor .admin-home-finder-tabs {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scroll-padding-inline: 4px;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor-section-nav {
+    gap: 18px;
+    margin-block: 4px 14px;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor-section-nav a,
+  .admin-shell .admin-home-editor .admin-home-tabs button,
+  .admin-shell .admin-home-editor .admin-home-finder-tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor {
+    gap: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor > section {
+    min-width: 0;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor > section > header {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-fields,
+  .admin-shell .admin-editor-page .admin-product-general-fields,
+  .admin-shell .admin-editor-page .admin-variant-list fieldset {
+    gap: 12px 16px;
+  }
+
+  .admin-shell .admin-editor-page .admin-variant-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-editor-page .admin-variant-list fieldset {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-variant-list fieldset > .admin-remove {
+    min-height: 44px;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .admin-shell .admin-editor-page .admin-olfactory-classification {
+    padding-block: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-olfactory-family-options {
+    gap: 6px;
+  }
+
+  .admin-shell .admin-editor-page .admin-olfactory-family-options label {
+    padding: 7px 10px;
+  }
+
+  .admin-shell .admin-editor-page .admin-threshold-control {
+    gap: 6px 16px;
+    padding-bottom: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-threshold-control p {
+    padding-bottom: 0;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-upload-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-photo-slot {
+    padding-block: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-photo-controls {
+    gap: 4px 10px;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photos .admin-home-file-button,
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-photo-preview,
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-photo-controls .admin-remove {
+    min-height: 44px;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photo-slot-assignment select {
+    height: 44px;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-photos .admin-product-photo-order button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .admin-shell .admin-product-import .admin-product-import__body {
+    padding: 14px;
+  }
+
+  .admin-shell .admin-product-import .admin-product-import__controls,
+  .admin-shell .admin-product-import__dialog .admin-product-import__row-filters {
+    gap: 8px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-block: 16px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-tabs {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-topbar-actions {
+    gap: 8px 18px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-workspace,
+  .admin-shell .admin-home-editor .admin-home-controls,
+  .admin-shell .admin-home-editor .admin-home-finder-editor {
+    gap: 12px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-controls {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-controls > h2 {
+    font-size: 18px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-image-control {
+    gap: 6px 10px;
+    padding-block: 10px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-image-control > div,
+  .admin-shell .admin-home-editor .admin-home-field,
+  .admin-shell .admin-home-editor .admin-hero-section-heading > div {
+    min-width: 0;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-image-control :is(strong, small),
+  .admin-shell .admin-home-editor .admin-home-slide-picker button,
+  .admin-shell .admin-home-editor .admin-home-finder-option-media-copy,
+  .admin-shell .admin-home-editor .admin-home-finder-available-list > div {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .admin-home-editor .admin-hero-order-actions {
+    gap: 4px 8px;
+    padding-bottom: 10px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-finder-option-head-actions {
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-finder-available-list > div {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding-left: 8px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-savebar {
+    gap: 8px 16px;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .admin-shell .admin-promotions-codes .admin-promotion-form .admin-fields,
+  .admin-shell .admin-offers .admin-offers-fields {
+    gap: 12px 16px;
+  }
+
+  .admin-shell .admin-offers .admin-offers-editor {
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .admin-shell .admin-offers .admin-offers-editor-heading,
+  .admin-shell .admin-offers .admin-offers-list-heading {
+    gap: 8px 14px;
+  }
+
+  .admin-shell .admin-offers .admin-offers-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-shell .admin-offers .admin-offers-product-field {
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell .admin-offers .admin-offers-actions,
+  .admin-shell .admin-offers .admin-offers-list-actions,
+  .admin-shell .admin-promotions-codes .admin-promotion-form .admin-inline-actions {
+    gap: 8px 12px;
+  }
+
+  .admin-shell .admin-offers .admin-offers-list-heading strong,
+  .admin-shell .admin-promotions-codes .admin-promotion-list strong {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-shell .site-settings-form {
+    gap: 14px;
+  }
+
+  .admin-shell .site-settings-form .admin-card {
+    padding: 16px;
+  }
+
+  .admin-shell .site-settings-form h2 {
+    margin-bottom: 12px;
+    font-size: 18px;
+  }
+
+  .admin-shell .site-settings-form .site-settings-grid {
+    gap: 12px 16px;
+    margin-top: 14px;
+  }
+
+  .admin-shell .site-settings-form .site-settings-actions {
+    padding-block: 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .admin-shell .site-settings-form .contact-qr-actions {
+    gap: 8px;
+  }
+
+  .admin-shell .site-settings-form .admin-media-editor-links {
+    gap: 4px 16px;
+    margin-block: 10px 16px;
+  }
+
+  .admin-shell .site-settings-form .admin-media-editor-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .admin-shell .site-settings-form .admin-media-card-copy {
+    gap: 7px;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-shell .admin-editor-page .admin-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-editor-page .admin-variant-list fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-variant-list fieldset > .admin-check,
+  .admin-shell .admin-editor-page .admin-variant-list fieldset > .admin-remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .admin-shell .admin-editor-page .admin-editor-actions .admin-product-save-state,
+  .admin-shell .admin-editor-page .admin-editor-actions > .button--primary {
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor-actions > .button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 9px 10px;
+    margin-left: 0;
+    font-size: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-olfactory-editor .olfactory-profile-content {
+    padding: 16px;
+  }
+
+  /* The icon and two columns left too little room for the actual values. */
+  .admin-shell .admin-editor-page .admin-olfactory-editor .olfactory-profile-traits {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-threshold-control label {
+    width: 100%;
+  }
+
+  .admin-shell .admin-editor-page .admin-product-upload-toolbar > .admin-home-file-button {
+    width: 100%;
+  }
+
+  .admin-shell .admin-product-import .admin-product-import__controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-product-import__dialog .admin-product-import__row-filters button {
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+
+  .admin-shell .admin-product-import__dialog .admin-product-import__pagination {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .admin-product-import__dialog .admin-product-import__pagination > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-topbar-actions {
+    justify-content: space-between;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-controls {
+    padding: 14px;
+  }
+
+  .admin-shell .admin-home-editor .admin-hero-section-heading {
+    align-items: start;
+  }
+
+  .admin-shell .admin-home-editor .admin-hero-section-heading .button {
+    padding-inline: 10px;
+  }
+
+  .admin-shell .admin-home-editor .admin-hero-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-home-editor .admin-hero-order-actions > span {
+    flex-basis: 100%;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-savebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-savebar .admin-form-notice {
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell .admin-home-editor .admin-home-savebar .button {
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+
+  .admin-shell .admin-offers .admin-offers-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .admin-offers .admin-offers-actions > .button,
+  .admin-shell .admin-promotions-codes .admin-promotion-form .admin-inline-actions > .button {
+    width: 100%;
+    min-height: 44px;
+    min-width: 0;
+  }
+
+  .admin-shell .admin-offers .admin-offers-preview-button {
+    max-width: 100%;
+    min-height: 44px;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .admin-shell .admin-offers .admin-offers-list-heading {
+    flex-wrap: wrap;
+  }
+
+  .admin-shell .site-settings-form .site-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .site-settings-form .site-settings-grid textarea {
+    min-height: 144px;
+  }
+
+  .admin-shell .site-settings-form .site-settings-actions .button {
+    width: 100%;
+  }
+
+  .admin-shell .admin-media-editor-dialog .admin-media-preview,
+  .admin-shell .admin-media-editor-dialog .admin-media-preview img {
+    max-height: min(30dvh, 240px);
+  }
+
+  .admin-shell .admin-media-editor-dialog .admin-media-form {
+    gap: 12px;
+  }
+
+  .admin-shell .admin-editor-page .admin-editor :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='file']),
+  .admin-shell .admin-home-editor .admin-home-controls :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='file']),
+  .admin-shell .admin-promotions-codes .admin-promotion-form :is(input, select, textarea):not([type='checkbox']):not([type='radio']),
+  .admin-shell .admin-offers .admin-offers-fields :is(input, select):not([type='checkbox']),
+  .admin-shell .site-settings-form .site-settings-grid :is(input, textarea),
+  .admin-shell .admin-media-editor-dialog .admin-media-form :is(input, select, textarea):not([type='file']) {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+}

@@ -85,7 +85,7 @@ import {
 } from '../domain/product-publication'
 import {
   getOrderTransitionError,
-  ORDER_STATUSES,
+  ORDER_ACTION_STATUSES,
 } from '../domain/order-workflow'
 export { hasCompleteOrderDelivery } from '../domain/order-workflow'
 import {
@@ -1827,7 +1827,7 @@ export const adminService = {
         kind: 'validation',
         message: 'Indica el nombre del responsable (de 2 a 80 caracteres).',
       }
-    if (!ORDER_STATUSES.includes(status))
+    if (!ORDER_ACTION_STATUSES.includes(status))
       return { kind: 'validation', message: 'Selecciona un estado válido.' }
     const selectedReferences = normalizeOrderReferences(references)
     if (!selectedReferences.length)

@@ -374,6 +374,156 @@ export async function auditCommerceConcurrency({
       realChargesTested: false,
     }
 
+    console.log('Commerce concurrency: reservation cancellation and expiry')
+    await prepare(5)
+    const cancellationBody = await payload()
+    const cancellationOperation = randomUUID()
+    const cancellationToken = token()
+    const cancellable = await create(
+      cancellationBody,
+      owners[0],
+      cancellationOperation,
+      cancellationToken,
+    )
+    const cancellationCommand = randomUUID()
+    const cancel = (order, operation = randomUUID(), expectedVersion = 1) =>
+      query(
+        "select api.admin_set_order_statuses($1::jsonb,'cancelled',$2,false,'individual') as value",
+        [
+          JSON.stringify([{ reference: order.reference, expectedVersion }]),
+          operation,
+        ],
+        'authenticated',
+        ids.admin,
+      )
+    const cancelled = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        cancel(cancellable.order, cancellationCommand),
+      ),
+    )
+    const cancellationReplay = await create(
+      cancellationBody,
+      owners[0],
+      cancellationOperation,
+      cancellationToken,
+    )
+    const cancellationNoop = await cancel(cancellable.order, randomUUID(), 2)
+    const cancelledState = (
+      await client.query(
+        `select o.status,o.version,v.stock,private.reservable_stock(v.id) as available,
+          (select count(*)::int from private.order_stock_reservations r where r.order_id=o.id) as holds,
+          (select count(*)::int from private.order_stock_reservations r where r.order_id=o.id and r.state='released' and r.closed_at is not null) as released,
+          (select count(*)::int from app.order_status_history h where h.order_id=o.id and h.to_status='cancelled') as history
+         from app.orders o join app.product_variants v on v.id=$2 where o.id=$1`,
+        [cancellable.order.id, ids.variant],
+      )
+    ).rows[0]
+    requireState(
+      cancelled.every((entry) => entry.updated.length === 1) &&
+        cancelled.every((entry) => JSON.stringify(entry) === JSON.stringify(cancelled[0])) &&
+        cancellationNoop.skipped.length === 1 &&
+        cancellationReplay.order.id === cancellable.order.id &&
+        cancellationReplay.order.status === 'cancelled' &&
+        cancelledState.status === 'cancelled' &&
+        Number(cancelledState.version) === 2 &&
+        cancelledState.stock === 5 && cancelledState.available === 5 &&
+        cancelledState.holds === 1 && cancelledState.released === 1 && cancelledState.history === 1,
+      'Concurrent cancellation or checkout replay duplicated a release, history entry or reservation.',
+    )
+    report.scenarios.reservationCancellation = {
+      independentConcurrentCommands: 10,
+      distinctCommandIds: 1,
+      canonicalReplay: true,
+      duplicateCommandIsNoop: true,
+      checkoutReplayDoesNotReserveAgain: true,
+      holdRows: cancelledState.holds,
+      releasedHolds: cancelledState.released,
+      auditEntries: cancelledState.history,
+      physicalStock: cancelledState.stock,
+      availableStock: cancelledState.available,
+    }
+
+    const makeDue = async (orderId) => {
+      // This is an accelerated clock fixture in the guarded disposable DB,
+      // not a claim that fifteen wall-clock minutes were observed remotely.
+      await client.query(
+        "update private.order_stock_reservations r set created_at=t.at-interval '16 minutes',expires_at=t.at-interval '1 minute' from (select clock_timestamp() at) t where r.order_id=$1 and r.state='active'",
+        [orderId],
+      )
+    }
+    const expire = () =>
+      query('select api.expire_stock_reservations(100) as value', [])
+    const due = await create(await payload(), owners[1])
+    await makeDue(due.order.id)
+    const expiryResults = await Promise.all([expire(), expire()])
+    const afterExpiry = (
+      await client.query(
+        `select o.status,o.version,v.stock,private.reservable_stock(v.id) as available,
+          (select count(*)::int from private.order_stock_reservations r where r.order_id=o.id and r.state='expired') as expired,
+          (select count(*)::int from app.order_status_history h where h.order_id=o.id and h.to_status='expired' and h.source='system' and h.actor_id is null) as history
+         from app.orders o join app.product_variants v on v.id=$2 where o.id=$1`,
+        [due.order.id, ids.variant],
+      )
+    ).rows[0]
+    requireState(
+      expiryResults.reduce((sum, count) => sum + count, 0) === 1 &&
+        await expire() === 0 && afterExpiry.status === 'expired' &&
+        Number(afterExpiry.version) === 2 && afterExpiry.expired === 1 &&
+        afterExpiry.history === 1 && afterExpiry.stock === 5 && afterExpiry.available === 5,
+      'Competing expiry jobs closed a reservation or order more than once.',
+    )
+    report.scenarios.reservationExpiry = {
+      concurrentServerCommands: 2,
+      holdsExpiredAcrossCommands: expiryResults.reduce((sum, count) => sum + count, 0),
+      subsequentCommandNoop: true,
+      auditEntries: afterExpiry.history,
+      physicalStock: afterExpiry.stock,
+      availableStock: afterExpiry.available,
+      acceleratedDisposableClockFixture: true,
+    }
+
+    const raced = await create(await payload(), owners[2])
+    await makeDue(raced.order.id)
+    await client.query('begin')
+    await client.query('select 1 from app.orders where id=$1 for update', [raced.order.id])
+    const competingCancellation = cancel(raced.order)
+    const cancellationWaiters = await waitForLockWaiters('api.admin_set_order_statuses', 1)
+    // The real cron RPC runs on a second pool connection while cancellation is
+    // blocked. SKIP LOCKED must leave this order for the command's reconciliation.
+    const skippedExpiry = await expire()
+    await client.query('commit')
+    const racedCancellation = await competingCancellation
+    const reconciled = (
+      await client.query(
+        `select o.status,o.version,v.stock,private.reservable_stock(v.id) as available,
+          (select count(*)::int from private.order_stock_reservations r where r.order_id=o.id and r.state='expired') as expired,
+          (select count(*)::int from app.order_status_history h where h.order_id=o.id) as history
+         from app.orders o join app.product_variants v on v.id=$2 where o.id=$1`,
+        [raced.order.id, ids.variant],
+      )
+    ).rows[0]
+    requireState(
+      skippedExpiry === 0 && racedCancellation.updated.length === 0 &&
+        racedCancellation.errors.length === 1 && reconciled.status === 'expired' &&
+        Number(reconciled.version) === 2 && reconciled.expired === 1 &&
+        reconciled.history === 1 && reconciled.stock === 5 && reconciled.available === 5 &&
+        await expire() === 0,
+      'Cancellation/expiry race lost its terminal state, duplicated history or changed physical stock.',
+    )
+    report.scenarios.reservationCancellationExpiryRace = {
+      confirmedCancellationLockWaiters: cancellationWaiters,
+      overlappingIndependentServerConnections: 2,
+      lockedCronOrderSkipped: true,
+      commandReconcilesDueExpiry: true,
+      staleCancellationRejected: true,
+      finalStatus: reconciled.status,
+      closedHolds: reconciled.expired,
+      auditEntries: reconciled.history,
+      physicalStock: reconciled.stock,
+      availableStock: reconciled.available,
+      acceleratedDisposableClockFixture: true,
+    }
+
     // A second, independent image makes cart line order relevant. The delay
     // trigger changes scheduling only: the unchanged RPC takes both real locks.
     await client.query('begin')

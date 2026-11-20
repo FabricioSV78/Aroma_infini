@@ -12,13 +12,17 @@ export interface AdminProductList {
 export type AdminOrderSelection = Pick<AdminOrder,
   'reference' | 'version' | 'status' | 'simulation' | 'paymentStatus' |
   'customerId' | 'customerName' | 'customerEmail' | 'contactPhone' | 'address'>
+/** Fulfilment counters deliberately exclude cancelled/expired terminal orders. */
+export type AdminOrderOperationalCounts = Record<
+  'received' | 'preparing' | 'shipped' | 'delivered', number
+>
 export interface AdminOrderList {
   ownerId: string
   accessRevision: number
   orders: AdminOrder[]
   total: number
   customer: AdminCustomer | null
-  counts: Record<AdminOrder['status'], number>
+  counts: AdminOrderOperationalCounts
 }
 export interface AdminCustomerList {
   ownerId: string
@@ -35,5 +39,5 @@ export interface AdminDashboardData {
   alerts: { productId: string; productName: string; variantId: string; ml: number | null; variantLabel?: string; stock: number; threshold: number }[]
   recentOrders: AdminOrder[]
   toPrepare: number
-  counts: Record<AdminOrder['status'], number>
+  counts: AdminOrderOperationalCounts
 }

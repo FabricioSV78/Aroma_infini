@@ -4,7 +4,7 @@ import {
   revokeAdminDevice,
   type AdminTrustedDevice,
 } from '../../services/admin-device-service'
-import { authService } from '../../services/auth-service'
+import { adminAuthService as authService } from '../../services/auth-service'
 import { useAuth } from '../auth/useAuth'
 import { useAdminNotice } from './AdminNoticeProvider'
 import type { AuthSession } from '../../types/auth'
@@ -12,7 +12,7 @@ import type { AuthSession } from '../../types/auth'
 const date = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' })
 
 export function AdminTrustedDevices() {
-  const { session } = useAuth()
+  const { session } = useAuth('admin')
   return (
     <AdminTrustedDevicesPanel
       key={session?.user.id ?? 'anonymous'}

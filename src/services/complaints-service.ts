@@ -5,8 +5,8 @@ import {
   type ComplaintStatus,
 } from '../domain/complaints'
 import { mediaApiBaseUrl } from './asset-source'
-import { requireSupabaseClient } from './supabase-client'
-import { authService } from './auth-service'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
+import { adminAuthService as authService } from './auth-service'
 
 export interface ComplaintOperation {
   operationId: string

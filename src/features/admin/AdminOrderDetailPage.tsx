@@ -31,6 +31,7 @@ import { OrderHistory } from './OrderHistory'
 import {
   ORDER_STATUSES,
   getOrderTransitionError,
+  isTerminalOrderStatus,
 } from '../../domain/order-workflow'
 import { OrderStatusPicker } from './OrderStatusPicker'
 import { Icon } from '../../components/ui/Icon'
@@ -189,26 +190,34 @@ export function AdminOrderDetailPage() {
     statusAction.current = true
     try {
       if (
-        (selectedStatusIndex < currentStatusIndex ||
+        (status === 'cancelled' ||
+          selectedStatusIndex < currentStatusIndex ||
           status === 'shipped' ||
           status === 'delivered') &&
         !(await notice.confirm({
           title:
-            selectedStatusIndex < currentStatusIndex
-              ? '¿Retroceder el estado del pedido?'
-              : status === 'shipped'
-                ? '¿Confirmar pedido enviado?'
-                : '¿Confirmar pedido entregado?',
+            status === 'cancelled'
+              ? '¿Cancelar el pedido?'
+              : selectedStatusIndex < currentStatusIndex
+                ? '¿Retroceder el estado del pedido?'
+                : status === 'shipped'
+                  ? '¿Confirmar pedido enviado?'
+                  : '¿Confirmar pedido entregado?',
           description:
-            selectedStatusIndex < currentStatusIndex
-              ? `El pedido ${orderReference} pasará a «${adminOrderStatusMeta[status].label}». El cambio quedará registrado en su historial.`
-              : `Confirma únicamente si el pedido ${orderReference} ya ${status === 'shipped' ? 'fue enviado' : 'fue recibido por el cliente'}.`,
+            status === 'cancelled'
+              ? `La reserva del pedido ${orderReference} se liberará. No se realizará ningún cobro.`
+              : selectedStatusIndex < currentStatusIndex
+                ? `El pedido ${orderReference} pasará a «${adminOrderStatusMeta[status].label}». El cambio quedará registrado en su historial.`
+                : `Confirma únicamente si el pedido ${orderReference} ya ${status === 'shipped' ? 'fue enviado' : 'fue recibido por el cliente'}.`,
           confirmLabel:
-            status === 'shipped'
-              ? 'Confirmar envío'
-              : status === 'delivered'
-                ? 'Confirmar entrega'
-                : 'Cambiar estado',
+            status === 'cancelled'
+              ? 'Cancelar pedido'
+              : status === 'shipped'
+                ? 'Confirmar envío'
+                : status === 'delivered'
+                  ? 'Confirmar entrega'
+                  : 'Cambiar estado',
+          destructive: status === 'cancelled',
         }))
       )
         return
@@ -271,14 +280,15 @@ export function AdminOrderDetailPage() {
         ← {returnTo === '/admin' ? 'Resumen' : 'Pedidos'}
       </Link>
       <AdminPageHeader
+        keepEyebrowOnMobile
         eyebrow={order.reference}
         title="Detalle del pedido"
         description="Consulta la compra y actualiza su preparación."
       />
       {order.simulation ? (
         <p className="admin-data-note">
-          Modo prueba: este pedido no representa un cobro real ni descuenta
-          inventario.
+          Modo prueba: sin cobro real. La reserva de stock y su vencimiento se
+          validan en el servidor.
         </p>
       ) : null}
       <dl className="admin-order-highlights" aria-label="Resumen del pedido">
@@ -397,7 +407,7 @@ export function AdminOrderDetailPage() {
                       {variantLabel(line)} · Cant. {line.quantity}
                     </small>
                   </span>
-                  <span>{formatPEN(line.unitPriceCents * line.quantity)}</span>
+                  <span className="admin-order-line-amount">{formatPEN(line.unitPriceCents * line.quantity)}</span>
                 </li>
               ))}
             </ul>
@@ -454,6 +464,7 @@ export function AdminOrderDetailPage() {
               className={`admin-delivery-edit-button${!deliveryReady && !editingDelivery ? ' is-required' : ''}`}
               type="button"
               disabled={
+                isTerminalOrderStatus(order.status) ||
                 deliveryPersistence.saving ||
                 deliveryPersistence.persistenceFailed
               }

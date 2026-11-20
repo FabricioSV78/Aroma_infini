@@ -91,12 +91,14 @@ export const authAdapter = {
   signOut: async () => undefined,
   onSessionChange: () => () => undefined,
 };
+export const adminAuthAdapter = authAdapter;
 `
 
 // These modules are fulfilled by the runner. No fixture is reachable from the
 // production module graph, query string, browser storage or global role flag.
 const authModule = `
 const listeners = new Set();
+let locallySignedOut = false;
 async function request(action, input) {
   const response = await fetch('/__aroma_playwright__/auth/' + action + '?path=' + encodeURIComponent(location.pathname), {
     method: input === undefined ? 'GET' : 'POST',
@@ -111,14 +113,15 @@ function emit() { for (const listener of listeners) listener(); }
 addEventListener('${fixtureEvent}', emit);
 export const authAdapter = {
   configured: true,
-  getVerifiedSession: () => request('session'),
-  signInWithPassword: () => request('sign-in', {}),
-  signUp: (input) => request('sign-up', input),
-  async signOut() { await request('sign-out', {}); emit(); },
+  getVerifiedSession: () => locallySignedOut ? Promise.resolve(null) : request('session'),
+  async signInWithPassword() { await request('sign-in', {}); locallySignedOut = false; },
+  async signUp(input) { await request('sign-up', input); locallySignedOut = false; },
+  async signOut() { try { await request('sign-out', {}); } finally { locallySignedOut = true; emit(); } },
   onSessionChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
 };
+export const adminAuthAdapter = { ...authAdapter, async getVerifiedSession() { if (locallySignedOut) return null; const session = await request('session'); return session?.user.role === 'admin' ? session : null; } };
 export function expireForTest() { return request('expire', {}).then(emit); }
-export function publishForTest() { emit(); }
+export function publishForTest() { locallySignedOut = false; emit(); }
 `
 
 const accountModule = `

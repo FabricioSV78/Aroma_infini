@@ -95,6 +95,7 @@ export async function readInitialPublicContext(
     ? {
         markup: `${projection === 'browse' ? catalogImageHint((values.browse as { value?: unknown } | undefined)?.value) : ''}<script type="application/json" id="${PUBLIC_INITIAL_CONTEXT_ID}">${json}</script>`,
         timings,
+        values,
       }
     : undefined
 }
@@ -110,7 +111,13 @@ export async function readInitialSettings(
   const start = performance.now()
   try {
     const value = await readPublicCatalog(
-      env, 'site_settings', {}, transport, 128 * 1024, 1000, request.signal,
+      env,
+      'site_settings',
+      {},
+      transport,
+      128 * 1024,
+      1000,
+      request.signal,
     )
     return { value, durationMs: performance.now() - start }
   } catch {

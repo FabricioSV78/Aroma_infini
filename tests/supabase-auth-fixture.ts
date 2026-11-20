@@ -7,7 +7,9 @@ export { expect } from '@playwright/test'
 // These are isolated network-contract tests, not hosted Supabase/Auth tests.
 // They execute the real SDK and application adapters. No source module is mocked.
 export const fixtureProject = 'abcdefghijklmnopqrst'
-export const fixtureStorageKey = `sb-${fixtureProject}-auth-token`
+export const fixtureLegacyStorageKey = `sb-${fixtureProject}-auth-token`
+export const fixtureStorageKey = `sb-${fixtureProject}-customer-auth-token`
+export const fixtureAdminStorageKey = `sb-${fixtureProject}-admin-auth-token`
 export const customerA = '00000000-0000-4000-8000-0000000000a1'
 export const customerB = '00000000-0000-4000-8000-0000000000b2'
 export const fixturePassword = 'Una-clave-Segura-123!'
@@ -27,6 +29,7 @@ export interface SupabaseAuthNetwork {
   invalidPassword: boolean
   confirmed: boolean
   signupSessionMissing: boolean
+  refreshAllowed: boolean
   adminMembership: boolean
   maliciousMetadata: boolean
   mfaEnrolled: boolean
@@ -39,7 +42,7 @@ export interface SupabaseAuthNetwork {
   currentEmail: string
   seedSession(
     page: Page,
-    options?: { expired?: boolean; storedUserId?: string },
+    options?: { expired?: boolean; storedUserId?: string; audience?: 'customer' | 'admin' | 'legacy' },
   ): Promise<void>
 }
 
@@ -70,6 +73,7 @@ export async function installNetwork(
   let assurance: 'aal1' | 'aal2' = 'aal1'
   let enrollmentStarted = false
   let sessionNumber = 0
+  const identities = new Map<string, { email: string; admin: boolean }>()
   const profiles = new Map([
     [customerA, { first_name: 'Ana', last_name: 'Torres', phone: '912345678' }],
     [
@@ -82,6 +86,7 @@ export async function installNetwork(
     invalidPassword: false,
     confirmed: true,
     signupSessionMissing: false,
+    refreshAllowed: false,
     adminMembership: false,
     maliciousMetadata: false,
     mfaEnrolled: true,
@@ -98,19 +103,20 @@ export async function installNetwork(
       await page.addInitScript(
         ({ key, value }) => localStorage.setItem(key, value),
         {
-          key: fixtureStorageKey,
+          key: options.audience === 'legacy' ? fixtureLegacyStorageKey : options.audience === 'admin' || (!options.audience && network.adminMembership) ? fixtureAdminStorageKey : fixtureStorageKey,
           value: JSON.stringify(session),
         },
       )
     },
   }
   function makeUser(userId = network.currentUserId) {
-    const profile = profiles.get(userId) ?? profiles.get(customerA)!
+    const profile = profiles.get(userId) ?? { first_name: '', last_name: '', phone: '' }
+    const email = userId === network.currentUserId ? network.currentEmail : identities.get(userId)?.email ?? `${userId}@example.invalid`
     return {
       id: userId,
       aud: 'authenticated',
       role: 'authenticated',
-      email: network.currentEmail,
+      email,
       email_confirmed_at: network.confirmed ? '2026-01-01T00:00:00.000Z' : null,
       confirmed_at: network.confirmed ? '2026-01-01T00:00:00.000Z' : null,
       phone: '',
@@ -127,7 +133,7 @@ export async function installNetwork(
           user_id: userId,
           identity_id: userId,
           provider: 'email',
-          identity_data: { email: network.currentEmail, sub: userId },
+          identity_data: { email, sub: userId },
         },
       ],
       factors:
@@ -148,6 +154,7 @@ export async function installNetwork(
     }
   }
   function makeSession(expired = false) {
+    identities.set(network.currentUserId, { email: network.currentEmail, admin: network.adminMembership })
     return {
       access_token: jwt(
         network.currentUserId,
@@ -188,6 +195,10 @@ export async function installNetwork(
     const body = request.postData()
       ? (request.postDataJSON() as Record<string, unknown>)
       : {}
+    const bearer = request.headers().authorization?.replace(/^Bearer /i, '')
+    let ownerId = network.currentUserId
+    try { if (bearer) ownerId = JSON.parse(Buffer.from(bearer.split('.')[1], 'base64url').toString()).sub ?? ownerId } catch { /* malformed fixture token is rejected below */ }
+    const ownerAdmin = ownerId === network.currentUserId ? network.adminMembership : identities.get(ownerId)?.admin === true
     network.requests.push({
       method: request.method(),
       path: url.pathname,
@@ -197,7 +208,9 @@ export async function installNetwork(
       body,
     })
     if (
-      url.pathname.startsWith('/rest/v1/rpc/') ||
+      (url.pathname.startsWith('/rest/v1/rpc/') &&
+        !['product_reviews', 'site_settings', 'site_media_document', 'public_media_aliases']
+          .some(name => url.pathname === `/rest/v1/rpc/${name}`)) ||
       url.pathname === '/auth/v1/user' ||
       url.pathname === '/auth/v1/factors' ||
       url.pathname.startsWith('/auth/v1/factors/')
@@ -226,7 +239,8 @@ export async function installNetwork(
           400,
         )
       } else if (grant === 'refresh_token') {
-        await fulfill(
+        if (network.refreshAllowed) { sessionNumber++; await fulfill(makeSession()) }
+        else await fulfill(
           { code: 'refresh_token_not_found', msg: 'Refresh token not found' },
           400,
         )
@@ -241,7 +255,7 @@ export async function installNetwork(
     }
     if (url.pathname === '/auth/v1/user') {
       if (request.method() === 'PUT') network.passwordUpdated = true
-      await fulfill(makeUser())
+      await fulfill(makeUser(ownerId))
       return
     }
     if (url.pathname === '/auth/v1/signup') {
@@ -305,11 +319,11 @@ export async function installNetwork(
         trustedUntil && Date.parse(trustedUntil) > Date.now(),
       )
       await fulfill({
-        user_id: network.actorOwnerMismatch ? customerB : network.currentUserId,
-        role: network.adminMembership ? 'admin' : 'customer',
+        user_id: network.actorOwnerMismatch ? customerB : ownerId,
+        role: ownerAdmin ? 'admin' : 'customer',
         aal: claims.aal,
         requires_mfa:
-          network.adminMembership && claims.aal !== 'aal2' && !trusted,
+          ownerAdmin && claims.aal !== 'aal2' && !trusted,
         trusted_device: trusted,
         trusted_until: trusted ? trustedUntil : null,
       })
@@ -320,7 +334,7 @@ export async function installNetwork(
       url.pathname === '/rest/v1/rpc/update_profile'
     ) {
       if (url.pathname.endsWith('update_profile')) {
-        profiles.set(network.currentUserId, {
+        profiles.set(ownerId, {
           first_name: String(body.p_first_name),
           last_name: String(body.p_last_name),
           phone: String(body.p_phone),
@@ -328,13 +342,13 @@ export async function installNetwork(
       }
       const owner = network.profileOwnerMismatch
         ? customerB
-        : network.currentUserId
-      await fulfill({
+        : ownerId
+      await fulfill(profiles.has(owner) ? {
         user_id: owner,
         ...profiles.get(owner),
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z',
-      })
+      } : null)
       return
     }
     if (url.pathname === '/rest/v1/rpc/get_address') {

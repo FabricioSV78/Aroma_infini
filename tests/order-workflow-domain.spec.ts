@@ -4,6 +4,8 @@ import {
   hasCompleteOrderDelivery,
   isOrderAttention,
   ORDER_STATUSES,
+  ORDER_ACTION_STATUSES,
+  ALL_ORDER_STATUSES,
 } from '../src/domain/order-workflow'
 import type { AdminOrder } from '../src/services/admin-service'
 
@@ -99,4 +101,50 @@ test('requieren atención solo los pedidos abiertos con pagos o datos pendientes
   expect(
     isOrderAttention({ ...order('delivered', 'refunded'), contactPhone: '' }),
   ).toBe(false)
+})
+
+test('cancelar cierra únicamente simulaciones pendientes y los terminales no son pasos de preparación', () => {
+  expect(ALL_ORDER_STATUSES).toEqual([
+    ...ORDER_STATUSES,
+    'cancelled',
+    'expired',
+  ])
+  expect(ORDER_ACTION_STATUSES).not.toContain('expired')
+  for (const status of ['received', 'preparing'] as const)
+    expect(
+      getOrderTransitionError(
+        { ...order(status, 'pending'), simulation: true },
+        'cancelled',
+      ),
+    ).toBeNull()
+  for (const status of ['shipped', 'delivered'] as const)
+    expect(
+      getOrderTransitionError(
+        { ...order(status, 'pending'), simulation: true },
+        'cancelled',
+      ),
+    ).toMatch(/Solo se pueden cancelar/)
+  expect(
+    getOrderTransitionError(order('received', 'pending'), 'cancelled'),
+  ).toMatch(/Solo se pueden cancelar/)
+  expect(
+    getOrderTransitionError({ ...order(), simulation: true }, 'cancelled'),
+  ).toMatch(/Solo se pueden cancelar/)
+  for (const status of ['cancelled', 'expired'] as const) {
+    expect(
+      isOrderAttention({ ...order(status, 'pending'), simulation: true }),
+    ).toBe(false)
+    expect(
+      getOrderTransitionError(
+        { ...order(status, 'pending'), simulation: true },
+        'preparing',
+      ),
+    ).toMatch(/no se puede reabrir/)
+  }
+  expect(
+    getOrderTransitionError(
+      { ...order('received', 'pending'), simulation: true },
+      'expired',
+    ),
+  ).toMatch(/automáticamente el sistema/)
 })

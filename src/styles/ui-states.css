@@ -58,6 +58,24 @@
   background: var(--color-brand);
 }
 
+.ui-navigation-feedback {
+  position: absolute;
+  top: calc(var(--header-height) + 40px);
+  right: var(--gutter);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - var(--gutter) * 2);
+  padding: 10px 14px;
+  border: 1px solid var(--admin-border, var(--color-line));
+  border-radius: 4px;
+  background: var(--admin-surface, var(--color-canvas));
+  color: var(--admin-accent, var(--color-brand));
+  box-shadow: 0 3px 14px rgb(0 0 0 / 6%);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .brands-directory > .ui-empty-state {
   grid-column: 1 / -1;
   margin: 0;

@@ -287,6 +287,7 @@ export function AdminProductOffers() {
     try {
       const first = await readAdminCatalogChoices({ withoutOffer: true, page: 1, limit: 100 })
       const items = [...first.items]
+      const seen = new Set(items.map(item => item.id))
       // The existing native selector and its keyboard type-ahead require all
       // names. Fetch identities only on explicit creation, never product DTOs.
       if (first.total > 10000) throw new Error('Hay demasiadas opciones para este selector.')
@@ -295,8 +296,9 @@ export function AdminProductOffers() {
         const next = await readAdminCatalogChoices({ withoutOffer: true, page, limit: 100 })
         if (next.ownerId !== first.ownerId || next.accessRevision !== first.accessRevision ||
             next.total !== first.total || !next.items.length ||
-            next.items.some(item => items.some(previous => previous.id === item.id)))
+            next.items.some(item => seen.has(item.id)))
           throw new Error('La lista de productos cambió. Vuelve a abrir la oferta para actualizarla.')
+        for (const item of next.items) seen.add(item.id)
         items.push(...next.items)
       }
       if (started === choicesRevision.current) setChoices(items)

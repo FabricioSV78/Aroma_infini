@@ -9,7 +9,7 @@ import { NavigationStatus } from '../../components/ui/NavigationStatus'
 import { AdminSaveFeedback } from './AdminSaveFeedback'
 import { AdminNoticeProvider, useAdminNotice } from './AdminNoticeProvider'
 import { AdminFieldValidation } from './AdminFieldValidation'
-import { authService } from '../../services/auth-service'
+import { adminAuthService as authService } from '../../services/auth-service'
 import { isRemoteCatalog } from '../../services/catalog-source'
 import { isProductionEnvironment } from '../../services/runtime-environment'
 import { mountAdminPwa } from '../../services/admin-pwa'
@@ -18,6 +18,8 @@ import { disableAdminPushOnSignOut } from '../../services/admin-notifications'
 import { preloadAdminRoute } from './admin-route-modules'
 import { consumeAdminDeviceNotice } from '../../services/admin-device-service'
 import { useAuth } from '../auth/useAuth'
+import '../../styles/admin-mobile.css'
+import './admin-editor-mobile.css'
 
 const adminGroups = [
   {
@@ -76,7 +78,7 @@ const adminGroups = [
 }>
 
 export function AdminLayout() {
-  const auth = useAuth()
+  const auth = useAuth('admin')
   return (
     <AdminNoticeProvider key={auth.session?.user.id ?? 'signed-out'}>
       <AdminLayoutContent />
@@ -178,7 +180,7 @@ function AdminLayoutContent() {
   }, [navigationOpen])
 
   useEffect(function closeDrawerAtDesktopBreakpoint() {
-    const desktop = window.matchMedia('(min-width: 1024px)')
+    const desktop = window.matchMedia('(min-width: 1200px)')
     const closeDrawer = (event: MediaQueryListEvent) => {
       if (event.matches) setNavigationOpen(false)
     }
@@ -228,7 +230,10 @@ function AdminLayoutContent() {
         </div>
         <div className="admin-header-actions">
           <AdminNotificationBell />
-          <Link to="/">Ver tienda</Link>
+          <Link className="admin-store-link" to="/" aria-label="Ver tienda">
+            <Icon name="store" aria-hidden="true" />
+            <span className="admin-store-link-label">Ver tienda</span>
+          </Link>
           <button
             className="admin-signout"
             type="button"
@@ -372,7 +377,7 @@ function AdminLayoutContent() {
         {!isProductionEnvironment && (
           <div className="admin-demo-banner">
             {isRemoteCatalog
-              ? 'Entorno de pruebas · Los pedidos de prueba no representan cobros ni reservas de stock.'
+              ? 'Entorno de pruebas · Sin cobros reales. Reserva de stock de 15 minutos para nuevos pedidos.'
               : 'Los cambios de este panel se guardan en este navegador.'}
           </div>
         )}

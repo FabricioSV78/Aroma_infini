@@ -6,6 +6,7 @@ import {
   expect,
   fixtureProject,
   fixtureStorageKey,
+  fixtureAdminStorageKey,
   signIn,
   test,
 } from './supabase-auth-fixture'
@@ -135,7 +136,7 @@ test('si falla la descarga del SDK, la página pública sigue visible y Auth per
 
 async function snapshot(page: Page) {
   const raw = await page.evaluate(
-    (key) => localStorage.getItem(key),
+    (key) => localStorage.getItem(location.pathname.startsWith('/admin') ? key.replace('-customer-auth-token','-admin-auth-token') : key),
     fixtureStorageKey,
   )
   if (!raw) throw new Error('Expected an SDK fixture session')
@@ -156,7 +157,8 @@ function changedToken(token: string, changes: Record<string, unknown>) {
 async function invoke(page: Page, action: 'enroll' | 'verified') {
   return page.evaluate(async (which) => {
     const source = '/src/services/auth-adapter.ts'
-    const { authAdapter } = await import(source)
+    const module = await import(source)
+    const authAdapter = location.pathname.startsWith('/admin') ? module.adminAuthAdapter : module.authAdapter
     try {
       const result =
         which === 'enroll'
@@ -579,7 +581,7 @@ test('una respuesta de actor anterior no publica AAL de un token reemplazado del
   }
   await page.evaluate(
     ({ key, session }) => localStorage.setItem(key, JSON.stringify(session)),
-    { key: fixtureStorageKey, session: rotated },
+    { key: fixtureAdminStorageKey, session: rotated },
   )
   release.resolve()
   expect(await pending).toEqual({ succeeded: true, empty: true })
@@ -628,7 +630,7 @@ test('una inscripción TOTP pendiente queda fijada al administrador original y d
   }
   await other.evaluate(
     ({ key, session }) => localStorage.setItem(key, JSON.stringify(session)),
-    { key: fixtureStorageKey, session: replacement },
+    { key: fixtureAdminStorageKey, session: replacement },
   )
   release.resolve()
   const result = await pending
@@ -675,7 +677,7 @@ for (const change of ['logout', 'other-account'] as const) {
     const pending = page.evaluate(
       async ({ previousToken, nextToken, userId, refreshToken }) => {
         const source = '/src/services/supabase-client.ts'
-        const { commitSupabaseMfaSession, requireSupabaseClient } =
+        const { commitSupabaseMfaSession, requireAdminSupabaseClient: requireSupabaseClient } =
           await import(source)
         try {
           const result = await commitSupabaseMfaSession(
@@ -729,7 +731,7 @@ for (const change of ['logout', 'other-account'] as const) {
     if (change === 'logout') {
       await other.evaluate(
         (key) => localStorage.removeItem(key),
-        fixtureStorageKey,
+        fixtureAdminStorageKey,
       )
     } else {
       const replacement = {
@@ -740,7 +742,7 @@ for (const change of ['logout', 'other-account'] as const) {
       await other.evaluate(
         ({ key, session }) =>
           localStorage.setItem(key, JSON.stringify(session)),
-        { key: fixtureStorageKey, session: replacement },
+        { key: fixtureAdminStorageKey, session: replacement },
       )
     }
     release.resolve()
@@ -749,7 +751,7 @@ for (const change of ['logout', 'other-account'] as const) {
       expect(
         await page.evaluate(
           (key) => localStorage.getItem(key),
-          fixtureStorageKey,
+          fixtureAdminStorageKey,
         ),
       ).toBeNull()
     } else {

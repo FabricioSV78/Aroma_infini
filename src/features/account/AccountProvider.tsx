@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useLocation } from 'react-router'
 import { accountAdapter } from '../../services/account-adapter'
 import {
   emptyAccountProfile,
@@ -19,20 +20,30 @@ import { useAuth } from '../auth/useAuth'
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   const auth = useAuth()
+  const { pathname } = useLocation()
+  const dataRequired =
+    pathname === '/cuenta' || pathname.startsWith('/cuenta/') ||
+    pathname === '/checkout' || pathname.startsWith('/checkout/')
   const userId =
-    auth.status === 'authenticated' && auth.session?.intent === 'account'
+    auth.status === 'authenticated' && auth.session?.intent === 'account' && auth.session.user.role === 'customer'
       ? auth.session.user.id
       : null
   const currentUser = useRef(userId)
+  // Public navigation needs only the verified identity for its account link.
+  // Each new visit to account/checkout gets its own fresh owner-scoped read;
+  // returning later cannot display an earlier visit as already verified.
+  const requestScope = useMemo(() => ({ userId, dataRequired }), [userId, dataRequired])
+  const [resolvedScope, setResolvedScope] = useState<object | null>(null)
   const [data, setData] = useState<AccountData | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
+  const [errorOwner, setErrorOwner] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
-  const owned = data?.userId === userId ? data : null
+  const owned = data?.userId === userId && resolvedScope === requestScope ? data : null
   useEffect(() => {
     currentUser.current = userId
     let live = true
-    if (!userId) return
+    if (!userId || !dataRequired) return
     void accountAdapter
       .load(userId)
       .then((result) => {
@@ -43,20 +54,23 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         )
           throw new AuthError('permission')
         setData(structuredClone(result))
+        setResolvedScope(requestScope)
         setStatus('ready')
         setError('')
       })
       .catch((reason) => {
         if (live && currentUser.current === userId) {
           setData(null)
+          setResolvedScope(requestScope)
           setStatus('error')
           setError(authErrorMessage(reason))
+          setErrorOwner(userId)
         }
       })
     return () => {
       live = false
     }
-  }, [userId, revision])
+  }, [userId, revision, dataRequired, requestScope])
   const reload = useCallback(() => {
     setStatus('loading')
     setError('')
@@ -99,8 +113,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       address: owned?.address ?? null,
       orders: owned?.orders ?? [],
       ordersAvailable: owned?.ordersAvailable !== false,
-      status: !userId || (!owned && status !== 'error') ? 'loading' : status,
-      error,
+      status: !userId || resolvedScope !== requestScope || (!owned && (status !== 'error' || errorOwner !== userId)) ? 'loading' : status,
+      error: errorOwner === userId ? error : '',
       reload,
       updateProfile,
       saveAddress,
@@ -116,6 +130,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       owned,
       status,
       error,
+      errorOwner,
+      requestScope,
+      resolvedScope,
       reload,
       updateProfile,
       saveAddress,

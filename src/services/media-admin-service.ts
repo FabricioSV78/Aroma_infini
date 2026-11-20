@@ -9,9 +9,9 @@ import {
   type ManagedVideoAsset,
   type ManagedSvgAsset,
 } from '../domain/media'
-import { authService } from './auth-service'
+import { adminAuthService as authService } from './auth-service'
 import { isRemoteCatalog } from './catalog-source'
-import { requireSupabaseClient } from './supabase-client'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import { registerManagedMedia, registerManagedVideo } from './media-registry'
 import { UserFacingError } from './admin-messages'
@@ -197,7 +197,7 @@ export async function mediaAdminActor(): Promise<ExpectedMediaActor> {
   const { data, error } = await requireSupabaseClient().auth.getSession()
   if (error || data.session?.user.id !== userId) sessionError()
   const token = data.session.access_token
-  const verified = await verifySupabaseUser(token)
+  const verified = await verifySupabaseUser(token, 'admin')
   if (verified.error || verified.data.user?.id !== userId) sessionError()
   const assertCurrent = async () => {
     const current = await requireSupabaseClient().auth.getSession()

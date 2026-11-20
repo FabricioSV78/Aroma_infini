@@ -246,7 +246,7 @@ try {
   const session = (await admin.client.auth.getSession()).data.session
   await context.addInitScript(
     ({ key, value }) => localStorage.setItem(key, value),
-    { key: `sb-${project}-auth-token`, value: JSON.stringify(session) },
+    { key: `sb-${project}-admin-auth-token`, value: JSON.stringify(session) },
   )
   const page = await context.newPage()
   await page.goto(origin + '/admin/notificaciones')

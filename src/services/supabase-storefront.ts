@@ -190,18 +190,13 @@ function parseGallery(value: unknown): ProductGalleryView {
   }
 }
 
-/** Rebuild a typed DTO instead of asserting an untrusted JSON object as Product. */
-export function parseCatalogProductRecord(
+/** Shared public product validator for full detail and compact finder DTOs. */
+export function parseCatalogProduct(
   value: unknown,
   allowDraft = false,
   familyCodes?: ReadonlySet<string>,
-): StorefrontProductRecord {
-  const source = record(value)
-  const raw = record(source.product)
-  if (source.mediaAssets !== undefined)
-    rememberManagedAssets(source.mediaAssets)
-  const details = record(source.detail)
-  const notes = record(details.notes)
+): Product {
+  const raw = record(value)
   if (raw.productType !== 'perfume' && raw.productType !== 'complemento')
     throw new CatalogReadError()
   const families = unique(
@@ -231,7 +226,7 @@ export function parseCatalogProductRecord(
     throw new CatalogReadError()
   const code = text(raw.sku, 5)
   if (!/^\d{5}$/.test(code)) throw new CatalogReadError()
-  const product: Product = {
+  return {
     id: uuid(raw.id),
     sku: code,
     slug: slug(raw.slug),
@@ -245,6 +240,20 @@ export function parseCatalogProductRecord(
     variants,
     discount: parseOffer(raw.discount),
   }
+}
+
+/** Rebuild a typed DTO instead of asserting an untrusted JSON object as Product. */
+export function parseCatalogProductRecord(
+  value: unknown,
+  allowDraft = false,
+  familyCodes?: ReadonlySet<string>,
+): StorefrontProductRecord {
+  const source = record(value)
+  if (source.mediaAssets !== undefined)
+    rememberManagedAssets(source.mediaAssets)
+  const details = record(source.detail)
+  const notes = record(details.notes)
+  const product = parseCatalogProduct(source.product, allowDraft, familyCodes)
   const level = details.intensityLevel
   if (level !== null && level !== 1 && level !== 2 && level !== 3)
     throw new CatalogReadError()

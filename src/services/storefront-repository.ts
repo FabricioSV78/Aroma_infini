@@ -14,7 +14,7 @@ import {
 } from './admin-runtime'
 import type { AdminState } from '../types/admin'
 import { isRemoteCatalog } from './catalog-source'
-import { invalidatePublicQueryCache } from './public-query-cache'
+import { invalidatePublicQueryCache, subscribePublicQueryInvalidation } from './public-query-cache'
 import {
   createRemoteStorefrontTransport,
   createSupabaseStorefrontRepository,
@@ -108,10 +108,13 @@ export const storefrontRepository: LocalStorefrontRepository = isRemoteCatalog
   : localStorefrontRepository
 
 /** A confirmed administrative command invalidates public reads, never hydrates them. */
-export function invalidateSupabaseStorefront() {
-  invalidatePublicQueryCache()
-  if (isRemoteCatalog) remoteStorefrontRepository.invalidate()
+export function invalidateSupabaseStorefront(publish = true) {
+  invalidatePublicQueryCache(publish)
 }
+
+subscribePublicQueryInvalidation(() => {
+  if (isRemoteCatalog) remoteStorefrontRepository.invalidate()
+})
 
 export function readStorefrontMetadata(): Promise<StorefrontSnapshot> {
   return isRemoteCatalog

@@ -1,6 +1,6 @@
 import type { AuthSession } from '../types/auth'
 import { AuthError } from './auth-errors'
-import { requireSupabaseClient } from './supabase-client'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 
 export interface AdminDeviceActor {
   userId: string

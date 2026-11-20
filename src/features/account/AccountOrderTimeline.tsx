@@ -3,6 +3,7 @@ import {
   accountStatusOrder,
   type AccountOrderStatus,
 } from '../../services/account-service'
+import { isTerminalOrderStatus } from '../../domain/order-workflow'
 
 export function AccountOrderTimeline({
   status,
@@ -10,6 +11,12 @@ export function AccountOrderTimeline({
   status: AccountOrderStatus
 }) {
   const currentIndex = accountStatusOrder.indexOf(status)
+  if (isTerminalOrderStatus(status))
+    return (
+      <p role="status">
+        {accountStatusLabels[status]}. La reserva del pedido está cerrada.
+      </p>
+    )
   return (
     <ol className="account-order-timeline" aria-label="Estado del pedido">
       {accountStatusOrder.map((step, index) => (

@@ -12,6 +12,7 @@ export default defineConfig({
     'public-initial-worker.spec.ts',
     'public-document-timing.spec.ts',
     'public-parallel-settings.spec.ts',
+    'public-initial-visual-worker.spec.ts',
   ],
   reporter: 'list',
   workers: 1,

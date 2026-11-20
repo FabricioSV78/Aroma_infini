@@ -185,6 +185,7 @@ function ProductPhotoWorkspace({ record }: { record: AdminProduct }) {
         ← Volver a productos
       </Link>
       <AdminPageHeader
+        keepDescriptionOnMobile
         eyebrow="Fotografías de producto"
         title={`Fotografías de ${record.product.name}`}
         description={`${variantSkuSummary(record.product.variants)} · ${photoStatus.count}/${photoStatus.expected} fotos · ${record.active ? 'Activo' : 'Desactivado'}`}

@@ -1,4 +1,4 @@
-import type { Product, ProductDetail, ProductVariant } from '../types/catalog'
+import type { Brand, Product, ProductDetail, ProductVariant } from '../types/catalog'
 import { isPerfume } from '../domain/product-type'
 import type {
   FinderAnswers,
@@ -7,10 +7,6 @@ import type {
   FinderResult,
   FragranceMatch,
 } from '../types/fragrance-finder'
-import type {
-  StorefrontSnapshot,
-  StorefrontProductRecord,
-} from './storefront-repository'
 import { formatPEN } from './currency'
 import { getVariantPrice } from './product-discounts'
 import {
@@ -20,6 +16,17 @@ import {
 } from '../domain/olfactory-family'
 
 export const finderWeights = { family: 5, occasion: 3, intensity: 2 } as const
+
+/** Ranking consumes a complete public Product, but never notes, descriptions,
+ * galleries, recommendation IDs or editorial media from its detail page. */
+export interface FinderRecord {
+  product: Product
+  detail: Pick<ProductDetail, 'occasion' | 'intensity'>
+}
+export interface FinderSnapshot {
+  products: FinderRecord[]
+  brands: Brand[]
+}
 
 export function normalizeFinderValue(value: string): string {
   return value
@@ -86,8 +93,8 @@ export function availableFinderVariants(
 }
 
 function availableRecords(
-  snapshot: StorefrontSnapshot,
-): StorefrontProductRecord[] {
+  snapshot: FinderSnapshot,
+): FinderRecord[] {
   const brands = new Set(snapshot.brands.map((brand) => brand.id))
   // Publication is owned by the repository, and availability by variant stock.
   return snapshot.products.filter(
@@ -102,7 +109,7 @@ function availableRecords(
   )
 }
 
-export function getFinderOptions(snapshot: StorefrontSnapshot): FinderOptions {
+export function getFinderOptions<T extends FinderSnapshot>(snapshot: T): FinderOptions {
   return getFinderOptionsFromProfiles(availableRecords(snapshot))
 }
 
@@ -143,8 +150,8 @@ export function getFinderOptionsFromProfiles(
   }
 }
 
-export function recommendFragrances(
-  snapshot: StorefrontSnapshot,
+export function recommendFragrances<T extends FinderSnapshot>(
+  snapshot: T,
   answers: FinderAnswers,
 ): FinderResult {
   const records = availableRecords(snapshot)

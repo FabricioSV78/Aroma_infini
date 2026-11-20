@@ -7,6 +7,8 @@ interface AdminPageHeaderProps {
   eyebrow: string
   title: string
   description: string
+  keepDescriptionOnMobile?: boolean
+  keepEyebrowOnMobile?: boolean
   action?: { label: string; to: string }
 }
 
@@ -14,14 +16,16 @@ export function AdminPageHeader({
   eyebrow,
   title,
   description,
+  keepDescriptionOnMobile = false,
+  keepEyebrowOnMobile = false,
   action,
 }: AdminPageHeaderProps) {
   return (
     <header className="admin-page-heading">
       <div>
-        <p className="eyebrow">{eyebrow}</p>
+        <p className={`eyebrow${keepEyebrowOnMobile ? ' admin-heading-context' : ''}`}>{eyebrow}</p>
         <h1>{title}</h1>
-        <p>{description}</p>
+        <p className={keepDescriptionOnMobile ? undefined : 'admin-heading-description'}>{description}</p>
       </div>
       {action ? (
         <Link className="button button--primary" to={action.to}>

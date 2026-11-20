@@ -1,0 +1,201 @@
+/* Keep the same table, selection model and commands on every screen. Only the
+   mobile/tablet presentation changes; the desktop checkbox stays in its cell. */
+.admin-order-page-select-text {
+  display: none;
+}
+.admin-order-date-toggle { display: none; }
+.admin-order-date-fields { display: contents; }
+
+@media (max-width: 1199px) {
+  .admin-page.admin-order-workspace .admin-work-order-table thead {
+    position: static;
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    margin-bottom: 12px;
+  }
+
+  .admin-page.admin-order-workspace .admin-work-order-table thead tr {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    margin: 0;
+  }
+
+  /* Preserve the column headings for table navigation without clipping the
+     interactive page-selection control with the old desktop-only thead. */
+  .admin-page.admin-order-workspace .admin-work-order-table thead th:not(:first-child) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .admin-page.admin-order-workspace .admin-work-order-table thead .admin-order-page-selection {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .admin-page.admin-order-workspace .admin-work-order-table thead .admin-order-checkbox-target {
+    display: flex;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 4px;
+    border-radius: 6px;
+    text-align: left;
+  }
+
+  .admin-page.admin-order-workspace .admin-order-checkbox-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .admin-order-page-select-text {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .admin-order-page-select-text small {
+    color: var(--admin-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .admin-order-workspace .admin-order-summary > a {
+    min-height: 56px;
+    padding: 10px 12px;
+  }
+
+  .admin-order-workspace .admin-order-selection-bar {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .admin-order-workspace .admin-order-selection-bar > div:first-child {
+    min-width: 0;
+    flex: 1 1 220px;
+    gap: 0;
+  }
+
+  .admin-order-workspace .admin-order-select-all,
+  .admin-order-workspace .admin-order-text-button {
+    min-height: 44px;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-order-reference,
+  .admin-order-action-dialog .dialog-heading h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-work-order-identity {
+    padding-right: 48px;
+  }
+
+  .admin-order-workspace .admin-work-order-table .admin-row-actions > a {
+    min-height: 44px;
+  }
+
+  .admin-shell .admin-order-workspace .admin-work-order-table tbody :is(th, td):not(.admin-order-selection-cell) {
+    padding: 8px 0;
+    gap: 4px;
+  }
+  .admin-shell .admin-order-workspace .admin-work-order-table .admin-work-order-identity {
+    padding-right: 48px;
+    gap: 3px;
+  }
+  .admin-shell .admin-order-workspace .admin-work-order-table tbody td:nth-child(6) {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .admin-shell .admin-order-workspace .admin-work-order-table .admin-work-order-actions > .admin-cell-label {
+    display: none;
+  }
+
+  .admin-order-action-dialog .dialog-inner {
+    padding: 20px;
+  }
+
+  .admin-order-action-dialog .admin-order-action-form {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-page.admin-order-workspace .admin-order-filter-bar .admin-order-preparation-field {
+    grid-column: auto;
+  }
+  .admin-order-workspace .admin-order-date-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    align-self: end;
+    gap: 8px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid var(--admin-border-strong);
+    border-radius: 8px;
+    background: var(--admin-surface);
+    color: var(--admin-accent);
+    font-size: 0.75rem;
+  }
+  .admin-order-date-toggle svg { width: 16px; height: 16px; flex: none; }
+  .admin-order-date-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .admin-order-workspace .admin-order-date-fields:not(.is-open) { display: none; }
+
+  .admin-order-workspace .admin-order-filter-bar .admin-filter-fields {
+    gap: 10px;
+  }
+
+  .admin-order-workspace .admin-order-selection-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 8px;
+  }
+
+  .admin-order-workspace .admin-order-selection-actions > .button {
+    min-width: 0;
+    padding-inline: 10px;
+    white-space: normal;
+  }
+
+  .admin-order-workspace .admin-order-selection-actions > .admin-order-text-button {
+    grid-column: 1 / -1;
+  }
+
+  .admin-order-action-dialog .admin-order-dialog-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .admin-order-action-dialog .admin-order-dialog-actions > .button {
+    min-width: 0;
+    width: 100%;
+    white-space: normal;
+  }
+}

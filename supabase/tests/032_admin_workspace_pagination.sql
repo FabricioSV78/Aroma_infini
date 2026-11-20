@@ -41,7 +41,9 @@ set constraints all immediate;
 set constraints all deferred;
 analyze app.products,app.product_variants,app.orders,app.order_items;
 
-select aroma_workspace_test.ok((select count(*)=120 from pg_indexes where schemaname in('app','private') and tablename not in('order_stock_reservations','media_builtin_bindings')),'Workspace pagination adds no indexes to existing tables');
+-- Later features may create their own tables/primary keys; this historical
+-- assertion protects the indexes of the pre-pagination tables only.
+select aroma_workspace_test.ok((select count(*)=120 from pg_indexes where schemaname in('app','private') and tablename not in('order_stock_reservations','media_builtin_bindings','admin_push_policy')),'Workspace pagination adds no indexes to existing tables');
 set local role anon;
 select aroma_workspace_test.error('select api.admin_product_list()','42501','Anonymous cannot read paged products');
 select aroma_workspace_test.error('select api.admin_order_list()','42501','Anonymous cannot read paged orders');

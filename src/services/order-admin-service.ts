@@ -11,8 +11,8 @@ import type {
 import type { Database, Json } from '../types/database.generated'
 import { adminService as local, applyRemoteOrders } from './admin-service'
 import { isRemoteCatalog } from './catalog-source'
-import { authService } from './auth-service'
-import { requireSupabaseClient } from './supabase-client'
+import { adminAuthService as authService } from './auth-service'
+import { requireAdminSupabaseClient as requireSupabaseClient } from './supabase-client'
 import { verifySupabaseUser } from './verified-auth-user'
 import { readAdminPageBatches } from './admin-page-batches'
 import { UserFacingError } from './admin-messages'
@@ -20,6 +20,9 @@ import type { AdminOrderListQuery } from '../domain/admin-list-query'
 import type { AdminCustomerList, AdminOrderList, AdminOrderSelection, AdminDashboardData } from '../types/admin-lists'
 import { adminListAccess } from './admin-list-access'
 import { createAdminProtectedReads } from './admin-protected-read'
+import { isProductionEnvironment } from './runtime-environment'
+import { notifyAdminOrdersChanged } from '../domain/order-events'
+import { invalidatePublicQueryCache } from './public-query-cache'
 
 import {
   invalidOrderResponse as invalid,
@@ -95,7 +98,7 @@ async function actor(): Promise<Actor> {
     session = await client.auth.getSession()
   if (session.error || session.data.session?.user.id !== userId) sessionError()
   const token = session.data.session.access_token
-  const verified = await verifySupabaseUser(token)
+  const verified = await verifySupabaseUser(token, 'admin')
   if (verified.error || verified.data.user?.id !== userId) sessionError()
   const result = { userId, token, generation: started, accessRevision }
   await stillActor(result)
@@ -336,6 +339,7 @@ export async function readAdminCustomerList(search: string, page: number): Promi
 export async function readAdminOrdersDashboard(): Promise<Pick<AdminDashboardData, 'ownerId' | 'accessRevision' | 'recentOrders' | 'toPrepare' | 'counts'>> {
   const { current, data: response } = await readProtectedPage('admin_order_list', {
     p_mode: 'dashboard', p_limit: 4,
+    p_query: { includeSimulation: !isProductionEnvironment },
   })
   const data = object(response), counts = object(data.counts)
   if (!Array.isArray(data.orders) || data.orders.length > 4) invalid()
@@ -454,6 +458,12 @@ export const orderAdminService = {
     )
       invalid()
     confirmMutationOrders(data.orders, data.orderHistory)
+    if (result.updated.length) {
+      notifyAdminOrdersChanged()
+      // Cancellation can restore stock and completed orders affect ranking.
+      // Publish only a refresh signal, never the order or customer payload.
+      invalidatePublicQueryCache(true)
+    }
     return { ...result, ...(options.listContext ? { page: parseOrderPage(data.page, current, options.listContext.limit) } : {}) }
   },
   async saveOrderDelivery(
@@ -496,6 +506,7 @@ export const orderAdminService = {
     await stillActor(current)
     check(response.error, response.status)
     confirmMutationOrders([object(response.data).order])
+    notifyAdminOrdersChanged()
     return { kind: 'saved' }
   },
 }

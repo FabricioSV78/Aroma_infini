@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { Dialog } from '../../components/ui/Dialog'
-import { authService } from '../../services/auth-service'
+import { adminAuthService as authService } from '../../services/auth-service'
 import { AuthError, authErrorMessage } from '../../services/auth-errors'
 import type { AuthMfaFactor } from '../../types/auth'
 import { AdminAuthShell } from './AdminAuthShell'

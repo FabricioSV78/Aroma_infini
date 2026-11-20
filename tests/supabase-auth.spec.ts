@@ -27,7 +27,8 @@ async function registration(page: Page) {
 async function authState(page: Page) {
   return page.evaluate(async () => {
     const modulePath = '/src/services/auth-service.ts'
-    const { authService } = await import(modulePath)
+    const module = await import(modulePath)
+    const authService = location.pathname.startsWith('/admin') ? module.adminAuthService : module.authService
     const state = authService.getSnapshot()
     return {
       status: state.status as string,
@@ -150,8 +151,8 @@ test('una metadata role=admin no concede acceso administrativo', async ({
   )
   await expect(page.locator('.admin-sidebar')).toHaveCount(0)
   const state = await authState(page)
-  expect(state.userId).toBe(customerA)
-  expect(state.role).toBe('customer')
+  expect(state.userId).toBeUndefined()
+  expect(state.role).toBeUndefined()
   await page.goto('/admin/productos')
   await expect(page).toHaveURL(/\/admin\/login/)
   await expect(page.locator('.admin-sidebar')).toHaveCount(0)

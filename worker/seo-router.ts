@@ -7,7 +7,7 @@ import { createSitemapHandler } from './sitemap'
 import { createSiteMediaSeoHandler } from './site-media-seo'
 import { filterPublicRouteHints } from './public-route-hints'
 import { createComplaintsHandler } from './complaints-handler'
-import { createAdminPushHandler, dispatchAdminPush } from './admin-push-handler'
+import { createAdminPushHandler, dispatchAdminPush, dispatchAdminOrderPush } from './admin-push-handler'
 import { createAdminDeviceHandler } from './admin-device-handler'
 import { expireStockReservations } from './stock-reservations'
 import {
@@ -110,16 +110,23 @@ export default {
     // Environments not yet migrated, and unrelated technical assets, retain
     // their existing static delivery. Reviewed retired originals never reach it.
     if (
-      /^(?:\/images\/|\/videos\/|\/brand\/)/.test(new URL(request.url).pathname) &&
+      /^(?:\/images\/|\/videos\/|\/brand\/)/.test(
+        new URL(request.url).pathname,
+      ) &&
       (request.method === 'GET' || request.method === 'HEAD')
-    ) return env.ASSETS.fetch(request)
+    )
+      return env.ASSETS.fetch(request)
     const adminDevice = await adminDeviceRequest(request, env)
     if (adminDevice) return adminDevice
     const adminPush = await adminPushRequest(request, env)
     if (adminPush) return adminPush
     const complaint = await complaintsRequest(request, env)
     if (complaint) return complaint
-    const checkout = await checkoutRequest(request, env)
+    const checkout = await checkoutRequest(request, env, (orderId) => {
+      ctx.waitUntil(dispatchAdminOrderPush(env, orderId).catch(() => {
+        console.warn({ event: 'order_push_dispatch_failed' })
+      }))
+    })
     if (checkout) return checkout
     const media = await mediaRequest(request, env, ctx)
     if (media) return media
@@ -140,14 +147,22 @@ export default {
     }
 
     const prepared = siteMediaSeo.prepareSettings(request, env)
-    const catalogPage = await catalogSeoRequest(request, env, prepared?.diagnostics.fetch)
+    let initialProduct: unknown
+    const catalogPage = await catalogSeoRequest(
+      request,
+      env,
+      prepared?.diagnostics.fetch,
+      (value) => {
+        initialProduct = value
+      },
+    )
     if (catalogPage) {
       if (catalogPage.status !== 200) prepared?.cancel()
       return siteMediaSeo(
         filterPublicRouteHints(catalogPage, request),
         request,
         env,
-        prepared,
+        prepared ? { ...prepared, product: initialProduct } : undefined,
       )
     }
     prepared?.cancel()

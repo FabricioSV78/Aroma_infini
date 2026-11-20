@@ -1,7 +1,8 @@
 import { Buffer } from 'node:buffer'
-import type { Route } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import {
   customerA,
+  customerB,
   expect,
   fixtureEmail,
   fixturePassword,
@@ -35,6 +36,142 @@ function expectOwner(route: Route) {
     Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
   ) as { sub: string }
   expect(claims.sub).toBe(customerA)
+}
+
+async function prepareAccountRead(page: Page) {
+  await signIn(page)
+  await expect(page).toHaveURL('/cuenta')
+  await page.goto('/contacto')
+  await page.evaluate(async () => {
+    const path = '/src/services/auth-service.ts'
+    const { authService } = await import(path) as typeof import('../src/services/auth-service')
+    await authService.initialize()
+  })
+}
+
+test('la cuenta comparte sólo lecturas pendientes del mismo propietario y vuelve a consultar después', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  await prepareAccountRead(page)
+  supabaseNetwork.requests.length = 0
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  let profileReads = 0
+  await page.route(`${origin}/rest/v1/rpc/get_profile`, async (route) => {
+    if (await options(route)) return
+    expectOwner(route)
+    profileReads++
+    await gate
+    await route.fallback()
+  })
+  const reading = page.evaluate(async (userId) => {
+    const path = '/src/services/account-adapter.ts'
+    const { accountAdapter } = await import(path) as typeof import('../src/services/account-adapter')
+    const values = await Promise.all([accountAdapter.load(userId), accountAdapter.load(userId)])
+    return values.map((value) => [value.userId, value.profile.firstName])
+  }, customerA)
+  try {
+    await expect.poll(() => profileReads).toBeGreaterThan(0)
+    // The address request proves both callers have passed identity verification.
+    await expect.poll(() => supabaseNetwork.requests.filter((request) => request.path.endsWith('/get_address')).length).toBeGreaterThan(0)
+    expect(profileReads).toBe(1)
+    release()
+    expect(await reading).toEqual([[customerA, 'Ana'], [customerA, 'Ana']])
+    await page.evaluate(async (userId) => {
+      const path = '/src/services/account-adapter.ts'
+      const { accountAdapter } = await import(path) as typeof import('../src/services/account-adapter')
+      return accountAdapter.load(userId)
+    }, customerA)
+    expect(profileReads).toBe(2)
+    expect(supabaseNetwork.requests.filter((request) => request.path.endsWith('/get_address'))).toHaveLength(2)
+    expect(supabaseNetwork.requests.filter((request) => request.path === '/auth/v1/user').length).toBeGreaterThanOrEqual(2)
+  } finally {
+    release()
+    await reading.catch(() => {})
+  }
+})
+
+test('una escritura de perfil invalida la lectura pendiente y no restaura datos anteriores', async ({
+  page,
+  supabaseNetwork,
+}) => {
+  void supabaseNetwork
+  await prepareAccountRead(page)
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  let profileReads = 0
+  await page.route(`${origin}/rest/v1/rpc/get_profile`, async (route) => {
+    if (await options(route)) return
+    expectOwner(route)
+    profileReads++
+    if (profileReads > 1) return route.fallback()
+    await gate
+    await route.fulfill({ headers, json: { user_id: customerA, first_name: 'Ana', last_name: 'Torres', phone: '912345678' } })
+  })
+  const reading = page.evaluate(async (userId) => {
+    const path = '/src/services/account-adapter.ts'
+    const { accountAdapter } = await import(path) as typeof import('../src/services/account-adapter')
+    return (await accountAdapter.load(userId)).profile.firstName
+  }, customerA)
+  try {
+    await expect.poll(() => profileReads).toBe(1)
+    await page.evaluate(async ({ userId, email }) => {
+      const path = '/src/services/account-adapter.ts'
+      const { accountAdapter } = await import(path) as typeof import('../src/services/account-adapter')
+      return accountAdapter.updateProfile(userId, { firstName: 'Actualizada', lastName: 'Torres', phone: '912345678', email })
+    }, { userId: customerA, email: fixtureEmail })
+    release()
+    expect(await reading).toBe('Actualizada')
+    expect(profileReads).toBe(2)
+  } finally {
+    release()
+    await reading.catch(() => {})
+  }
+})
+
+for (const nextOwner of [customerA, customerB]) {
+  test(`una lectura pendiente no sobrevive al cierre y nuevo acceso de ${nextOwner === customerA ? 'la misma cuenta' : 'otra cuenta'}`, async ({
+    page,
+    supabaseNetwork,
+  }) => {
+    await prepareAccountRead(page)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let profileReads = 0
+    await page.route(`${origin}/rest/v1/rpc/get_profile`, async (route) => {
+      if (await options(route)) return
+      profileReads++
+      await gate
+      await route.fulfill({ headers, json: { user_id: customerA, first_name: 'Anterior', last_name: 'Torres', phone: '912345678' } })
+    })
+    const reading = page.evaluate(async (userId) => {
+      const path = '/src/services/account-adapter.ts'
+      const { accountAdapter } = await import(path) as typeof import('../src/services/account-adapter')
+      try { await accountAdapter.load(userId); return 'published' }
+      catch (error) { return error instanceof Error && 'code' in error ? error.code : 'unknown' }
+    }, customerA)
+    try {
+      await expect.poll(() => profileReads).toBe(1)
+      await page.evaluate(async () => {
+        const path = '/src/services/auth-service.ts'
+        const { authService } = await import(path) as typeof import('../src/services/auth-service')
+        await authService.signOut()
+      })
+      supabaseNetwork.currentUserId = nextOwner
+      supabaseNetwork.currentEmail = nextOwner === customerA ? fixtureEmail : 'beatriz@example.invalid'
+      await page.evaluate(async ({ email, password }) => {
+        const path = '/src/services/auth-service.ts'
+        const { authService } = await import(path) as typeof import('../src/services/auth-service')
+        await authService.signIn({ email, password })
+      }, { email: supabaseNetwork.currentEmail, password: fixturePassword })
+      release()
+      expect(await reading).toBe('session')
+    } finally {
+      release()
+      await reading.catch(() => {})
+    }
+  })
 }
 
 test('perfil y dirección dependen del propietario remoto, no de una confirmación de correo', async ({

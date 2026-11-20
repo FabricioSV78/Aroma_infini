@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import {
   publicBrandPreviewsFixture,
@@ -285,6 +285,52 @@ function gate() {
   })
   return { wait, resolve }
 }
+
+test('Quinientos favoritos no descargan sus fichas al navegar por Tienda; la colección las pide al abrirse', async ({
+  page,
+  supabaseNetwork,
+  favoritesNetwork,
+}) => {
+  const ids = Array.from(
+    { length: 500 },
+    (_, index) => `60000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+  )
+  favoritesNetwork.lists.set(customerA, { productIds: ids, version: 1 })
+  await supabaseNetwork.seedSession(page)
+  await page.goto('/tienda')
+  const heart = page.getByRole('button', {
+    name: 'Quitar Flor de Prueba de favoritos',
+  })
+  await expect(heart).toBeEnabled()
+  const byIds = () => favoritesNetwork.calls.filter(
+    (call) => call.name === 'catalog_products_by_ids',
+  )
+  const backgroundCalls = byIds().length
+  const phase = process.env.AROMA_FAVORITES_PROBE_PHASE
+  if (phase === 'before' || phase === 'after') {
+    const folder = 'artifacts/integral-performance-2026-11-19/component-probes'
+    await mkdir(folder, { recursive: true })
+    await writeFile(`${folder}/favorites-${phase}.json`, JSON.stringify({
+      phase,
+      scope: 'Real React and Supabase SDK with isolated owner/catalog HTTP fixtures; 500 saved IDs',
+      publicPage: '/tienda',
+      favoriteCount: ids.length,
+      unnecessaryCatalogReads: backgroundCalls,
+      privateFavoritesReads: favoritesNetwork.calls.filter(
+        (call) => call.name === 'customer_favorites',
+      ).length,
+    }, null, 2))
+  }
+  // The explicit before probe measures the known regression without leaving a
+  // failing browser fixture behind; ordinary runs always assert the fix.
+  if (phase === 'before') return
+  expect(backgroundCalls).toBe(0)
+  await account(page)
+  await expect(page.locator('.favorites-grid .product-card')).toHaveCount(3)
+  expect(byIds()).toHaveLength(5)
+  expect(byIds().every((call) => (call.body.p_product_ids as string[]).length === 100)).toBe(true)
+  await expect(heart).toHaveAttribute('aria-pressed', 'true')
+})
 async function account(page: Page) {
   if (page.url().startsWith('http://127.0.0.1:5193/')) {
     await navigate(page, '/cuenta/favoritos')
@@ -326,6 +372,106 @@ async function changeSession(page: Page, owner: string) {
     { key: fixtureStorageKey, owner },
   )
 }
+
+test('La cuenta carga sus datos privados al entrar, sin consultarlos desde las páginas públicas', async ({
+  page,
+  supabaseNetwork,
+  favoritesNetwork,
+}) => {
+  void favoritesNetwork
+  await supabaseNetwork.seedSession(page)
+  await page.goto('/tienda')
+  await expect(page.getByRole('button', { name: 'Quitar Flor de Prueba de favoritos' })).toBeEnabled()
+  const privateReads = () => supabaseNetwork.requests.filter(
+    (request) => ['/rest/v1/rpc/get_profile', '/rest/v1/rpc/get_address', '/rest/v1/rpc/customer_orders'].includes(request.path),
+  )
+  const phase = process.env.AROMA_FAVORITES_PROBE_PHASE
+  if (phase === 'before') await expect.poll(() => privateReads().length).toBeGreaterThanOrEqual(3)
+  const backgroundReads = privateReads().length
+  if (phase === 'before' || phase === 'after') {
+    const folder = 'artifacts/integral-performance-2026-11-19/component-probes'
+    await mkdir(folder, { recursive: true })
+    await writeFile(`${folder}/account-demand-${phase}.json`, JSON.stringify({
+      phase,
+      scope: 'Real provider and Supabase SDK with owner-scoped HTTP fixtures',
+      publicPage: '/tienda', privateAccountReads: backgroundReads,
+      privateEndpoints: privateReads().map((request) => request.path),
+    }, null, 2))
+  }
+  if (phase === 'before') return
+  expect(backgroundReads).toBe(0)
+  await navigate(page, '/cuenta/datos')
+  await expect(page.getByRole('textbox', { name: 'Nombre', exact: true })).toHaveValue('Ana')
+  expect(privateReads()).toHaveLength(3)
+  await navigate(page, '/contacto')
+  await expect(page.locator('main h1')).toHaveText('Contacto')
+  expect(privateReads()).toHaveLength(3)
+  await navigate(page, '/cuenta/datos')
+  await expect(page.getByRole('textbox', { name: 'Nombre', exact: true })).toHaveValue('Ana')
+  expect(privateReads()).toHaveLength(6)
+})
+
+test('Cuenta y favoritos comparten sólo una verificación de identidad pendiente y la cuenta verifica otra vez tras leer', async ({
+  page,
+  context,
+  supabaseNetwork,
+  favoritesNetwork,
+}) => {
+  void favoritesNetwork
+  await supabaseNetwork.seedSession(page)
+  await page.goto('/tienda')
+  await expect(page.getByRole('button', { name: 'Quitar Flor de Prueba de favoritos' })).toBeEnabled()
+  const held = gate()
+  let userRequests = 0
+  await context.route(`${origin}/auth/v1/user`, async (route) => {
+    if (route.request().method() === 'GET') {
+      userRequests++
+      if (userRequests === 1) await held.wait
+    }
+    await route.fallback()
+  })
+  await page.evaluate(async (owner) => {
+    const accountPath = '/src/services/account-adapter.ts'
+    const favoritesPath = '/src/services/customer-favorites-service.ts'
+    const [{ accountAdapter }, { customerFavoritesService }] = await Promise.all([
+      import(accountPath), import(favoritesPath),
+    ])
+    Reflect.set(window, '__concurrentAccountRead', { done: false, error: '' })
+    void Promise.all([accountAdapter.load(owner), customerFavoritesService.load(true)]).then(
+      () => Reflect.set(window, '__concurrentAccountRead', { done: true, error: '' }),
+      (error: Error) => Reflect.set(window, '__concurrentAccountRead', { done: true, error: error.message }),
+    )
+  }, customerA)
+  try {
+    await expect.poll(() => userRequests).toBe(1)
+    // Both operations are deliberately held at Auth while independent effect
+    // microtasks settle. A completed verification must never be reused below.
+    await page.waitForTimeout(100)
+    expect(userRequests).toBe(1)
+    held.resolve()
+    await expect.poll(() => page.evaluate(() => Reflect.get(window, '__concurrentAccountRead'))).toEqual({ done: true, error: '' })
+    expect(userRequests).toBe(2)
+  } finally {
+    held.resolve()
+  }
+})
+
+test('El resumen distingue un error de favoritos de una cuenta sin productos guardados', async ({
+  page,
+  supabaseNetwork,
+  favoritesNetwork,
+}) => {
+  favoritesNetwork.failRead = true
+  favoritesNetwork.lists.set(customerA, { productIds: [], version: 0 })
+  await supabaseNetwork.seedSession(page)
+  await page.goto('/cuenta')
+  const summary = page.locator('section[aria-labelledby="overview-favorites-title"]')
+  await expect(summary).toContainText('No pudimos cargar tus favoritos.')
+  await expect(summary.locator('span').first()).toHaveText('—')
+  favoritesNetwork.failRead = false
+  await summary.getByRole('button', { name: 'Volver a intentar', exact: true }).click()
+  await expect(summary.locator('span').first()).toHaveText('00')
+})
 
 test('Los favoritos de invitado permanecen separados de la cuenta y reaparecen al salir', async ({
   page,
