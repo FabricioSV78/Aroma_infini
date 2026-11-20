@@ -9,8 +9,9 @@ import { useAdminListData } from './useAdminListData'
 import type { AdminProductList } from '../../types/admin-lists'
 import { adminListPage, adminProductListQuery } from '../../domain/admin-list-query'
 import { Icon } from '../../components/ui/Icon'
+import { InlineStatus } from '../../components/ui/InlineStatus'
 import { type AdminBrand, type AdminProduct } from '../../services/admin-service'
-import { catalogAdminService as adminService } from '../../services/catalog-admin-service'
+import { catalogAdminService as adminService, readAdminProductList } from '../../services/catalog-admin-service'
 import { formatPEN } from '../../services/currency'
 import { getVariantPrice } from '../../services/product-discounts'
 import { imageSource, imageSourceSet } from '../../services/image-source'
@@ -48,11 +49,14 @@ export function AdminProductsPage() {
   const state = useAdminStore()
   const routed = useAdminListData<AdminProductList>()
   const [confirmedPage, setConfirmedPage] = useState<{ base: AdminProductList; page: AdminProductList } | null>(null)
-  // An explicit import already verified the complete catalog for SKU/duplicate
-  // checks and merged its canonical result. Reuse that snapshot until the next
-  // route read, without making a confirmed import depend on another HTTP read.
-  const [importedFor, setImportedFor] = useState<AdminProductList | null>(null)
-  const remote = routed && importedFor === routed ? null : confirmedPage?.base === routed ? confirmedPage.page : routed
+  const remote = confirmedPage?.base === routed ? confirmedPage.page : routed
+  const [listRefresh, setListRefresh] = useState<{
+    base: AdminProductList
+    status: 'loading' | 'error'
+  } | null>(null)
+  const refreshRequest = useRef(0)
+  const refreshStatus = listRefresh?.base === routed ? listRefresh.status : null
+  useEffect(() => () => { refreshRequest.current++ }, [routed])
   const revalidator = useRevalidator()
   const catalogProducts = remote?.products ?? state.products
   const features = remote?.features ?? state.features
@@ -167,6 +171,29 @@ export function AdminProductsPage() {
     setParams({})
   }
 
+  async function refreshImportedProducts() {
+    if (!routed) return
+    const base = routed
+    const request = ++refreshRequest.current
+    setListRefresh({ base, status: 'loading' })
+    try {
+      // Import validation/confirmation only holds the imported records, not a
+      // complete catalog. Refresh this page and its SQL totals without replacing
+      // the list with that partial store or fetching unrelated product pages.
+      const page = await readAdminProductList(
+        adminProductListQuery(params), adminListPage(params), pageSize,
+      )
+      if (request !== refreshRequest.current) return
+      setConfirmedPage({ base, page })
+      setListRefresh(null)
+    } catch {
+      // A confirmed import remains successful even if this separate read fails.
+      // Keep the last verified page; retrying this action never imports again.
+      if (request === refreshRequest.current)
+        setListRefresh({ base, status: 'error' })
+    }
+  }
+
   async function changeProductVisibility(record: AdminProduct) {
     if (
       confirmingVisibility.current ||
@@ -198,7 +225,13 @@ export function AdminProductsPage() {
       async () => {
         const result = await adminService.setProductActive(record.product.id, !record.active, record,
           remote ? { query: adminProductListQuery(params), page: adminListPage(params), limit: pageSize } : undefined)
-        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
+        if (routed && result.page) {
+          // This write already returned a newer canonical page. An older
+          // post-import read must not replace it or leave a spurious error.
+          refreshRequest.current++
+          setListRefresh(null)
+          setConfirmedPage({ base: routed, page: result.page })
+        }
         return result
       },
       () => {
@@ -242,7 +275,28 @@ export function AdminProductsPage() {
         description="Controla la tienda, las presentaciones y el inventario desde un solo lugar."
         action={{ label: 'Nuevo producto', to: '/admin/productos/nuevo' }}
       />
-      <AdminProductImport onImported={() => setImportedFor(routed)} />
+      <AdminProductImport onImported={() => void refreshImportedProducts()} />
+      {refreshStatus ? (
+        <div className="admin-save-feedback">
+          <InlineStatus
+            busy={refreshStatus === 'loading'}
+            role={refreshStatus === 'error' ? 'alert' : 'status'}
+          >
+            {refreshStatus === 'loading'
+              ? 'Actualizando productos…'
+              : 'Los productos se guardaron, pero no pudimos actualizar el listado. Reintenta la actualización; no es necesario importar de nuevo.'}
+          </InlineStatus>
+          {refreshStatus === 'error' ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => void refreshImportedProducts()}
+            >
+              Reintentar actualización
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <AdminSaveFeedback {...visibilityPersistence} />
 
       <section

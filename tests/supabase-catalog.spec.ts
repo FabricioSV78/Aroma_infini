@@ -1932,6 +1932,129 @@ test('las familias administradas se guardan con SDK remoto y se comparten con pr
   ).toHaveLength(4)
 })
 
+for (const viewport of [
+  { name: 'escritorio', width: 1440, height: 900, limit: 12 },
+  { name: 'móvil', width: 390, height: 844, limit: 4 },
+] as const) {
+  test(`Excel actualiza la página remota tras importar diez productos y conserva el anterior sin recargar en ${viewport.name}`, async ({
+    page,
+    supabaseNetwork,
+    catalogNetwork,
+  }) => {
+    await page.setViewportSize(viewport)
+    await signInAdmin(page, supabaseNetwork)
+    await openImport(page)
+    const rows = page.locator('.admin-table--products tbody tr')
+    await expect(rows).toHaveCount(1)
+    await expect(rows).toContainText('Fleur de Test')
+    const preview = await reviewFile(
+      page,
+      await importFile(
+        Array.from({ length: 10 }, (_, index) =>
+          importRecord({
+            marca: 'Maison de Test',
+            nombre: `Perfume árabe importado ${String(index + 1).padStart(2, '0')}`,
+            slug: '',
+            sku: '',
+          }),
+        ),
+      ),
+    )
+    const confirm = preview.getByRole('button', {
+      name: 'Confirmar e importar 10 productos',
+      exact: true,
+    })
+    await expect(confirm).toBeEnabled()
+    const readsBefore = catalogNetwork.calls.filter(
+      (call) => call.name === 'admin_product_list' && call.body.p_limit === viewport.limit,
+    ).length
+    const documentRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+        documentRequests.push(request.url())
+    })
+    await confirm.click()
+    await expect(page.locator('.admin-notice-dialog')).toContainText('10 productos importados')
+    await page.locator('.admin-notice-dialog').getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(page.locator('.admin-filter-result')).toContainText('11 productos')
+    await expect(page.locator('.admin-inventory-summary > div').first()).toContainText('11')
+    await expect(rows).toHaveCount(Math.min(11, viewport.limit))
+    await expect(rows.filter({ hasText: 'Fleur de Test' })).toHaveCount(1)
+    const readsAfterImport = catalogNetwork.calls.filter(
+      (call) => call.name === 'admin_product_list' && call.body.p_limit === viewport.limit,
+    ).slice(readsBefore)
+    expect(readsAfterImport).toHaveLength(1)
+    expect(readsAfterImport[0].body).toMatchObject({ p_page: 1, p_limit: viewport.limit })
+    expect(catalogNetwork.calls.filter((call) => call.name === 'admin_import_products')).toHaveLength(1)
+    expect(catalogNetwork.calls.some((call) => call.name === 'admin_catalog_page')).toBe(false)
+    if (viewport.limit === 4) {
+      const pagination = page.getByRole('navigation', { name: 'Paginación de productos' })
+      await expect(pagination).toContainText('Página 1 de 3')
+      await pagination.getByRole('button', { name: 'Siguiente', exact: true }).click()
+      await expect(pagination).toContainText('Página 2 de 3')
+      await expect(rows).toHaveCount(4)
+      await pagination.getByRole('button', { name: 'Siguiente', exact: true }).click()
+      await expect(pagination).toContainText('Página 3 de 3')
+      await expect(rows).toHaveCount(3)
+      await page.getByRole('searchbox').fill('Fleur de Test')
+      await page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click()
+      await expect(rows).toHaveCount(1)
+      await expect(rows).toContainText('Fleur de Test')
+      await expect(page.locator('.admin-filter-result')).toContainText('1 producto')
+      expect(catalogNetwork.calls.filter((call) => call.name === 'admin_product_list' && call.body.p_limit === 4).slice(readsBefore).map((call) => call.body.p_page)).toEqual([1, 2, 3, 1])
+    } else {
+      for (let index = 1; index <= 10; index++)
+        await expect(rows.filter({ hasText: `Perfume árabe importado ${String(index).padStart(2, '0')}` })).toHaveCount(1)
+    }
+    expect(documentRequests).toEqual([])
+  })
+}
+
+test('Excel conserva el producto anterior y permite reintentar únicamente la lectura si falla actualizar el listado', async ({
+  page,
+  supabaseNetwork,
+  catalogNetwork,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await signInAdmin(page, supabaseNetwork)
+  await openImport(page)
+  const rows = page.locator('.admin-table--products tbody tr')
+  await expect(rows).toHaveCount(1)
+  const preview = await reviewFile(
+    page,
+    await importFile(Array.from({ length: 10 }, (_, index) => importRecord({
+      marca: 'Maison de Test',
+      nombre: `Reintento de listado ${index + 1}`,
+      slug: '',
+      sku: '',
+    }))),
+  )
+  const confirm = preview.getByRole('button', { name: 'Confirmar e importar 10 productos', exact: true })
+  await expect(confirm).toBeEnabled()
+  const readsBefore = catalogNetwork.calls.filter((call) => call.name === 'admin_product_list' && call.body.p_limit === 12).length
+  catalogNetwork.failCatalogAfterImport = true
+  await confirm.click()
+  await expect(page.locator('.admin-notice-dialog')).toContainText('10 productos importados')
+  await page.locator('.admin-notice-dialog').getByRole('button', { name: 'Cerrar', exact: true }).click()
+  const retry = page.getByRole('button', { name: 'Reintentar actualización', exact: true })
+  await expect(retry).toBeVisible()
+  await expect(page.getByText('Los productos se guardaron, pero no pudimos actualizar el listado. Reintenta la actualización; no es necesario importar de nuevo.', { exact: true })).toBeVisible()
+  await expect(rows.filter({ hasText: 'Fleur de Test' })).toHaveCount(1)
+  await settleCatalogRefreshRender(page)
+  expect(catalogNetwork.calls.filter((call) => call.name === 'admin_product_list' && call.body.p_limit === 12).length - readsBefore).toBe(1)
+  expect(catalogNetwork.calls.filter((call) => call.name === 'admin_import_products')).toHaveLength(1)
+  catalogNetwork.catalogReadUnavailable = false
+  catalogNetwork.failCatalogAfterImport = false
+  await retry.click()
+  await expect(page.locator('.admin-filter-result')).toContainText('11 productos')
+  await expect(rows).toHaveCount(11)
+  await expect(rows.filter({ hasText: 'Fleur de Test' })).toHaveCount(1)
+  await expect(retry).toHaveCount(0)
+  expect(catalogNetwork.calls.filter((call) => call.name === 'admin_product_list' && call.body.p_limit === 12).length - readsBefore).toBe(2)
+  expect(catalogNetwork.calls.filter((call) => call.name === 'admin_import_products')).toHaveLength(1)
+  expect(catalogNetwork.calls.some((call) => call.name === 'admin_catalog_page')).toBe(false)
+})
+
 test('Excel importa mediante el comando remoto y mantiene los productos pendientes de fotos fuera de la tienda', async ({
   page,
   supabaseNetwork,
@@ -2165,7 +2288,10 @@ test('QA-AROMA Excel remoto importa 500 productos y 1000 presentaciones con una 
     .locator('.admin-notice-dialog')
     .getByRole('button', { name: 'Cerrar', exact: true })
     .click()
-  await page.reload()
+  await expect(page.locator('.admin-filter-result')).toContainText('501 productos')
+  await expect(page.locator('.admin-table--products tbody tr')).toHaveCount(12)
+  await expect(page.locator('.admin-table--products tbody tr').filter({ hasText: 'Fleur de Test' })).toHaveCount(1)
+  await expect(page.getByRole('navigation', { name: 'Paginación de productos' })).toContainText('Página 1 de 42')
   await page
     .getByLabel('Buscar producto, marca o SKU')
     .fill('QA-AROMA-RPC-500-100')
