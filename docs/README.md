@@ -6,6 +6,8 @@ entrega. Un informe antiguo no acredita el estado actual de producción.
 
 ## Desarrollo, validación y despliegue
 
+- [Limpieza del repositorio y GitHub del 20 de noviembre](REPOSITORY_CLEANUP_2026_11_20.md):
+  archivos retirados, conservación de evidencias, validaciones y sincronización de `develop`.
 - [Limpieza del repositorio del 17 de noviembre](REPOSITORY_CLEANUP_2026_11_17.md):
   inventario, exclusiones de Git, pruebas y simulación de archivos pendientes.
 - [README del proyecto](../README.md): arquitectura, instalación y comandos.

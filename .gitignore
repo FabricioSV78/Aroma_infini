@@ -27,6 +27,10 @@ coverage/
 .cache/
 .npm/
 *.log
+# Root-level caches and npm's numbered crash logs are also generated.
+/.eslintcache
+/.prettiercache
+/npm-debug.log*
 
 # Local source exports; keep source files instead of generated dumps.
 repomix-output.*
