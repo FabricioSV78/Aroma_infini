@@ -26,6 +26,30 @@ const limits = Object.freeze({
   managedVideos: 2,
 })
 
+class StagingContractError extends Error {
+  constructor(reason, details = {}) {
+    super(reason)
+    this.reason = reason
+    this.details = details
+  }
+}
+
+/** Only controlled categories and allowlisted metadata; never response bodies. */
+export function formatStagingCheck(item) {
+  const label = `[${item.status}] ${item.code}`
+  if (item.status !== 'failed') return label
+  const parts = [item.reason]
+  if (Number.isInteger(item.expectedStatus))
+    parts.push(`expected HTTP ${item.expectedStatus}`)
+  if (Number.isInteger(item.diagnostic?.status))
+    parts.push(`received HTTP ${item.diagnostic.status}`)
+  if (item.header) parts.push(`header ${item.header}`)
+  if (item.diagnostic?.cfRay) parts.push(`CF-Ray ${item.diagnostic.cfRay}`)
+  if (Number.isFinite(item.diagnostic?.headersMs))
+    parts.push(`headers ${item.diagnostic.headersMs}ms`)
+  return `${label}: ${parts.join('; ')}`
+}
+
 /** No arbitrary destinations, server keys, browser sessions or CLI credentials. */
 export function validateStagingConfiguration({ config, publicEnv }) {
   try {
@@ -80,14 +104,25 @@ export async function runStagingChecks({
     managedVideosChecked: 0,
   }
   const checks = []
+  let diagnostic
   async function check(code, action) {
+    diagnostic = undefined
     try {
       await action()
       checks.push({ code, status: 'passed' })
       return true
-    } catch {
+    } catch (error) {
       // Fetch, decoding and server errors may contain response text or keys.
-      checks.push({ code, status: 'failed', reason: 'contract-or-connection' })
+      checks.push({
+        code,
+        status: 'failed',
+        reason:
+          error instanceof StagingContractError
+            ? error.reason
+            : 'contract-or-connection',
+        ...(error instanceof StagingContractError ? error.details : {}),
+        ...(diagnostic ? { diagnostic } : {}),
+      })
       return false
     }
   }
@@ -102,35 +137,47 @@ export async function runStagingChecks({
       assert.equal(path, `/rest/v1/rpc/${rpc}`)
     } else assert(['GET', 'HEAD'].includes(method))
     stats.requests++
-    return fetchImpl(new URL(path, rpc ? supabaseOrigin : origin), {
-      method,
-      redirect: 'manual',
-      credentials: 'omit',
-      signal: AbortSignal.any([
-        deadline,
-        AbortSignal.timeout(limits.requestTimeoutMs),
-      ]),
-      headers: {
-        ...headers,
+    diagnostic = undefined
+    const started = performance.now()
+    const response = await fetchImpl(
+      new URL(path, rpc ? supabaseOrigin : origin),
+      {
+        method,
+        redirect: 'manual',
+        credentials: 'omit',
+        signal: AbortSignal.any([
+          deadline,
+          AbortSignal.timeout(limits.requestTimeoutMs),
+        ]),
+        headers: {
+          ...headers,
+          ...(rpc
+            ? {
+                apikey: publishableKey,
+                'Accept-Profile': 'api',
+                'Content-Profile': 'api',
+                'Content-Type': 'application/json',
+              }
+            : {}),
+        },
         ...(rpc
           ? {
-              apikey: publishableKey,
-              'Accept-Profile': 'api',
-              'Content-Profile': 'api',
-              'Content-Type': 'application/json',
+              body: JSON.stringify(
+                rpc === 'catalog_products'
+                  ? { p_limit: limits.catalogProducts, p_offset: 0 }
+                  : {},
+              ),
             }
           : {}),
       },
-      ...(rpc
-        ? {
-            body: JSON.stringify(
-              rpc === 'catalog_products'
-                ? { p_limit: limits.catalogProducts, p_offset: 0 }
-                : {},
-            ),
-          }
-        : {}),
-    })
+    )
+    const ray = response.headers.get('cf-ray') || ''
+    diagnostic = {
+      status: response.status,
+      headersMs: Math.round(performance.now() - started),
+      ...(/^[a-f0-9]{16,32}-[A-Z0-9]{3,6}$/.test(ray) ? { cfRay: ray } : {}),
+    }
+    return response
   }
   async function bytes(response, maximum = limits.responseBytes) {
     const chunks = []
@@ -163,8 +210,12 @@ export async function runStagingChecks({
   }
   async function expectResponse(response, status, type, maximum) {
     try {
-      assert.equal(response.status, status)
-      if (type) assert.match(response.headers.get('content-type') || '', type)
+      if (response.status !== status)
+        throw new StagingContractError('unexpected-http-status', {
+          expectedStatus: status,
+        })
+      if (type && !type.test(response.headers.get('content-type') || ''))
+        throw new StagingContractError('unexpected-content-type')
       return await bytes(response, maximum)
     } catch (error) {
       await response.body?.cancel().catch(() => {})
@@ -172,7 +223,11 @@ export async function runStagingChecks({
     }
   }
   function nosniff(response) {
-    assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+    pageHeader(response, 'x-content-type-options', 'nosniff')
+  }
+  function pageHeader(response, header, value) {
+    if (response.headers.get(header) !== value)
+      throw new StagingContractError('invalid-security-header', { header })
   }
   function immutable(response, requireEtag = true) {
     nosniff(response)
@@ -207,17 +262,17 @@ export async function runStagingChecks({
       await expectResponse(response, status, /^text\/html\b/i, 2 * 1024 * 1024)
     ).toString()
     nosniff(response)
-    assert.equal(response.headers.get('x-frame-options'), 'DENY')
-    assert.equal(
-      response.headers.get('referrer-policy'),
-      'strict-origin-when-cross-origin',
-    )
-    if (applicationShell) assert.match(html, /id=["']root["']/)
-    else assert.match(html, /<!doctype html>/i)
+    pageHeader(response, 'x-frame-options', 'DENY')
+    pageHeader(response, 'referrer-policy', 'strict-origin-when-cross-origin')
+    if (applicationShell && !/id=["']root["']/.test(html))
+      throw new StagingContractError('missing-react-root')
+    if (!applicationShell && !/<!doctype html>/i.test(html))
+      throw new StagingContractError('missing-html-document')
     const robots = `${response.headers.get('x-robots-tag') || ''} ${
       html.match(/<meta\b(?=[^>]*name=["']robots["'])[^>]*>/i)?.[0] || ''
     }`
-    assert.match(robots, /\bnoindex\b/i)
+    if (!/\bnoindex\b/i.test(robots))
+      throw new StagingContractError('missing-noindex')
     return html
   }
   for (const path of pages) {
@@ -497,8 +552,7 @@ if (
     if (process.argv.includes('--json'))
       console.log(JSON.stringify(result, null, 2))
     else {
-      for (const item of result.checks)
-        console.log(`[${item.status}] ${item.code}`)
+      for (const item of result.checks) console.log(formatStagingCheck(item))
       console.log(
         `Staging: ${result.result}; ${result.stats.requests} solicitudes. Sin escrituras ni habilitación de producción.`,
       )

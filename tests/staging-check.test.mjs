@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import sharp from 'sharp'
 import {
+  formatStagingCheck,
   runStagingChecks,
   validateStagingConfiguration,
 } from '../scripts/check-staging.mjs'
@@ -536,6 +537,123 @@ test('missing noindex and security headers produce a failed operational check', 
     },
   })
   assert.equal(result.result, 'failed')
+})
+
+for (const { label, status, body, headers, reason, header } of [
+  { label: 'a soft 404', status: 200, reason: 'unexpected-http-status' },
+  {
+    label: 'an unavailable upstream',
+    status: 503,
+    reason: 'unexpected-http-status',
+  },
+  {
+    label: 'the wrong content type',
+    status: 404,
+    headers: { 'Content-Type': 'application/json' },
+    reason: 'unexpected-content-type',
+  },
+  {
+    label: 'missing React root',
+    status: 404,
+    body: html.replace('<div id="root"></div>', '<main>No encontrado</main>'),
+    reason: 'missing-react-root',
+  },
+  {
+    label: 'missing noindex',
+    status: 404,
+    body: html.replace('noindex,nofollow', 'index,follow'),
+    reason: 'missing-noindex',
+  },
+  ...[
+    ['X-Content-Type-Options', 'x-content-type-options'],
+    ['X-Frame-Options', 'x-frame-options'],
+    ['Referrer-Policy', 'referrer-policy'],
+  ].map(([name, header]) => ({
+    label: `invalid ${name}`,
+    status: 404,
+    headers: { [name]: 'invalid' },
+    reason: 'invalid-security-header',
+    header,
+  })),
+]) {
+  test(`missing-product reports ${label} without weakening the 404 contract`, async () => {
+    const marker = 'synthetic-secret-must-not-leak'
+    const ray = '0123456789abcdef-GIG'
+    const { result, fixture } = await run({
+      override: ({ url }) => {
+        if (url.pathname !== '/producto/staging-operational-check-missing')
+          return
+        return response(`${body ?? html}<!-- ${marker} -->`, status, {
+          ...securityHeaders,
+          'Content-Type': 'text/html',
+          'CF-Ray': ray,
+          ...headers,
+        })
+      },
+    })
+    const failure = result.checks.find(
+      (item) => item.code === 'missing-product',
+    )
+    assert.equal(result.result, 'failed')
+    assert.equal(failure.status, 'failed')
+    assert.equal(failure.reason, reason)
+    assert.equal(failure.header, header)
+    assert.equal(failure.diagnostic.status, status)
+    assert.equal(failure.diagnostic.cfRay, ray)
+    assert.ok(failure.diagnostic.headersMs >= 0)
+    if (reason === 'unexpected-http-status')
+      assert.equal(failure.expectedStatus, 404)
+    assert.equal(
+      fixture.calls.filter(
+        (call) =>
+          call.url.pathname === '/producto/staging-operational-check-missing',
+      ).length,
+      1,
+    )
+    assert.ok(!JSON.stringify(result).includes(marker))
+    assert.match(formatStagingCheck(failure), /\[failed\] missing-product:/)
+    assert.match(
+      formatStagingCheck(failure),
+      new RegExp(`received HTTP ${status}`),
+    )
+    assert.match(formatStagingCheck(failure), /CF-Ray 0123456789abcdef-GIG/)
+  })
+}
+
+test('missing-product never exposes arbitrary provider errors or untrusted correlation headers', async () => {
+  const marker = 'synthetic-private-value-must-not-leak'
+  for (const networkError of [false, true]) {
+    const { result, fixture } = await run({
+      override: ({ url }) => {
+        if (url.pathname !== '/producto/staging-operational-check-missing')
+          return
+        if (networkError) throw new Error(`Provider details ${marker}`)
+        return response(marker, 503, { 'CF-Ray': marker })
+      },
+    })
+    const failure = result.checks.find(
+      (item) => item.code === 'missing-product',
+    )
+    assert.equal(failure.status, 'failed')
+    assert.equal(
+      failure.reason,
+      networkError ? 'contract-or-connection' : 'unexpected-http-status',
+    )
+    assert.equal(failure.diagnostic?.cfRay, undefined)
+    assert.ok(!JSON.stringify(result).includes(marker))
+    assert.ok(!formatStagingCheck(failure).includes(marker))
+    assert.equal(
+      fixture.calls.filter(
+        (call) =>
+          call.url.pathname === '/producto/staging-operational-check-missing',
+      ).length,
+      1,
+    )
+  }
+  assert.equal(
+    formatStagingCheck({ status: 'passed', code: 'missing-product' }),
+    '[passed] missing-product',
+  )
 })
 
 test('offsite redirects are never followed or reported with their sensitive URL', async () => {

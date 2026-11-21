@@ -353,6 +353,7 @@
   align-items: center;
   border-radius: 10px;
   justify-content: flex-start;
+  gap: 10px;
   transition:
     background-color 150ms ease,
     color 150ms ease,
