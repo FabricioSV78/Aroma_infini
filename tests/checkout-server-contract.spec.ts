@@ -5,6 +5,7 @@ import {
   type CheckoutOperation,
 } from '../src/services/checkout-server'
 import { UserFacingError } from '../src/services/admin-messages'
+import { isOrderReference } from '../src/domain/order-reference'
 
 const variantId = '50000000-0000-4000-8000-000000000001'
 function line() {
@@ -80,6 +81,31 @@ function confirmation() {
     },
   }
 }
+
+test('Short references and historical codes preserve the exact confirmation and independent private token', () => {
+  for (const reference of [
+    'AI-004827',
+    'AI-1000000',
+    'AI-0123456789ABCDEF',
+    'AI-210926-01',
+    'AI-TEST-1234567890123456',
+  ]) {
+    const value = confirmation()
+    value.order.reference = reference
+    const result = parseSimulatedOrderResponse(value, operation())
+    expect(result.reference).toBe(reference)
+    expect(result.trackingToken).toBe(operation().trackingToken)
+    expect(result.totalCents).toBe(21000)
+  }
+  for (const reference of [
+    'AI-004827/../otra',
+    'https://evil.invalid',
+    'AI-<script>',
+    'AI-000001\n',
+    'AI-' + '1'.repeat(41),
+  ])
+    expect(isOrderReference(reference)).toBe(false)
+})
 
 test('A canonical quote preserves precise cents and separately identifies product savings', () => {
   const parsed = parseCheckoutQuote(quote())

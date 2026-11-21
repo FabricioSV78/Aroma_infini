@@ -15,6 +15,7 @@ export function createAuthService(authAdapter: AuthAdapter) {
   let request: Promise<void> | undefined
   let expiryTimer: ReturnType<typeof setTimeout> | undefined
   let lockedAfterSignOut = false
+  let signOutRequest: Promise<void> | undefined
   let explicitOperation = 0
   let verificationError: unknown
 
@@ -151,6 +152,7 @@ export function createAuthService(authAdapter: AuthAdapter) {
     },
     refresh: settleCurrentSession,
     async signIn(input: { email: string; password: string }) {
+      if (signOutRequest) await signOutRequest.catch(() => undefined)
       lockedAfterSignOut = false
       explicitOperation++
       try {
@@ -162,15 +164,19 @@ export function createAuthService(authAdapter: AuthAdapter) {
           state.status !== 'authenticated' ||
           state.session?.intent !== 'account'
         )
-          throw state.status === 'error' && verificationError instanceof AuthError
+          throw state.status === 'error' &&
+            verificationError instanceof AuthError
             ? verificationError
-            : new AuthError(state.status === 'error' ? 'service' : 'credentials')
+            : new AuthError(
+                state.status === 'error' ? 'service' : 'credentials',
+              )
         return state.session
       } finally {
         explicitOperation--
       }
     },
     async signUp(input: AuthSignUpInput) {
+      if (signOutRequest) await signOutRequest.catch(() => undefined)
       explicitOperation++
       try {
         await authAdapter.signUp(input)
@@ -212,20 +218,41 @@ export function createAuthService(authAdapter: AuthAdapter) {
         explicitOperation--
       }
     },
-    async signOut() {
+    signOut(beforeProviderSignOut?: Promise<unknown>) {
+      const cleanup = beforeProviderSignOut?.catch(() => undefined)
+      if (signOutRequest) return signOutRequest
       lockedAfterSignOut = true
       revision++
       request = undefined
       clearTimeout(expiryTimer)
-      publish({ status: 'anonymous', session: null, message: '' })
       // Local access is revoked immediately, including on provider/network failure.
       explicitOperation++
-      try {
-        await authAdapter.signOut()
-      } finally {
-        explicitOperation--
-        lockedAfterSignOut = false
-      }
+      signOutRequest = Promise.resolve()
+        .then(async () => {
+          if (cleanup) {
+            let deadline: ReturnType<typeof setTimeout> | undefined
+            try {
+              // Device opt-out needs the still-valid provider session. Keep the
+              // UI anonymous while allowing that narrow cleanup to finish first.
+              await Promise.race([
+                cleanup,
+                new Promise<void>((resolve) => {
+                  deadline = setTimeout(resolve, 2500)
+                }),
+              ])
+            } finally {
+              clearTimeout(deadline)
+            }
+          }
+          await authAdapter.signOut()
+        })
+        .finally(() => {
+          explicitOperation--
+          lockedAfterSignOut = false
+          signOutRequest = undefined
+        })
+      publish({ status: 'anonymous', session: null, message: '' })
+      return signOutRequest
     },
   }
   return service

@@ -44,6 +44,23 @@ function fixture(index: number): AdminOrder {
   }
 }
 
+test('short and historical references coexist in shipping labels and order summaries', async () => {
+  const short = { ...fixture(0), reference: 'AI-004827' }
+  const legacy = { ...fixture(1), reference: 'AI-0123456789ABCDEF' }
+  for (const type of ['shipping', 'summary'] as const) {
+    const bytes = await generateOrderPdf([short, legacy], [], type, {
+      fontBytes: await fontBytes(),
+    })
+    const pdf = await PDFDocument.load(bytes)
+    expect(pdf.getPageCount()).toBe(1)
+    expect(
+      inspectOrderDocuments([short, legacy], [], type).valid.map(
+        (o) => o.reference,
+      ),
+    ).toEqual([short.reference, legacy.reference])
+  }
+})
+
 for (const count of [1, 3, 5, 10, 50, 100]) {
   for (const type of ['shipping', 'summary'] as const) {
     test(`${count} ${type}: PDF vectorial, fuente incorporada y páginas completas`, async () => {

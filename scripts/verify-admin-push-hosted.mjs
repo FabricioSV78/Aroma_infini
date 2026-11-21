@@ -227,12 +227,15 @@ try {
   assert(denied.error)
   pass('Authenticated browser role cannot dispatch notifications directly')
   const before = await query(
-    'select count(*)::int as events,count(*) filter(where o.simulation)::int as simulated from app.admin_notifications n join app.orders o on o.id=n.order_id;',
+    `select count(*)::int as events,count(*) filter(where
+      (n.kind='new_order' and (o.simulation or o.payment_status<>'approved' or o.payment_verified_at is null or n.delivery_environment is not null))
+      or (n.kind='simulated_order' and (not o.simulation or o.payment_status<>'pending' or o.payment_verified_at is not null or n.delivery_environment is distinct from 'staging'))
+    )::int as invalid_boundary from app.admin_notifications n join app.orders o on o.id=n.order_id;`,
     'verified-event-boundary',
   )
-  assert(find(before, (row) => row.simulated === 0))
+  assert(find(before, (row) => row.invalid_boundary === 0))
   pass(
-    'No simulated hosted order appears in the commercial notification outbox',
+    'Commercial notices require verified payment; operational simulations remain explicitly staging-only',
   )
   browser = await chromium.launch({
     channel: 'chrome',

@@ -241,9 +241,9 @@ function AdminLayoutContent() {
             type="button"
             aria-label="Cerrar sesión"
             onClick={() => {
-              void disableAdminPushOnSignOut().catch(() => {})
+              const pushOptOut = disableAdminPushOnSignOut()
               void authService
-                .signOut()
+                .signOut(pushOptOut)
                 .catch(() =>
                   notice.toast(
                     'El acceso local se cerró. Revisa la conexión para cerrar también la sesión del proveedor.',

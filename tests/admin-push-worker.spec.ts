@@ -51,6 +51,7 @@ function fixture(
     claims?: unknown[]
     eligible?: boolean
     provider?: number
+    providerByEndpoint?: Readonly<Record<string, number | 'transport-error'>>
     senderThrows?: boolean
     code?: string
     sqlStatus?: number
@@ -136,14 +137,15 @@ function fixture(
     throw new Error(`Unexpected fixture route: ${name}`)
   }
   const send = async (
-    subscription: unknown,
+    subscription: { endpoint: string; p256dh: string; auth: string },
     vapid: unknown,
     payload: unknown,
   ) => {
     sends.push({ subscription, vapid, payload })
-    if (options.senderThrows)
+    const provider = options.providerByEndpoint?.[subscription.endpoint]
+    if (options.senderThrows || provider === 'transport-error')
       throw new Error('PRIVATE_PROVIDER_MESSAGE_AND_ENDPOINT')
-    return { status: options.provider ?? 201 }
+    return { status: provider ?? options.provider ?? 201 }
   }
   const dependencies = { fetch: transport, send }
   const env = {
@@ -720,6 +722,68 @@ for (const [status, expected] of [
     })
   })
 }
+for (const firstOutcome of [201, 410, 'transport-error'] as const) {
+  test(`one event reaches three independent devices when the first provider result is ${firstOutcome}`, async () => {
+    const deliveries = [1, 2, 3].map((number) => ({
+      deliveryId: `30000000-0000-4000-8000-00000000000${number}`,
+      leaseId: `40000000-0000-4000-8000-00000000000${number}`,
+      endpoint: `https://fcm.googleapis.com/wp/independent-device-${number}`,
+    }))
+    const f = fixture({
+      claims: deliveries.map((delivery) => claim(delivery)),
+      providerByEndpoint: { [deliveries[0].endpoint]: firstOutcome },
+    })
+
+    expect(await dispatchAdminPush(f.env, f.dependencies)).toEqual({
+      claimed: 3,
+      accepted: firstOutcome === 201 ? 3 : 2,
+    })
+    expect(f.sends.map((sent) => sent.subscription)).toEqual(
+      deliveries.map(({ endpoint }) => ({ endpoint, p256dh, auth })),
+    )
+    for (const sent of f.sends)
+      expect(sent.payload).toMatchObject({
+        id: eventId,
+        kind: 'new_order',
+        tag: `ai-admin-${eventId}`,
+        url: '/admin/pedidos/AI-2026-000001',
+      })
+    for (const [index, delivery] of deliveries.entries()) {
+      expect(
+        f.calls
+          .filter((call) => call.url.endsWith('/check_admin_push_delivery'))
+          .map((call) => call.body),
+      ).toContainEqual({
+        p_delivery_id: delivery.deliveryId,
+        p_lease_id: delivery.leaseId,
+      })
+      const completions = f.calls.filter(
+        (call) =>
+          call.url.endsWith('/finish_admin_push') &&
+          call.body.p_delivery_id === delivery.deliveryId,
+      )
+      expect(completions).toHaveLength(1)
+      expect(completions[0].body).toMatchObject({
+        p_lease_id: delivery.leaseId,
+        p_result:
+          index > 0 || firstOutcome === 201
+            ? 'accepted'
+            : firstOutcome === 410
+              ? 'expired'
+              : 'retry',
+        p_http_status:
+          index === 0 && firstOutcome === 'transport-error'
+            ? null
+            : index === 0
+              ? firstOutcome
+              : 201,
+      })
+    }
+    expect(
+      f.calls.filter((call) => call.url.endsWith('/check_admin_push_delivery')),
+    ).toHaveLength(3)
+  })
+}
 test('revoked administrator or disabled subscription is rechecked immediately before every send', async () => {
   const f = fixture({ eligible: false, claims: [claim()] })
   const result = await dispatchAdminPush(f.env, f.dependencies)
@@ -733,21 +797,51 @@ test('revoked administrator or disabled subscription is rechecked immediately be
 test('post-commit staging dispatch scopes claims to one committed order and uses explicit simulation copy', async () => {
   const f = fixture({ claims: [claim({ kind: 'simulated_order' })] })
   const orderId = '60000000-0000-4000-8000-000000000001'
-  expect(await dispatchAdminOrderPush(f.env, orderId, f.dependencies)).toEqual({ claimed: 1, accepted: 1 })
-  expect(f.calls.find(c => c.url.endsWith('/claim_admin_order_push'))?.body).toEqual({
-    p_environment: 'staging', p_limit: 10, p_order_id: orderId,
+  expect(await dispatchAdminOrderPush(f.env, orderId, f.dependencies)).toEqual({
+    claimed: 1,
+    accepted: 1,
+  })
+  expect(
+    f.calls.find((c) => c.url.endsWith('/claim_admin_order_push'))?.body,
+  ).toEqual({
+    p_environment: 'staging',
+    p_limit: 10,
+    p_order_id: orderId,
   })
   expect(f.sends[0].payload).toMatchObject({
-    kind: 'simulated_order', title: 'Pedido de prueba',
+    kind: 'simulated_order',
+    title: 'Pedido de prueba',
     body: 'Pedido de prueba AI-2026-000001 recibido. Toca para revisar.',
-    url: '/admin/pedidos/AI-2026-000001', tag: `ai-admin-${eventId}`,
+    url: '/admin/pedidos/AI-2026-000001',
+    tag: `ai-admin-${eventId}`,
   })
   expect(JSON.stringify(f.sends[0].payload)).not.toContain('confirmado')
   const before = f.calls.length
-  expect(await dispatchAdminOrderPush({ ...f.env, APP_ENVIRONMENT: 'production', PUSH_ENVIRONMENT: 'production' }, orderId, f.dependencies)).toEqual({ claimed: 0, accepted: 0 })
+  expect(
+    await dispatchAdminOrderPush(
+      {
+        ...f.env,
+        APP_ENVIRONMENT: 'production',
+        PUSH_ENVIRONMENT: 'production',
+      },
+      orderId,
+      f.dependencies,
+    ),
+  ).toEqual({ claimed: 0, accepted: 0 })
   expect(f.calls).toHaveLength(before)
-  await expect(dispatchAdminOrderPush(f.env, 'invalid', f.dependencies)).rejects.toThrow('Invalid order delivery scope')
+  await expect(
+    dispatchAdminOrderPush(f.env, 'invalid', f.dependencies),
+  ).rejects.toThrow('Invalid order delivery scope')
 })
+test('short order codes are preserved in push text and the protected detail destination', async () => {
+  const f = fixture({ claims: [claim({ kind: 'simulated_order', orderReference: 'AI-004827' })] })
+  expect(await dispatchAdminPush(f.env, f.dependencies)).toEqual({ claimed: 1, accepted: 1 })
+  expect(f.sends[0].payload).toMatchObject({
+    body: 'Pedido de prueba AI-004827 recibido. Toca para revisar.',
+    url: '/admin/pedidos/AI-004827',
+  })
+})
+
 test('unsafe stored endpoint cannot cause any external send', async () => {
   const f = fixture({
     claims: [claim({ endpoint: 'https://169.254.169.254/latest/meta-data' })],

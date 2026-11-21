@@ -420,7 +420,7 @@ const test = authTest.extend<{ checkoutNetwork: Network }>({
       const value = orders.get(String(body.operationId)) ?? {
         order: {
           ...input,
-          reference: 'AI-TEST-1234567890ABCDEF',
+          reference: 'AI-004827',
           placedAt: new Date().toISOString(),
           mode: attached ? ('demo-account' as const) : ('guest' as const),
           lines: [{ ...line, unitPriceCents: state.price }],
@@ -848,7 +848,7 @@ test('el servidor cotiza, el cupón se valida remotamente y el pedido de prueba 
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('aroma-infini:order-tracking:v1') || '[]'),
   )
-  expect(stored[0].reference).toBe('AI-TEST-1234567890ABCDEF')
+  expect(stored[0].reference).toBe('AI-004827')
   expect(await page.evaluate(async () => {
     const path = '/src/services/public-query-cache.ts'
     return (await import(path)).publicQueryCacheGeneration() as number
@@ -1420,6 +1420,8 @@ test('el mismo pedido pasa de checkout de cuenta a administración, PDF y seguim
     totalCents: 12000,
   })
   const original = structuredClone(checkoutNetwork.order!)
+  expect(original.reference).toBe('AI-004827')
+  await expect(page.locator('main')).toContainText(original.reference)
   await page.getByRole('link', { name: 'Ver en Mis pedidos' }).click()
   await expect(page.locator('.account-order-list')).toContainText(
     original.reference,

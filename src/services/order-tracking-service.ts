@@ -5,9 +5,9 @@ import { orderStatusService } from './order-status-service'
 import { isRemoteCatalog } from './catalog-source'
 import { requireReadySupabaseClient } from './supabase-client'
 import { UserFacingError } from '../domain/user-facing-error'
+import { isOrderReference } from '../domain/order-reference'
 
 const STORAGE_KEY = 'aroma-infini:order-tracking:v1'
-const REFERENCE_PATTERN = /^AI-(?:DEMO-|TEST-|SIM-)?[A-F0-9]{16,32}$/
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/i
 const MAX_RECORDS = 30
 
@@ -27,7 +27,7 @@ function isTrackingRecord(value: unknown): value is TrackingRecord {
   const record = value as Partial<TrackingRecord>
   return (
     typeof record.reference === 'string' &&
-    REFERENCE_PATTERN.test(record.reference) &&
+    isOrderReference(record.reference) &&
     typeof record.placedAt === 'string' &&
     !Number.isNaN(Date.parse(record.placedAt)) &&
     ALL_ORDER_STATUSES.includes(record.status as OrderStatus) &&
@@ -85,7 +85,7 @@ export function saveTrackingRecord(order: MockOrder): void {
 
 export function getTrackingRecord(reference: string): TrackingRecord | null {
   const normalized = reference.trim().toUpperCase()
-  if (!REFERENCE_PATTERN.test(normalized)) return null
+  if (!isOrderReference(normalized)) return null
   const record = readTrackingRecords().find(
     (item) => item.reference === normalized,
   )
@@ -112,7 +112,7 @@ export async function loadTrackingRecord(
 ): Promise<TrackingRecord | null> {
   if (!isRemoteCatalog) return getTrackingRecord(reference)
   const normalized = reference.trim().toUpperCase()
-  if (!REFERENCE_PATTERN.test(normalized)) return null
+  if (!isOrderReference(normalized)) return null
   const saved = readTrackingRecords().find(
     (record) => record.reference === normalized,
   )

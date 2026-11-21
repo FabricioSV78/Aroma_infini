@@ -2,6 +2,8 @@ import { mkdir, readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import {
   expect,
+  fixtureEmail,
+  fixturePassword,
   signIn,
   test as authTest,
   type SupabaseAuthNetwork,
@@ -494,93 +496,179 @@ test('la campana usa datos reales del contrato, marca leídas y restaura foco si
   ).toBeFocused()
 })
 
-test('los pedidos operativos se identifican como pruebas y la recepción push invalida pedidos sin publicar datos', async ({ page, supabaseNetwork, pushNetwork }) => {
+test('los pedidos operativos se identifican como pruebas y la recepción push invalida pedidos sin publicar datos', async ({
+  page,
+  supabaseNetwork,
+  pushNetwork,
+}) => {
   pushNetwork.items[0].kind = 'simulated_order'
   await administrator(page, supabaseNetwork)
-  await page.getByRole('button', { name: 'Notificaciones: 1 sin leer', exact: true }).click()
-  await expect(page.getByRole('dialog').getByRole('link', { name: /Nuevo pedido de prueba/ })).toHaveAttribute('href', '/admin/pedidos/AI-TEST-0001')
+  await page
+    .getByRole('button', { name: 'Notificaciones: 1 sin leer', exact: true })
+    .click()
+  await expect(
+    page
+      .getByRole('dialog')
+      .getByRole('link', { name: /Nuevo pedido de prueba/ }),
+  ).toHaveAttribute('href', '/admin/pedidos/AI-TEST-0001')
   const result = await page.evaluate(async () => {
     let events = 0
     let hasPayload = false
-    window.addEventListener('aroma-infini:orders-changed', (event) => { events++; hasPayload ||= 'detail' in event })
-    navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'ADMIN_NOTIFICATION_RECEIVED' } }))
+    window.addEventListener('aroma-infini:orders-changed', (event) => {
+      events++
+      hasPayload ||= 'detail' in event
+    })
+    navigator.serviceWorker.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'ADMIN_NOTIFICATION_RECEIVED' },
+      }),
+    )
     await Promise.resolve()
     return { events, hasPayload }
   })
   expect(result).toEqual({ events: 1, hasPayload: false })
 })
 
-test('IndexedDB real del navegador evita duplicados tras reiniciar el worker y conserva únicamente IDs acotados', async ({ page, supabaseNetwork, pushNetwork }) => {
+test('IndexedDB real del navegador evita duplicados tras reiniciar el worker y conserva únicamente IDs acotados', async ({
+  page,
+  supabaseNetwork,
+  pushNetwork,
+}) => {
   void pushNetwork
   await administrator(page, supabaseNetwork)
   const result = await page.evaluate(async (source) => {
     const shown: Array<{ title: string; options: Record<string, unknown> }> = []
-    type PushEvent = { data: { json: () => unknown }; waitUntil: (work: Promise<unknown>) => void }
-    function instance(storage: IDBFactory | null = indexedDB, rejectFirst = false) {
+    type PushEvent = {
+      data: { json: () => unknown }
+      waitUntil: (work: Promise<unknown>) => void
+    }
+    function instance(
+      storage: IDBFactory | null = indexedDB,
+      rejectFirst = false,
+    ) {
       let push!: (event: PushEvent) => void
       let attempts = 0
       const scope = {
-        indexedDB: storage, location: { origin: location.origin },
-        addEventListener(name: string, handler: typeof push) { if (name === 'push') push = handler },
+        indexedDB: storage,
+        location: { origin: location.origin },
+        addEventListener(name: string, handler: typeof push) {
+          if (name === 'push') push = handler
+        },
         skipWaiting: async () => {},
-        registration: { async showNotification(title: string, options: Record<string, unknown>) {
-          attempts++
-          if (rejectFirst && attempts === 1) throw new Error('Controlled display failure')
-          shown.push({ title, options })
-        } },
+        registration: {
+          async showNotification(
+            title: string,
+            options: Record<string, unknown>,
+          ) {
+            attempts++
+            if (rejectFirst && attempts === 1)
+              throw new Error('Controlled display failure')
+            shown.push({ title, options })
+          },
+        },
         clients: { claim: async () => {}, matchAll: async () => [] },
       }
       new Function('self', source)(scope)
-      return { async push(id: string) {
-        let work: Promise<unknown> = Promise.resolve()
-        push({ data: { json: () => ({ id, kind: 'simulated_order', url: '/admin/pedidos/AI-FIXTURE-123' }) }, waitUntil: value => { work = value } })
-        await work
-      } }
+      return {
+        async push(id: string) {
+          let work: Promise<unknown> = Promise.resolve()
+          push({
+            data: {
+              json: () => ({
+                id,
+                kind: 'simulated_order',
+                url: '/admin/pedidos/AI-FIXTURE-123',
+              }),
+            },
+            waitUntil: (value) => {
+              work = value
+            },
+          })
+          await work
+        },
+      }
     }
     const worker = instance()
-    await Promise.all([worker.push('persistent-event'), worker.push('persistent-event')])
+    await Promise.all([
+      worker.push('persistent-event'),
+      worker.push('persistent-event'),
+    ])
     await instance().push('persistent-event')
     const shownAfterRestart = shown.length
-    const read = () => new Promise<Array<{ id: string; shownAt: number }>>((resolve, reject) => {
-      const request = indexedDB.open('aroma-admin-push-events-v1', 1)
-      request.onerror = () => reject(request.error)
-      request.onsuccess = () => {
-        const database = request.result, transaction = database.transaction('shown', 'readonly')
-        const values = transaction.objectStore('shown').getAll()
-        transaction.oncomplete = () => { database.close(); resolve(values.result) }
-        transaction.onerror = () => { database.close(); reject(transaction.error) }
-      }
-    })
+    const read = () =>
+      new Promise<Array<{ id: string; shownAt: number }>>((resolve, reject) => {
+        const request = indexedDB.open('aroma-admin-push-events-v1', 1)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result,
+            transaction = database.transaction('shown', 'readonly')
+          const values = transaction.objectStore('shown').getAll()
+          transaction.oncomplete = () => {
+            database.close()
+            resolve(values.result)
+          }
+          transaction.onerror = () => {
+            database.close()
+            reject(transaction.error)
+          }
+        }
+      })
     const first = await read()
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.open('aroma-admin-push-events-v1', 1)
       request.onerror = () => reject(request.error)
       request.onsuccess = () => {
-        const database = request.result, transaction = database.transaction('shown', 'readwrite')
+        const database = request.result,
+          transaction = database.transaction('shown', 'readwrite')
         const store = transaction.objectStore('shown')
-        store.put({ id: 'expired-event', shownAt: Date.now() - 25 * 60 * 60 * 1000 })
-        for (let i = 0; i < 512; i++) store.put({ id: `retained-${i}`, shownAt: Date.now() - 1000 })
-        transaction.oncomplete = () => { database.close(); resolve() }
-        transaction.onerror = () => { database.close(); reject(transaction.error) }
+        store.put({
+          id: 'expired-event',
+          shownAt: Date.now() - 25 * 60 * 60 * 1000,
+        })
+        for (let i = 0; i < 512; i++)
+          store.put({ id: `retained-${i}`, shownAt: Date.now() - 1000 })
+        transaction.oncomplete = () => {
+          database.close()
+          resolve()
+        }
+        transaction.onerror = () => {
+          database.close()
+          reject(transaction.error)
+        }
       }
     })
     await instance().push('bounded-new-event')
     const bounded = await read()
     const failed = instance(indexedDB, true)
     let rejected = false
-    try { await failed.push('retry-after-display-failure') } catch { rejected = true }
-    const recordedBeforeRetry = (await read()).some(row => row.id === 'retry-after-display-failure')
+    try {
+      await failed.push('retry-after-display-failure')
+    } catch {
+      rejected = true
+    }
+    const recordedBeforeRetry = (await read()).some(
+      (row) => row.id === 'retry-after-display-failure',
+    )
     await failed.push('retry-after-display-failure')
-    const recordedAfterRetry = (await read()).some(row => row.id === 'retry-after-display-failure')
+    const recordedAfterRetry = (await read()).some(
+      (row) => row.id === 'retry-after-display-failure',
+    )
     const fallback = instance(null)
     await fallback.push('storage-unavailable')
-    return { shownAfterRestart, first, boundedCount: bounded.length,
-      containsExpired: bounded.some(row => row.id === 'expired-event'),
-      containsNew: bounded.some(row => row.id === 'bounded-new-event'),
-      fields: [...new Set(bounded.flatMap(row => Object.keys(row)))].sort(),
-      rejected, recordedBeforeRetry, recordedAfterRetry,
-      fallbackShown: shown.at(-1)?.options.tag === 'aroma-admin-storage-unavailable',
-      referenceShown: String(shown[0].options.body).includes('AI-FIXTURE-123') }
+    return {
+      shownAfterRestart,
+      first,
+      boundedCount: bounded.length,
+      containsExpired: bounded.some((row) => row.id === 'expired-event'),
+      containsNew: bounded.some((row) => row.id === 'bounded-new-event'),
+      fields: [...new Set(bounded.flatMap((row) => Object.keys(row)))].sort(),
+      rejected,
+      recordedBeforeRetry,
+      recordedAfterRetry,
+      fallbackShown:
+        shown.at(-1)?.options.tag === 'aroma-admin-storage-unavailable',
+      referenceShown: String(shown[0].options.body).includes('AI-FIXTURE-123'),
+    }
   }, serviceWorkerSource)
   expect(result.shownAfterRestart).toBe(1)
   expect(result.first).toHaveLength(1)
@@ -663,6 +751,229 @@ test('la suscripción del navegador se retira al cerrar sesión y el centro no c
     pushNetwork.requests.filter((item) => item.path.endsWith('/subscriptions')),
   ).toHaveLength(1)
 })
+
+test('salir retira el acceso local al instante y confirma la baja push antes de revocar la sesión del proveedor', async ({
+  page,
+  context,
+  supabaseNetwork,
+  pushNetwork,
+}) => {
+  await administrator(page, supabaseNetwork)
+  await page
+    .getByRole('button', { name: 'Activar notificaciones', exact: true })
+    .click()
+  await expect(
+    page.locator('.admin-notifications-page').getByRole('status'),
+  ).toContainText('activadas')
+  const registered = pushNetwork.requests.find((request) =>
+    request.path.endsWith('/push/subscriptions'),
+  )
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let unsubscribeStarted = false
+  let unsubscribeCompleted = false
+  let prematureProviderLogout = false
+  let unsubscribes = 0
+  const logoutRequests = () =>
+    supabaseNetwork.requests.filter(
+      (request) => request.path === '/auth/v1/logout',
+    )
+  context.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/auth/v1/logout')
+      prematureProviderLogout ||= !unsubscribeCompleted
+  })
+  context.on('response', (response) => {
+    if (
+      new URL(response.url()).pathname === '/api/admin/push/unsubscribe' &&
+      response.status() === 204
+    )
+      unsubscribeCompleted = true
+  })
+  await context.route('**/api/admin/push/unsubscribe', async (route) => {
+    unsubscribes++
+    unsubscribeStarted = true
+    expect(route.request().postDataJSON()).toEqual({
+      deviceId: registered?.body?.deviceId,
+    })
+    await gate
+    // Complete the same owned-device opt-out as the fixture, after its gate.
+    pushNetwork.enabled = false
+    await route.fulfill({ status: 204 })
+  })
+  try {
+    await page
+      .getByRole('button', { name: 'Cerrar sesión', exact: true })
+      .click()
+    await expect(page).toHaveURL(
+      '/admin/login?returnTo=%2Fadmin%2Fnotificaciones',
+    )
+    await expect(page.locator('.admin-sidebar')).toHaveCount(0)
+    await expect.poll(() => unsubscribeStarted).toBe(true)
+    expect(logoutRequests()).toHaveLength(0)
+    expect(pushNetwork.enabled).toBe(true)
+    await expect
+      .poll(async () => (await browserState(page)).hasSubscription)
+      .toBe(false)
+    release()
+    await expect.poll(() => logoutRequests().length).toBe(1)
+    expect(prematureProviderLogout).toBe(false)
+    expect(logoutRequests()[0].scope).toBe('local')
+    expect(pushNetwork.enabled).toBe(false)
+    expect(unsubscribes).toBe(1)
+    expect((await browserState(page)).removals).toBe(1)
+  } finally {
+    release()
+  }
+})
+
+test('volver a iniciar sesión durante la baja espera el cierre anterior y conserva la sesión nueva', async ({
+  page,
+  context,
+  supabaseNetwork,
+  pushNetwork,
+}) => {
+  await administrator(page, supabaseNetwork)
+  await page
+    .getByRole('button', { name: 'Activar notificaciones', exact: true })
+    .click()
+  await expect(
+    page.locator('.admin-notifications-page').getByRole('status'),
+  ).toContainText('activadas')
+  const passwordRequests = () =>
+    supabaseNetwork.requests.filter(
+      (request) =>
+        request.path === '/auth/v1/token' && request.grant === 'password',
+    )
+  const before = passwordRequests().length
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let started = false
+  await context.route('**/api/admin/push/unsubscribe', async (route) => {
+    started = true
+    await gate
+    pushNetwork.enabled = false
+    await route.fulfill({ status: 204 })
+  })
+  try {
+    await page
+      .getByRole('button', { name: 'Cerrar sesión', exact: true })
+      .click()
+    await expect(page).toHaveURL(
+      '/admin/login?returnTo=%2Fadmin%2Fnotificaciones',
+    )
+    await expect.poll(() => started).toBe(true)
+    await page
+      .getByLabel('Correo electrónico', { exact: true })
+      .fill(fixtureEmail)
+    await page.getByLabel('Contraseña', { exact: true }).fill(fixturePassword)
+    await page
+      .getByRole('button', { name: 'Iniciar sesión', exact: true })
+      .click()
+    expect(passwordRequests()).toHaveLength(before)
+    expect(
+      supabaseNetwork.requests.filter(
+        (request) => request.path === '/auth/v1/logout',
+      ),
+    ).toHaveLength(0)
+    release()
+    await expect(
+      page.getByRole('heading', { name: 'Verificación en dos pasos' }),
+    ).toBeVisible()
+    const operations = supabaseNetwork.requests.filter(
+      (request) =>
+        request.path === '/auth/v1/logout' ||
+        (request.path === '/auth/v1/token' && request.grant === 'password'),
+    )
+    expect(operations.slice(-2).map((request) => request.path)).toEqual([
+      '/auth/v1/logout',
+      '/auth/v1/token',
+    ])
+    await page
+      .getByLabel('Código de verificación', { exact: true })
+      .fill('123456')
+    await page
+      .getByRole('button', { name: 'Verificar y continuar', exact: true })
+      .click()
+    await expect(page).toHaveURL('/admin/notificaciones')
+    await expect(page.locator('.admin-sidebar')).toBeVisible()
+    expect(passwordRequests()).toHaveLength(before + 1)
+    expect(
+      supabaseNetwork.requests.filter(
+        (request) => request.path === '/auth/v1/logout',
+      ),
+    ).toHaveLength(1)
+  } finally {
+    release()
+  }
+})
+
+for (const failure of ['unavailable', 'timeout'] as const) {
+  test(`una baja push ${failure} no conserva el acceso ni impide el cierre local del proveedor`, async ({
+    page,
+    context,
+    supabaseNetwork,
+    pushNetwork,
+  }) => {
+    await administrator(page, supabaseNetwork)
+    await page
+      .getByRole('button', { name: 'Activar notificaciones', exact: true })
+      .click()
+    await expect(
+      page.locator('.admin-notifications-page').getByRole('status'),
+    ).toContainText('activadas')
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let unsubscribes = 0
+    await context.route('**/api/admin/push/unsubscribe', async (route) => {
+      unsubscribes++
+      if (failure === 'timeout') await gate
+      await route.fulfill({ status: 503, json: {} }).catch(() => {})
+    })
+    try {
+      await page
+        .getByRole('button', { name: 'Cerrar sesión', exact: true })
+        .click()
+      await expect(page).toHaveURL(
+        '/admin/login?returnTo=%2Fadmin%2Fnotificaciones',
+      )
+      await expect(page.locator('.admin-sidebar')).toHaveCount(0)
+      await expect
+        .poll(async () => (await browserState(page)).hasSubscription)
+        .toBe(false)
+      await expect
+        .poll(
+          () =>
+            supabaseNetwork.requests.filter(
+              (request) => request.path === '/auth/v1/logout',
+            ).length,
+        )
+        .toBe(1)
+      const logout = supabaseNetwork.requests.find(
+        (request) => request.path === '/auth/v1/logout',
+      )
+      expect(logout?.scope).toBe('local')
+      expect(unsubscribes).toBe(1)
+      expect((await browserState(page)).removals).toBe(1)
+      // A failed/aborted remote opt-out is never reported as a confirmed one.
+      expect(pushNetwork.enabled).toBe(true)
+      expect(
+        await page.evaluate(async () => {
+          const path = '/src/services/admin-notifications.ts'
+          const { adminNotifications } = await import(path)
+          return adminNotifications.getSnapshot().items
+        }),
+      ).toEqual([])
+    } finally {
+      release()
+    }
+  })
+}
 
 test('una denegación del servidor retira inmediatamente los avisos privados ya cargados', async ({
   page,

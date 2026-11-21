@@ -223,6 +223,14 @@ try {
     console.log(`APPLIED locally: ${filename}`)
   }
 
+  // Historical migrations can use session-level SET. Do not let their DDL
+  // limits leak into unrelated assertions; restore the runner's original,
+  // bounded settings rather than changing either migration history or limits.
+  await client.query(
+    "select set_config('statement_timeout',$1,false),set_config('lock_timeout',$2,false)",
+    [String(config.statement_timeout), String(config.lock_timeout)],
+  )
+
   // The same metadata preflight is syntax-checked against a real SQL engine.
   await client.query(
     await readFile(path.join(root, 'supabase/audit/preflight.sql'), 'utf8'),
@@ -1450,7 +1458,10 @@ try {
         ),
       ),
     )
-    if (new Set(repeated.map((entry) => entry.order.id)).size !== 1)
+    if (
+      new Set(repeated.map((entry) => entry.order.id)).size !== 1 ||
+      new Set(repeated.map((entry) => entry.order.reference)).size !== 1
+    )
       throw new Error('A checkout retry created duplicate orders.')
     const conflict = await Promise.allSettled([
       commerceQuery(
@@ -1492,7 +1503,8 @@ try {
     ).rows
     if (
       rows.length !== 100 ||
-      new Set(rows.map((row) => row.reference)).size !== 100
+      new Set(rows.map((row) => row.reference)).size !== 100 ||
+      !rows.every((row) => /^AI-[0-9]{6,19}$/.test(row.reference))
     )
       throw new Error('Concurrent simulations lost or duplicated an order.')
     const statusSql =
@@ -1612,6 +1624,12 @@ try {
       paymentRemainsPending: true,
       reusedChangedPayloadRejected: true,
       idempotentStatusRetry: true,
+      shortOrderReferences: {
+        concurrentRequests: 100,
+        connections: 10,
+        uniqueReferences: 100,
+        replayedReferencePreserved: true,
+      },
     }
     report.commerceSecurity = await auditCommerceConcurrency({
       client,

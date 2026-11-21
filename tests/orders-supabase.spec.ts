@@ -829,6 +829,20 @@ test('Mis pedidos se consulta por propietario y nunca muestra los pedidos de otr
   await expect(page.locator('main')).toContainText('Aún no hay pedidos')
 })
 
+test('El código corto exige enlace privado y convive con búsquedas y pedidos históricos', async ({ page, supabaseNetwork, ordersNetwork }) => {
+  const current = ordersNetwork.orders[0], legacy = ordersNetwork.orders[1].reference
+  current.reference = 'AI-004827'
+  await page.goto('/seguir-pedido?codigo=AI-004827')
+  await expect(page.locator('.tracking-not-found')).toContainText('enlace privado')
+  await page.goto(`/seguir-pedido?codigo=AI-004827#acceso=${token}`)
+  await expect(page.locator('.tracking-result')).toContainText('AI-004827')
+  await admin(page, supabaseNetwork)
+  await page.goto('/admin/pedidos?q=AI-004827')
+  await expect(page.locator('.admin-order-workspace')).toContainText('AI-004827')
+  await page.goto(`/admin/pedidos/${legacy}`)
+  await expect(page.locator('#admin-content')).toContainText(legacy)
+})
+
 test('El seguimiento requiere el enlace privado o propietario y sólo presenta el estado', async ({
   page,
   ordersNetwork,

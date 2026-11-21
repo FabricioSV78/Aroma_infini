@@ -15,6 +15,11 @@ pasos. Abre **Configuración → Notificaciones**.
 5. Para retirarlo, pulsa **Desactivar en este dispositivo**. Los otros
    dispositivos del mismo administrador conservan su configuración.
 
+Cada cuenta admite hasta **20 dispositivos activos por entorno**. Varias
+cuentas administrativas también pueden recibir el mismo evento. Las pestañas
+de un mismo perfil de navegador comparten una suscripción; dos perfiles o
+dispositivos independientes mantienen suscripciones distintas.
+
 Si bloqueaste el permiso, cámbialo en los ajustes del navegador o del sistema y
 pulsa «Actualizar estado». Las restricciones de batería, Concentración/No molestar,
 conectividad y sistema operativo pueden demorar o impedir que se muestre un aviso.
@@ -32,11 +37,14 @@ La fuente es el pedido guardado en el servidor. El disparador requiere las tres
 condiciones: `simulation = false`, `payment_status = 'approved'` y
 `payment_verified_at` informado por un proceso de pago verificado.
 
-**Actualmente Mercado Pago sigue simulado.** Las restricciones SQL existentes
-todavía permiten únicamente pedidos simulados con pago pendiente. Se conservaron:
-ningún pedido de pruebas genera un aviso comercial, una cifra inventada o un
-evento de venta. Las pruebas de dispositivos son independientes del centro de
-pedidos y no se presentan como ventas.
+**Actualmente Mercado Pago sigue simulado.** Los pedidos simulados no generan
+ventas ni avisos de pago verificado. Desde `20261118000200`, desarrollo permite
+avisos operativos de pedidos de prueba mediante una opción privada de staging:
+el evento se identifica como `simulated_order`, solo se entrega al entorno
+`staging` y muestra «Pedido de prueba». La opción está desactivada por defecto
+en la migración; no es una regla para activar pagos o notificar producción.
+«Enviar prueba» sigue siendo una comprobación de un único dispositivo y no crea
+pedidos.
 
 La futura integración real de Mercado Pago debe levantar explícitamente esas
 restricciones y asignar el marcador solo después de comprobar el pago en el
@@ -68,8 +76,12 @@ No se implementó ni se activó la pasarela real en esta entrega.
 - El texto en pantalla bloqueada es fijo y genérico: no contiene nombre,
   teléfono, dirección, importe ni detalle de productos del cliente.
 - El cierre explícito de sesión retira la suscripción del navegador sin retrasar
-  la revocación del acceso local. Si la red falla, el endpoint deja de existir en
-  el navegador y el servidor lo desactiva al recibir su expiración del proveedor.
+  la revocación del acceso local. La baja push se inicia con la sesión válida;
+  el cierre remoto de Auth espera su finalización hasta un máximo de 2,5 segundos.
+  Un nuevo login espera ese cierre anterior para conservar su propia sesión.
+  El logout utiliza `scope: local` y no cierra los otros dispositivos. Si falla
+  la red, no se anuncia una baja remota exitosa: se intenta retirar el endpoint
+  del navegador y el proveedor puede comunicar su caducidad posteriormente.
 
 El pedido y su evento único se guardan sin llamadas de red al servicio push.
 Después, un cron por minuto expande la cola y reclama hasta diez envíos, con
@@ -86,9 +98,10 @@ desactiva exclusivamente la suscripción vencida. Los fallos no eliminan pedidos
 
 ## Configuración del operador
 
-La migración versionada es `20261104000300_admin_push.sql`. No introduce usuarios
-administradores ni datos de ventas. Se aplica mediante el procedimiento habitual
-de migraciones del entorno, después de revisar el proyecto vinculado.
+La base de push está en `20261104000300_admin_push.sql`; los eventos operativos
+de staging están en `20261118000200_staging_order_notifications.sql`. No crean
+administradores ni ventas. Se aplican mediante el procedimiento habitual de
+migraciones del entorno, después de revisar el proyecto vinculado.
 
 Por entorno, el Worker utiliza estos secretos:
 
@@ -147,7 +160,7 @@ Las capturas del panel están en `artifacts/admin-notifications/screenshots/`
 registra su resultado sanitizado en `artifacts/admin-push/hosted-result.json`;
 crea únicamente cuentas temporales identificadas y comprueba su retirada.
 
-Resultado de esta entrega: 649 comprobaciones SQL en 25 migraciones, 40 pruebas
+Resultados históricos de la entrega del 4 de noviembre: 649 comprobaciones SQL en 25 migraciones, 40 pruebas
 del protocolo/API/runtime y 14 pruebas del panel aprobadas. Typecheck, lint,
 compilaciones de staging y producción y empaquetado de Wrangler correctos. También
 pasaron las regresiones de SEO (26), checkout/contratos (28), pedidos (17) y los
@@ -186,6 +199,12 @@ Para la aceptación física, en **cada teléfono** instala la PWA y prueba:
 
 Registra modelo, versión del sistema/navegador y lo observado. No se deben dar
 por completadas estas pruebas físicas a partir de una respuesta HTTP 201/202.
+
+La [auditoría del 20 de noviembre](ADMIN_PUSH_MULTIDEVICE_2026_11_20.md) verificó
+recepción real mediante FCM y el service worker desplegado en tres perfiles
+independientes de Chrome: dos de una cuenta y uno de otra. Incluye caducidad,
+deduplicación, permiso bloqueado y revocación administrativa. Detectó y corrigió
+la carrera entre baja push y logout remoto, sin cambios de esquema o seguridad.
 
 Referencias oficiales: [Push API](https://developer.mozilla.org/en-US/docs/Web/API/Push_API),
 [Web Push en iOS](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/),

@@ -1,4 +1,5 @@
 import type { CartItem } from '../types/catalog'
+import { isOrderReference } from '../domain/order-reference'
 import type {
   CheckoutDraft,
   MockOrder,
@@ -368,7 +369,7 @@ export function parseSimulatedOrderResponse(
     discount > subtotal ||
     total !== subtotal - discount + fee ||
     subtotal !== sumLines(items) ||
-    !/^AI-(?:TEST-|SIM-)?[A-F0-9]{16,32}$/.test(text(data.reference, 64)) ||
+    !isOrderReference(text(data.reference, 64)) ||
     !Number.isFinite(Date.parse(text(data.placedAt, 64)))
   )
     throw new UserFacingError(

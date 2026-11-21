@@ -1,3 +1,4 @@
+import { isOrderReference } from '../domain/order-reference'
 import {
   registerAdminRuntime,
   subscribeAdminState,
@@ -1540,7 +1541,7 @@ export const adminService = {
       `${order.contact.firstName.trim()} ${order.contact.lastName.trim()}`.trim()
     if (
       !order.reference.trim() ||
-      !/^AI-[A-F0-9]{16}$/.test(order.reference) ||
+      !isOrderReference(order.reference) ||
       !customerName ||
       !customerEmail ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) ||

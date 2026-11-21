@@ -49,6 +49,14 @@ function order() {
     totalCents: 21000,
   }
 }
+
+test('Short references are display data; the internal UUID and owner remain independent', () => {
+  const result = parseAdminOrder({ ...order(), reference: 'AI-004827' })
+  expect(result.reference).toBe('AI-004827')
+  expect(result.id).toBe(owner)
+  expect(result.customerId).toBe(owner)
+  expect(result.totalCents).toBe(21000)
+})
 test('Los pedidos de prueba conservan totales y precios históricos sin afirmar un pago aprobado', () => {
   const result = parseAdminOrder(order())
   expect(result.paymentStatus).toBe('pending')
