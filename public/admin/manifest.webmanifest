@@ -5,6 +5,7 @@
   "description": "Panel administrativo de Aroma Infini",
   "lang": "es-PE",
   "start_url": "/admin/resumen",
+  "launch_handler": { "client_mode": "navigate-existing" },
   "scope": "/admin/",
   "display": "standalone",
   "background_color": "#f4f3ef",

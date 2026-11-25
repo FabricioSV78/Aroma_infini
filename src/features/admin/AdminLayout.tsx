@@ -384,7 +384,7 @@ function AdminLayoutContent() {
         {!isProductionEnvironment && (
           <div className="admin-demo-banner">
             {isRemoteCatalog
-              ? 'Entorno de pruebas · Sin cobros reales. Reserva de stock de 15 minutos para nuevos pedidos.'
+              ? 'Entorno de pruebas · Sin cobros reales. Los nuevos pedidos descuentan stock y permiten probar todo el flujo.'
               : 'Los cambios de este panel se guardan en este navegador.'}
           </div>
         )}

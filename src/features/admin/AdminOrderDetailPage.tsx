@@ -287,8 +287,8 @@ export function AdminOrderDetailPage() {
       />
       {order.simulation ? (
         <p className="admin-data-note">
-          Modo prueba: sin cobro real. La reserva de stock y su vencimiento se
-          validan en el servidor.
+          Modo prueba: sin cobro real. Los nuevos pedidos confirmados pueden
+          prepararse, enviarse y entregarse sin un límite de 15 minutos.
         </p>
       ) : null}
       <dl className="admin-order-highlights" aria-label="Resumen del pedido">
@@ -302,7 +302,7 @@ export function AdminOrderDetailPage() {
           <dt>Pago</dt>
           <dd>
             <AdminBadge tone={paymentStatus.tone}>
-              {paymentStatus.label}
+              {order.simulation ? 'Prueba sin cobro' : paymentStatus.label}
             </AdminBadge>
           </dd>
         </div>
@@ -385,7 +385,7 @@ export function AdminOrderDetailPage() {
             <h2 id="admin-order-payment">Pago</h2>
             <p>
               <AdminBadge tone={paymentStatus.tone}>
-                {paymentStatus.label}
+                {order.simulation ? 'Prueba sin cobro' : paymentStatus.label}
               </AdminBadge>
             </p>
             <p>Método indicado: Mercado Pago</p>
@@ -407,7 +407,9 @@ export function AdminOrderDetailPage() {
                       {variantLabel(line)} · Cant. {line.quantity}
                     </small>
                   </span>
-                  <span className="admin-order-line-amount">{formatPEN(line.unitPriceCents * line.quantity)}</span>
+                  <span className="admin-order-line-amount">
+                    {formatPEN(line.unitPriceCents * line.quantity)}
+                  </span>
                 </li>
               ))}
             </ul>

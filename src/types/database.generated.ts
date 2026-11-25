@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '14.18'
-  }
   api: {
     Tables: {
       [_ in never]: never
@@ -26,12 +21,15 @@ export type Database = {
         Args: { p_limit?: number; p_page?: number; p_query?: Json }
         Returns: Json
       }
-      admin_catalog_context: { Args: never; Returns: Json }
+      admin_catalog_context: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_catalog_page: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: Json
       }
-      admin_commerce_settings: { Args: never; Returns: Json }
+      admin_commerce_settings: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       admin_complaints: {
         Args: {
           p_limit?: number
@@ -61,17 +59,17 @@ export type Database = {
         Args: { p_expected_version: number; p_id: string }
         Returns: undefined
       }
-      admin_device_list: { Args: never; Returns: Json }
+      admin_device_list: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_device_register: {
         Args: { p_label: string; p_token_hash: string }
         Returns: Json
       }
       admin_device_resume: { Args: { p_token: string }; Returns: Json }
       admin_device_revoke: { Args: { p_device_id: string }; Returns: Json }
-      admin_home_document: { Args: never; Returns: Json }
+      admin_home_document: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_import_conflicts: { Args: { p_rows: Json }; Returns: Json }
       admin_import_products: { Args: { p_records: Json }; Returns: Json }
-      admin_media_aliases: { Args: never; Returns: Json }
+      admin_media_aliases: { Args: Record<PropertyKey, never>; Returns: Json }
       admin_media_detail: { Args: { p_asset_id: string }; Returns: Json }
       admin_media_library: {
         Args: {
@@ -102,7 +100,10 @@ export type Database = {
         Args: { p_limit?: number; p_page?: number }
         Returns: Json
       }
-      admin_olfactory_families: { Args: never; Returns: Json }
+      admin_olfactory_families: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       admin_order_list: {
         Args: {
           p_limit?: number
@@ -276,7 +277,10 @@ export type Database = {
         }
         Returns: Json
       }
-      admin_site_media_document: { Args: never; Returns: Json }
+      admin_site_media_document: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       admin_update_complaint: {
         Args: {
           p_delivered_at?: string
@@ -289,17 +293,29 @@ export type Database = {
         }
         Returns: Json
       }
-      builtin_media_build_state: { Args: never; Returns: Json }
+      builtin_media_build_state: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       builtin_media_resolve: { Args: { p_path: string }; Returns: Json }
-      catalog_brand_previews: { Args: never; Returns: Json }
-      catalog_brands: { Args: never; Returns: Json }
+      catalog_brand_previews: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      catalog_brands: { Args: Record<PropertyKey, never>; Returns: Json }
       catalog_browse: {
         Args: { p_page_size?: number; p_query?: Json }
         Returns: Json
       }
-      catalog_finder_context: { Args: never; Returns: Json }
-      catalog_home_context: { Args: never; Returns: Json }
-      catalog_olfactory_families: { Args: never; Returns: Json }
+      catalog_finder_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      catalog_home_context: { Args: Record<PropertyKey, never>; Returns: Json }
+      catalog_olfactory_families: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       catalog_product: { Args: { p_slug: string }; Returns: Json }
       catalog_product_context: { Args: { p_slug: string }; Returns: Json }
       catalog_products: {
@@ -310,7 +326,7 @@ export type Database = {
         Args: { p_product_ids?: string[]; p_variant_ids?: string[] }
         Returns: Json
       }
-      catalog_settings: { Args: never; Returns: Json }
+      catalog_settings: { Args: Record<PropertyKey, never>; Returns: Json }
       check_admin_push_delivery: {
         Args: { p_delivery_id: string; p_lease_id: string }
         Returns: Json
@@ -342,7 +358,7 @@ export type Database = {
         }
         Returns: Json
       }
-      commerce_settings: { Args: never; Returns: Json }
+      commerce_settings: { Args: Record<PropertyKey, never>; Returns: Json }
       consume_email_change_attempt: {
         Args: { p_user_id: string }
         Returns: Json
@@ -356,6 +372,15 @@ export type Database = {
         }
         Returns: Json
       }
+      create_confirmed_simulated_order: {
+        Args: {
+          p_checkout: Json
+          p_operation_id: string
+          p_tracking_token: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       create_simulated_order: {
         Args: {
           p_checkout: Json
@@ -365,9 +390,9 @@ export type Database = {
         }
         Returns: Json
       }
-      current_actor: { Args: never; Returns: Json }
-      customer_favorites: { Args: never; Returns: Json }
-      customer_orders: { Args: never; Returns: Json }
+      current_actor: { Args: Record<PropertyKey, never>; Returns: Json }
+      customer_favorites: { Args: Record<PropertyKey, never>; Returns: Json }
+      customer_orders: { Args: Record<PropertyKey, never>; Returns: Json }
       customer_product_review: { Args: { p_product_id: string }; Returns: Json }
       expire_stock_reservations: { Args: { p_limit?: number }; Returns: number }
       finish_admin_push: {
@@ -381,9 +406,9 @@ export type Database = {
         }
         Returns: Json
       }
-      get_address: { Args: never; Returns: Json }
-      get_profile: { Args: never; Returns: Json }
-      home_document: { Args: never; Returns: Json }
+      get_address: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_profile: { Args: Record<PropertyKey, never>; Returns: Json }
+      home_document: { Args: Record<PropertyKey, never>; Returns: Json }
       media_gc_claim: { Args: { p_limit?: number }; Returns: Json }
       media_gc_failure: {
         Args: { p_asset_id: string; p_claim_id: string; p_code: string }
@@ -440,12 +465,12 @@ export type Database = {
         }
         Returns: Json
       }
-      public_media_aliases: { Args: never; Returns: Json }
+      public_media_aliases: { Args: Record<PropertyKey, never>; Returns: Json }
       release_account_recovery_claim: {
         Args: { p_claim_id: string; p_user_id: string }
         Returns: boolean
       }
-      remove_address: { Args: never; Returns: undefined }
+      remove_address: { Args: Record<PropertyKey, never>; Returns: undefined }
       save_account_recovery_code: {
         Args: { p_claim_id?: string; p_code_hash: string; p_user_id: string }
         Returns: Json
@@ -472,8 +497,8 @@ export type Database = {
         }
         Returns: Json
       }
-      site_media_document: { Args: never; Returns: Json }
-      site_settings: { Args: never; Returns: Json }
+      site_media_document: { Args: Record<PropertyKey, never>; Returns: Json }
+      site_settings: { Args: Record<PropertyKey, never>; Returns: Json }
       submit_product_review: {
         Args: {
           p_comment: string
@@ -514,6 +539,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           department: string
@@ -555,6 +581,7 @@ export type Database = {
           kind: string
           order_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           delivery_environment?: string | null
@@ -592,12 +619,13 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           created_at?: string
           id?: string
           name: string
-          name_key?: string | null
+          name_key?: never
           slug: string
           updated_at?: string
           version?: number
@@ -607,7 +635,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
-          name_key?: string | null
+          name_key?: never
           slug?: string
           updated_at?: string
           version?: number
@@ -623,6 +651,7 @@ export type Database = {
           province: string
           province_label: string
         }
+        ComputedFields: never
         Insert: {
           department: string
           department_label: string
@@ -646,10 +675,10 @@ export type Database = {
           delivery_evidence: string
           demonstration: boolean
           id: string
-          input: Json
+          input: NonNullable<Json>
           input_hash: string
           operation_id: string
-          provider: Json
+          provider: NonNullable<Json>
           receipt_hash: string
           reference: string
           response: string
@@ -659,14 +688,15 @@ export type Database = {
           submitted_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           delivery_evidence?: string
           demonstration: boolean
           id?: string
-          input: Json
+          input: NonNullable<Json>
           input_hash: string
           operation_id: string
-          provider: Json
+          provider: NonNullable<Json>
           receipt_hash: string
           reference: string
           response?: string
@@ -680,10 +710,10 @@ export type Database = {
           delivery_evidence?: string
           demonstration?: boolean
           id?: string
-          input?: Json
+          input?: NonNullable<Json>
           input_hash?: string
           operation_id?: string
-          provider?: Json
+          provider?: NonNullable<Json>
           receipt_hash?: string
           reference?: string
           response?: string
@@ -711,6 +741,7 @@ export type Database = {
           value: number
           version: number
         }
+        ComputedFields: never
         Insert: {
           code: string
           created_at?: string
@@ -749,6 +780,7 @@ export type Database = {
           product_id: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           product_id: string
@@ -782,6 +814,7 @@ export type Database = {
           user_id: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           updated_at?: string
           user_id: string
@@ -796,25 +829,26 @@ export type Database = {
       }
       home_document: {
         Row: {
-          content: Json
+          content: NonNullable<Json>
           created_at: string
-          media: Json
+          media: NonNullable<Json>
           singleton: boolean
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
-          content: Json
+          content: NonNullable<Json>
           created_at?: string
-          media: Json
+          media: NonNullable<Json>
           singleton?: boolean
           updated_at?: string
           version?: number
         }
         Update: {
-          content?: Json
+          content?: NonNullable<Json>
           created_at?: string
-          media?: Json
+          media?: NonNullable<Json>
           singleton?: boolean
           updated_at?: string
           version?: number
@@ -827,6 +861,7 @@ export type Database = {
           singleton: boolean
           slot: string[]
         }
+        ComputedFields: never
         Insert: {
           media_id: string
           singleton?: boolean
@@ -878,6 +913,7 @@ export type Database = {
           verified_at: string | null
           width: number | null
         }
+        ComputedFields: never
         Insert: {
           byte_size?: number | null
           created_at?: string
@@ -940,6 +976,7 @@ export type Database = {
           version: number
           width: number
         }
+        ComputedFields: never
         Insert: {
           asset_id?: string | null
           classification?: string
@@ -980,19 +1017,20 @@ export type Database = {
         Row: {
           key: string
           kind: string
-          metadata: Json
+          metadata: NonNullable<Json>
           path: string
         }
+        ComputedFields: never
         Insert: {
           key: string
           kind: string
-          metadata: Json
+          metadata: NonNullable<Json>
           path: string
         }
         Update: {
           key?: string
           kind?: string
-          metadata?: Json
+          metadata?: NonNullable<Json>
           path?: string
         }
         Relationships: [
@@ -1015,11 +1053,12 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           alt?: string
           asset_id: string
           label: string
-          search_document?: unknown
+          search_document?: never
           section: string
           updated_at?: string
           version?: number
@@ -1028,7 +1067,7 @@ export type Database = {
           alt?: string
           asset_id?: string
           label?: string
-          search_document?: unknown
+          search_document?: never
           section?: string
           updated_at?: string
           version?: number
@@ -1053,6 +1092,7 @@ export type Database = {
           sha256: string
           width: number
         }
+        ComputedFields: never
         Insert: {
           asset_id: string
           byte_size: number
@@ -1092,13 +1132,14 @@ export type Database = {
           sort_order: number
           version: number
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           aliases?: string[]
           aroma_label: string
           code: string
           label: string
-          name_key?: string | null
+          name_key?: never
           sort_order?: number
           version?: number
         }
@@ -1108,7 +1149,7 @@ export type Database = {
           aroma_label?: string
           code?: string
           label?: string
-          name_key?: string | null
+          name_key?: never
           sort_order?: number
           version?: number
         }
@@ -1119,25 +1160,26 @@ export type Database = {
           actor_id: string
           changed_at: string
           id: string
-          new_delivery: Json
+          new_delivery: NonNullable<Json>
           order_id: string
-          previous_delivery: Json
+          previous_delivery: NonNullable<Json>
         }
+        ComputedFields: never
         Insert: {
           actor_id: string
           changed_at?: string
           id?: string
-          new_delivery: Json
+          new_delivery: NonNullable<Json>
           order_id: string
-          previous_delivery: Json
+          previous_delivery: NonNullable<Json>
         }
         Update: {
           actor_id?: string
           changed_at?: string
           id?: string
-          new_delivery?: Json
+          new_delivery?: NonNullable<Json>
           order_id?: string
-          previous_delivery?: Json
+          previous_delivery?: NonNullable<Json>
         }
         Relationships: [
           {
@@ -1168,6 +1210,7 @@ export type Database = {
           variant_id: string | null
           variant_label: string | null
         }
+        ComputedFields: never
         Insert: {
           brand_name: string
           image_source: string
@@ -1247,6 +1290,7 @@ export type Database = {
           source: string
           to_status: string
         }
+        ComputedFields: never
         Insert: {
           actor_id?: string | null
           actor_name: string
@@ -1307,6 +1351,7 @@ export type Database = {
           shipping_cents: number
           shipping_estimate: string
           simulation: boolean
+          simulation_confirmed_at: string | null
           status: string
           street: string
           subtotal_cents: number
@@ -1316,6 +1361,7 @@ export type Database = {
           user_id: string | null
           version: number
         }
+        ComputedFields: never
         Insert: {
           address_reference?: string
           alternate_recipient_dni?: string | null
@@ -1343,6 +1389,7 @@ export type Database = {
           shipping_cents: number
           shipping_estimate: string
           simulation?: boolean
+          simulation_confirmed_at?: string | null
           status?: string
           street: string
           subtotal_cents: number
@@ -1379,6 +1426,7 @@ export type Database = {
           shipping_cents?: number
           shipping_estimate?: string
           simulation?: boolean
+          simulation_confirmed_at?: string | null
           status?: string
           street?: string
           subtotal_cents?: number
@@ -1397,6 +1445,7 @@ export type Database = {
           position: number
           product_id: string
         }
+        ComputedFields: never
         Insert: {
           framing?: string
           media_id: string
@@ -1433,6 +1482,7 @@ export type Database = {
           position: number
           product_id: string
         }
+        ComputedFields: never
         Insert: {
           label: string
           phase: string
@@ -1467,6 +1517,7 @@ export type Database = {
           value: number
           version: number
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           discount_type: string
@@ -1505,6 +1556,7 @@ export type Database = {
           position: number
           product_id: string
         }
+        ComputedFields: never
         Insert: {
           family_code: string
           position?: number
@@ -1538,6 +1590,7 @@ export type Database = {
           product_id: string
           recommended_product_id: string
         }
+        ComputedFields: never
         Insert: {
           position: number
           product_id: string
@@ -1578,6 +1631,7 @@ export type Database = {
           title: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           author_display: string
           comment: string
@@ -1628,6 +1682,7 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           created_at?: string
@@ -1636,7 +1691,7 @@ export type Database = {
           legacy_id?: string | null
           merchant_sku?: string | null
           ml?: number | null
-          presentation_key?: string | null
+          presentation_key?: never
           price_cents?: number
           product_id: string
           stock?: number
@@ -1651,7 +1706,7 @@ export type Database = {
           legacy_id?: string | null
           merchant_sku?: string | null
           ml?: number | null
-          presentation_key?: string | null
+          presentation_key?: never
           price_cents?: number
           product_id?: string
           stock?: number
@@ -1693,6 +1748,7 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           aromatic_profile?: string
@@ -1767,6 +1823,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           first_name?: string
@@ -1795,6 +1852,7 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           free_threshold_cents: number
           national_courier_fee_cents: number
@@ -1828,6 +1886,7 @@ export type Database = {
           province: string | null
           singleton: boolean
         }
+        ComputedFields: never
         Insert: {
           active: boolean
           courier_fee_cents: number
@@ -1870,6 +1929,7 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           alt?: string
           asset_id?: string | null
@@ -1896,21 +1956,22 @@ export type Database = {
       }
       site_settings: {
         Row: {
-          data: Json
+          data: NonNullable<Json>
           singleton: boolean
           updated_at: string
           updated_by: string | null
           version: number
         }
+        ComputedFields: never
         Insert: {
-          data: Json
+          data: NonNullable<Json>
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
           version?: number
         }
         Update: {
-          data?: Json
+          data?: NonNullable<Json>
           singleton?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -1927,6 +1988,7 @@ export type Database = {
           updated_at: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           complements_enabled?: boolean
           created_at?: string
@@ -1977,6 +2039,7 @@ export type Database = {
           created_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           claim_id?: string | null
           code_hash: string
@@ -1999,6 +2062,7 @@ export type Database = {
           bucket_hash: string
           window_started_at: string
         }
+        ComputedFields: never
         Insert: {
           attempt_count: number
           bucket_hash: string
@@ -2018,6 +2082,7 @@ export type Database = {
           granted_by: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           granted_at?: string
@@ -2038,6 +2103,7 @@ export type Database = {
           read_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           notification_id: string
           read_at?: string
@@ -2069,6 +2135,7 @@ export type Database = {
           subscription_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           accepted_at?: string | null
           attempts?: number
@@ -2120,6 +2187,7 @@ export type Database = {
           singleton: boolean
           staging_simulated_order_notifications: boolean
         }
+        ComputedFields: never
         Insert: {
           singleton?: boolean
           staging_simulated_order_notifications?: boolean
@@ -2149,6 +2217,7 @@ export type Database = {
           user_id: string
           version: number
         }
+        ComputedFields: never
         Insert: {
           auth: string
           created_at?: string
@@ -2194,6 +2263,7 @@ export type Database = {
           user_id: string
           window_started_at: string
         }
+        ComputedFields: never
         Insert: {
           action: string
           attempt_count: number
@@ -2224,6 +2294,7 @@ export type Database = {
           token_hash: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at: string
           created_by: string
@@ -2266,6 +2337,7 @@ export type Database = {
           user_id: string
           verified_claims_hash: string
         }
+        ComputedFields: never
         Insert: {
           authorized_by_resume?: boolean
           created_at: string
@@ -2300,6 +2372,7 @@ export type Database = {
           user_id: string
           window_started_at: string
         }
+        ComputedFields: never
         Insert: {
           attempt_count: number
           user_id: string
@@ -2321,6 +2394,7 @@ export type Database = {
           next_status: string
           previous_status: string | null
         }
+        ComputedFields: never
         Insert: {
           actor_id?: string | null
           changed_at?: string
@@ -2345,6 +2419,7 @@ export type Database = {
           identifier: string
           window_start: string
         }
+        ComputedFields: never
         Insert: {
           attempts: number
           identifier: string
@@ -2367,6 +2442,7 @@ export type Database = {
           id: number
           occurred_at: string
         }
+        ComputedFields: never
         Insert: {
           actor_id?: string | null
           asset_id: string
@@ -2393,6 +2469,7 @@ export type Database = {
           user_id: string
           window_start: string
         }
+        ComputedFields: never
         Insert: {
           attempts: number
           user_id: string
@@ -2411,21 +2488,22 @@ export type Database = {
           created_at: string
           operation_id: string
           request_hash: string
-          result: Json
+          result: NonNullable<Json>
         }
+        ComputedFields: never
         Insert: {
           actor_id: string
           created_at?: string
           operation_id: string
           request_hash: string
-          result: Json
+          result: NonNullable<Json>
         }
         Update: {
           actor_id?: string
           created_at?: string
           operation_id?: string
           request_hash?: string
-          result?: Json
+          result?: NonNullable<Json>
         }
         Relationships: []
       }
@@ -2439,6 +2517,7 @@ export type Database = {
           state: string
           variant_id: string
         }
+        ComputedFields: never
         Insert: {
           closed_at?: string | null
           created_at?: string
@@ -2469,7 +2548,7 @@ export type Database = {
         Returns: boolean
       }
       admin_device_session: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           assurance: string
           credential_hash: string
@@ -2481,7 +2560,10 @@ export type Database = {
           verified_claims_hash: string
         }[]
       }
-      admin_device_trusted_until: { Args: never; Returns: string }
+      admin_device_trusted_until: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       admin_order_candidates: {
         Args: { p_query: Json }
         Returns: Database['app']['Tables']['orders']['Row'][]
@@ -2493,7 +2575,7 @@ export type Database = {
         }
       }
       admin_product_candidates: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           active: boolean
           brand_id: string
@@ -2519,14 +2601,20 @@ export type Database = {
         Args: { p_kind: string; p_metadata: Json }
         Returns: boolean
       }
-      builtin_reconcile_retention: { Args: never; Returns: undefined }
+      builtin_reconcile_retention: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       builtin_reconcile_sources: {
         Args: { p_keys: string[] }
         Returns: undefined
       }
       builtin_source_in_use: { Args: { p_path: string }; Returns: boolean }
       builtin_source_key: { Args: { p_path: string }; Returns: string }
-      catalog_flush_constraints: { Args: never; Returns: undefined }
+      catalog_flush_constraints: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       catalog_name_key: { Args: { p_value: string }; Returns: string }
       catalog_next_variant_sku: { Args: { p_reserved: Json }; Returns: string }
       catalog_prepare_variant_skus: { Args: { p_records: Json }; Returns: Json }
@@ -2547,7 +2635,12 @@ export type Database = {
         Returns: Json
       }
       catalog_product_is_published: {
-        Args: { p_product: Database['app']['Tables']['products']['Row'] }
+        Args: {
+          p_product: Omit<
+            Database['app']['Tables']['products']['Row'],
+            Database['app']['Tables']['products']['ComputedFields']
+          >
+        }
         Returns: boolean
       }
       catalog_public_document: { Args: { p_product_id: string }; Returns: Json }
@@ -2557,7 +2650,7 @@ export type Database = {
         Returns: string
       }
       catalog_sales_units: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           product_id: string
           units: number
@@ -2617,12 +2710,19 @@ export type Database = {
         Args: { p_empty?: boolean; p_max: number; p_value: Json }
         Returns: string
       }
+      confirm_simulated_order: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
       coupon_document: { Args: { p_id: string }; Returns: Json }
       coupon_quote: {
         Args: { p_code: string; p_has_offers: boolean; p_subtotal: number }
         Returns: Json
       }
-      current_user_membership: { Args: never; Returns: boolean }
+      current_user_membership: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       expire_order_stock_reservations: {
         Args: { p_expired_at?: string; p_order_id: string }
         Returns: number
@@ -2630,6 +2730,10 @@ export type Database = {
       favorite_product_is_published: {
         Args: { p_product_id: string }
         Returns: boolean
+      }
+      flush_simulated_inventory_constraints: {
+        Args: { p_order_id: string }
+        Returns: undefined
       }
       hero_upgrade: { Args: { p_hero: Json }; Returns: Json }
       hero_validate: { Args: { p_hero: Json }; Returns: undefined }
@@ -2661,7 +2765,7 @@ export type Database = {
         Args: { p_content: Json; p_media: Json }
         Returns: undefined
       }
-      is_admin: { Args: never; Returns: boolean }
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       media_default_label: {
         Args: { p_id: string; p_purpose: string }
         Returns: string
@@ -2675,8 +2779,14 @@ export type Database = {
       }
       media_library_json: {
         Args: {
-          p_library: Database['app']['Tables']['media_library']['Row']
-          p_media: Database['app']['Tables']['media_assets']['Row']
+          p_library: Omit<
+            Database['app']['Tables']['media_library']['Row'],
+            Database['app']['Tables']['media_library']['ComputedFields']
+          >
+          p_media: Omit<
+            Database['app']['Tables']['media_assets']['Row'],
+            Database['app']['Tables']['media_assets']['ComputedFields']
+          >
           p_uses: number
           p_variants: Json
         }
@@ -2705,6 +2815,10 @@ export type Database = {
           section: string
         }[]
       }
+      next_order_reference: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       olfactory_aliases_valid: {
         Args: { p_values: string[] }
         Returns: boolean
@@ -2721,14 +2835,25 @@ export type Database = {
         Args: { p_environment: string }
         Returns: undefined
       }
-      request_assurance: { Args: never; Returns: string }
-      request_user_id: { Args: never; Returns: string }
-      require_catalog_admin: { Args: never; Returns: undefined }
-      require_customer_identity: { Args: never; Returns: string }
+      request_assurance: { Args: Record<PropertyKey, never>; Returns: string }
+      request_user_id: { Args: Record<PropertyKey, never>; Returns: string }
+      require_catalog_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      require_customer_identity: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       reservable_stock: { Args: { p_variant_id: string }; Returns: number }
       review_content_allowed: { Args: { p_text: string }; Returns: boolean }
       review_document: {
-        Args: { p_review: Database['app']['Tables']['product_reviews']['Row'] }
+        Args: {
+          p_review: Omit<
+            Database['app']['Tables']['product_reviews']['Row'],
+            Database['app']['Tables']['product_reviews']['ComputedFields']
+          >
+        }
         Returns: Json
       }
       review_size_available: {
@@ -2755,7 +2880,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      site_media_projection: { Args: never; Returns: Json }
+      site_media_projection: { Args: Record<PropertyKey, never>; Returns: Json }
       validate_complaint: { Args: { p_input: Json }; Returns: undefined }
       validate_site_settings: { Args: { p_data: Json }; Returns: undefined }
     }

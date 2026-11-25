@@ -51,6 +51,39 @@ Cambiar contraseña, correo, factor TOTP, estado de bloqueo o membresía invalid
 la confianza anterior. Reactivar posteriormente la cuenta no reactiva cookies
 revocadas. Eliminar una sesión Auth elimina su concesión por clave foránea.
 
+### Corrección de revocación — 24 de noviembre de 2026
+
+Se corrigió el rechazo de peticiones DELETE sin contenido cuando Cloudflare
+las entrega al Worker con un flujo vacío en lugar de `body === null`. Antes,
+la petición fallaba con HTTP 400 incluso sin sesión, antes de autenticar al
+solicitante. Ahora se comprueba que el cuerpo tenga exactamente cero bytes;
+un cuerpo con contenido sigue siendo rechazado antes de acceder a Supabase.
+Se conservan HTTPS, origen, límites, autenticación, MFA y comprobación de dueño.
+No se añadieron consultas, cachés, sondeos ni cambios visuales.
+
+La corrección está activa únicamente en staging, versión
+`bf9d2a50-9e8d-44f9-a5e8-a7692ea898b8`. No requiere migraciones.
+Pasaron TypeScript, ESLint, build y empaquetado, 93 pruebas de autenticación
+y 15 del Worker. Chrome móvil con Supabase Auth, TOTP y Worker reales verificó
+el registro de confianza, un nuevo acceso con contraseña y su revocación desde
+el panel. SQL confirmó la auditoría del dueño, la ausencia de concesiones del
+dispositivo revocado y la conservación del factor TOTP verificado. La cuenta
+temporal se eliminó; no se revocaron dispositivos de cuentas existentes.
+
+El QR solo reaparece al inscribir un autenticador cuando no queda ningún
+factor TOTP verificado. Vencer los 60 días, revocar confianza, borrar cookies
+o cambiar de navegador requiere el código del autenticador existente, no un
+QR nuevo. Revocar confianza no elimina el autenticador ni invalida por sí sola
+una sesión que conserva una verificación AAL2 real.
+
+Evidencias: `artifacts/admin-device-fix-2026-11-24/`. Incluyen la verificación
+de siete hashes públicos y de bindings, capturas móviles y confirmación de
+que la versión activa de producción no cambió. El primer ensayo alojado se
+detuvo por una aserción del ensayo que esperaba visible el menú lateral de
+escritorio en móvil; se corrigió solo esa aserción y el recorrido completo
+aprobó. Workerd local emitió un diagnóstico de cierre de libuv en Windows
+con código de salida cero; la prueba alojada independiente también aprobó.
+
 Las rutas nuevas solo aceptan HTTPS del mismo origen, un encabezado propio y
 los métodos previstos. Las mutaciones exigen `Origin` exacto; una consulta GET
 sin `Origin` exige `Sec-Fetch-Site: same-origin`. No se habilita CORS para

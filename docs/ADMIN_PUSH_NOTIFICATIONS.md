@@ -31,6 +31,42 @@ actualiza al volver al panel, recibir un aviso o pulsar Actualizar; no mantiene
 un temporizador de consultas constantes. Los datos permanecen en Supabase aunque
 el sistema operativo no haya mostrado el aviso push.
 
+## Apertura de la PWA — actualización del 24 de noviembre de 2026
+
+- Un nuevo arranque de la aplicación instalada abre **Resumen**. Se normaliza
+  una URL restaurada antes de crear el router y solicitar datos de esa pantalla.
+- Una notificación abre el pedido o el centro de avisos. El service worker añade
+  `adminLaunch=notification`; el arranque consume esa intención y la elimina de
+  la URL. No concede permisos: los loaders conservan Auth, MFA y RLS.
+- Cambiar a otra aplicación, usar la cámara, bloquear la pantalla o recuperar
+  una página conservada en memoria no redirige ni descarta formularios. Esta
+  conservación fue confirmada expresamente por el usuario.
+- Una recarga manual conserva la pantalla actual. La navegación SPA y las
+  pestañas normales del navegador mantienen su comportamiento anterior.
+
+El manifiesto conserva `start_url: /admin/resumen` y declara
+`launch_handler.client_mode: navigate-existing`. Como la API de lanzamiento
+no está disponible en todos los navegadores, también existe la normalización
+del nuevo documento en modo instalado. No se utilizan foco, visibilidad,
+temporizadores ni consultas para intentar adivinar cuándo se cerró la app.
+Una instalación ya abierta debe recargarse una vez para recibir el código y
+el service worker nuevos; la actualización del manifiesto la gestiona el
+navegador/sistema operativo.
+
+Validación: 33 pruebas de entrada/autenticación, siete contratos de PWA y
+22 pruebas de notificaciones; TypeScript, ESLint, build y paquete aprobados.
+El staging activo es `83cda31a-1c90-4f55-a5e5-c016b37cddf7`. Se verificaron
+nueve hashes publicados y cuatro comprobaciones con Auth/MFA, Supabase y
+frontend reales en Chrome a 390 px, emulando el modo instalado. La cuenta
+temporal se retiró y producción no cambió. Ese ensayo no equivale al cierre y
+relanzamiento de Android físico. El usuario también confirmó en su Android
+que, después de cerrar la PWA desde aplicaciones recientes y abrirla desde su
+icono, la primera pantalla es **Resumen**. Esta última comprobación es manual.
+Evidencias: `artifacts/admin-pwa-entry-2026-11-24/`.
+
+Referencias: [Launch Handler de Chrome](https://developer.chrome.com/docs/web-platform/launch-handler),
+[compatibilidad de LaunchQueue](https://github.com/mdn/browser-compat-data/blob/main/api/LaunchQueue.json).
+
 ## Qué genera un aviso comercial
 
 La fuente es el pedido guardado en el servidor. El disparador requiere las tres

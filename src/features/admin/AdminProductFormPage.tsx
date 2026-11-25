@@ -182,6 +182,8 @@ export function AdminProductFormPage() {
   const [message, setMessage] = useState('')
   const [mediaBusy, setMediaBusy] = useState(false)
   const mediaUploadRef = useRef(false)
+  const deletingProduct = useRef(false)
+  const [deleteStarted, setDeleteStarted] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [relatedOpen, setRelatedOpen] = useState(false)
   const [relatedLookup, setRelatedLookup] = useState<{id: string; includeIds: string[]} | null>(null)
@@ -325,7 +327,11 @@ export function AdminProductFormPage() {
     return () => window.clearTimeout(timer)
   }, [location.hash])
 
-  if (editing && !stored)
+  if (
+    editing &&
+    !stored &&
+    !(deleteStarted && (saving || persistence.persistenceFailed))
+  )
     return (
       <div className="admin-page admin-empty">
         <p className="eyebrow">Producto no encontrado</p>
@@ -456,6 +462,7 @@ export function AdminProductFormPage() {
     if (
       mediaUploadRef.current ||
       mediaBusy ||
+      deletingProduct.current ||
       saving ||
       persistence.persistenceFailed
     )
@@ -496,6 +503,58 @@ export function AdminProductFormPage() {
         description: result.message,
         primary: { label: 'Volver a editar' },
       })
+  }
+
+  async function deleteProduct() {
+    if (
+      !stored ||
+      deletingProduct.current ||
+      mediaUploadRef.current ||
+      mediaBusy ||
+      saving ||
+      persistence.persistenceFailed
+    )
+      return
+    deletingProduct.current = true
+    try {
+      const confirmed = await notice.confirm({
+        title: `¿Eliminar ${stored.product.name}?`,
+        description:
+          'Se eliminarán el producto y sus presentaciones, y se retirarán sus fotos de esta ficha. Esta acción no se puede deshacer.' +
+          (hasUnsavedChanges
+            ? ' También se descartarán los cambios sin guardar.'
+            : ''),
+        confirmLabel: 'Eliminar producto',
+        cancelLabel: 'Cancelar',
+        destructive: true,
+      })
+      if (!confirmed) return
+      setDeleteStarted(true)
+      const result = await persistence.save(
+        () => adminService.deleteProduct(stored.product.id, form.version),
+        () => {
+          allowNavigation.current = true
+          notice.toast('Producto eliminado.')
+          navigate('/admin/productos', { replace: true })
+        },
+      )
+      if (
+        result?.kind !== 'saved' &&
+        adminService.getSnapshot().products.some(
+          (record) => record.product.id === stored.product.id,
+        )
+      )
+        setDeleteStarted(false)
+      if (result?.kind === 'validation')
+        notice.show({
+          kind: 'warning',
+          title: 'No se pudo eliminar el producto',
+          description: result.message,
+          primary: { label: 'Volver al producto' },
+        })
+    } finally {
+      deletingProduct.current = false
+    }
   }
 
   return (
@@ -1251,6 +1310,16 @@ export function AdminProductFormPage() {
               </p>
             ) : null}
           </div>
+          {editing ? (
+            <button
+              type="button"
+              className="admin-remove"
+              disabled={mediaBusy || saving || persistence.persistenceFailed}
+              onClick={() => void deleteProduct()}
+            >
+              {deleteStarted && saving ? 'Eliminando…' : 'Eliminar producto'}
+            </button>
+          ) : null}
         </section>
 
         {message ? (

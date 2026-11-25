@@ -1363,6 +1363,30 @@ export const adminService = {
     }))
     return { kind: 'saved' }
   },
+  deleteProduct(id: string): AdminSaveResult {
+    const record = state.products.find((item) => item.product.id === id)
+    if (!record)
+      return { kind: 'validation', message: 'El producto ya no existe.' }
+    const variantIds = new Set(record.product.variants.map((variant) => variant.id))
+    if (
+      state.orders.some((order) =>
+        order.lines.some((line) => variantIds.has(line.variantId)),
+      ) ||
+      state.products.some((item) =>
+        item.product.id !== id && item.detail.recommendationIds.includes(id),
+      )
+    )
+      return {
+        kind: 'validation',
+        message:
+          'No se puede eliminar un producto vinculado a pedidos o recomendaciones. Retira las recomendaciones o desactívalo para ocultarlo conservando el historial de pedidos.',
+      }
+    commit((current) => ({
+      ...current,
+      products: current.products.filter((item) => item.product.id !== id),
+    }))
+    return { kind: 'saved' }
+  },
   setProductActive(id: string, active: boolean): AdminSaveResult {
     const record = state.products.find((item) => item.product.id === id)
     if (!record)

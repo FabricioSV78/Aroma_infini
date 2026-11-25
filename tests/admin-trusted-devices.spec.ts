@@ -361,7 +361,8 @@ test('un primer QR se inscribe una vez y dos administradores conservan sesiones 
     const accountIn = (target: Page) =>
       target.evaluate(async () => {
         const source = '/src/services/auth-service.ts'
-        return (await import(source)).adminAuthService.getSnapshot().session?.user.id
+        return (await import(source)).adminAuthService.getSnapshot().session
+          ?.user.id
       })
     expect(await accountIn(page)).toBe(customerA)
     expect(await accountIn(otherPage)).toBe(customerB)
@@ -459,6 +460,77 @@ test('configuración permite revocar un dispositivo por separado y conserva los 
   }
 })
 
+for (const remembered of [false, true]) {
+  test(`revocar este navegador ${remembered ? 'recordado AAL1' : 'verificado AAL2'} conserva el autenticador existente`, async ({
+    page,
+    context,
+    supabaseNetwork,
+  }) => {
+    const state = serverState()
+    supabaseNetwork.adminMembership = true
+    await securePanel(context, supabaseNetwork, state)
+    await passwordLogin(page)
+    await verify(page)
+    if (remembered) {
+      await page
+        .getByRole('button', { name: 'Cerrar sesión', exact: true })
+        .click()
+      await passwordLogin(page)
+      await expect(page).toHaveURL(`${origin}/admin`)
+    }
+    await page.goto(`${origin}/admin/configuracion`)
+    const panel = page.getByRole('region', {
+      name: 'Dispositivos de confianza',
+    })
+    let revocations = 0
+    page.on('request', (request) => {
+      if (
+        request.method() === 'DELETE' &&
+        request.url().includes('/api/admin/auth/devices/')
+      )
+        revocations++
+    })
+    await panel
+      .getByRole('button', {
+        name: 'Revocar confianza de Navegador 1',
+        exact: true,
+      })
+      .click()
+    if (remembered) {
+      await expect(
+        page.getByLabel('Código de verificación', { exact: true }),
+      ).toBeVisible()
+      await expect(page.locator('.admin-sidebar')).toHaveCount(0)
+    } else {
+      await expect(
+        panel.getByText('No tienes dispositivos de confianza activos.', {
+          exact: true,
+        }),
+      ).toBeVisible()
+      await page
+        .getByRole('button', { name: 'Cerrar sesión', exact: true })
+        .click()
+      await passwordLogin(page)
+      await expect(
+        page.getByLabel('Código de verificación', { exact: true }),
+      ).toBeVisible()
+    }
+    expect(revocations).toBe(1)
+    expect(state.devices[0].revoked).toBe(true)
+    await expect(
+      page.getByRole('img', {
+        name: 'Código QR para configurar tu aplicación autenticadora',
+      }),
+    ).toHaveCount(0)
+    expect(
+      supabaseNetwork.requests.filter(
+        (request) =>
+          request.path === '/auth/v1/factors' && request.method === 'POST',
+      ),
+    ).toHaveLength(0)
+  })
+}
+
 test('una sesión de confianza AAL1 queda limitada por su fecha y un rechazo de Auth retira el acceso', async ({
   page,
   context,
@@ -476,7 +548,8 @@ test('una sesión de confianza AAL1 queda limitada por su fecha y un rechazo de 
   await expect(page).toHaveURL(`${origin}/admin`)
   const expiresAt = await page.evaluate(async () => {
     const source = '/src/services/auth-service.ts'
-    return (await import(source)).adminAuthService.getSnapshot().session?.expiresAt
+    return (await import(source)).adminAuthService.getSnapshot().session
+      ?.expiresAt
   })
   expect(expiresAt).toBe(Date.parse(expiry))
   // Managed Auth can revoke a session independently, including when another

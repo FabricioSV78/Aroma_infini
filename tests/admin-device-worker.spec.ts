@@ -418,6 +418,56 @@ test('list and revoke need an authorized admin and return only reviewed fields',
   }
 })
 
+test('revocation accepts an empty transport stream while rejecting any actual body before authorization', async () => {
+  const emptyHeaders: Record<string, string>[] = [{}, { 'Content-Length': '0' }]
+  for (const headers of emptyHeaders) {
+    const f = fixture({ aal: 'aal1', trusted: true })
+    const original = request(`/devices/${otherDevice}`)
+    const input = new Request(original, {
+      headers: new Headers({
+        ...Object.fromEntries(original.headers),
+        ...headers,
+      }),
+      body: '',
+    })
+    expect(input.body).not.toBeNull()
+    const result = await f.handle(input)
+    expect(result?.status).toBe(200)
+    expect(await result?.json()).toEqual({ revoked: true })
+    expect(
+      f.calls.filter((call) => call.path.endsWith('/admin_device_revoke')),
+    ).toHaveLength(1)
+    expect(result!.headers.get('Cache-Control')).toBe('no-store')
+  }
+  for (const [body, headers] of [
+    ['{}', {}],
+    [' ', {}],
+    ['x', { 'Content-Length': '0' }],
+    ['', { 'Content-Length': '1' }],
+  ] as const) {
+    const f = fixture()
+    const original = request(`/devices/${otherDevice}`)
+    const result = await f.handle(
+      new Request(original, {
+        headers: new Headers({
+          ...Object.fromEntries(original.headers),
+          ...headers,
+        }),
+        body,
+      }),
+    )
+    expect(result?.status).toBe(400)
+    expect(f.calls).toHaveLength(0)
+  }
+  const anonymous = fixture()
+  const input = new Request(
+    request(`/devices/${device}`, { headers: { Authorization: null } }),
+    { body: '' },
+  )
+  expect((await anonymous.handle(input))?.status).toBe(401)
+  expect(anonymous.calls).toHaveLength(0)
+})
+
 test('rate limits, invalid client fields and unsupported routes are bounded before mutation', async () => {
   const rate = fixture({ rate: false })
   expect((await rate.handle(request('/device/register')))?.status).toBe(429)
@@ -591,6 +641,10 @@ test('native workerd generates and hashes the cookie using WebCrypto and user JW
             aal: 'aal2',
             requires_mfa: false,
           })
+        if (path.endsWith('/admin_device_revoke')) {
+          expect(await input.json()).toEqual({ p_device_id: device })
+          return Response.json({ revoked: true, current: true })
+        }
         const body = (await input.json()) as { p_token_hash: string }
         storedHash = body.p_token_hash
         return Response.json({
@@ -624,6 +678,21 @@ test('native workerd generates and hashes the cookie using WebCrypto and user JW
       ).toString('hex'),
     )
     expect(await result.text()).not.toContain(raw)
+    const revoked = await runtime.dispatchFetch(
+      `${origin}${prefix}/devices/${device}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Origin: origin,
+          Authorization: `Bearer ${token}`,
+          'X-Aroma-Admin-Device': '1',
+        },
+        body: '',
+      },
+    )
+    expect(revoked.status).toBe(200)
+    expect(await revoked.json()).toEqual({ revoked: true })
+    expect(revoked.headers.get('Set-Cookie')).toContain('Max-Age=0')
   } finally {
     await runtime.dispose()
   }

@@ -278,7 +278,7 @@ export async function submitSimulatedOrder(
       'checkout-unavailable',
       'El pago en línea no está disponible en este momento.',
     )
-  const client = (await requireReadySupabaseClient()),
+  const client = await requireReadySupabaseClient(),
     before = await client.auth.getSession()
   if (before.error)
     throw new UserFacingError(
@@ -343,8 +343,12 @@ export async function submitSimulatedOrder(
         : 'No pudimos confirmar el pedido. Conservamos los datos para volver a intentar.',
     )
   }
-  const confirmed = parseSimulatedOrderResponse(value, operation, Boolean(userId))
-  // A confirmed reservation changes availability even without a real charge.
+  const confirmed = parseSimulatedOrderResponse(
+    value,
+    operation,
+    Boolean(userId),
+  )
+  // A confirmed test purchase changes stock without asserting a real charge.
   invalidatePublicQueryCache(true)
   return confirmed
 }

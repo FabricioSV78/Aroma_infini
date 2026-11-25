@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import sharp from 'sharp'
 import { classifyRoute } from '../worker/route-policy'
+import { adminPwaEntryDestination } from '../src/domain/admin-pwa-entry'
 
 const source = readFileSync('public/admin/sw.js', 'utf8')
 type BrowserEvent = {
@@ -112,20 +113,32 @@ test('safe generic lockscreen payload, stable deduplication tag, explicit tests 
   await worker.push(null)
   expect(worker.shown.at(-1)?.title).toBe('Aroma Infini Admin')
   await worker.click('/admin/pedidos/AI-123')
-  expect(worker.opened).toEqual(['https://aroma.example/admin/pedidos/AI-123'])
+  expect(worker.opened).toEqual([
+    'https://aroma.example/admin/pedidos/AI-123?adminLaunch=notification',
+  ])
 })
 test('staging operational orders are explicitly identified and cannot inject a title, body or foreign destination', async () => {
   const worker = runtime()
   await worker.push({
-    kind: 'simulated_order', id: 'operation-123',
-    title: 'PRIVATE CUSTOMER', body: 'PRIVATE ADDRESS',
+    kind: 'simulated_order',
+    id: 'operation-123',
+    title: 'PRIVATE CUSTOMER',
+    body: 'PRIVATE ADDRESS',
     url: '/admin/pedidos/AI-STAGING-123',
   })
   expect(worker.shown[0].title).toBe('Aroma Infini — Pedido de prueba')
-  expect(worker.shown[0].options.body).toBe('Pedido de prueba AI-STAGING-123 recibido. Toca para revisar.')
-  expect(worker.shown[0].options.data).toEqual({ url: '/admin/pedidos/AI-STAGING-123' })
+  expect(worker.shown[0].options.body).toBe(
+    'Pedido de prueba AI-STAGING-123 recibido. Toca para revisar.',
+  )
+  expect(worker.shown[0].options.data).toEqual({
+    url: '/admin/pedidos/AI-STAGING-123',
+  })
   expect(JSON.stringify(worker.shown)).not.toContain('PRIVATE')
-  await worker.push({ kind: 'new_order', id: 'bad-url', url: '/admin/pedidos/../../logout?secret=PRIVATE' })
+  await worker.push({
+    kind: 'new_order',
+    id: 'bad-url',
+    url: '/admin/pedidos/../../logout?secret=PRIVATE',
+  })
   expect(JSON.stringify(worker.shown)).not.toContain('secret=')
   expect(worker.shown[1].options.data).toEqual({ url: '/admin/notificaciones' })
 })
@@ -148,7 +161,9 @@ test('click focuses/navigates existing admin window; malicious links remain insi
     },
   ])
   await worker.click('https://evil.example/steal')
-  expect(visited).toEqual(['https://aroma.example/admin/notificaciones'])
+  expect(visited).toEqual([
+    'https://aroma.example/admin/notificaciones?adminLaunch=notification',
+  ])
   expect(focused).toBe(true)
   expect(worker.opened).toHaveLength(0)
   await worker.push({ url: '/admin/pedidos/../../../logout' })
@@ -173,7 +188,9 @@ test('an order notification retains its detail destination in an already open ad
 
   await worker.click('/admin/pedidos/AI-123')
 
-  expect(visited).toEqual(['https://aroma.example/admin/pedidos/AI-123'])
+  expect(visited).toEqual([
+    'https://aroma.example/admin/pedidos/AI-123?adminLaunch=notification',
+  ])
   expect(focused).toBe(true)
   expect(worker.opened).toHaveLength(0)
 })
@@ -185,6 +202,7 @@ test('manifest scope/start and platform icons have correct actual dimensions', a
   expect(manifest.id).toBe('/admin/')
   expect(manifest.scope).toBe('/admin/')
   expect(manifest.start_url).toBe('/admin/resumen')
+  expect(manifest.launch_handler).toEqual({ client_mode: 'navigate-existing' })
   expect(manifest.start_url.startsWith(manifest.scope)).toBe(true)
   expect(manifest.display).toBe('standalone')
   expect(classifyRoute(manifest.start_url)).toBe('app')
@@ -201,5 +219,50 @@ test('manifest scope/start and platform icons have correct actual dimensions', a
       size,
       'png',
     ])
+  }
+})
+
+test('standalone reopening resets restored routes but consumes notification intent once without bypassing protected routes', () => {
+  const url = (path: string) => new URL(path, 'https://aroma.example')
+  for (const path of [
+    '/admin/productos',
+    '/admin/pedidos/AI-123',
+    '/admin/promociones?vista=ofertas',
+  ]) {
+    expect(adminPwaEntryDestination(url(path), true, false)).toBe(
+      '/admin/resumen',
+    )
+    expect(adminPwaEntryDestination(url(path), true, true)).toBeNull()
+    expect(adminPwaEntryDestination(url(path), false, false)).toBeNull()
+  }
+  const notification = url('/admin/pedidos/AI-123?adminLaunch=notification')
+  expect(adminPwaEntryDestination(notification, true, false)).toBe(
+    '/admin/pedidos/AI-123',
+  )
+  expect(adminPwaEntryDestination(notification, true, false)).toBe(
+    '/admin/resumen',
+  )
+  expect(
+    adminPwaEntryDestination(
+      url('/admin/notificaciones?adminLaunch=notification'),
+      true,
+      false,
+    ),
+  ).toBe('/admin/notificaciones')
+  expect(
+    adminPwaEntryDestination(
+      url('/admin/productos?adminLaunch=notification'),
+      true,
+      false,
+    ),
+  ).toBe('/admin/resumen')
+  for (const path of [
+    '/admin/login?returnTo=%2Fadmin%2Fpedidos%2FAI-123',
+    '/admin/recuperar',
+    '/mi-cuenta',
+    '/tienda',
+    '/administrator',
+  ]) {
+    expect(adminPwaEntryDestination(url(path), true, false)).toBeNull()
   }
 })

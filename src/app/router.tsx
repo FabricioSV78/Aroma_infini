@@ -23,6 +23,7 @@ import {
   catalogLoader,
   brandsLoader,
 } from '../features/catalog/catalog-loaders'
+import { adminPwaEntryDestination } from '../domain/admin-pwa-entry'
 
 const loadCatalogPage = publicRouteModules.catalog
 
@@ -44,6 +45,18 @@ let router: ReturnType<typeof createBrowserRouter> | undefined
 
 /** Route code can preload from HTML without starting loaders before hydration. */
 export function getRouter() {
+  if (!router && /^\/admin(?:\/|$)/.test(window.location.pathname)) {
+    const navigation = performance.getEntriesByType('navigation')[0] as
+      PerformanceNavigationTiming | undefined
+    const destination = adminPwaEntryDestination(
+      new URL(window.location.href),
+      window.matchMedia('(display-mode: standalone)').matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true,
+      navigation?.type === 'reload',
+    )
+    if (destination)
+      window.history.replaceState(window.history.state, '', destination)
+  }
   return (router ??= createBrowserRouter([
     {
       element: <StoreLayout />,

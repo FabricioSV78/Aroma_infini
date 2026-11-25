@@ -940,6 +940,38 @@ export const catalogAdminService = {
     const result = await savedProduct(response, current)
     return { ...result, ...(listContext ? { page: parseProductPage(object(object(response).page), current, listContext.limit) } : {}) }
   },
+  async deleteProduct(id: string, expectedVersion?: number): Promise<AdminSaveResult> {
+    if (!isRemoteCatalog) return local.deleteProduct(id)
+    const current = await actor()
+    try {
+      await command(
+        'admin_delete_product',
+        { p_id: id, p_expected_version: revision(expectedVersion) },
+        current,
+      )
+    } catch (error) {
+      if (error instanceof UserFacingError && error.code === 'referenced')
+        throw new UserFacingError(
+          'referenced',
+          'No se puede eliminar un producto vinculado a pedidos o recomendaciones. Retira las recomendaciones o desactívalo para ocultarlo conservando el historial de pedidos.',
+        )
+      if (error instanceof UserFacingError && error.code === 'network')
+        throw new UserFacingError(
+          'network',
+          'No pudimos confirmar la eliminación. Revisa el listado de productos antes de volver a intentarlo.',
+        )
+      throw error
+    }
+    await stillActor(current)
+    const snapshot = local.getSnapshot()
+    applyRemoteCatalog({
+      products: snapshot.products.filter((record) => record.product.id !== id),
+      brands: snapshot.brands,
+      features: snapshot.features,
+    })
+    invalidateSupabaseStorefront()
+    return { kind: 'saved' }
+  },
   async setProductActive(
     id: string,
     active: boolean,

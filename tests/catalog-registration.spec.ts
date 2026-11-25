@@ -148,6 +148,94 @@ test('Los registros nuevos conservan edición, desactivación y eliminación al 
   ).toBe(false)
 })
 
+test('La eliminación local protege pedidos y recomendaciones y persiste sin alterar otros contenidos', async ({
+  page,
+}) => {
+  await page.goto('/tienda')
+  await expect(page.locator('.catalog-toolbar [role="status"]')).toHaveText(
+    '15 productos',
+  )
+  const result = await page.evaluate(async () => {
+    const path = '/src/services/admin-service.ts'
+    const { adminService, hydrateAdminStore } = (await import(
+      path
+    )) as typeof import('../src/services/admin-service')
+    await hydrateAdminStore()
+    await adminService.flush()
+    const before = structuredClone(adminService.getSnapshot())
+    const orderedVariants = new Set(
+      before.orders.flatMap((order) => order.lines.map((line) => line.variantId)),
+    )
+    const ordered = before.products.find(({ product }) =>
+      product.variants.some((variant) => orderedVariants.has(variant.id)),
+    )
+    if (!ordered) throw new Error('The isolated fixture needs an ordered product.')
+    const rejectedOrder = adminService.deleteProduct(ordered.product.id)
+    const orderStateUnchanged = JSON.stringify(adminService.getSnapshot()) === JSON.stringify(before)
+    const clone = (id: string, recommendationIds: string[]) => {
+      const record = structuredClone(before.products[0])
+      return {
+        ...record,
+        active: true,
+        product: {
+          ...record.product,
+          id,
+          slug: id,
+          name: id,
+          sku: undefined,
+          variants: record.product.variants.map((variant, index) => ({
+            ...variant,
+            id: `${id}-${index}`,
+            sku: undefined,
+          })),
+        },
+        detail: { ...record.detail, recommendationIds },
+      }
+    }
+    const targetId = 'eliminacion-local-aislada'
+    const sourceId = 'recomendacion-local-aislada'
+    const createdTarget = adminService.saveProduct(clone(targetId, []))
+    const createdSource = adminService.saveProduct(clone(sourceId, [targetId]))
+    const beforeReference = JSON.stringify(adminService.getSnapshot())
+    const rejectedReference = adminService.deleteProduct(targetId)
+    const referenceStateUnchanged = JSON.stringify(adminService.getSnapshot()) === beforeReference
+    const removedSource = adminService.deleteProduct(sourceId)
+    const removedTarget = adminService.deleteProduct(targetId)
+    await adminService.flush()
+    return {
+      before,
+      after: adminService.getSnapshot(),
+      rejectedOrder,
+      orderStateUnchanged,
+      createdTarget,
+      createdSource,
+      rejectedReference,
+      referenceStateUnchanged,
+      removedSource,
+      removedTarget,
+      targetId,
+      sourceId,
+    }
+  })
+  expect(result.rejectedOrder).toMatchObject({ kind: 'validation' })
+  expect(result.orderStateUnchanged).toBe(true)
+  expect(result.createdTarget).toEqual({ kind: 'saved' })
+  expect(result.createdSource).toEqual({ kind: 'saved' })
+  expect(result.rejectedReference).toMatchObject({ kind: 'validation' })
+  expect(result.referenceStateUnchanged).toBe(true)
+  expect(result.removedSource).toEqual({ kind: 'saved' })
+  expect(result.removedTarget).toEqual({ kind: 'saved' })
+  expect(result.after.products).toEqual(result.before.products)
+  expect(unchangedSettings(result.after)).toEqual(unchangedSettings(result.before))
+  await page.reload()
+  const reloaded = await snapshot(page)
+  expect(reloaded).toEqual(result.after)
+  expect(reloaded.products.some(({ product }) =>
+    product.id === result.targetId || product.id === result.sourceId,
+  )).toBe(false)
+  await expect(page.locator('.catalog-toolbar [role="status"]')).toHaveText('15 productos')
+})
+
 test('La migración retira muestras anteriores, preserva productos y configuración y se ejecuta una sola vez', async ({
   page,
 }) => {

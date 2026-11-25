@@ -63,7 +63,7 @@ function response(value: unknown, status = 200) {
 }
 
 /** Both client and provider bodies are bounded, including undeclared streams. */
-async function readJson(
+async function readBody(
   input: Request | Response,
   maximum: number,
   signal: AbortSignal,
@@ -75,7 +75,7 @@ async function readJson(
   )
     throw invalid()
   const reader = input.body?.getReader()
-  if (!reader) throw invalid()
+  if (!reader) return new Uint8Array()
   const bodyReader = reader
   try {
     const chunks: Uint8Array[] = []
@@ -112,13 +112,22 @@ async function readJson(
       bytes.set(chunk, offset)
       offset += chunk.byteLength
     }
-    return JSON.parse(
-      new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes),
-    ) as unknown
+    return bytes
   } finally {
     void reader.cancel().catch(() => {})
     reader.releaseLock()
   }
+}
+
+async function readJson(
+  input: Request | Response,
+  maximum: number,
+  signal: AbortSignal,
+) {
+  const bytes = await readBody(input, maximum, signal)
+  return JSON.parse(
+    new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes),
+  ) as unknown
 }
 
 function base(env: AdminDeviceEnvironment) {
@@ -376,7 +385,11 @@ export function createAdminDeviceHandler(dependencies: Dependencies = {}) {
           Object.keys(body).length
         )
           throw invalid()
-      } else if (request.body !== null) throw invalid()
+      } else if (request.body !== null) {
+        // An incoming DELETE can have an empty stream instead of a null body.
+        // Reject actual bytes, not the transport's representation of no content.
+        await readBody(request, 0, AbortSignal.timeout(15000))
+      }
       const current = await actor(request, env)
       await limit(env, `admin-auth:user:${current.userId}`)
       if (register) {

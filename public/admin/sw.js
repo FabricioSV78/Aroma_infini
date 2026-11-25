@@ -115,7 +115,9 @@ self.addEventListener('push', (event) => {
 })
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = new URL(adminPath(event.notification.data?.url), self.location.origin).href
+  const destination = new URL(adminPath(event.notification.data?.url), self.location.origin)
+  destination.searchParams.set('adminLaunch', 'notification')
+  const url = destination.href
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const admin = windows.find((client) => {

@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useLocation, useRevalidator, useSearchParams } from 'react-router'
+import {
+  Link,
+  useLocation,
+  useRevalidator,
+  useSearchParams,
+} from 'react-router'
 import { useAdminListData } from './useAdminListData'
-import type { AdminOrderList, AdminOrderSelection } from '../../types/admin-lists'
-import { adminListPage, adminOrderListQuery } from '../../domain/admin-list-query'
+import type {
+  AdminOrderList,
+  AdminOrderSelection,
+} from '../../types/admin-lists'
+import {
+  adminListPage,
+  adminOrderListQuery,
+} from '../../domain/admin-list-query'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
 import { getPeruDistrictLabel, getPeruProvinceLabel } from '../../content/peru'
@@ -84,13 +95,16 @@ export function AdminOrdersPage() {
   const persistence = useAdminSave({ catalog: true })
   const state = useAdminStore()
   const routed = useAdminListData<AdminOrderList>()
-  const [confirmedPage, setConfirmedPage] = useState<{ base: AdminOrderList; page: AdminOrderList } | null>(null)
+  const [confirmedPage, setConfirmedPage] = useState<{
+    base: AdminOrderList
+    page: AdminOrderList
+  } | null>(null)
   const remote = confirmedPage?.base === routed ? confirmedPage.page : routed
   const revalidator = useRevalidator()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const [dateFiltersOpen, setDateFiltersOpen] = useState(
-    () => Boolean(params.get('desde') || params.get('hasta')),
+  const [dateFiltersOpen, setDateFiltersOpen] = useState(() =>
+    Boolean(params.get('desde') || params.get('hasta')),
   )
   const selectionScopeParams = new URLSearchParams(params)
   selectionScopeParams.delete('page')
@@ -104,7 +118,11 @@ export function AdminOrdersPage() {
       ? selectionState.items
       : new Map<string, AdminOrderStatus>()
   if (selectionState.scope !== selectionScope) {
-    setSelectionState({ scope: selectionScope, items: new Map(), records: new Map() })
+    setSelectionState({
+      scope: selectionScope,
+      items: new Map(),
+      records: new Map(),
+    })
   }
 
   function setSelection(
@@ -116,14 +134,24 @@ export function AdminOrdersPage() {
     additional: readonly AdminOrderSelection[] = [],
   ) {
     setSelectionState((current) => {
-      const items = typeof next === 'function'
-        ? next(current.scope === selectionScope ? current.items : new Map()) : next
+      const items =
+        typeof next === 'function'
+          ? next(current.scope === selectionScope ? current.items : new Map())
+          : next
       const known = new Map([
         ...(current.scope === selectionScope ? current.records : []),
-        ...(remote?.orders ?? state.orders).map(order => [order.reference, order] as const),
-        ...additional.map(order => [order.reference, order] as const),
+        ...(remote?.orders ?? state.orders).map(
+          (order) => [order.reference, order] as const,
+        ),
+        ...additional.map((order) => [order.reference, order] as const),
       ])
-      return { scope: selectionScope, items, records: new Map([...known].filter(([reference]) => items.has(reference))) }
+      return {
+        scope: selectionScope,
+        items,
+        records: new Map(
+          [...known].filter(([reference]) => items.has(reference)),
+        ),
+      }
     })
   }
   const [error, setError] = useState('')
@@ -146,11 +174,24 @@ export function AdminOrdersPage() {
       if (refreshFrame !== null) return
       refreshFrame = window.requestAnimationFrame(() => {
         refreshFrame = null
-        if (!active || document.visibilityState !== 'visible' || busyRef.current) return
+        if (
+          !active ||
+          document.visibilityState !== 'visible' ||
+          busyRef.current
+        )
+          return
         const expectedRead = ++pageReadRevision.current
-        void (routed ? readAdminOrderList(adminOrderListQuery(params), adminListPage(params)).then(page => {
-          if (active && expectedRead === pageReadRevision.current) setConfirmedPage({ base: routed, page })
-        }) : loadAdminOrders(true)).catch(() => {
+        void (
+          routed
+            ? readAdminOrderList(
+                adminOrderListQuery(params),
+                adminListPage(params),
+              ).then((page) => {
+                if (active && expectedRead === pageReadRevision.current)
+                  setConfirmedPage({ base: routed, page })
+              })
+            : loadAdminOrders(true)
+        ).catch(() => {
           if (active && expectedRead === pageReadRevision.current)
             setError(
               'No pudimos actualizar la lista. Conservamos los pedidos confirmados; vuelve a abrir este apartado para intentar de nuevo.',
@@ -168,12 +209,17 @@ export function AdminOrdersPage() {
     }
   }, [routed, params])
   const [feedback, setFeedback] = useState<OrderActionFeedback | null>(null)
-  const [localReviewReferences, setLocalReviewReferences] = useState<string[] | null>(
-    null,
-  )
-  const reviewReferences = remote ? params.get('revisar')?.split(',') ?? null : localReviewReferences
+  const [localReviewReferences, setLocalReviewReferences] = useState<
+    string[] | null
+  >(null)
+  const reviewReferences = remote
+    ? (params.get('revisar')?.split(',') ?? null)
+    : localReviewReferences
   function setReviewReferences(references: string[] | null) {
-    if (!remote) { setLocalReviewReferences(references); return }
+    if (!remote) {
+      setLocalReviewReferences(references)
+      return
+    }
     const next = new URLSearchParams(params)
     next.delete('page')
     if (references) next.set('revisar', references.join(','))
@@ -211,7 +257,8 @@ export function AdminOrdersPage() {
   const selectedCustomer = remote?.customer ?? customerById.get(customerFilter)
   const normalizedSearch = orderSearchText(search)
   const orders = useMemo(
-    () => remote?.orders ??
+    () =>
+      remote?.orders ??
       [...state.orders]
         .filter((order) => {
           if (reviewReferences)
@@ -267,12 +314,13 @@ export function AdminOrdersPage() {
   const somePageSelected = pagination.items.some((order) =>
     selection.has(order.reference),
   )
-  const allFilteredSelected =
-    total > 0 && selection.size === total
+  const allFilteredSelected = total > 0 && selection.size === total
   const returnTo = `${location.pathname}${location.search}`
   const knownOrders = new Map([
     ...selectionState.records,
-    ...(remote?.orders ?? state.orders).map(order => [order.reference, order] as const),
+    ...(remote?.orders ?? state.orders).map(
+      (order) => [order.reference, order] as const,
+    ),
   ])
   const actionOrders =
     statusAction?.references.flatMap((reference) => {
@@ -384,7 +432,15 @@ export function AdminOrdersPage() {
             deliveryConfirmed,
             expectedVersions: statusAction.expectedVersions,
             operationId: statusAction.operationId,
-            ...(remote ? { listContext: { query: adminOrderListQuery(params), page: adminListPage(params), limit: 20 } } : {}),
+            ...(remote
+              ? {
+                  listContext: {
+                    query: adminOrderListQuery(params),
+                    page: adminListPage(params),
+                    limit: 20,
+                  },
+                }
+              : {}),
           },
         )
         if (result.kind === 'validation') {
@@ -392,7 +448,8 @@ export function AdminOrdersPage() {
           return
         }
         setStatusAction(null)
-        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
+        if (routed && result.page)
+          setConfirmedPage({ base: routed, page: result.page })
         await saveFeedback(
           `Pedido ${reference}: ${adminOrderStatusMeta[targetStatus].label.toLowerCase()}.`,
         )
@@ -406,7 +463,15 @@ export function AdminOrdersPage() {
             deliveryConfirmed,
             expectedVersions: statusAction.expectedVersions,
             operationId: statusAction.operationId,
-            ...(remote ? { listContext: { query: adminOrderListQuery(params), page: adminListPage(params), limit: 20 } } : {}),
+            ...(remote
+              ? {
+                  listContext: {
+                    query: adminOrderListQuery(params),
+                    page: adminListPage(params),
+                    limit: 20,
+                  },
+                }
+              : {}),
           },
         )
         if (result.kind === 'validation') {
@@ -421,7 +486,8 @@ export function AdminOrdersPage() {
         setFeedback(report)
         setSelection(new Map())
         setStatusAction(null)
-        if (routed && result.page) setConfirmedPage({ base: routed, page: result.page })
+        if (routed && result.page)
+          setConfirmedPage({ base: routed, page: result.page })
         await saveFeedback(
           `${result.updated.length} de ${statusAction.references.length} pedidos actualizados.`,
           result.errors.length || result.skipped.length
@@ -475,15 +541,27 @@ export function AdminOrdersPage() {
   }
 
   async function selectAllFiltered() {
-    if (!remote) { setSelection(new Map(orders.map(order => [order.reference, order.status]))); return }
+    if (!remote) {
+      setSelection(
+        new Map(orders.map((order) => [order.reference, order.status])),
+      )
+      return
+    }
     if (busyRef.current) return
     busyRef.current = true
     setBusy(true)
     try {
       const rows = await readAdminOrderSelection(adminOrderListQuery(params))
-      setSelection(new Map(rows.map(order => [order.reference, order.status])), rows)
-    } catch (cause) { notice.error(cause, 'orders') }
-    finally { busyRef.current = false; setBusy(false) }
+      setSelection(
+        new Map(rows.map((order) => [order.reference, order.status])),
+        rows,
+      )
+    } catch (cause) {
+      notice.error(cause, 'orders')
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
   }
 
   async function openExport(references: string[]) {
@@ -493,8 +571,12 @@ export function AdminOrdersPage() {
     try {
       await loadAdminOrdersByReferences(references)
       setExportReferences(references)
-    } catch (cause) { notice.error(cause, 'orders') }
-    finally { busyRef.current = false; setBusy(false) }
+    } catch (cause) {
+      notice.error(cause, 'orders')
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
   }
 
   return (
@@ -562,7 +644,11 @@ export function AdminOrdersPage() {
           ) : null}
         </div>
       ) : null}
-      {(remote ? Object.values(remote.counts).some(count => count > 0) : state.orders.length > 0) ? (
+      {(
+        remote
+          ? Object.values(remote.counts).some((count) => count > 0)
+          : state.orders.length > 0
+      ) ? (
         <section
           className="admin-order-summary"
           aria-label="Resumen de pedidos"
@@ -583,7 +669,11 @@ export function AdminOrdersPage() {
                   : adminOrderStatusMeta[status].label}
               </AdminBadge>
               <strong>
-                {(status === 'cancelled' || status === 'expired' ? undefined : remote?.counts[status]) ?? state.orders.filter((order) => order.status === status).length}
+                {(status === 'cancelled' || status === 'expired'
+                  ? undefined
+                  : remote?.counts[status]) ??
+                  state.orders.filter((order) => order.status === status)
+                    .length}
               </strong>
             </Link>
           ))}
@@ -635,14 +725,22 @@ export function AdminOrdersPage() {
             Filtrar por fecha{from || until ? ' · Activo' : ''}
             <Icon name="chevron" aria-hidden="true" />
           </button>
-          <div id="admin-order-date-fields" className={`admin-order-date-fields${dateFiltersOpen ? ' is-open' : ''}`}>
+          <div
+            id="admin-order-date-fields"
+            className={`admin-order-date-fields${dateFiltersOpen ? ' is-open' : ''}`}
+          >
             <label>
               Desde
               <input type="date" name="desde" key={from} defaultValue={from} />
             </label>
             <label>
               Hasta
-              <input type="date" name="hasta" key={until} defaultValue={until} />
+              <input
+                type="date"
+                name="hasta"
+                key={until}
+                defaultValue={until}
+              />
             </label>
           </div>
           <button
@@ -755,7 +853,10 @@ export function AdminOrdersPage() {
                         })
                       }}
                     />
-                    <span className="admin-order-page-select-text" aria-hidden="true">
+                    <span
+                      className="admin-order-page-select-text"
+                      aria-hidden="true"
+                    >
                       Seleccionar esta página
                       <small>{pagination.items.length} pedidos</small>
                     </span>
@@ -775,7 +876,8 @@ export function AdminOrdersPage() {
                 const paymentStatus =
                   adminPaymentStatusMeta[order.paymentStatus]
                 const currentStep = ORDER_STATUSES.indexOf(order.status)
-                const nextStatus = currentStep < 0 ? undefined : ORDER_STATUSES[currentStep + 1]
+                const nextStatus =
+                  currentStep < 0 ? undefined : ORDER_STATUSES[currentStep + 1]
                 const customer = customerById.get(order.customerId)
                 const deliveryReady = hasCompleteOrderDelivery(
                   order,
@@ -849,7 +951,9 @@ export function AdminOrdersPage() {
                     <td>
                       <span className="admin-cell-label">Pago</span>
                       <AdminBadge tone={paymentStatus.tone}>
-                        {paymentStatus.label}
+                        {order.simulation
+                          ? 'Prueba sin cobro'
+                          : paymentStatus.label}
                       </AdminBadge>
                     </td>
                     <td>

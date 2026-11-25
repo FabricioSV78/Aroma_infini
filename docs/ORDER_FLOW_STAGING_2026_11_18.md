@@ -1,5 +1,54 @@
 # Pedidos, reservas, dashboard y push — staging
 
+## Actualización vigente — 24 de noviembre de 2026
+
+Los **15 minutos corresponden al plazo para pagar un intento pendiente**,
+no al tiempo para preparar, enviar o entregar una compra confirmada.
+El informe histórico de abajo describe la reserva original; el checkout de
+prueba actual utiliza la confirmación simulada detallada aquí.
+
+Al terminar el checkout en staging, `api.create_confirmed_simulated_order`
+valida el mismo carrito, precios, disponibilidad, identidad e idempotencia,
+confirma la simulación y descuenta inventario físico en una sola transacción.
+La reserva queda `consumed`, con `simulation_confirmed_at` como auditoría.
+El pedido conserva `simulation=true`, `payment_status=pending` y
+`payment_verified_at=null`: no representa un pago aprobado ni una venta real.
+El panel lo identifica como **Prueba sin cobro**.
+
+- **Nuevo → En preparación → Enviado → Entregado:** sin vencimiento por el
+  plazo de pago. Se mantienen la secuencia, datos de entrega y confirmaciones.
+- **Cancelar antes del envío:** devuelve el stock una sola vez y cierra el
+  consumo como `released`. No publica automáticamente productos desactivados.
+- **Reintentar:** conserva el pedido y no vuelve a descontar inventario ni a
+  crear un evento de notificación.
+- **Intento pendiente:** la RPC anterior conserva las reservas de 15 minutos
+  y su liberación. El cron no vence consumos ya confirmados.
+- **Pedido histórico con reserva vencida:** no se reactiva ni consume stock
+  automáticamente; se explica la causa y se solicita una prueba nueva.
+
+Migración adicional: `20261124000100_confirmed_checkout_simulation.sql`,
+aplicada exclusivamente en desarrollo. Conserva RLS/MFA, permisos de navegador
+y datos históricos. La nueva RPC solo puede ejecutarla el servidor. Las
+restricciones diferidas de catálogo se validan antes de devolver el control al
+solicitante, y las cancelaciones masivas bloquean pedidos, productos y variantes
+en un orden global para evitar ciclos de espera entre lotes.
+
+Validación: **1.174 comprobaciones SQL**, 40 contratos de comercio/Worker,
+30 pruebas de checkout y 44 de pedidos aprobadas; TypeScript, ESLint, build y
+empaquetado correctos. Se verificó con Chrome y servicios reales: compra móvil,
+stock 3→2, reintento sin otro descuento, preparación/envío/entrega con la fecha
+de reserva de un fixture colocada más de 15 minutos atrás, cancelación 1→2 una
+sola vez, dos solicitudes simultáneas por la última unidad con una sola
+confirmación y un evento de notificación por pedido. Se retiraron únicamente
+los fixtures identificados. La prueba del plazo utiliza datos temporales
+controlados; no se presenta como una espera real de quince minutos.
+
+Versión activa de staging: `0dd93a6d-780b-4b6e-9c19-da1fb11c7954`.
+Nueve hashes publicados verificados; producción sin cambios. Evidencias:
+`artifacts/confirmed-order-flow-2026-11-24/`. Sin cambios de diseño ni cobros.
+
+## Informe histórico del 18 de noviembre
+
 18 de noviembre de 2026, America/Lima. Pruebas alojadas y cambios exclusivamente en desarrollo/staging. Sin cobros, compras comerciales, cambios en producción, commit ni push. Se conservaron los cambios de trabajo previos.
 
 ## Resultado

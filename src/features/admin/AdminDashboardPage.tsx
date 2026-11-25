@@ -79,20 +79,30 @@ export function AdminDashboardPage() {
   const activeBrandIds = new Set(
     state.brands.filter((brand) => brand.active).map((brand) => brand.id),
   )
-  const activeProducts = remote ? [] : state.products.filter(
-    (record) => record.active && activeBrandIds.has(record.product.brandId),
-  )
-  const inventoryAlerts = remote ? remote.alerts.map(item => ({ ...item,
-    tone: item.stock === 0 ? 'danger' as const : 'warning' as const,
-  })) : getInventoryAlerts(state.products)
+  const activeProducts = remote
+    ? []
+    : state.products.filter(
+        (record) => record.active && activeBrandIds.has(record.product.brandId),
+      )
+  const inventoryAlerts = remote
+    ? remote.alerts.map((item) => ({
+        ...item,
+        tone: item.stock === 0 ? ('danger' as const) : ('warning' as const),
+      }))
+    : getInventoryAlerts(state.products)
   const alertCount = remote?.alertCount ?? inventoryAlerts.length
-  const totalStock = remote?.stock ?? activeProducts.reduce(
-    (total, record) => total + getProductInventory(record).totalStock,
-    0,
-  )
+  const totalStock =
+    remote?.stock ??
+    activeProducts.reduce(
+      (total, record) => total + getProductInventory(record).totalStock,
+      0,
+    )
   const ordersToPrepare = operationalOrders.filter(
     (order) =>
-      (order.paymentStatus === 'approved' || (includeSimulation && order.simulation && order.paymentStatus === 'pending')) &&
+      (order.paymentStatus === 'approved' ||
+        (includeSimulation &&
+          order.simulation &&
+          order.paymentStatus === 'pending')) &&
       ['received', 'preparing'].includes(order.status),
   )
   const shipmentsInProgress = operationalOrders.filter(
@@ -111,7 +121,9 @@ export function AdminDashboardPage() {
     {
       label: 'Pedidos por preparar',
       value: remote?.toPrepare ?? ordersToPrepare.length,
-      detail: includeSimulation ? 'Nuevos y en preparación' : 'Aprobados y aún no enviados',
+      detail: includeSimulation
+        ? 'Nuevos y en preparación'
+        : 'Aprobados y aún no enviados',
       action: 'Ver pedidos',
       to: '/admin/pedidos?preparacion=atencion',
       icon: 'orders',
@@ -124,7 +136,11 @@ export function AdminDashboardPage() {
       action: 'Ver alertas',
       to: '/admin/productos?stock=alert',
       icon: 'alert',
-      tone: (remote ? remote.outAlertCount > 0 : inventoryAlerts.some((item) => item.tone === 'danger'))
+      tone: (
+        remote
+          ? remote.outAlertCount > 0
+          : inventoryAlerts.some((item) => item.tone === 'danger')
+      )
         ? 'danger'
         : alertCount
           ? 'warning'
@@ -138,7 +154,10 @@ export function AdminDashboardPage() {
       ariaLabel: 'Envíos en curso: ver detalle',
       to: '/admin/pedidos?preparacion=shipped',
       icon: 'truck',
-      tone: (remote?.counts.shipped ?? shipmentsInProgress.length) ? 'info' : 'success',
+      tone:
+        (remote?.counts.shipped ?? shipmentsInProgress.length)
+          ? 'info'
+          : 'success',
     },
     {
       label: 'Unidades disponibles',
@@ -379,7 +398,9 @@ export function AdminDashboardPage() {
                     className="admin-order-payment"
                   >
                     <span className="sr-only">Pago: </span>
-                    {paymentStatus.label}
+                    {order.simulation
+                      ? 'Prueba sin cobro'
+                      : paymentStatus.label}
                   </AdminBadge>
                   <strong className="admin-order-total">
                     <span className="sr-only">Total: </span>
@@ -398,7 +419,9 @@ export function AdminDashboardPage() {
           </ul>
         ) : (
           <p className="admin-dashboard-empty">
-            {includeSimulation ? 'Todavía no hay pedidos.' : 'Todavía no hay pedidos comerciales.'}
+            {includeSimulation
+              ? 'Todavía no hay pedidos.'
+              : 'Todavía no hay pedidos comerciales.'}
           </p>
         )}
       </section>

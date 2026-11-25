@@ -304,22 +304,41 @@ export function createCheckoutHandler(transport: typeof fetch = fetch) {
         // A verified administrative Auth session is not a customer identity.
         // Check the same signed credential against protected membership; never
         // use browser role flags or treat a rejected identity as guest checkout.
-        const actorResponse = await transport(`${base.origin}/rest/v1/rpc/current_actor`, {
-          method: 'POST',
-          headers: {
-            apikey: env.SUPABASE_PUBLISHABLE_KEY,
-            Authorization: authorization,
-            'Content-Type': 'application/json',
-            'Content-Profile': 'api',
-            'Accept-Profile': 'api',
+        const actorResponse = await transport(
+          `${base.origin}/rest/v1/rpc/current_actor`,
+          {
+            method: 'POST',
+            headers: {
+              apikey: env.SUPABASE_PUBLISHABLE_KEY,
+              Authorization: authorization,
+              'Content-Type': 'application/json',
+              'Content-Profile': 'api',
+              'Accept-Profile': 'api',
+            },
+            body: '{}',
+            signal: authSignal,
+            redirect: 'manual',
           },
-          body: '{}', signal: authSignal, redirect: 'manual',
-        })
-        const actor = await readProviderJson(actorResponse, authSignal, 128 * 1024)
-        if (!actorResponse.ok || !actor || typeof actor !== 'object' ||
-          !('user_id' in actor) || actor.user_id !== userId ||
-          !('role' in actor) || actor.role !== 'customer')
-          throw new CheckoutError(403, 'session', 'Inicia sesión con tu cuenta de cliente antes de continuar.')
+        )
+        const actor = await readProviderJson(
+          actorResponse,
+          authSignal,
+          128 * 1024,
+        )
+        if (
+          !actorResponse.ok ||
+          !actor ||
+          typeof actor !== 'object' ||
+          !('user_id' in actor) ||
+          actor.user_id !== userId ||
+          !('role' in actor) ||
+          actor.role !== 'customer'
+        )
+          throw new CheckoutError(
+            403,
+            'session',
+            'Inicia sesión con tu cuenta de cliente antes de continuar.',
+          )
       }
       const body = await readJson(request)
       if (
@@ -350,7 +369,7 @@ export function createCheckoutHandler(transport: typeof fetch = fetch) {
         AbortSignal.timeout(20000),
       ])
       const confirmed = await transport(
-        `${base.origin}/rest/v1/rpc/create_simulated_order`,
+        `${base.origin}/rest/v1/rpc/create_confirmed_simulated_order`,
         {
           method: 'POST',
           headers,
@@ -408,11 +427,16 @@ export function createCheckoutHandler(transport: typeof fetch = fetch) {
       // task, never part of payment/stock confirmation or its success response.
       const order = value.order
       if (
-        afterCommit && order && typeof order === 'object' && 'id' in order &&
+        afterCommit &&
+        order &&
+        typeof order === 'object' &&
+        'id' in order &&
         typeof order.id === 'string' &&
         /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(order.id)
       ) {
-        try { afterCommit(order.id) } catch {
+        try {
+          afterCommit(order.id)
+        } catch {
           console.warn({ event: 'order_push_dispatch_schedule_failed' })
         }
       }

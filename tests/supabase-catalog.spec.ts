@@ -460,6 +460,18 @@ const test = authTest.extend<{ catalogNetwork: CatalogNetwork }>({
             : [...state.products, record]
           productVersions.set(record.product.id, version)
           await reply({ record, version, ...(name === 'admin_save_product_page' ? { page: adminListFixture('admin_product_list', body, { products: state.products, brands: state.brands, productVersions, features: { complementsEnabled: state.complementsEnabled } }) } : {}) })
+        } else if (name === 'admin_delete_product') {
+          const id = String(body.p_id)
+          if (body.p_expected_version !== productVersions.get(id)) {
+            await reply(
+              { code: 'PT409', message: 'Stale isolated fixture version' },
+              409,
+            )
+            return
+          }
+          state.products = state.products.filter(({ product }) => product.id !== id)
+          productVersions.delete(id)
+          await route.fulfill({ status: 204, headers })
         } else if (name === 'admin_save_offer') {
           const record = state.products.find(
             ({ product }) => product.id === body.p_product_id,
@@ -1727,6 +1739,106 @@ test('el administrador edita con AAL2, recibe versión canónica y la tienda ref
   await expect(page.locator('.product-card')).toContainText(
     'Fleur de Test Actualizada',
   )
+})
+
+test('eliminar producto pide confirmación y cancelar no ejecuta consultas de escritura', async ({
+  page,
+  supabaseNetwork,
+  catalogNetwork,
+}) => {
+  await signInAdmin(page, supabaseNetwork)
+  await page.goto(`/admin/productos/${remoteProductId}`)
+  await page.getByRole('button', { name: 'Eliminar producto', exact: true }).click()
+  const confirmation = page.locator('.admin-notice-dialog')
+  await expect(confirmation).toContainText('Fleur de Test')
+  await confirmation.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(confirmation).not.toBeVisible()
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Fleur de Test')
+  expect(catalogNetwork.calls.filter(({ name }) => name === 'admin_delete_product')).toHaveLength(0)
+  expect(catalogNetwork.products).toHaveLength(1)
+  await page.goto('/admin/productos/nuevo')
+  await expect(page.getByRole('button', { name: 'Guardar producto', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Eliminar producto', exact: true })).toHaveCount(0)
+})
+
+test('eliminar producto confirma una sola RPC versionada y actualiza el listado sin descargar el catálogo', async ({
+  page,
+  supabaseNetwork,
+  catalogNetwork,
+}) => {
+  await signInAdmin(page, supabaseNetwork)
+  await page.goto(`/admin/productos/${remoteProductId}`)
+  await page.getByLabel('Nombre', { exact: true }).fill('Borrador que se eliminará')
+  let release = () => {}
+  catalogNetwork.holdWrite = new Promise<void>((resolve) => { release = resolve })
+  try {
+    await page.getByRole('button', { name: 'Eliminar producto', exact: true }).click()
+    await page.locator('.admin-notice-dialog')
+      .getByRole('button', { name: 'Eliminar producto', exact: true })
+      .evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
+    await expect.poll(() => catalogNetwork.calls.filter(({ name }) => name === 'admin_delete_product').length).toBe(1)
+    await expect(page).toHaveURL(`/admin/productos/${remoteProductId}`)
+    expect(catalogNetwork.products).toHaveLength(1)
+  } finally {
+    catalogNetwork.holdWrite = null
+    release()
+  }
+  await expect(page).toHaveURL(/\/admin\/productos(?:\?|$)/)
+  await expect(page.locator('.admin-products-page')).not.toContainText('Fleur de Test')
+  const calls = catalogNetwork.calls.filter(({ name }) => name === 'admin_delete_product')
+  expect(calls).toHaveLength(1)
+  expect(calls[0].body).toEqual({ p_id: remoteProductId, p_expected_version: 1 })
+  expect(calls[0].authorization).toMatch(/^Bearer /)
+  expect(catalogNetwork.products).toHaveLength(0)
+  expect(await clientProducts(page)).toEqual([])
+  expect(catalogNetwork.calls.filter(({ name }) => name === 'admin_catalog_page')).toHaveLength(0)
+  await page.goto('/tienda')
+  await expect(page.locator('.product-card')).toHaveCount(0)
+})
+
+for (const failure of [
+  { code: '23503', status: 409, expected: /asociado|pedidos|referencias/i },
+  { code: 'PT409', status: 409, expected: /modificó|versión|actualiz/i },
+]) {
+  test(`eliminar producto conserva el borrador y los datos al rechazar ${failure.code}`, async ({
+    page,
+    supabaseNetwork,
+    catalogNetwork,
+  }) => {
+    await signInAdmin(page, supabaseNetwork)
+    await page.goto(`/admin/productos/${remoteProductId}`)
+    await page.getByLabel('Nombre', { exact: true }).fill('Borrador conservado')
+    catalogNetwork.writeError = { code: failure.code, status: failure.status, message: 'Isolated protected deletion rejected' }
+    await page.getByRole('button', { name: 'Eliminar producto', exact: true }).click()
+    await page.locator('.admin-notice-dialog').getByRole('button', { name: 'Eliminar producto', exact: true }).click()
+    await expect(page.locator('.admin-notice-dialog')).toContainText(failure.expected)
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.admin-notice-dialog')).not.toBeVisible()
+    await expect(page).toHaveURL(`/admin/productos/${remoteProductId}`)
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Borrador conservado')
+    expect(catalogNetwork.products[0].product.name).toBe('Fleur de Test')
+    expect(catalogNetwork.calls.filter(({ name }) => name === 'admin_delete_product')).toHaveLength(1)
+    await expect(page.getByRole('button', { name: 'Eliminar producto', exact: true })).toBeEnabled()
+  })
+}
+
+test('eliminar producto permanece accesible sin desbordamiento en móvil', async ({
+  page,
+  supabaseNetwork,
+  catalogNetwork,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 })
+  await signInAdmin(page, supabaseNetwork)
+  await page.goto(`/admin/productos/${remoteProductId}`)
+  const action = page.getByRole('button', { name: 'Eliminar producto', exact: true })
+  await action.scrollIntoViewIfNeeded()
+  await expect(action).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  await action.click()
+  await expect(page.locator('.admin-notice-dialog')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+  await page.locator('.admin-notice-dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
+  expect(catalogNetwork.calls.filter(({ name }) => name === 'admin_delete_product')).toHaveLength(0)
 })
 
 test('un error de validación remota conserva el borrador y no confirma un cambio inexistente', async ({
