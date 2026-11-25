@@ -4,6 +4,7 @@ import {
   customerA,
   customerB,
   expect,
+  fixtureAdminStorageKey,
   fixtureEmail,
   fixturePassword,
   installNetwork,
@@ -148,6 +149,20 @@ async function passwordLogin(page: Page, email = fixtureEmail) {
     .click()
 }
 
+async function signOutPanel(page: Page) {
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await expect(page).toHaveURL(
+    (url) => url.origin === origin && url.pathname === '/admin/login',
+  )
+  // The panel hides private data immediately. A new document must wait until
+  // the SDK has removed the previous session from storage.
+  await expect
+    .poll(() =>
+      page.evaluate((key) => localStorage.getItem(key) === null, fixtureAdminStorageKey),
+    )
+    .toBe(true)
+}
+
 async function verify(page: Page) {
   await page
     .getByLabel('Código de verificación', { exact: true })
@@ -204,7 +219,7 @@ test('recuerda 60 días con cookie protegida; volver a entrar exige contraseña 
       }),
     ),
   ).not.toContain('server-only-secret')
-  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await signOutPanel(page)
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
   expect(
     supabaseNetwork.requests.find((item) => item.path === '/auth/v1/logout')
@@ -282,9 +297,7 @@ for (const reason of ['expired', 'revoked', 'other-account'] as const) {
     await securePanel(context, supabaseNetwork, state)
     await passwordLogin(page)
     await verify(page)
-    await page
-      .getByRole('button', { name: 'Cerrar sesión', exact: true })
-      .click()
+    await signOutPanel(page)
     if (reason === 'expired')
       state.devices[0].expires_at = new Date(Date.now() - 1000).toISOString()
     if (reason === 'revoked') state.devices[0].revoked = true
@@ -368,9 +381,7 @@ test('un primer QR se inscribe una vez y dos administradores conservan sesiones 
     expect(await accountIn(otherPage)).toBe(customerB)
     await page.reload()
     await expect(page.locator('.admin-sidebar')).toBeVisible()
-    await otherPage
-      .getByRole('button', { name: 'Cerrar sesión', exact: true })
-      .click()
+    await signOutPanel(otherPage)
     await expect(
       otherPage.getByLabel('Contraseña', { exact: true }),
     ).toBeVisible()
@@ -472,9 +483,7 @@ for (const remembered of [false, true]) {
     await passwordLogin(page)
     await verify(page)
     if (remembered) {
-      await page
-        .getByRole('button', { name: 'Cerrar sesión', exact: true })
-        .click()
+      await signOutPanel(page)
       await passwordLogin(page)
       await expect(page).toHaveURL(`${origin}/admin`)
     }
@@ -507,9 +516,7 @@ for (const remembered of [false, true]) {
           exact: true,
         }),
       ).toBeVisible()
-      await page
-        .getByRole('button', { name: 'Cerrar sesión', exact: true })
-        .click()
+      await signOutPanel(page)
       await passwordLogin(page)
       await expect(
         page.getByLabel('Código de verificación', { exact: true }),
@@ -541,7 +548,7 @@ test('una sesión de confianza AAL1 queda limitada por su fecha y un rechazo de 
   await securePanel(context, supabaseNetwork, state)
   await passwordLogin(page)
   await verify(page)
-  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await signOutPanel(page)
   const expiry = new Date(Date.now() + 60000).toISOString()
   state.devices[0].expires_at = expiry
   await passwordLogin(page)

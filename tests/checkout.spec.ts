@@ -370,7 +370,7 @@ test('Invitado: datos, entrega, promoción, rechazo, error, aprobación y confir
   await expect(page.getByText(trackingHref!.split('codigo=')[1])).toHaveCount(0)
 })
 
-test('El pedido simulado se refleja en administración y seguimiento sin aprobar pago ni consumir inventario', async ({
+test('El pedido simulado local se identifica sin cobro y conserva el pago pendiente y el stock', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -409,8 +409,21 @@ test('El pedido simulado se refleja en administración y seguimiento sin aprobar
   const orderRow = page.locator('.admin-table tbody tr')
   await expect(orderRow).toHaveCount(1)
   await expect(orderRow).toContainText('Lucía Compradora')
-  await expect(orderRow).toContainText('Pago pendiente')
+  await expect(
+    orderRow.getByText('Prueba sin cobro', { exact: true }),
+  ).toBeVisible()
   await expect(orderRow).toContainText('Modo prueba')
+  const payment = await page.evaluate(async (reference) => {
+    const path = '/src/services/admin-service.ts'
+    const { adminService } = (await import(
+      path
+    )) as typeof import('../src/services/admin-service')
+    const order = adminService
+      .getSnapshot()
+      .orders.find((item) => item.reference === reference)
+    return { simulation: order?.simulation, paymentStatus: order?.paymentStatus }
+  }, reference)
+  expect(payment).toEqual({ simulation: true, paymentStatus: 'pending' })
 
   await orderRow
     .getByRole('link', { name: new RegExp(`Ver ${reference}`) })
